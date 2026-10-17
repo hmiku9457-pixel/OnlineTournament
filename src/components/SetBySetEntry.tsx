@@ -41,9 +41,11 @@ interface SetBySetEntryProps {
   onSaved?: () => void;
   onCompleted?: (sets: MatchSet[]) => void;
   compact?: boolean;
+  sideARecord?: string;
+  sideBRecord?: string;
 }
 
-export function SetBySetEntry({ match, onSaved, onCompleted, compact = false }: SetBySetEntryProps) {
+export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, sideARecord, sideBRecord }: SetBySetEntryProps) {
   const [playedSets, setPlayedSets] = useState<MatchSet[]>(match.sets ?? []);
   const [currentValue, setCurrentValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -89,9 +91,9 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false }: 
   return (
     <div className={compact ? 'set-by-set-entry compact' : 'set-by-set-entry'}>
       <div className="set-entry-scoreline">
-        <span>{match.sideA}</span>
+        <span>{match.sideA}{sideARecord && <em className="swiss-record">{sideARecord}</em>}</span>
         <strong>{wins.a}:{wins.b}</strong>
-        <span>{match.sideB}</span>
+        <span>{match.sideB}{sideBRecord && <em className="swiss-record">{sideBRecord}</em>}</span>
       </div>
 
       {playedSets.length > 0 && (

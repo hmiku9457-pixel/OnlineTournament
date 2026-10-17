@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getMockPlayerSnapshot, getMockRuntimeMatches } from '@/services/mockRuntime';
+import { buildSwissStandings } from '@/services/mockCompetitionViews';
+import { getActiveStage } from '@/services/mockPhaseLifecycle';
 import { getMockTournament } from '@/services/mockTournamentStore';
 
 export function PlayerTournamentPage() {
@@ -10,6 +12,10 @@ export function PlayerTournamentPage() {
   const snapshot = useMemo(() => getMockPlayerSnapshot(tournament), [tournament]);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament]);
   const upcoming = matches.filter((match) => match.status === 'READY' || match.status === 'WAITING').slice(0, 3);
+  const activeStage = getActiveStage(tournament);
+  const swissRecords = activeStage?.type === 'SWISS'
+    ? new Map(buildSwissStandings(tournament, activeStage).map((row) => [row.name, `${row.wins}:${row.losses}`]))
+    : new Map<string, string>();
 
   return (
     <div className="player-view-shell">
@@ -33,18 +39,18 @@ export function PlayerTournamentPage() {
             {snapshot.currentMatch ? (
               <>
                 <div className="player-match-table">{snapshot.currentMatch.table}</div>
-                <h2>{snapshot.currentMatch.sideA}</h2>
+                <h2>{snapshot.currentMatch.sideA}{swissRecords.get(snapshot.currentMatch.sideA) && <span className="swiss-record">{swissRecords.get(snapshot.currentMatch.sideA)}</span>}</h2>
                 <div className="player-score">{snapshot.currentMatch.score}</div>
-                <h2>{snapshot.currentMatch.sideB}</h2>
+                <h2>{snapshot.currentMatch.sideB}{swissRecords.get(snapshot.currentMatch.sideB) && <span className="swiss-record">{swissRecords.get(snapshot.currentMatch.sideB)}</span>}</h2>
                 <p className="muted">{snapshot.currentMatch.phase} · {snapshot.currentMatch.round}</p>
                 <Link className="btn primary player-primary-action" to={`/score/${snapshot.currentMatch.id}`}>Ergebnis / Sätze eintragen</Link>
               </>
             ) : snapshot.nextMatch ? (
               <>
                 <div className="player-match-table">{snapshot.nextMatch.table}</div>
-                <h2>{snapshot.nextMatch.sideA}</h2>
+                <h2>{snapshot.nextMatch.sideA}{swissRecords.get(snapshot.nextMatch.sideA) && <span className="swiss-record">{swissRecords.get(snapshot.nextMatch.sideA)}</span>}</h2>
                 <div className="player-versus">gegen</div>
-                <h2>{snapshot.nextMatch.sideB}</h2>
+                <h2>{snapshot.nextMatch.sideB}{swissRecords.get(snapshot.nextMatch.sideB) && <span className="swiss-record">{swissRecords.get(snapshot.nextMatch.sideB)}</span>}</h2>
                 <p className="muted">{snapshot.nextMatch.note ?? 'Bitte rechtzeitig am Tisch bereit sein.'}</p>
               </>
             ) : <p>Aktuell ist kein weiteres Spiel geplant.</p>}
@@ -64,7 +70,7 @@ export function PlayerTournamentPage() {
             <div className="player-upcoming-list">
               {upcoming.map((match) => (
                 <div className="player-upcoming-row" key={match.id}>
-                  <div><strong>{match.sideA} – {match.sideB}</strong><span className="muted">{match.phase} · {match.round}</span></div>
+                  <div><strong>{match.sideA}{swissRecords.get(match.sideA) && <span className="swiss-record">{swissRecords.get(match.sideA)}</span>} – {match.sideB}{swissRecords.get(match.sideB) && <span className="swiss-record">{swissRecords.get(match.sideB)}</span>}</strong><span className="muted">{match.phase} · {match.round}</span></div>
                   <span className={match.status === 'READY' ? 'badge ready' : 'badge'}>{match.table}</span>
                 </div>
               ))}

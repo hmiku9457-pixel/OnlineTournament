@@ -1,3 +1,12 @@
+## 0.2.2 - Turnierverlauf UX & Schweizer Pairing
+
+- Gruppen: Teilnehmer in der Tabelle sind anklickbar und öffnen alle Partien des Spielers.
+- Gruppen: Ergebnishover zeigt die exakten Satzergebnisse.
+- Folgephasen: Teilnehmer zeigen ihre Platzierung aus der vorherigen Phase, z. B. „Gruppe A - 1.“.
+- Schweizer System: neue Zufallsreihenfolge vor dem Phasenstart.
+- Schweizer System: aktuelle Sieg:Niederlage-Bilanz wird an Teilnehmernamen in Rangliste, Paarungen, Spieler-, Zuschauer- und Scoring-Ansicht angezeigt.
+- Schweizer Pairing: Paarungen werden nach Scoregruppen erzeugt; nur notwendige Floats zwischen benachbarten Scoregruppen werden zugelassen und Wiederholungsgegner möglichst vermieden.
+- Schweizer Freilose zählen konsistent als Sieg für Pairing und angezeigten Record.
 
 ## 0.1.5
 - Verhindert: Teilnehmer können nicht gleichzeitig zwei belegten/zugewiesenen Tischen zugeordnet werden.

@@ -1,7 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { getStageEntrants } from '@/services/mockPhaseLifecycle';
-import { getGroupAssignments } from '@/services/mockDrawStore';
+import { getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import {
   getMockStageBaseMatches,
   getMockStageMatches,
@@ -27,6 +27,7 @@ export interface MockGroupMatch {
   score: string;
   status: 'played' | 'live' | 'open';
   matchDay?: number;
+  sets?: MatchSet[];
 }
 
 export interface MockGroupView {
@@ -69,7 +70,7 @@ function scoreFromSets(sets: MatchSet[]) {
   return `${winsA}:${winsB}`;
 }
 
-function computeStandings(members: string[], matches: ReturnType<typeof getMockStageMatches>): MockStanding[] {
+function computeStandings(members: string[], matches: ReturnType<typeof getMockStageMatches>, tieOrder?: string[], automaticWins: string[] = []): MockStanding[] {
   const rows = new Map(members.map((name) => [name, {
     rank: 0,
     name,
@@ -109,6 +110,15 @@ function computeStandings(members: string[], matches: ReturnType<typeof getMockS
     }
   });
 
+  automaticWins.forEach((name) => {
+    const row = rows.get(name);
+    if (!row) return;
+    row.played += 1;
+    row.wins += 1;
+  });
+
+  const orderIndex = new Map((tieOrder ?? members).map((name, index) => [name, index]));
+
   return [...rows.values()]
     .sort((a, b) => (
       b.wins - a.wins
@@ -116,6 +126,7 @@ function computeStandings(members: string[], matches: ReturnType<typeof getMockS
       || b.setsWon - a.setsWon
       || (b.ballsWon - b.ballsLost) - (a.ballsWon - a.ballsLost)
       || b.ballsWon - a.ballsWon
+      || (orderIndex.get(a.name) ?? Number.MAX_SAFE_INTEGER) - (orderIndex.get(b.name) ?? Number.MAX_SAFE_INTEGER)
       || a.name.localeCompare(b.name, 'de')
     ))
     .map((row, index) => ({
@@ -155,6 +166,7 @@ export function buildMockGroups(tournament: DemoTournament, stage: TournamentSta
         score: match.status === 'FINISHED' ? match.score.replace(/\s/g, '') : match.status === 'LIVE' ? match.score : '–',
         status,
         matchDay: match.matchDay,
+        sets: match.sets,
       };
     }).sort((a, b) => (a.matchDay ?? 0) - (b.matchDay ?? 0) || a.id.localeCompare(b.id));
     return { id: `${stage.id}-group-${groupIndex + 1}`, label, standings, matches };
@@ -187,5 +199,51 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
 }
 
 export function buildSwissStandings(tournament: DemoTournament, stage: TournamentStage): MockStanding[] {
-  return computeStandings(getStageEntrants(tournament, stage), getMockStageMatches(tournament, stage));
+  const order = getSwissOrder(tournament, stage);
+  const automaticWins = getMockStageBaseMatches(tournament, stage).filter((match) => match.autoWinner && match.sideB === 'Freilos').map((match) => match.autoWinner!);
+  return computeStandings(order, getMockStageMatches(tournament, stage), order, automaticWins);
+}
+
+
+export function getPreviousStageFinishLabels(tournament: DemoTournament, stage: TournamentStage) {
+  const stageIndex = tournament.stages.findIndex((item) => item.id === stage.id);
+  if (stageIndex <= 0) return {} as Record<string, string>;
+  const previous = tournament.stages[stageIndex - 1];
+  const labels: Record<string, string> = {};
+
+  if (previous.type === 'GROUPS') {
+    buildMockGroups(tournament, previous).forEach((group) => {
+      group.standings.forEach((row) => { labels[row.name] = `${group.label} - ${row.rank}.`; });
+    });
+    return labels;
+  }
+
+  if (previous.type === 'SWISS') {
+    buildSwissStandings(tournament, previous).forEach((row) => { labels[row.name] = `Platz ${row.rank}`; });
+    return labels;
+  }
+
+  if (previous.type === 'ROUND_ROBIN') {
+    const standings = computeStandings(getStageEntrants(tournament, previous), getMockStageMatches(tournament, previous));
+    standings.forEach((row) => { labels[row.name] = `Platz ${row.rank}`; });
+    return labels;
+  }
+
+  if (previous.type === 'KNOCKOUT' || previous.type === 'DOUBLE_ELIMINATION' || previous.type === 'PLACEMENT') {
+    const rounds = buildMockBracket(tournament, previous);
+    const final = rounds[rounds.length - 1]?.matches[0];
+    if (final?.winner) labels[final.winner] = 'Sieger';
+    if (final) {
+      const finalist = final.sideA === final.winner ? final.sideB : final.sideA;
+      if (finalist && finalist !== 'TBD' && finalist !== 'Freilos') labels[finalist] = 'Finalist';
+    }
+    const semifinal = rounds.find((round) => round.label === 'Halbfinale');
+    semifinal?.matches.forEach((match) => {
+      [match.sideA, match.sideB].forEach((name) => {
+        if (name !== 'TBD' && name !== 'Freilos' && !labels[name]) labels[name] = 'Halbfinale';
+      });
+    });
+  }
+
+  return labels;
 }

@@ -29,6 +29,7 @@ public/manifest.webmanifest
 public/sw.js
 src/App.tsx
 src/components/AppShell.tsx
+src/components/PrestartDrawEditor.tsx
 src/components/SetBySetEntry.tsx
 src/components/StageCard.tsx
 src/data/demoTournaments.ts
@@ -40,6 +41,7 @@ src/engine/recommendations.ts
 src/engine/scheduler.ts
 src/engine/standings.ts
 src/engine/swiss.ts
+src/engine/swissScoreGroups.ts
 src/engine/withdrawal.ts
 src/lib/supabase.ts
 src/main.tsx
@@ -54,6 +56,9 @@ src/pages/TournamentControlPage.tsx
 src/pages/TournamentPage.tsx
 src/services/matchAccess.ts
 src/services/mockCompetitionViews.ts
+src/services/mockDrawStore.ts
+src/services/mockParticipants.ts
+src/services/mockPhaseLifecycle.ts
 src/services/mockRuntime.ts
 src/services/mockTournamentStore.ts
 src/services/realtime.ts
@@ -70,6 +75,7 @@ tests/bracket.test.ts
 tests/recommendations.test.ts
 tests/rules.test.ts
 tests/standings.test.ts
+tests/swiss-score-groups.test.ts
 tests/swiss.test.ts
 tests/tournamentCreation.test.ts
 tests/withdrawal.test.ts

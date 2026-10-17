@@ -944,3 +944,39 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   background: #f8fafc;
 }
 .locked-stage-placeholder { display: grid; gap: 5px; margin-top: 12px; }
+
+/* Group player drill-down, score tooltips and phase provenance */
+.standing-player-button {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.standing-player-button:hover strong { text-decoration: underline; }
+.standing-player-button small,
+.participant-origin {
+  display: block;
+  margin-top: 1px;
+  color: #667085;
+  font-size: .67rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.match-score-hover { cursor: help; text-decoration: underline dotted #98a2b3; text-underline-offset: 3px; }
+.player-games-modal { width: min(580px, 100%); }
+.player-games-modal-head { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; }
+.player-games-modal-head h2 { margin: 8px 0 0; }
+.player-games-list { display: grid; margin-top: 16px; border-top: 1px solid #eaecf0; }
+.player-game-row { display: grid; grid-template-columns: 90px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #eaecf0; }
+.swiss-record { display: inline-flex; margin-left: 6px; padding: 2px 6px; border-radius: 999px; background: #f2f4f7; color: #344054; font-size: .72rem; font-weight: 800; }
+.bracket-match .participant-origin { margin-top: 2px; }
+
+@media (max-width: 600px) {
+  .player-game-row { grid-template-columns: 1fr auto; }
+  .player-game-row > .muted { grid-column: 1 / -1; }
+}

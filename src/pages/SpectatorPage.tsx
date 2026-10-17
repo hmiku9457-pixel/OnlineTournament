@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { buildMockBracket, buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
+import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { getMockRuntimeMatches } from '@/services/mockRuntime';
 import { getMockTournament } from '@/services/mockTournamentStore';
+import { getActiveStage } from '@/services/mockPhaseLifecycle';
+
 
 export function SpectatorPage() {
   const { tournamentId } = useParams();
@@ -11,6 +13,10 @@ export function SpectatorPage() {
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament]);
   const live = matches.filter((match) => match.status === 'LIVE' || match.status === 'CONFIRMATION');
   const next = matches.filter((match) => match.status === 'READY' || match.status === 'WAITING');
+  const activeStage = getActiveStage(tournament);
+  const swissRecords = activeStage?.type === 'SWISS'
+    ? new Map(buildSwissStandings(tournament, activeStage).map((row) => [row.name, `${row.wins}:${row.losses}`]))
+    : new Map<string, string>();
 
   return (
     <div className="spectator-shell">
@@ -36,9 +42,9 @@ export function SpectatorPage() {
             <article className="card spectator-match-card" key={match.id}>
               <div className="spectator-match-head"><span className="badge live">LIVE</span><strong>{match.table}</strong></div>
               <span className="muted">{match.round}</span>
-              <div className="spectator-team">{match.sideA}</div>
+              <div className="spectator-team">{match.sideA}{swissRecords.get(match.sideA) && <span className="swiss-record">{swissRecords.get(match.sideA)}</span>}</div>
               <div className="spectator-score">{match.score}</div>
-              <div className="spectator-team">{match.sideB}</div>
+              <div className="spectator-team">{match.sideB}{swissRecords.get(match.sideB) && <span className="swiss-record">{swissRecords.get(match.sideB)}</span>}</div>
             </article>
           ))}
         </div>
@@ -47,6 +53,7 @@ export function SpectatorPage() {
       <section className="spectator-competition-overview">
         <div className="spectator-section-head"><h2>Turnierstand</h2><span className="muted">Tabellen & Turnierbäume</span></div>
         {tournament.stages.map((stage) => {
+          const previousFinishLabels = getPreviousStageFinishLabels(tournament, stage);
           if (stage.type === 'GROUPS') {
             const groups = buildMockGroups(tournament, stage);
             return (
@@ -58,7 +65,7 @@ export function SpectatorPage() {
                       <h4>{group.label}</h4>
                       <div className="mini-standing-table detailed">
                         <div className="mini-standing-head"><span>#</span><span>Spieler</span><span>Sp.</span><span>S</span><span>N</span><span>Sätze</span><span>±</span><span>Bälle</span><span>±</span></div>
-                        {group.standings.map((row) => <div className="mini-standing-row" key={row.name}><span>{row.rank}</span><strong>{row.name}</strong><span>{row.played}</span><span>{row.wins}</span><span>{row.losses}</span><span>{row.sets}</span><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><span>{row.balls}</span><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span></div>)}
+                        {group.standings.map((row) => <div className="mini-standing-row" key={row.name}><span>{row.rank}</span><strong>{row.name}{previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</strong><span>{row.played}</span><span>{row.wins}</span><span>{row.losses}</span><span>{row.sets}</span><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><span>{row.balls}</span><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span></div>)}
                       </div>
                     </article>
                   ))}
@@ -72,7 +79,7 @@ export function SpectatorPage() {
             return (
               <section className="spectator-stage-block" key={stage.id}>
                 <div className="competition-stage-head"><div><span className="badge">SCHWEIZER SYSTEM</span><h3>{stage.name}</h3></div></div>
-                <div className="card table-wrap"><table className="compact-table"><thead><tr><th>#</th><th>Teilnehmer</th><th>Sp.</th><th>Siege</th><th>N.</th><th>Sätze</th><th>Satz ±</th><th>Bälle</th><th>Ball ±</th></tr></thead><tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><strong>{row.name}</strong></td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.sets}</td><td>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td>{row.balls}</td><td>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></tr>)}</tbody></table></div>
+                <div className="card table-wrap"><table className="compact-table"><thead><tr><th>#</th><th>Teilnehmer</th><th>Sp.</th><th>Siege</th><th>N.</th><th>Sätze</th><th>Satz ±</th><th>Bälle</th><th>Ball ±</th></tr></thead><tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><strong>{row.name}</strong> <span className="swiss-record">{row.wins}:{row.losses}</span>{previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.sets}</td><td>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td>{row.balls}</td><td>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></tr>)}</tbody></table></div>
               </section>
             );
           }
@@ -82,7 +89,7 @@ export function SpectatorPage() {
             return (
               <section className="spectator-stage-block" key={stage.id}>
                 <div className="competition-stage-head"><div><span className="badge">K.-O.</span><h3>{stage.name}</h3></div></div>
-                <div className="bracket-scroll"><div className="bracket-board">{rounds.map((round) => <div className="bracket-round" key={round.label}><h4>{round.label}</h4><div className="bracket-round-matches">{round.matches.map((match) => <article className="bracket-match" key={match.id}><div className={match.winner === match.sideA ? 'winner' : ''}><span>{match.sideA}</span><strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[0] : ''}</strong></div><div className={match.winner === match.sideB ? 'winner' : ''}><span>{match.sideB}</span><strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[1] : match.score === 'Freilos' ? 'BYE' : ''}</strong></div></article>)}</div></div>)}</div></div>
+                <div className="bracket-scroll"><div className="bracket-board">{rounds.map((round) => <div className="bracket-round" key={round.label}><h4>{round.label}</h4><div className="bracket-round-matches">{round.matches.map((match) => <article className="bracket-match" key={match.id}><div className={match.winner === match.sideA ? 'winner' : ''}><span>{match.sideA}{previousFinishLabels[match.sideA] && <small className="participant-origin">{previousFinishLabels[match.sideA]}</small>}</span><strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[0] : ''}</strong></div><div className={match.winner === match.sideB ? 'winner' : ''}><span>{match.sideB}{previousFinishLabels[match.sideB] && <small className="participant-origin">{previousFinishLabels[match.sideB]}</small>}</span><strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[1] : match.score === 'Freilos' ? 'BYE' : ''}</strong></div></article>)}</div></div>)}</div></div>
               </section>
             );
           }
@@ -97,7 +104,7 @@ export function SpectatorPage() {
           {next.map((match) => (
             <div className="spectator-next-row" key={match.id}>
               <span className={match.status === 'READY' ? 'badge ready' : 'badge'}>{match.table}</span>
-              <div><strong>{match.sideA} – {match.sideB}</strong><span className="muted">{match.phase} · {match.round}</span></div>
+              <div><strong>{match.sideA}{swissRecords.get(match.sideA) && <span className="swiss-record">{swissRecords.get(match.sideA)}</span>} – {match.sideB}{swissRecords.get(match.sideB) && <span className="swiss-record">{swissRecords.get(match.sideB)}</span>}</strong><span className="muted">{match.phase} · {match.round}</span></div>
               <span className="muted">{match.status === 'READY' ? 'bereit' : 'wartet'}</span>
             </div>
           ))}

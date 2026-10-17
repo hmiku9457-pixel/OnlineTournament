@@ -9,6 +9,7 @@ interface StageDrawConfig {
   stageId: string;
   groupAssignments?: Record<string, number>;
   bracketSlots?: string[];
+  swissOrder?: string[];
 }
 
 function readAll(): StageDrawConfig[] {
@@ -142,7 +143,7 @@ export function resetGroupAssignments(tournament: DemoTournament, stage: Tournam
   const current = readAll();
   const existing = findConfig(tournament.id, stage.id);
   if (!existing) return true;
-  const remainingConfig = existing.bracketSlots
+  const remainingConfig = (existing.bracketSlots || existing.swissOrder)
     ? { ...existing, groupAssignments: undefined }
     : null;
   writeAll([
@@ -159,6 +160,29 @@ export function randomizeGroupAssignments(tournament: DemoTournament, stage: Tou
   const randomized = shuffled(participants);
   const assignments = Object.fromEntries(randomized.map((participant, index) => [participant, index % groupCount]));
   upsert({ tournamentId: tournament.id, stageId: stage.id, groupAssignments: assignments });
+  return true;
+}
+
+export function getSwissOrder(tournament: DemoTournament, stage: TournamentStage) {
+  const participants = getStageEntrants(tournament, stage);
+  const existing = findConfig(tournament.id, stage.id)?.swissOrder;
+  if (existing?.length === participants.length && participants.every((participant) => existing.includes(participant))) {
+    return [...existing];
+  }
+  return stableShuffled(participants);
+}
+
+export function randomizeSwissOrder(tournament: DemoTournament, stage: TournamentStage) {
+  if (!canEditDraw(tournament, stage)) return false;
+  const participants = getStageEntrants(tournament, stage);
+  const config = findConfig(tournament.id, stage.id);
+  upsert({
+    tournamentId: tournament.id,
+    stageId: stage.id,
+    groupAssignments: config?.groupAssignments,
+    bracketSlots: config?.bracketSlots,
+    swissOrder: shuffled(participants),
+  });
   return true;
 }
 
@@ -204,7 +228,7 @@ export function resetBracketSlots(tournament: DemoTournament, stage: TournamentS
   const current = readAll();
   const existing = findConfig(tournament.id, stage.id);
   if (!existing) return true;
-  const remainingConfig = existing.groupAssignments
+  const remainingConfig = (existing.groupAssignments || existing.swissOrder)
     ? { ...existing, bracketSlots: undefined }
     : null;
   writeAll([

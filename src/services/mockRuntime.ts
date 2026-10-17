@@ -1,9 +1,10 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
+import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
 import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { completeStage, getActiveStage, getStageEntrants, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
-import { getBracketSlots, getGroupAssignments } from '@/services/mockDrawStore';
+import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 
 export { getRuntimeParticipantNames } from '@/services/mockParticipants';
 
@@ -222,31 +223,80 @@ function knockoutMatches(tournament: DemoTournament, stage: TournamentStage, res
   return rounds;
 }
 
-function swissRoundPairings(participants: string[], roundNumber: number) {
-  const rotated = [...participants];
-  if (rotated.length > 2) {
-    const shift = (roundNumber - 1) % rotated.length;
-    rotated.push(...rotated.splice(0, shift));
-  }
-  const pairs: Array<[string, string]> = [];
-  for (let index = 0; index < rotated.length; index += 2) {
-    pairs.push([rotated[index], rotated[index + 1] ?? 'Freilos']);
-  }
-  return pairs;
+function swissScoreState(participants: string[], matches: BaseStageMatch[], results: StoredMatchResult[]) {
+  const state = new Map(participants.map((name, index) => [name, {
+    name,
+    wins: 0,
+    losses: 0,
+    byes: 0,
+    order: index,
+    opponents: new Set<string>(),
+  }]));
+
+  matches.forEach((match) => {
+    const a = state.get(match.sideA);
+    if (!a) return;
+    if (match.autoWinner === match.sideA && match.sideB === 'Freilos') {
+      a.wins += 1;
+      a.byes += 1;
+      return;
+    }
+    const b = state.get(match.sideB);
+    if (!b) return;
+    const result = results.find((item) => item.matchId === match.id && item.status === 'FINISHED');
+    if (!result) return;
+    a.opponents.add(match.sideB);
+    b.opponents.add(match.sideA);
+    const winner = resultWinner(result, match.sideA, match.sideB);
+    if (winner === match.sideA) {
+      a.wins += 1;
+      b.losses += 1;
+    } else if (winner === match.sideB) {
+      b.wins += 1;
+      a.losses += 1;
+    }
+  });
+
+  return state;
+}
+
+
+function swissRoundPairings(
+  participants: string[],
+  previousMatches: BaseStageMatch[],
+  results: StoredMatchResult[],
+) {
+  const state = swissScoreState(participants, previousMatches, results);
+  const players: SwissScorePlayer[] = participants.map((name) => {
+    const row = state.get(name)!;
+    return {
+      name,
+      wins: row.wins,
+      losses: row.losses,
+      byes: row.byes,
+      order: row.order,
+      opponents: row.opponents,
+    };
+  });
+  return generateScoreGroupedSwissPairings(players);
 }
 
 function swissMatches(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]): BaseStageMatch[] {
-  const participants = getStageEntrants(tournament, stage);
+  const participants = getSwissOrder(tournament, stage);
   const totalRounds = Math.max(1, Number(stage.settings.rounds) || 4);
   const matches: BaseStageMatch[] = [];
 
   for (let round = 1; round <= totalRounds; round += 1) {
-    const pairings = swissRoundPairings(participants, round);
     if (round > 1) {
       const previous = matches.filter((match) => match.round === `Runde ${round - 1}` && !match.autoWinner);
       const previousDone = previous.every((match) => results.find((item) => item.matchId === match.id)?.status === 'FINISHED');
       if (!previousDone) break;
     }
+
+    const pairings = round === 1
+      ? swissRoundPairings(participants, [], results)
+      : swissRoundPairings(participants, matches, results);
+
     pairings.forEach(([sideA, sideB], index) => {
       matches.push({
         id: `${stage.id}-sw-r${round}-m${index + 1}`,

@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { MatchSet } from '@/domain/types';
 import { SetBySetEntry } from '@/components/SetBySetEntry';
+import { buildSwissStandings } from '@/services/mockCompetitionViews';
 import {
   confirmMockMatchSide,
   findMockRuntimeMatch,
@@ -36,6 +37,10 @@ export function ScoringPage() {
   const bestOf = runtime?.match.bestOf ?? 3;
   const resultSets = completedSets.length ? completedSets : (existing?.sets ?? runtime?.match.sets ?? []);
   const wins = winsFromSets(resultSets);
+  const stage = runtime?.tournament.stages.find((item) => item.id === runtime.match.stageId);
+  const swissRecords = stage?.type === 'SWISS' && runtime
+    ? new Map(buildSwissStandings(runtime.tournament, stage).map((row) => [row.name, `${row.wins}:${row.losses}`]))
+    : new Map<string, string>();
 
   function confirm(side: 'A' | 'B') {
     if (!matchId) return;
@@ -97,7 +102,7 @@ export function ScoringPage() {
             <button className="btn small" type="button" onClick={() => navigate(-1)}>← Zurück</button>
           </div>
           <span className="badge ready">SPIEL ABGESCHLOSSEN</span>
-          <h1>{sideA} – {sideB}</h1>
+          <h1>{sideA}{swissRecords.get(sideA) && <span className="swiss-record">{swissRecords.get(sideA)}</span>} – {sideB}{swissRecords.get(sideB) && <span className="swiss-record">{swissRecords.get(sideB)}</span>}</h1>
           <div className="finished-score">{wins.a} : {wins.b}</div>
           <p className="score-waiting-message">Wartet auf nächste Partie.</p>
           <div className="completed-set-list">
@@ -135,7 +140,7 @@ export function ScoringPage() {
           <button className="btn small" type="button" onClick={() => navigate(-1)}>← Zurück</button>
         </div>
         <div><span className="badge live">LIVE</span><span className="score-table-label">{runtime.match.table}</span></div>
-        <h1>{sideA} – {sideB}</h1>
+        <h1>{sideA}{swissRecords.get(sideA) && <span className="swiss-record">{swissRecords.get(sideA)}</span>} – {sideB}{swissRecords.get(sideB) && <span className="swiss-record">{swissRecords.get(sideB)}</span>}</h1>
         <p className="muted">Best-of-{bestOf} · Satzweise Eingabe: <strong>7</strong> = 11:7, <strong>-7</strong> = 7:11. Jeden Satz mit Enter oder dem Satz-Button bestätigen.</p>
       </div>
 
@@ -143,6 +148,8 @@ export function ScoringPage() {
         <div className="control-section-head"><h2>Satzweise Ergebniseingabe</h2><span className="badge">BO{bestOf}</span></div>
         <SetBySetEntry
           match={runtime.match}
+          sideARecord={swissRecords.get(sideA)}
+          sideBRecord={swissRecords.get(sideB)}
           onCompleted={(sets) => {
             setCompletedSets(sets);
             setCompleted(true);
