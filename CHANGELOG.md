@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Rework participant entry into a compact editor plus a scrollable participant list with edit/remove actions and field-specific validation messages.
+- Add Step 4 recommendation constraints for maximum group count, maximum Swiss rounds and knockout qualifier count.
+- Allow organizers to disable individual tournament systems from the recommendation pool.
+- Replace ambiguous "Top" wording in the UI with explicit qualification wording.
 - Rework tournament creation into a five-step wizard: basic data → participants → match requirements → format recommendation → per-phase Best-of.
 - Derive participant count from entered singles players or doubles pairs instead of requiring it up front.
 - Add Best-of-1 and make Best-of a stage-level setting.

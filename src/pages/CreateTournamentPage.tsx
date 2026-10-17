@@ -1,25 +1,47 @@
 import { useEffect, useMemo, useState } from 'react';
-import { bestOfOptions, phasesForFormat } from '@/domain/tournamentCreation';
+import {
+  bestOfOptions,
+  phasesForFormat,
+  type SupportedFormatId,
+} from '@/domain/tournamentCreation';
 import type { Discipline } from '@/domain/types';
 import { recommendTournamentFormats } from '@/engine/recommendations';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
-type ParticipantDraft = {
-  id: string;
+type ParticipantFields = {
   firstName: string;
   lastName: string;
   partnerFirstName: string;
   partnerLastName: string;
 };
 
+type ParticipantDraft = ParticipantFields & {
+  id: string;
+};
+
+type ParticipantField = keyof ParticipantFields;
+type ParticipantErrors = Partial<Record<ParticipantField, string>>;
+
 const stepLabels = ['Grunddaten', 'Teilnehmer', 'Spieldaten', 'Turnierform', 'Phasen'];
+const formatLabels: Record<SupportedFormatId, string> = {
+  'round-robin': 'Jeder gegen jeden',
+  'groups-ko': 'Gruppenphase + K.-o.',
+  'swiss-ko': 'Schweizer System + K.-o.',
+  'single-ko': 'Einfaches K.-o.',
+};
+
+const initialEnabledFormats: Record<SupportedFormatId, boolean> = {
+  'round-robin': true,
+  'groups-ko': true,
+  'swiss-ko': true,
+  'single-ko': true,
+};
+
 let participantSequence = 0;
 
-function newParticipant(): ParticipantDraft {
-  participantSequence += 1;
+function emptyParticipantFields(): ParticipantFields {
   return {
-    id: `participant-${participantSequence}`,
     firstName: '',
     lastName: '',
     partnerFirstName: '',
@@ -27,12 +49,35 @@ function newParticipant(): ParticipantDraft {
   };
 }
 
-function participantIsComplete(participant: ParticipantDraft, discipline: Discipline): boolean {
+function newParticipant(fields: ParticipantFields): ParticipantDraft {
+  participantSequence += 1;
+  return { id: `participant-${participantSequence}`, ...fields };
+}
+
+function participantIsComplete(participant: ParticipantFields, discipline: Discipline): boolean {
   if (!participant.firstName.trim() || !participant.lastName.trim()) return false;
   if (discipline === 'DOUBLES') {
     return Boolean(participant.partnerFirstName.trim() && participant.partnerLastName.trim());
   }
   return true;
+}
+
+function validateParticipant(participant: ParticipantFields, discipline: Discipline): ParticipantErrors {
+  const errors: ParticipantErrors = {};
+  if (!participant.firstName.trim()) errors.firstName = 'Vorname fehlt.';
+  if (!participant.lastName.trim()) errors.lastName = 'Nachname fehlt.';
+  if (discipline === 'DOUBLES') {
+    if (!participant.partnerFirstName.trim()) errors.partnerFirstName = 'Vorname von Spieler 2 fehlt.';
+    if (!participant.partnerLastName.trim()) errors.partnerLastName = 'Nachname von Spieler 2 fehlt.';
+  }
+  return errors;
+}
+
+function participantDisplayName(participant: ParticipantFields, discipline: Discipline): string {
+  const firstPlayer = `${participant.firstName.trim()} ${participant.lastName.trim()}`.trim();
+  if (discipline === 'SINGLES') return firstPlayer;
+  const secondPlayer = `${participant.partnerFirstName.trim()} ${participant.partnerLastName.trim()}`.trim();
+  return `${firstPlayer} / ${secondPlayer}`;
 }
 
 export function CreateTournamentPage() {
@@ -41,20 +86,59 @@ export function CreateTournamentPage() {
   const [sport, setSport] = useState('table_tennis');
   const [discipline, setDiscipline] = useState<Discipline>('SINGLES');
   const [tables, setTables] = useState(8);
-  const [participants, setParticipants] = useState<ParticipantDraft[]>([newParticipant(), newParticipant()]);
+  const [participants, setParticipants] = useState<ParticipantDraft[]>([]);
+  const [participantForm, setParticipantForm] = useState<ParticipantFields>(emptyParticipantFields());
+  const [participantErrors, setParticipantErrors] = useState<ParticipantErrors>({});
+  const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null);
   const [minimumMatches, setMinimumMatches] = useState(4);
-  const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
+  const [selectedFormat, setSelectedFormat] = useState<SupportedFormatId | null>(null);
   const [phaseBestOf, setPhaseBestOf] = useState<Record<string, number>>({});
+  const [enabledFormats, setEnabledFormats] = useState<Record<SupportedFormatId, boolean>>(initialEnabledFormats);
+  const [maxGroups, setMaxGroups] = useState<number | null>(null);
+  const [maxSwissRounds, setMaxSwissRounds] = useState<number | null>(null);
+  const [knockoutQualifierCount, setKnockoutQualifierCount] = useState<number | null>(null);
 
   const participantCount = participants.filter((participant) => participantIsComplete(participant, discipline)).length;
-  const participantsValid = participants.length >= 2 && participants.every((participant) => participantIsComplete(participant, discipline));
+  const incompleteSavedParticipants = participants.length - participantCount;
+  const participantFormHasContent = Object.values(participantForm).some((value) => value.trim().length > 0);
+  const participantsValid = participants.length >= 2 && incompleteSavedParticipants === 0;
+
+  const defaultMaxGroups = Math.max(2, Math.ceil(participantCount / (participantCount >= 20 ? 5 : 4)));
+  const defaultMaxSwissRounds = Math.max(minimumMatches, Math.ceil(Math.log2(Math.max(2, participantCount))));
+  const defaultKnockoutQualifierCount = Math.max(
+    2,
+    Math.min(participantCount, participantCount >= 16 ? 8 : 4),
+  );
+  const effectiveMaxGroups = maxGroups ?? defaultMaxGroups;
+  const effectiveMaxSwissRounds = maxSwissRounds ?? defaultMaxSwissRounds;
+  const effectiveKnockoutQualifierCount = knockoutQualifierCount ?? defaultKnockoutQualifierCount;
 
   const recommendations = useMemo(
-    () => recommendTournamentFormats({ playerCount: participantCount, tableCount: tables, minimumMatches }),
-    [participantCount, tables, minimumMatches],
+    () => recommendTournamentFormats(
+      { playerCount: participantCount, tableCount: tables, minimumMatches },
+      {
+        enabledFormats,
+        maxGroups: effectiveMaxGroups,
+        maxSwissRounds: effectiveMaxSwissRounds,
+        knockoutQualifierCount: effectiveKnockoutQualifierCount,
+      },
+    ),
+    [
+      participantCount,
+      tables,
+      minimumMatches,
+      enabledFormats,
+      effectiveMaxGroups,
+      effectiveMaxSwissRounds,
+      effectiveKnockoutQualifierCount,
+    ],
   );
 
   const phases = useMemo(() => (selectedFormat ? phasesForFormat(selectedFormat) : []), [selectedFormat]);
+  const selectedRecommendation = useMemo(
+    () => recommendations.find((recommendation) => recommendation.id === selectedFormat),
+    [recommendations, selectedFormat],
+  );
 
   useEffect(() => {
     if (selectedFormat && !recommendations.some((item) => item.id === selectedFormat)) {
@@ -77,19 +161,60 @@ export function CreateTournamentPage() {
 
   const canContinue =
     (step === 1 && Boolean(name.trim()) && tables >= 1) ||
-    (step === 2 && participantsValid) ||
+    (step === 2 && participantsValid && !participantFormHasContent && !editingParticipantId) ||
     (step === 3 && minimumMatches >= 1) ||
     (step === 4 && Boolean(selectedFormat)) ||
     step === 5;
 
-  function updateParticipant(id: string, field: keyof Omit<ParticipantDraft, 'id'>, value: string) {
-    setParticipants((current) => current.map((participant) => (
-      participant.id === id ? { ...participant, [field]: value } : participant
-    )));
+  function updateParticipantForm(field: ParticipantField, value: string) {
+    setParticipantForm((current) => ({ ...current, [field]: value }));
+    setParticipantErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
+  function resetParticipantEditor() {
+    setParticipantForm(emptyParticipantFields());
+    setParticipantErrors({});
+    setEditingParticipantId(null);
+  }
+
+  function saveParticipant() {
+    const errors = validateParticipant(participantForm, discipline);
+    setParticipantErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    if (editingParticipantId) {
+      setParticipants((current) => current.map((participant) => (
+        participant.id === editingParticipantId ? { ...participant, ...participantForm } : participant
+      )));
+    } else {
+      setParticipants((current) => [...current, newParticipant(participantForm)]);
+    }
+    resetParticipantEditor();
+  }
+
+  function editParticipant(participant: ParticipantDraft) {
+    setParticipantForm({
+      firstName: participant.firstName,
+      lastName: participant.lastName,
+      partnerFirstName: participant.partnerFirstName,
+      partnerLastName: participant.partnerLastName,
+    });
+    setParticipantErrors({});
+    setEditingParticipantId(participant.id);
   }
 
   function removeParticipant(id: string) {
     setParticipants((current) => current.filter((participant) => participant.id !== id));
+    if (editingParticipantId === id) resetParticipantEditor();
+  }
+
+  function toggleFormat(formatId: SupportedFormatId) {
+    setEnabledFormats((current) => ({ ...current, [formatId]: !current[formatId] }));
   }
 
   function goNext() {
@@ -160,54 +285,128 @@ export function CreateTournamentPage() {
         )}
 
         {step === 2 && (
-          <section>
-            <div className="section-head">
+          <section className="participant-step">
+            <div className="section-head compact-head">
               <div>
                 <h2>Teilnehmer eintragen</h2>
                 <p className="muted">
                   {discipline === 'SINGLES'
-                    ? `${participantCount} Einzelspieler vollständig eingetragen.`
-                    : `${participantCount} Doppel vollständig eingetragen.`}
+                    ? `${participantCount} Einzelspieler gespeichert.`
+                    : `${participantCount} Doppel gespeichert.`}
                 </p>
               </div>
-              <button className="btn" type="button" onClick={() => setParticipants((current) => [...current, newParticipant()])}>
-                + Teilnehmer
-              </button>
             </div>
 
-            <div className="participant-list">
-              {participants.map((participant, index) => (
-                <article className="participant-row" key={participant.id}>
-                  <div className="participant-number">{index + 1}</div>
-                  <div className="participant-fields">
-                    <div className="field">
-                      <label htmlFor={`${participant.id}-first`}>{discipline === 'DOUBLES' ? 'Spieler 1 · Vorname' : 'Vorname'}</label>
-                      <input id={`${participant.id}-first`} value={participant.firstName} onChange={(event) => updateParticipant(participant.id, 'firstName', event.target.value)} />
-                    </div>
-                    <div className="field">
-                      <label htmlFor={`${participant.id}-last`}>{discipline === 'DOUBLES' ? 'Spieler 1 · Nachname' : 'Nachname'}</label>
-                      <input id={`${participant.id}-last`} value={participant.lastName} onChange={(event) => updateParticipant(participant.id, 'lastName', event.target.value)} />
-                    </div>
-                    {discipline === 'DOUBLES' && (
-                      <>
-                        <div className="field">
-                          <label htmlFor={`${participant.id}-partner-first`}>Spieler 2 · Vorname</label>
-                          <input id={`${participant.id}-partner-first`} value={participant.partnerFirstName} onChange={(event) => updateParticipant(participant.id, 'partnerFirstName', event.target.value)} />
-                        </div>
-                        <div className="field">
-                          <label htmlFor={`${participant.id}-partner-last`}>Spieler 2 · Nachname</label>
-                          <input id={`${participant.id}-partner-last`} value={participant.partnerLastName} onChange={(event) => updateParticipant(participant.id, 'partnerLastName', event.target.value)} />
-                        </div>
-                      </>
-                    )}
+            <div className="participant-entry-layout">
+              <div className="participant-editor">
+                <div className="participant-editor-head">
+                  <div>
+                    <span className="badge">{editingParticipantId ? 'Bearbeiten' : 'Neuer Eintrag'}</span>
+                    <h3>{discipline === 'SINGLES' ? 'Spieler' : 'Doppel'} erfassen</h3>
                   </div>
-                  <button className="btn participant-remove" type="button" disabled={participants.length <= 2} onClick={() => removeParticipant(participant.id)} aria-label={`Teilnehmer ${index + 1} entfernen`}>
-                    Entfernen
+                  {editingParticipantId && (
+                    <button className="btn" type="button" onClick={resetParticipantEditor}>Abbrechen</button>
+                  )}
+                </div>
+
+                <div className="participant-mask">
+                  <div className="field">
+                    <label htmlFor="participant-first">{discipline === 'DOUBLES' ? 'Spieler 1 · Vorname' : 'Vorname'}</label>
+                    <input
+                      id="participant-first"
+                      className={participantErrors.firstName ? 'input-error' : ''}
+                      value={participantForm.firstName}
+                      onChange={(event) => updateParticipantForm('firstName', event.target.value)}
+                      aria-invalid={Boolean(participantErrors.firstName)}
+                      autoFocus
+                    />
+                    {participantErrors.firstName && <span className="field-error">{participantErrors.firstName}</span>}
+                  </div>
+                  <div className="field">
+                    <label htmlFor="participant-last">{discipline === 'DOUBLES' ? 'Spieler 1 · Nachname' : 'Nachname'}</label>
+                    <input
+                      id="participant-last"
+                      className={participantErrors.lastName ? 'input-error' : ''}
+                      value={participantForm.lastName}
+                      onChange={(event) => updateParticipantForm('lastName', event.target.value)}
+                      aria-invalid={Boolean(participantErrors.lastName)}
+                    />
+                    {participantErrors.lastName && <span className="field-error">{participantErrors.lastName}</span>}
+                  </div>
+                  {discipline === 'DOUBLES' && (
+                    <>
+                      <div className="field">
+                        <label htmlFor="participant-partner-first">Spieler 2 · Vorname</label>
+                        <input
+                          id="participant-partner-first"
+                          className={participantErrors.partnerFirstName ? 'input-error' : ''}
+                          value={participantForm.partnerFirstName}
+                          onChange={(event) => updateParticipantForm('partnerFirstName', event.target.value)}
+                          aria-invalid={Boolean(participantErrors.partnerFirstName)}
+                        />
+                        {participantErrors.partnerFirstName && <span className="field-error">{participantErrors.partnerFirstName}</span>}
+                      </div>
+                      <div className="field">
+                        <label htmlFor="participant-partner-last">Spieler 2 · Nachname</label>
+                        <input
+                          id="participant-partner-last"
+                          className={participantErrors.partnerLastName ? 'input-error' : ''}
+                          value={participantForm.partnerLastName}
+                          onChange={(event) => updateParticipantForm('partnerLastName', event.target.value)}
+                          aria-invalid={Boolean(participantErrors.partnerLastName)}
+                        />
+                        {participantErrors.partnerLastName && <span className="field-error">{participantErrors.partnerLastName}</span>}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="participant-editor-actions">
+                  <button className="btn primary" type="button" onClick={saveParticipant}>
+                    {editingParticipantId ? 'Änderungen speichern' : discipline === 'SINGLES' ? 'Spieler hinzufügen' : 'Doppel hinzufügen'}
                   </button>
-                </article>
-              ))}
+                  <span className="muted">
+                    {participantFormHasContent || editingParticipantId
+                      ? 'Aktuelle Eingabe zuerst speichern oder abbrechen.'
+                      : `Mindestens 2 ${discipline === 'SINGLES' ? 'Spieler' : 'Doppel'} für ein Turnier.`}
+                  </span>
+                </div>
+              </div>
+
+              <aside className="participant-roster" aria-label="Gespeicherte Teilnehmer">
+                <div className="participant-roster-head">
+                  <div>
+                    <h3>Teilnehmerliste</h3>
+                    <span className="muted">{participantCount} gespeichert</span>
+                  </div>
+                  <span className="badge">{participantCount}</span>
+                </div>
+
+                <div className="participant-roster-list">
+                  {participants.length === 0 ? (
+                    <div className="participant-empty">
+                      Noch keine Teilnehmer gespeichert. Neue Einträge erscheinen hier sofort.
+                    </div>
+                  ) : participants.map((participant, index) => (
+                    <article className={`participant-roster-row ${editingParticipantId === participant.id ? 'editing' : ''}`} key={participant.id}>
+                      <span className="participant-list-number">{index + 1}</span>
+                      <div className="participant-list-name">
+                        <strong>{participantDisplayName(participant, discipline)}</strong>
+                        {!participantIsComplete(participant, discipline) && <span className="field-error">Eintrag muss ergänzt werden.</span>}
+                      </div>
+                      <div className="participant-list-actions">
+                        <button className="btn small" type="button" onClick={() => editParticipant(participant)}>Bearbeiten</button>
+                        <button className="btn small" type="button" onClick={() => removeParticipant(participant.id)}>Entfernen</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </aside>
             </div>
-            {!participantsValid && <div className="callout">Mindestens zwei vollständige {discipline === 'SINGLES' ? 'Teilnehmer' : 'Doppel'} werden benötigt.</div>}
+
+            {incompleteSavedParticipants > 0 && (
+              <div className="callout">{incompleteSavedParticipants} gespeicherte Einträge müssen nach der Änderung der Disziplin noch ergänzt werden.</div>
+            )}
           </section>
         )}
 
@@ -233,24 +432,95 @@ export function CreateTournamentPage() {
         {step === 4 && (
           <section>
             <h2>Turnierform auswählen</h2>
-            <p className="muted">Die Reihenfolge ist eine Empfehlung anhand von {participantCount} {discipline === 'SINGLES' ? 'Teilnehmern' : 'Doppeln'}, {tables} Tischen und mindestens {minimumMatches} Spielen.</p>
-            <div className="recommendation-list">
-              {recommendations.map((item, index) => (
-                <button
-                  className={`card recommendation recommendation-select ${selectedFormat === item.id ? 'selected' : ''} ${index === 0 ? 'best' : ''}`}
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedFormat(item.id)}
-                >
-                  <div className="recommendation-head">
-                    <span className="badge">{index === 0 ? 'Empfohlen' : 'Alternative'}</span>
-                    {selectedFormat === item.id && <span className="badge selected-badge">Ausgewählt</span>}
+            <p className="muted">Die Vorschläge reagieren sofort auf die Vorgaben rechts. Systeme, die du deaktivierst, werden nicht mehr vorgeschlagen.</p>
+
+            <div className="format-step-layout">
+              <div className="recommendation-list">
+                {recommendations.length === 0 && (
+                  <div className="callout">Aktuell ist kein Turniersystem aktiviert. Aktiviere rechts mindestens ein System.</div>
+                )}
+                {recommendations.map((item, index) => (
+                  <button
+                    className={`card recommendation recommendation-select ${selectedFormat === item.id ? 'selected' : ''} ${index === 0 ? 'best' : ''}`}
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedFormat(item.id)}
+                  >
+                    <div className="recommendation-head">
+                      <span className="badge">{index === 0 ? 'Empfohlen' : 'Alternative'}</span>
+                      {selectedFormat === item.id && <span className="badge selected-badge">Ausgewählt</span>}
+                    </div>
+                    <h3>{item.label}</h3>
+                    <p>{item.description}</p>
+                    <p className="muted">Geschätzte Spiele insgesamt: {item.estimatedMatches}</p>
+                  </button>
+                ))}
+              </div>
+
+              <aside className="format-settings-panel">
+                <div className="format-settings-head">
+                  <h3>Vorgaben für Vorschläge</h3>
+                  <p className="muted">Grenzen und erlaubte Systeme festlegen.</p>
+                </div>
+
+                <div className="format-setting-fields">
+                  <div className="field">
+                    <label htmlFor="max-groups">Maximale Gruppenanzahl</label>
+                    <input
+                      id="max-groups"
+                      type="number"
+                      min="2"
+                      max={Math.max(2, Math.floor(participantCount / 2))}
+                      value={effectiveMaxGroups}
+                      onChange={(event) => setMaxGroups(Math.max(2, Number(event.target.value)))}
+                      disabled={!enabledFormats['groups-ko']}
+                    />
+                    <span className="field-hint">Gruppenphase wird mit höchstens dieser Anzahl geplant.</span>
                   </div>
-                  <h3>{item.label}</h3>
-                  <p>{item.description}</p>
-                  <p className="muted">Geschätzte Spiele insgesamt: {item.estimatedMatches}</p>
-                </button>
-              ))}
+
+                  <div className="field">
+                    <label htmlFor="max-swiss-rounds">Max. Schweizer Runden</label>
+                    <input
+                      id="max-swiss-rounds"
+                      type="number"
+                      min="1"
+                      max="30"
+                      value={effectiveMaxSwissRounds}
+                      onChange={(event) => setMaxSwissRounds(Math.max(1, Number(event.target.value)))}
+                      disabled={!enabledFormats['swiss-ko']}
+                    />
+                    <span className="field-hint">Die Empfehlung überschreitet diese Rundenzahl nicht.</span>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="knockout-qualifiers">Qualifizierte für K.-o.</label>
+                    <input
+                      id="knockout-qualifiers"
+                      type="number"
+                      min="2"
+                      max={Math.max(2, participantCount)}
+                      value={effectiveKnockoutQualifierCount}
+                      onChange={(event) => setKnockoutQualifierCount(Math.max(2, Number(event.target.value)))}
+                      disabled={!enabledFormats['groups-ko'] && !enabledFormats['swiss-ko']}
+                    />
+                    <span className="field-hint">Anzahl der bestplatzierten Teilnehmer, die nach Gruppen oder Schweizer System in die K.-o.-Phase einziehen.</span>
+                  </div>
+                </div>
+
+                <fieldset className="format-toggle-group">
+                  <legend>Erlaubte Turniersysteme</legend>
+                  {(Object.keys(formatLabels) as SupportedFormatId[]).map((formatId) => (
+                    <label className="format-toggle" key={formatId}>
+                      <input
+                        type="checkbox"
+                        checked={enabledFormats[formatId]}
+                        onChange={() => toggleFormat(formatId)}
+                      />
+                      <span>{formatLabels[formatId]}</span>
+                    </label>
+                  ))}
+                </fieldset>
+              </aside>
             </div>
           </section>
         )}
@@ -259,6 +529,12 @@ export function CreateTournamentPage() {
           <section>
             <h2>Best-of pro Phase</h2>
             <p className="muted">Jede Phase erhält ihre eigene Satzlänge. Best-of-1 ist besonders für kompakte Gruppenphasen verfügbar.</p>
+            {selectedRecommendation && (
+              <div className="selected-format-summary">
+                <span className="badge">Gewählte Turnierform</span>
+                <strong>{selectedRecommendation.label}</strong>
+              </div>
+            )}
             <div className="phase-config-list">
               {phases.map((phase, index) => (
                 <article className="phase-config" key={phase.key}>
@@ -289,6 +565,7 @@ export function CreateTournamentPage() {
                 <div><dt>Teilnehmer</dt><dd>{participantCount}</dd></div>
                 <div><dt>Tische</dt><dd>{tables}</dd></div>
                 <div><dt>Mindestspiele</dt><dd>{minimumMatches}</dd></div>
+                <div><dt>Turnierform</dt><dd>{selectedRecommendation?.label ?? '—'}</dd></div>
               </dl>
             </div>
           </section>

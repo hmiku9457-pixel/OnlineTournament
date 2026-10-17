@@ -7,7 +7,7 @@ The engine must stay deterministic and UI-independent.
 Example:
 
 1. SWISS – 5 rounds
-2. KNOCKOUT – Top 8
+2. KNOCKOUT – 8 Qualifizierte
 3. PLACEMENT – optional places 5–8
 
 A stage receives participants and produces rankings/qualifiers for the next stage. Advancement is automatic by default but may be manually overridden by authorized staff, e.g. after a withdrawal.

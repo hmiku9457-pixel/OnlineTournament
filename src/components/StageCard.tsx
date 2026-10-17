@@ -9,7 +9,7 @@ export function StageCard({ stage }: { stage: TournamentStage }) {
       <div>
         Qualifikation:{' '}
         {stage.advancement.type === 'top_n'
-          ? `Top ${stage.advancement.value}`
+          ? `${stage.advancement.value} Qualifizierte`
           : stage.advancement.type === 'percentage'
             ? `${stage.advancement.value}%`
             : 'manuell'}

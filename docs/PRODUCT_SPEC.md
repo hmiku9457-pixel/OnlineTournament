@@ -27,7 +27,7 @@ Tournament creation is a staged wizard:
 1. enter basic data (name, sport, discipline, tables),
 2. enter participants; participant count is derived and is never required up front,
 3. choose desired minimum matches,
-4. choose from the calculated format recommendations,
+4. choose from the calculated format recommendations; a right-side settings panel can limit the maximum group count, maximum Swiss rounds and number of knockout qualifiers, and can exclude individual tournament systems from the recommendation pool,
 5. configure Best-of independently for every generated phase.
 
 ## Table tennis
@@ -50,7 +50,7 @@ Required person fields:
 
 Optional fields include club, rating and birth year. Persons exist only inside one tournament.
 
-A doubles pair is represented as one competitive participant with two person members.
+A doubles pair is represented as one competitive participant with two person members. Participant entry uses one compact input mask; only completed entries are added to the participant list. Saved entries can be edited from the list, and validation identifies the concrete missing field rather than reporting an unrelated minimum-participant error.
 
 ## Seeding & draws
 
