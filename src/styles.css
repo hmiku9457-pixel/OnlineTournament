@@ -610,3 +610,53 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   .participant-step-head { align-items: flex-start; flex-direction: column; }
   .queue-row-actions { grid-column: 2 / -1; }
 }
+
+/* Tournament control compact table-management pass */
+.control-head { margin-bottom: 10px; }
+.control-head h1 { font-size: clamp(1.45rem, 2.4vw, 1.95rem); }
+.control-head p { margin-top: 3px; font-size: .85rem; }
+.control-back-button { margin-bottom: 5px; }
+.control-tabs { margin-bottom: 12px; padding: 3px; }
+.control-tab { padding: 7px 12px; }
+.control-overview-stack { gap: 14px; }
+.control-section-head p { margin-top: 1px; font-size: .8rem; }
+.control-section-spaced { margin-top: 14px; }
+.control-table-section-head { align-items: flex-end; }
+.control-table-head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 7px; }
+.overview-table-grid { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; margin-top: 8px; }
+.overview-table-card { gap: 6px; min-height: 118px; padding: 11px 12px; }
+.overview-table-card > .muted { font-size: .72rem; line-height: 1.2; }
+.table-status-top { min-height: 24px; }
+.overview-table-match { gap: 5px; font-size: .86rem; }
+.overview-table-match span { font-size: 1rem; }
+.free-table-message { min-height: 52px; gap: 2px; padding: 5px 8px; text-align: center; justify-items: center; }
+.free-table-message strong { font-size: .84rem; }
+.free-table-message span { font-size: .72rem; line-height: 1.25; text-align: center; }
+.quick-result-entry { gap: 5px; }
+.quick-result-entry input { padding: 5px 7px; font-size: .8rem; }
+.assigned-match-actions { gap: 5px; }
+.assigned-match-actions .btn { padding: 5px 7px; font-size: .74rem; }
+.control-overview-columns { gap: 12px; grid-template-columns: minmax(0, 1fr) 280px; }
+.control-side { gap: 9px; }
+.control-side .card { padding: 12px; }
+.control-side .card h3 { margin-bottom: 7px; }
+.control-metrics-grid { gap: 8px 10px; margin-top: 8px; }
+.control-metrics-grid > div { min-width: 0; gap: 1px; }
+.control-metrics-grid .muted { display: block; min-width: 0; font-size: .68rem; line-height: 1.15; overflow-wrap: anywhere; }
+.control-metrics-grid strong { font-size: 1rem; line-height: 1.15; }
+.match-queue { gap: 6px; }
+.match-queue-row.expanded { padding-top: 8px; padding-bottom: 8px; }
+.match-queue-main { gap: 1px; }
+.match-queue-main > strong { line-height: 1.15; }
+.pause-time { font-size: .66rem; }
+.table-assignment-picker { margin-top: 5px; padding: 5px; }
+
+@media (max-width: 1000px) {
+  .control-table-section-head { align-items: flex-start; }
+  .control-overview-columns { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .control-table-head-actions { justify-content: flex-start; }
+  .overview-table-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+}

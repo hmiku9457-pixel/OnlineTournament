@@ -194,6 +194,18 @@ export function TournamentControlPage() {
     refreshRuntime();
   }
 
+  function autoAssignWaitingMatches() {
+    const waitingMatches = nextMatches.filter((match) => match.status === 'WAITING');
+    const assignments = Math.min(waitingMatches.length, freeTables.length);
+
+    for (let index = 0; index < assignments; index += 1) {
+      assignMockMatchToTable(tournament, waitingMatches[index].id, freeTables[index]);
+    }
+
+    setAssigningMatchId(null);
+    refreshRuntime();
+  }
+
   return (
     <>
       <header className="control-head">
@@ -228,7 +240,23 @@ export function TournamentControlPage() {
       {tab === 'overview' && (
         <section className="control-overview-stack">
           <div>
-            <div className="control-section-head"><div><h2>Tische</h2><p className="muted">Alle Spielorte auf einen Blick – auch freie Tische bleiben sichtbar.</p></div><span className="badge live">{tableMatches.length} belegt / zugewiesen</span></div>
+            <div className="control-section-head control-table-section-head">
+              <div>
+                <h2>Tische</h2>
+                <p className="muted">Alle Spielorte auf einen Blick – auch freie Tische bleiben sichtbar.</p>
+              </div>
+              <div className="control-table-head-actions">
+                <span className="badge live">{tableMatches.length} belegt / zugewiesen</span>
+                <button
+                  className="btn small primary"
+                  type="button"
+                  disabled={freeTables.length === 0 || !nextMatches.some((match) => match.status === 'WAITING')}
+                  onClick={autoAssignWaitingMatches}
+                >
+                  Automatisch zuweisen
+                </button>
+              </div>
+            </div>
             <div className="overview-table-grid">
               {Array.from({ length: tournament.tables }, (_, index) => {
                 const tableName = `Tisch ${index + 1}`;
