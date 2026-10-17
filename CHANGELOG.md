@@ -1,3 +1,9 @@
+
+## 0.1.1
+- Hinzugefügt: großer Demo-/Testpool mit aktiven Turnieren für die grafische Beurteilung verschiedener Turnierformen.
+- Verbessert: Dashboard zeigt mehrere aktive Beispielturniere mit unterschiedlichen Formaten.
+- Verbessert: Turnierdetailseite liest Demo-Turniere dynamisch nach ID und zeigt reichhaltigere Phaseninformationen.
+
 # Changelog
 
 ## Unreleased

@@ -334,3 +334,43 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color:
     text-align: left;
   }
 }
+
+/* Demo test pool */
+.span-3 { grid-column: span 3; }
+.metric-small { font-size: 1.4rem; line-height: 1.2; }
+.demo-pool-note { background: #fffbeb; border-color: #fedf89; }
+.tournament-preview-card { display: grid; gap: 14px; }
+.tournament-preview-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.tournament-preview-title-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tournament-preview-title-row h3 { margin: 0; }
+.tournament-preview-head p { margin: 4px 0 0; }
+.tournament-preview-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.tournament-preview-meta > div,
+.tournament-profile-grid > div,
+.tournament-mini-facts > div,
+.stage-card-meta > div { display: grid; gap: 3px; }
+.tournament-preview-foot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 6px; border-top: 1px solid #eaecf0; }
+.tournament-page-status-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.tournament-page-status-row h1 { margin: 0; }
+.tournament-profile-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 18px; }
+.tournament-mini-facts { display: grid; gap: 12px; margin-top: 14px; }
+.stage-card { display: grid; gap: 10px; }
+.stage-card-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.stage-card-order { color: #667085; font-size: .82rem; font-weight: 700; }
+.stage-card h3 { margin: 0; }
+.stage-card p { margin: 0; }
+.stage-card-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-top: 8px; border-top: 1px solid #eaecf0; }
+
+@media (max-width: 1100px) {
+  .span-3 { grid-column: span 6; }
+  .tournament-profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .span-3 { grid-column: span 12; }
+  .tournament-preview-head,
+  .tournament-preview-foot { flex-direction: column; align-items: flex-start; }
+  .tournament-preview-meta,
+  .tournament-profile-grid,
+  .stage-card-meta { grid-template-columns: 1fr; }
+}
