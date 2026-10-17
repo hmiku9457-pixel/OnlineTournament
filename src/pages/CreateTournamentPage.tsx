@@ -285,6 +285,7 @@ function NumberChoice({
 export function CreateTournamentPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<WizardStep>(1);
+  const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(false);
   const [name, setName] = useState('');
   const [sport, setSport] = useState('table_tennis');
   const [discipline, setDiscipline] = useState<Discipline>('SINGLES');
@@ -418,6 +419,27 @@ export function CreateTournamentPage() {
   function removeParticipant(id: string) {
     setParticipants((current) => current.filter((participant) => participant.id !== id));
     if (editingParticipantId === id) resetParticipantEditor();
+  }
+
+  function generateTestParticipants() {
+    const targetCount = 19;
+    setParticipants((current) => {
+      const next = [...current];
+      let sequence = 1;
+      while (next.length < targetCount) {
+        const suffix = String(sequence).padStart(2, '0');
+        const firstName = 'Test';
+        const lastName = `Spieler ${suffix}`;
+        const partnerFirstName = discipline === 'DOUBLES' ? 'Test' : '';
+        const partnerLastName = discipline === 'DOUBLES' ? `Partner ${suffix}` : '';
+        const candidate: ParticipantFields = { firstName, lastName, partnerFirstName, partnerLastName };
+        const duplicate = validateParticipant(candidate, discipline, next, null);
+        if (Object.keys(duplicate).length === 0) next.push(newParticipant(candidate));
+        sequence += 1;
+      }
+      return next;
+    });
+    resetParticipantEditor();
   }
 
   function toggleSystem(systemId: TournamentSystemId) {
@@ -579,6 +601,7 @@ export function CreateTournamentPage() {
       if (phaseDrafts.length === 0 && selectedRecommendation) {
         setPhaseDrafts(selectedRecommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount)));
       }
+      setHasVisitedPhaseStep(true);
       setStep(5);
       return;
     }
@@ -591,7 +614,7 @@ export function CreateTournamentPage() {
   }
 
   function submitTournament() {
-    if (!phaseConfigurationValid || !participantsValid) return;
+    if (step !== 5 || !hasVisitedPhaseStep || !phaseConfigurationValid || !participantsValid) return;
     const tournament = createMockTournament({
       name,
       sport,
@@ -666,7 +689,7 @@ export function CreateTournamentPage() {
         })}
       </nav>
 
-      <form className="card wizard-card" onSubmit={(event) => { event.preventDefault(); if (step === 5) submitTournament(); else goNext(); }}>
+      <div className="card wizard-card">
         {step === 1 && (
           <section>
             <h2>Grunddaten</h2>
@@ -708,7 +731,7 @@ export function CreateTournamentPage() {
 
         {step === 2 && (
           <section className="participant-step">
-            <div className="section-head compact-head">
+            <div className="section-head compact-head participant-step-head">
               <div>
                 <h2>Teilnehmer eintragen</h2>
                 <p className="muted">
@@ -717,6 +740,9 @@ export function CreateTournamentPage() {
                     : `${participantCount} Doppel gespeichert.`}
                 </p>
               </div>
+              <button className="btn" type="button" onClick={generateTestParticipants} disabled={participantCount >= 19}>
+                {discipline === 'SINGLES' ? '19 Testspieler erzeugen' : '19 Testdoppel erzeugen'}
+              </button>
             </div>
 
             <div className="participant-entry-layout">
@@ -1253,11 +1279,11 @@ export function CreateTournamentPage() {
             {step < 5 ? (
               <button className="btn primary" type="button" onClick={goNext} disabled={!canContinue}>Weiter</button>
             ) : (
-              <button className="btn primary" type="submit" disabled={!phaseConfigurationValid}>Turnier erstellen</button>
+              <button className="btn primary" type="button" onClick={submitTournament} disabled={!phaseConfigurationValid || !hasVisitedPhaseStep}>Turnier erstellen</button>
             )}
           </div>
         </footer>
-      </form>
+      </div>
     </>
   );
 }

@@ -591,3 +591,22 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   .participant-inline-panel { grid-column: 2; }
   .short-set-entry { grid-template-columns: 58px minmax(0, 1fr) 54px; }
 }
+
+/* Prototype UX: quick test participants and table assignment */
+.participant-step-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.empty-dashboard-state { display: grid; justify-items: start; gap: 8px; }
+.overview-table-card.reserved { border-color: #b2ccff; background: #f5f8ff; }
+.overview-table-card.table-drop-target { border-style: dashed; transition: border-color .15s ease, background .15s ease, transform .15s ease; }
+.overview-table-card.table-drop-target:hover { border-color: #667085; background: #f9fafb; }
+.free-table-message { display: grid; gap: 4px; color: #667085; align-content: center; min-height: 86px; }
+.free-table-message strong { color: #344054; }
+.assigned-match-actions, .queue-row-actions, .table-assignment-picker { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.draggable-match { cursor: grab; }
+.draggable-match:active { cursor: grabbing; }
+.draggable-match.assigned { background: #f5f8ff; }
+.table-assignment-picker { margin-top: 8px; padding: 8px; border: 1px solid #e4e7ec; border-radius: 9px; background: #f9fafb; }
+
+@media (max-width: 700px) {
+  .participant-step-head { align-items: flex-start; flex-direction: column; }
+  .queue-row-actions { grid-column: 2 / -1; }
+}

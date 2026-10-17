@@ -1,4 +1,4 @@
-import { demoTournaments, findDemoTournament, type DemoTournament } from '@/data/demoTournaments';
+import { type DemoTournament } from '@/data/demoTournaments';
 import type { Discipline, StageType, TournamentStage, TournamentStatus } from '@/domain/types';
 
 const STORAGE_KEY = 'online-tournament:local-prototype-tournaments:v1';
@@ -115,12 +115,35 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
 }
 
 export function getAllMockTournaments(): DemoTournament[] {
-  return [...readLocalTournaments(), ...demoTournaments];
+  return readLocalTournaments();
 }
 
 export function getMockTournament(tournamentId?: string): DemoTournament {
   const local = readLocalTournaments().find((item) => item.id === tournamentId);
-  return local ?? findDemoTournament(tournamentId) ?? readLocalTournaments()[0] ?? demoTournaments[0];
+  if (local) return local;
+  const firstLocal = readLocalTournaments()[0];
+  if (firstLocal) return firstLocal;
+  return {
+    id: tournamentId ?? 'local-empty',
+    name: 'Noch kein Turnier erstellt',
+    subtitle: 'Erstelle zuerst ein lokales Testturnier.',
+    status: 'DRAFT',
+    visibility: 'PRIVATE',
+    sport: 'Tischtennis',
+    discipline: 'SINGLES',
+    participants: 0,
+    tables: 1,
+    activeTables: 0,
+    runningMatches: 0,
+    openConfirmations: 0,
+    phasesLabel: 'Keine Phasen',
+    estimatedDuration: '–',
+    lastUpdate: '–',
+    stages: [],
+    areas: [{ name: 'Standardbereich', tables: '1', preferred: '–', mode: 'offen' }],
+    participantNames: [],
+    isLocalPrototype: true,
+  };
 }
 
 export function updateMockTournamentStatus(tournamentId: string, status: TournamentStatus): DemoTournament {
@@ -139,6 +162,8 @@ export function updateMockTournamentStatus(tournamentId: string, status: Tournam
 export function removeLocalPrototypeTournaments() {
   if (typeof window === 'undefined') return;
   window.localStorage.removeItem(STORAGE_KEY);
+  window.localStorage.removeItem('online-tournament:mock-match-results:v2');
+  window.localStorage.removeItem('online-tournament:mock-match-runtime:v1');
 }
 
 export function countActiveMockTournaments() {

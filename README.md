@@ -84,7 +84,7 @@ MIT
 
 ## DB-loser Prototyp-Modus
 
-Bis zur Anbindung von Supabase kann der komplette UX-Fluss lokal getestet werden. Neu erstellte Turniere werden im Browser per `localStorage` gespeichert. Das Dashboard kombiniert diese lokalen Turniere mit dem statischen Demo-Testpool.
+Bis zur Anbindung von Supabase kann der komplette UX-Fluss lokal getestet werden. Neu erstellte Turniere werden im Browser per `localStorage` gespeichert. Das Dashboard zeigt ausschließlich diese lokal erstellten Turniere; ein statischer Demo-Testpool wird nicht mehr mitgeliefert.
 
 Klickbare Prototyp-Oberflächen:
 

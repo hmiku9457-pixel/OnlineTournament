@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { StageCard } from '@/components/StageCard';
 import type { MatchSet, TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
-import { completeMockMatch, getMockRuntimeMatches, getRuntimeParticipantNames, type MockRuntimeMatch } from '@/services/mockRuntime';
+import { assignMockMatchToTable, completeMockMatch, getMockRuntimeMatches, getRuntimeParticipantNames, startMockMatch, unassignMockMatch, type MockRuntimeMatch } from '@/services/mockRuntime';
 import { getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 
 type ControlTab = 'overview' | 'flow' | 'matches' | 'participants' | 'stages';
@@ -162,14 +162,37 @@ export function TournamentControlPage() {
   const [runtimeVersion, setRuntimeVersion] = useState(0);
   const [participantPanel, setParticipantPanel] = useState<{ name: string; mode: 'edit' | 'games' } | null>(null);
   const [withdrawn, setWithdrawn] = useState<Set<string>>(new Set());
+  const [assigningMatchId, setAssigningMatchId] = useState<string | null>(null);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament, runtimeVersion]);
   const participants = useMemo(() => getRuntimeParticipantNames(tournament), [tournament]);
   const liveMatches = matches.filter((match) => match.status === 'LIVE' || match.status === 'CONFIRMATION');
   const nextMatches = matches.filter((match) => match.status === 'READY' || match.status === 'WAITING');
-  const matchesByTable = new Map(liveMatches.map((match) => [match.table, match]));
+  const tableMatches = matches.filter((match) => ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch '));
+  const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
+  const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table));
 
   function setStatus(status: TournamentStatus) {
     setTournament(updateMockTournamentStatus(tournament.id, status));
+  }
+
+  function refreshRuntime() {
+    setRuntimeVersion((value) => value + 1);
+  }
+
+  function assignToTable(matchId: string, table: string) {
+    if (!assignMockMatchToTable(tournament, matchId, table)) return;
+    setAssigningMatchId(null);
+    refreshRuntime();
+  }
+
+  function startAssignedMatch(matchId: string) {
+    startMockMatch(matchId);
+    refreshRuntime();
+  }
+
+  function releaseAssignedMatch(matchId: string) {
+    unassignMockMatch(matchId);
+    refreshRuntime();
   }
 
   return (
@@ -206,21 +229,48 @@ export function TournamentControlPage() {
       {tab === 'overview' && (
         <section className="control-overview-stack">
           <div>
-            <div className="control-section-head"><div><h2>Tische</h2><p className="muted">Alle Spielorte auf einen Blick – auch freie Tische bleiben sichtbar.</p></div><span className="badge live">{liveMatches.length} belegt</span></div>
+            <div className="control-section-head"><div><h2>Tische</h2><p className="muted">Alle Spielorte auf einen Blick – auch freie Tische bleiben sichtbar.</p></div><span className="badge live">{tableMatches.length} belegt / zugewiesen</span></div>
             <div className="overview-table-grid">
               {Array.from({ length: tournament.tables }, (_, index) => {
                 const tableName = `Tisch ${index + 1}`;
                 const match = matchesByTable.get(tableName);
+                const isLive = match?.status === 'LIVE' || match?.status === 'CONFIRMATION';
+                const isReady = match?.status === 'READY';
                 return (
-                  <article className={match ? 'card overview-table-card busy' : 'card overview-table-card'} key={tableName}>
-                    <div className="table-status-top"><strong>{tableName}</strong><span className={match ? 'badge live' : 'badge'}>{match ? 'läuft' : 'frei'}</span></div>
+                  <article
+                    className={match ? `card overview-table-card busy ${isReady ? 'reserved' : ''}` : 'card overview-table-card table-drop-target'}
+                    key={tableName}
+                    onDragOver={(event) => { if (!match) event.preventDefault(); }}
+                    onDrop={(event) => {
+                      if (match) return;
+                      event.preventDefault();
+                      const matchId = event.dataTransfer.getData('text/mock-match-id');
+                      if (matchId) assignToTable(matchId, tableName);
+                    }}
+                  >
+                    <div className="table-status-top">
+                      <strong>{tableName}</strong>
+                      <span className={isLive ? 'badge live' : isReady ? 'badge ready' : 'badge'}>{isLive ? 'läuft' : isReady ? 'zugewiesen' : 'frei'}</span>
+                    </div>
                     {match ? (
                       <>
                         <span className="muted">{match.phase} · {match.round} · BO{match.bestOf}</span>
                         <div className="overview-table-match"><strong>{match.sideA}</strong><span>{match.score}</span><strong>{match.sideB}</strong></div>
-                        <QuickResultEntry match={match} onSaved={() => setRuntimeVersion((value) => value + 1)} />
+                        {isReady ? (
+                          <div className="assigned-match-actions">
+                            <button className="btn small primary" type="button" onClick={() => startAssignedMatch(match.id)}>Spiel starten</button>
+                            <button className="btn small" type="button" onClick={() => releaseAssignedMatch(match.id)}>Zuweisung lösen</button>
+                          </div>
+                        ) : (
+                          <QuickResultEntry match={match} onSaved={refreshRuntime} />
+                        )}
                       </>
-                    ) : <div className="free-table-message">Frei für die nächste Partie</div>}
+                    ) : (
+                      <div className="free-table-message">
+                        <strong>Frei für die nächste Partie</strong>
+                        <span>Spiel hierher ziehen oder über „Zuweisen“ auswählen.</span>
+                      </div>
+                    )}
                   </article>
                 );
               })}
@@ -232,15 +282,41 @@ export function TournamentControlPage() {
               <div className="control-section-head control-section-spaced"><div><h2>Nächste Spiele</h2><p className="muted">Pausenzeit zeigt, wie lange jeder Teilnehmer seit seinem letzten Spiel frei hat.</p></div></div>
               <div className="match-queue">
                 {nextMatches.map((match, index) => (
-                  <article className="match-queue-row expanded" key={match.id}>
+                  <article
+                    className={`match-queue-row expanded draggable-match ${match.status === 'READY' ? 'assigned' : ''}`}
+                    key={match.id}
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData('text/mock-match-id', match.id);
+                      event.dataTransfer.effectAllowed = 'move';
+                    }}
+                  >
                     <span className="queue-position">{index + 1}</span>
                     <div className="match-queue-main">
                       <strong>{match.sideA} <em className="pause-time">{match.pauseA} Min. Pause</em></strong>
                       <strong>{match.sideB} <em className="pause-time">{match.pauseB} Min. Pause</em></strong>
                       <span className="muted">{match.phase} · {match.round}{match.note ? ` · ${match.note}` : ''}</span>
+                      {assigningMatchId === match.id && (
+                        <div className="table-assignment-picker">
+                          {freeTables.length === 0 ? (
+                            <span className="muted">Aktuell ist kein Tisch frei.</span>
+                          ) : freeTables.map((table) => (
+                            <button className="btn small" type="button" key={table} onClick={() => assignToTable(match.id, table)}>{table}</button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <span className={match.status === 'READY' ? 'badge ready' : 'badge'}>{match.table}</span>
-                    <button className="btn small" type="button">{match.status === 'READY' ? 'Aufrufen' : 'Zuweisen'}</button>
+                    <div className="queue-row-actions">
+                      {match.status === 'READY' ? (
+                        <>
+                          <button className="btn small primary" type="button" onClick={() => startAssignedMatch(match.id)}>Starten</button>
+                          <button className="btn small" type="button" onClick={() => releaseAssignedMatch(match.id)}>Lösen</button>
+                        </>
+                      ) : (
+                        <button className="btn small" type="button" onClick={() => setAssigningMatchId((current) => current === match.id ? null : match.id)}>Zuweisen</button>
+                      )}
+                    </div>
                   </article>
                 ))}
               </div>
@@ -249,7 +325,7 @@ export function TournamentControlPage() {
               <div className="card control-status-card">
                 <h3>Turnierstatus</h3>
                 <div className="control-metrics-grid">
-                  <div><span className="muted">Belegte Tische</span><strong>{liveMatches.length}/{tournament.tables}</strong></div>
+                  <div><span className="muted">Belegte/Zugewiesene Tische</span><strong>{tableMatches.length}/{tournament.tables}</strong></div>
                   <div><span className="muted">Wartende Spiele</span><strong>{nextMatches.length}</strong></div>
                   <div><span className="muted">Offene Bestätigungen</span><strong>{tournament.openConfirmations}</strong></div>
                   <div><span className="muted">Restzeit grob</span><strong>{tournament.estimatedDuration}</strong></div>

@@ -29,7 +29,14 @@ interface StoredMatchResult {
   confirmedB?: boolean;
 }
 
+interface StoredMatchRuntime {
+  matchId: string;
+  table?: string;
+  status?: MockMatchState;
+}
+
 const RESULT_KEY = 'online-tournament:mock-match-results:v2';
+const RUNTIME_KEY = 'online-tournament:mock-match-runtime:v1';
 
 const firstNames = [
   'Max', 'Lukas', 'Jonas', 'Leon', 'Tim', 'Felix', 'Paul', 'Ben', 'Noah', 'Elias', 'Nico', 'Jan',
@@ -55,6 +62,30 @@ function writeResults(results: StoredMatchResult[]) {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(RESULT_KEY, JSON.stringify(results));
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
+}
+
+function readRuntime(): StoredMatchRuntime[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(RUNTIME_KEY) ?? '[]') as StoredMatchRuntime[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeRuntime(states: StoredMatchRuntime[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(RUNTIME_KEY, JSON.stringify(states));
+  window.dispatchEvent(new CustomEvent('mock-runtime-change'));
+}
+
+function updateRuntime(matchId: string, update: Omit<StoredMatchRuntime, 'matchId'>) {
+  const current = readRuntime();
+  const previous = current.find((item) => item.matchId === matchId) ?? { matchId };
+  const next = { ...previous, ...update, matchId };
+  writeRuntime([next, ...current.filter((item) => item.matchId !== matchId)]);
+  return next;
 }
 
 function generateSingles(count: number) {
@@ -84,6 +115,24 @@ function scoreFromSets(sets: MatchSet[]) {
   return `${winsA} : ${winsB}`;
 }
 
+function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchResult[], storedRuntime: StoredMatchRuntime[]) {
+  const savedResult = storedResults.find((item) => item.matchId === match.id);
+  const savedRuntime = storedRuntime.find((item) => item.matchId === match.id);
+  const status = savedResult?.status ?? savedRuntime?.status ?? match.status;
+  return {
+    ...match,
+    table: savedRuntime?.table ?? match.table,
+    status,
+    score: savedResult ? scoreFromSets(savedResult.sets) : match.score,
+    sets: savedResult?.sets ?? match.sets,
+    note: status === 'READY'
+      ? 'Tisch zugewiesen – wartet auf Start'
+      : status === 'WAITING'
+        ? 'Wartet auf Tischzuweisung'
+        : undefined,
+  };
+}
+
 export function getMockRuntimeMatches(tournament: DemoTournament): MockRuntimeMatch[] {
   const names = getRuntimeParticipantNames(tournament);
   const currentStage = tournament.stages[0];
@@ -91,46 +140,74 @@ export function getMockRuntimeMatches(tournament: DemoTournament): MockRuntimeMa
   const stageId = currentStage?.id ?? `${tournament.id}-stage`;
   const bestOf = currentStage?.bestOf ?? 3;
   const tableCount = Math.max(1, tournament.tables);
-  const stored = readResults();
+  const storedResults = readResults();
+  const storedRuntime = readRuntime();
 
-  const liveCount = tournament.status === 'RUNNING' ? Math.min(Math.max(2, tournament.runningMatches || 3), Math.min(tableCount, 8)) : 0;
-  const live = Array.from({ length: liveCount }, (_, index): MockRuntimeMatch => {
-    const id = `${tournament.id}-live-${index + 1}`;
-    const saved = stored.find((item) => item.matchId === id);
-    return {
-      id,
-      table: `Tisch ${index + 1}`,
-      sideA: participantAt(names, index * 2),
-      sideB: participantAt(names, index * 2 + 1),
-      score: saved ? scoreFromSets(saved.sets) : index % 3 === 0 ? '2 : 1' : index % 3 === 1 ? '1 : 1' : '1 : 2',
-      status: saved?.status ?? (index === liveCount - 1 && tournament.openConfirmations > 0 ? 'CONFIRMATION' : 'LIVE'),
-      phase,
-      stageId,
-      bestOf,
-      pauseA: 12 + ((index * 7) % 19),
-      pauseB: 5 + ((index * 11) % 23),
-      sets: saved?.sets,
-      round: currentStage?.type === 'SWISS' ? 'Runde 3' : currentStage?.type === 'GROUPS' ? `Gruppe ${String.fromCharCode(65 + (index % Math.max(1, Number(currentStage.settings.groups) || 4)))}` : 'Aktuelle Runde',
-    };
-  });
+  const liveCount = tournament.status === 'RUNNING'
+    ? Math.min(Math.max(0, tournament.runningMatches), Math.min(tableCount, 4))
+    : 0;
 
-  const ready = Array.from({ length: Math.min(7, Math.max(3, tournament.participants - liveCount * 2)) }, (_, index): MockRuntimeMatch => ({
+  const live = Array.from({ length: liveCount }, (_, index): MockRuntimeMatch => applyStoredState({
+    id: `${tournament.id}-live-${index + 1}`,
+    table: `Tisch ${index + 1}`,
+    sideA: participantAt(names, index * 2),
+    sideB: participantAt(names, index * 2 + 1),
+    score: index % 3 === 0 ? '2 : 1' : index % 3 === 1 ? '1 : 1' : '1 : 2',
+    status: index === liveCount - 1 && tournament.openConfirmations > 0 ? 'CONFIRMATION' : 'LIVE',
+    phase,
+    stageId,
+    bestOf,
+    pauseA: 12 + ((index * 7) % 19),
+    pauseB: 5 + ((index * 11) % 23),
+    round: currentStage?.type === 'SWISS'
+      ? 'Runde 3'
+      : currentStage?.type === 'GROUPS'
+        ? `Gruppe ${String.fromCharCode(65 + (index % Math.max(1, Number(currentStage.settings.groups) || 4)))}`
+        : 'Aktuelle Runde',
+  }, storedResults, storedRuntime));
+
+  const queuedCount = Math.min(10, Math.max(4, tournament.participants - liveCount * 2));
+  const queued = Array.from({ length: queuedCount }, (_, index): MockRuntimeMatch => applyStoredState({
     id: `${tournament.id}-ready-${index + 1}`,
-    table: index < Math.max(1, tableCount - liveCount) ? `Tisch ${liveCount + index + 1}` : 'Noch offen',
+    table: 'Noch offen',
     sideA: participantAt(names, liveCount * 2 + index * 2),
     sideB: participantAt(names, liveCount * 2 + index * 2 + 1),
     score: '–',
-    status: index < Math.max(1, tableCount - liveCount) ? 'READY' : 'WAITING',
+    status: 'WAITING',
     phase,
     stageId,
     bestOf,
     pauseA: 3 + ((index * 6) % 28),
     pauseB: 8 + ((index * 9) % 24),
-    round: currentStage?.type === 'SWISS' ? 'Runde 3' : currentStage?.type === 'GROUPS' ? `Gruppe ${String.fromCharCode(65 + (index % Math.max(1, Number(currentStage.settings.groups) || 4)))}` : 'Nächstes Spiel',
-    note: index >= Math.max(1, tableCount - liveCount) ? 'Wartet auf freien Tisch' : undefined,
-  }));
+    round: currentStage?.type === 'SWISS'
+      ? 'Runde 3'
+      : currentStage?.type === 'GROUPS'
+        ? `Gruppe ${String.fromCharCode(65 + (index % Math.max(1, Number(currentStage.settings.groups) || 4)))}`
+        : 'Nächstes Spiel',
+    note: 'Wartet auf Tischzuweisung',
+  }, storedResults, storedRuntime));
 
-  return [...live, ...ready];
+  return [...live, ...queued];
+}
+
+export function assignMockMatchToTable(tournament: DemoTournament, matchId: string, table: string) {
+  const matches = getMockRuntimeMatches(tournament);
+  const occupied = matches.some((match) => (
+    match.id !== matchId
+    && match.table === table
+    && ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status)
+  ));
+  if (occupied) return false;
+  updateRuntime(matchId, { table, status: 'READY' });
+  return true;
+}
+
+export function unassignMockMatch(matchId: string) {
+  updateRuntime(matchId, { table: 'Noch offen', status: 'WAITING' });
+}
+
+export function startMockMatch(matchId: string) {
+  updateRuntime(matchId, { status: 'LIVE' });
 }
 
 export function completeMockMatch(matchId: string, sets: MatchSet[], status: MockMatchState = 'FINISHED') {
@@ -159,14 +236,20 @@ export function getMockPlayerSnapshot(tournament: DemoTournament) {
   const player = participants[0] ?? 'Max Mustermann';
   const matches = getMockRuntimeMatches(tournament);
   const ownLive = matches.find((match) => (match.status === 'LIVE' || match.status === 'CONFIRMATION') && (match.sideA === player || match.sideB === player));
-  const next = matches.find((match) => match.status === 'READY' && (match.sideA === player || match.sideB === player)) ?? matches.find((match) => match.status === 'READY');
+  const next = matches.find((match) => match.status === 'READY' && (match.sideA === player || match.sideB === player))
+    ?? matches.find((match) => match.status === 'WAITING' && (match.sideA === player || match.sideB === player))
+    ?? matches.find((match) => match.status === 'READY' || match.status === 'WAITING');
   return {
     player,
     playerCode: '4821',
     matchCode: 'A7K2',
     currentMatch: ownLive,
     nextMatch: next,
-    standing: tournament.stages[0]?.type === 'GROUPS' ? '2. Platz · Gruppe A' : tournament.stages[0]?.type === 'SWISS' ? 'Rang 5 · 3:1' : 'Noch im Turnier',
+    standing: tournament.stages[0]?.type === 'GROUPS'
+      ? '2. Platz · Gruppe A'
+      : tournament.stages[0]?.type === 'SWISS'
+        ? 'Rang 5 · 3:1'
+        : 'Noch im Turnier',
   };
 }
 
