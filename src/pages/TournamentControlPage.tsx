@@ -252,7 +252,6 @@ export function TournamentControlPage() {
                     {match ? (
                       <>
                         <span className="muted">{match.phase} · {match.round} · BO{match.bestOf}</span>
-                        <div className="overview-table-match"><strong>{match.sideA}</strong><span>{match.score}</span><strong>{match.sideB}</strong></div>
                         <SetBySetEntry match={match} onSaved={refreshRuntime} compact />
                       </>
                     ) : (

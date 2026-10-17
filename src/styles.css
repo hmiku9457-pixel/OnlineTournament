@@ -689,29 +689,29 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 }
 
 /* Satzweise Ergebniseingabe */
-.set-by-set-entry { display: grid; gap: 12px; }
-.played-set-history { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.played-set-history::before { content: 'Bisher gespielt:'; color: #667085; font-size: .76rem; font-weight: 700; margin-right: 2px; }
-.played-set-chip { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 8px; border: 1px solid #d0d5dd; border-radius: 999px; background: #f9fafb; font-size: .78rem; font-weight: 800; }
-.current-set-entry-row { display: grid; grid-template-columns: minmax(100px, 130px) minmax(145px, auto); gap: 8px; align-items: end; }
+.set-by-set-entry { display: grid; gap: 10px; }
+.current-set-entry-row { display: grid; grid-template-columns: 92px max-content; gap: 8px; align-items: end; }
 .current-set-field { display: grid; gap: 4px; }
 .current-set-field > span { color: #667085; font-size: .74rem; font-weight: 800; }
-.current-set-field input { width: 100%; min-height: 34px; border: 1px solid #d0d5dd; border-radius: 8px; padding: 6px 8px; text-align: center; font-weight: 800; }
+.current-set-field input { width: 92px; height: 34px; min-height: 34px; border: 1px solid #d0d5dd; border-radius: 8px; padding: 5px 7px; text-align: center; font-weight: 800; }
 .current-set-field input:focus { border-color: #667085; outline: 2px solid rgb(102 112 133 / 14%); }
+.current-set-entry-row .btn { height: 34px; min-height: 34px; padding-block: 0; display: inline-flex; align-items: center; justify-content: center; }
 .set-entry-scoreline { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; font-size: .8rem; }
 .set-entry-scoreline span:first-child { text-align: left; }
 .set-entry-scoreline span:last-child { text-align: right; }
 .set-entry-scoreline strong { font-size: 1rem; }
-.set-by-set-entry.compact { gap: 7px; }
-.set-by-set-entry.compact .played-set-history { gap: 4px; }
-.set-by-set-entry.compact .played-set-history::before { font-size: .68rem; }
-.set-by-set-entry.compact .played-set-chip { min-height: 23px; padding: 2px 6px; font-size: .7rem; }
-.set-by-set-entry.compact .current-set-entry-row { grid-template-columns: minmax(78px, 105px) 1fr; gap: 6px; }
+.played-set-history { display: grid; justify-items: center; }
+.played-set-history ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; justify-items: center; }
+.played-set-history li { font-size: .82rem; font-weight: 800; line-height: 1.25; }
+.set-by-set-entry.compact { gap: 6px; }
+.set-by-set-entry.compact .current-set-entry-row { grid-template-columns: 76px max-content; gap: 6px; }
 .set-by-set-entry.compact .current-set-field > span { font-size: .68rem; }
-.set-by-set-entry.compact .current-set-field input { min-height: 30px; padding: 4px 6px; }
-.set-by-set-entry.compact .current-set-entry-row .btn { min-height: 30px; padding-block: 4px; }
+.set-by-set-entry.compact .current-set-field input { width: 76px; height: 30px; min-height: 30px; padding: 3px 5px; }
+.set-by-set-entry.compact .current-set-entry-row .btn { height: 30px; min-height: 30px; padding-block: 0; }
+.set-by-set-entry.compact .played-set-history li { font-size: .72rem; }
 
 @media (max-width: 600px) {
   .current-set-entry-row,
-  .set-by-set-entry.compact .current-set-entry-row { grid-template-columns: 1fr; }
+  .set-by-set-entry.compact .current-set-entry-row { grid-template-columns: minmax(72px, 92px) minmax(0, 1fr); }
+  .current-set-entry-row .btn { width: 100%; }
 }

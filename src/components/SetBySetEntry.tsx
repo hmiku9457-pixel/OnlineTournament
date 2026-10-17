@@ -88,13 +88,19 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false }: 
 
   return (
     <div className={compact ? 'set-by-set-entry compact' : 'set-by-set-entry'}>
+      <div className="set-entry-scoreline">
+        <span>{match.sideA}</span>
+        <strong>{wins.a}:{wins.b}</strong>
+        <span>{match.sideB}</span>
+      </div>
+
       {playedSets.length > 0 && (
         <div className="played-set-history" aria-label="Bisher gespielte Sätze">
-          {playedSets.map((set) => (
-            <span className="played-set-chip" key={set.number}>
-              S{set.number} {set.sideAScore}:{set.sideBScore}
-            </span>
-          ))}
+          <ul>
+            {playedSets.map((set) => (
+              <li key={set.number}>{set.sideAScore}:{set.sideBScore}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -118,11 +124,6 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false }: 
         </div>
       )}
 
-      <div className="set-entry-scoreline">
-        <span>{match.sideA}</span>
-        <strong>{wins.a}:{wins.b}</strong>
-        <span>{match.sideB}</span>
-      </div>
       {error && <div className="field-error">{error}</div>}
     </div>
   );
