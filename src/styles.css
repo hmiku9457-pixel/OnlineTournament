@@ -878,3 +878,13 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 }
 .bracket-dnd-match-label { color: #667085; font-size: .72rem; font-weight: 800; padding: 0 2px 2px; }
 .bracket-dnd-match .bracket-dnd-slot { border-radius: 7px; }
+
+/* Direct bracket editing and live competition state */
+.bracket-edit-hint { margin: 4px 0 0; font-size: .82rem; }
+.bracket-board.editable .bracket-round:first-child .bracket-match { border-color: #d0d5dd; }
+.editable-bracket-slot { cursor: grab; transition: background .12s ease, outline .12s ease; }
+.editable-bracket-slot:hover { background: #f9fafb; outline: 1px dashed #98a2b3; outline-offset: -3px; }
+.editable-bracket-slot:active { cursor: grabbing; }
+.editable-bracket-slot.bye { background: #f8fafc; }
+.bracket-seed-label { display: block; margin-top: 2px; color: #667085; font-size: .68rem; font-weight: 700; }
+.group-match-row.live { background: #ecfdf3; }

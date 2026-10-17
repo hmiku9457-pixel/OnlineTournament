@@ -1,6 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
-import { getRuntimeParticipantNames } from '@/services/mockRuntime';
+import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { generateKnockoutFirstRound } from '@/engine/bracket';
 import { isStageEditable } from '@/services/mockPhaseLifecycle';
 

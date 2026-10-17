@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type DragEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { StageCard } from '@/components/StageCard';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
@@ -6,6 +6,7 @@ import { SetBySetEntry } from '@/components/SetBySetEntry';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
 import { assignMockMatchToTable, getMockAssignmentBlockReason, getMockRuntimeMatches, getRuntimeParticipantNames } from '@/services/mockRuntime';
+import { canEditDraw, getBracketSlots, randomizeBracketSlots, setBracketSlot } from '@/services/mockDrawStore';
 import { getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
 
@@ -30,7 +31,19 @@ function statusLabel(status: TournamentStatus) {
   }
 }
 
-function StageCompetitionView({ tournamentId, stage, tournament }: { tournamentId: string; stage: TournamentStage; tournament: ReturnType<typeof getMockTournament> }) {
+const BRACKET_DRAG_TYPE = 'text/online-tournament-bracket-slot';
+
+function StageCompetitionView({
+  tournamentId,
+  stage,
+  tournament,
+  onDrawChanged,
+}: {
+  tournamentId: string;
+  stage: TournamentStage;
+  tournament: ReturnType<typeof getMockTournament>;
+  onDrawChanged?: () => void;
+}) {
   if (stage.type === 'GROUPS') {
     const groups = buildMockGroups(tournament, stage);
     return (
@@ -47,12 +60,11 @@ function StageCompetitionView({ tournamentId, stage, tournament }: { tournamentI
                 ))}
               </div>
               <div className="group-match-list">
-                {group.matches.slice(0, 8).map((match, index) => (
-                  <div className="group-match-row" key={`${match.sideA}-${match.sideB}-${index}`}>
+                {group.matches.map((match) => (
+                  <div className={match.status === 'live' ? 'group-match-row live' : 'group-match-row'} key={match.id}>
                     <span>{match.sideA}</span><strong>{match.score}</strong><span>{match.sideB}</span>
                   </div>
                 ))}
-                {group.matches.length > 8 && <div className="muted group-more-games">+ {group.matches.length - 8} weitere Spiele</div>}
               </div>
             </article>
           ))}
@@ -78,19 +90,74 @@ function StageCompetitionView({ tournamentId, stage, tournament }: { tournamentI
 
   if (stage.type === 'KNOCKOUT' || stage.type === 'DOUBLE_ELIMINATION' || stage.type === 'PLACEMENT') {
     const rounds = buildMockBracket(tournament, stage);
+    const editable = canEditDraw(tournament, stage) && (stage.type === 'KNOCKOUT' || stage.type === 'DOUBLE_ELIMINATION');
+    const slots = editable ? getBracketSlots(tournament, stage) : [];
+    const seededParticipants = getRuntimeParticipantNames(tournament).slice(0, Math.max(2, Math.min(tournament.participants, Number(stage.settings.entrants) || tournament.participants)));
+
+    function seedLabel(name: string) {
+      const index = seededParticipants.indexOf(name);
+      return index >= 0 ? `Seed ${index + 1}` : '';
+    }
+
+    function handleBracketDrop(event: DragEvent<HTMLDivElement>, slotIndex: number) {
+      if (!editable) return;
+      event.preventDefault();
+      const value = event.dataTransfer.getData(BRACKET_DRAG_TYPE);
+      if (!value) return;
+      if (setBracketSlot(tournament, stage, slotIndex, value)) onDrawChanged?.();
+    }
+
     return (
       <section className="competition-stage-section">
-        <div className="competition-stage-head"><div><span className="badge">{stage.type === 'DOUBLE_ELIMINATION' ? 'DOPPEL-K.-O.' : 'K.-O.'}</span><h3>{stage.name}</h3></div></div>
+        <div className="competition-stage-head">
+          <div>
+            <span className="badge">{stage.type === 'DOUBLE_ELIMINATION' ? 'DOPPEL-K.-O.' : 'K.-O.'}</span>
+            <h3>{stage.name}</h3>
+            {editable && <p className="muted bracket-edit-hint">Startplätze direkt im Baum per Drag & Drop verschieben.</p>}
+          </div>
+          {editable && (
+            <button className="btn small" type="button" onClick={() => { if (randomizeBracketSlots(tournament, stage)) onDrawChanged?.(); }}>
+              Neue Zufallsverteilung
+            </button>
+          )}
+        </div>
         <div className="bracket-scroll">
-          <div className="bracket-board">
-            {rounds.map((round) => (
+          <div className={editable ? 'bracket-board editable' : 'bracket-board'}>
+            {rounds.map((round, roundIndex) => (
               <div className="bracket-round" key={round.label}>
                 <h4>{round.label}</h4>
                 <div className="bracket-round-matches">
-                  {round.matches.map((match) => (
+                  {round.matches.map((match, matchIndex) => (
                     <article className="bracket-match" key={match.id}>
-                      <div className={match.winner === match.sideA ? 'winner' : ''}><span>{match.sideA}</span><strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[0] : ''}</strong></div>
-                      <div className={match.winner === match.sideB ? 'winner' : ''}><span>{match.sideB}</span><strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[1] : match.score === 'Freilos' ? 'BYE' : ''}</strong></div>
+                      {[match.sideA, match.sideB].map((side, sideIndex) => {
+                        const slotIndex = matchIndex * 2 + sideIndex;
+                        const isEditableSlot = editable && roundIndex === 0 && slotIndex < slots.length;
+                        const winner = match.winner === side;
+                        return (
+                          <div
+                            className={`${winner ? 'winner ' : ''}${isEditableSlot ? 'editable-bracket-slot' : ''}${side === 'Freilos' ? ' bye' : ''}`.trim()}
+                            key={`${match.id}-${sideIndex}`}
+                            draggable={isEditableSlot}
+                            onDragStart={(event) => {
+                              if (!isEditableSlot) return;
+                              event.dataTransfer.setData(BRACKET_DRAG_TYPE, side);
+                              event.dataTransfer.effectAllowed = 'move';
+                            }}
+                            onDragOver={(event) => {
+                              if (!isEditableSlot) return;
+                              event.preventDefault();
+                              event.dataTransfer.dropEffect = 'move';
+                            }}
+                            onDrop={(event) => handleBracketDrop(event, slotIndex)}
+                          >
+                            <span>
+                              {side}
+                              {isEditableSlot && side !== 'Freilos' && <small className="bracket-seed-label">{seedLabel(side)}</small>}
+                            </span>
+                            <strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : match.score === 'Freilos' && side === 'Freilos' ? 'BYE' : ''}</strong>
+                          </div>
+                        );
+                      })}
                     </article>
                   ))}
                 </div>
@@ -401,7 +468,7 @@ export function TournamentControlPage() {
                 stage={stage}
                 onChanged={() => setDrawVersion((value) => value + 1)}
               />
-              <StageCompetitionView tournamentId={tournament.id} tournament={tournament} stage={stage} />
+              <StageCompetitionView tournamentId={tournament.id} tournament={tournament} stage={stage} onDrawChanged={() => setDrawVersion((value) => value + 1)} />
             </div>
           ))}
         </section>

@@ -1,7 +1,11 @@
 import type { DemoTournament } from '@/data/demoTournaments';
-import type { MatchSet } from '@/domain/types';
+import type { MatchSet, TournamentStage } from '@/domain/types';
 import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
-import { completeStage, getActiveStage } from '@/services/mockPhaseLifecycle';
+import { completeStage, getActiveStage, isStageStarted } from '@/services/mockPhaseLifecycle';
+import { getRuntimeParticipantNames } from '@/services/mockParticipants';
+import { getBracketSlots, getGroupAssignments } from '@/services/mockDrawStore';
+
+export { getRuntimeParticipantNames } from '@/services/mockParticipants';
 
 export type MockMatchState = 'LIVE' | 'READY' | 'WAITING' | 'CONFIRMATION' | 'FINISHED';
 
@@ -36,18 +40,16 @@ interface StoredMatchRuntime {
   status?: MockMatchState;
 }
 
+interface BaseStageMatch {
+  id: string;
+  sideA: string;
+  sideB: string;
+  round: string;
+  autoWinner?: string;
+}
+
 const RESULT_KEY = 'online-tournament:mock-match-results:v2';
 const RUNTIME_KEY = 'online-tournament:mock-match-runtime:v1';
-
-const firstNames = [
-  'Max', 'Lukas', 'Jonas', 'Leon', 'Tim', 'Felix', 'Paul', 'Ben', 'Noah', 'Elias', 'Nico', 'Jan',
-  'Moritz', 'Tobias', 'Daniel', 'Simon', 'David', 'Florian', 'Marco', 'Erik', 'Julian', 'Robin', 'Marius', 'Kevin',
-  'Anna', 'Laura', 'Sophie', 'Lea', 'Mia', 'Lena', 'Lisa', 'Julia', 'Nina', 'Sarah', 'Marie', 'Emma',
-];
-const lastNames = [
-  'Müller', 'Schmidt', 'Bauer', 'Fischer', 'Wagner', 'Becker', 'Schulz', 'Hoffmann', 'Koch', 'Richter', 'Klein', 'Wolf',
-  'Neumann', 'Schwarz', 'Zimmermann', 'Braun', 'Krüger', 'Hartmann', 'Lange', 'Werner', 'Schmitz', 'Krause', 'Meier', 'Lehmann',
-];
 
 function readResults(): StoredMatchResult[] {
   if (typeof window === 'undefined') return [];
@@ -89,23 +91,6 @@ function updateRuntime(matchId: string, update: Omit<StoredMatchRuntime, 'matchI
   return next;
 }
 
-function generateSingles(count: number) {
-  return Array.from({ length: count }, (_, index) => `${firstNames[index % firstNames.length]} ${lastNames[(index * 5 + 3) % lastNames.length]}`);
-}
-
-export function getRuntimeParticipantNames(tournament: DemoTournament) {
-  if (tournament.participantNames?.length) return tournament.participantNames;
-  if (tournament.discipline === 'DOUBLES') {
-    const names = generateSingles(tournament.participants * 2);
-    return Array.from({ length: tournament.participants }, (_, index) => `${names[index * 2]} / ${names[index * 2 + 1]}`);
-  }
-  return generateSingles(tournament.participants);
-}
-
-function participantAt(names: string[], index: number) {
-  return names[index % Math.max(1, names.length)] ?? `Teilnehmer ${index + 1}`;
-}
-
 function scoreFromSets(sets: MatchSet[]) {
   let winsA = 0;
   let winsB = 0;
@@ -114,6 +99,160 @@ function scoreFromSets(sets: MatchSet[]) {
     else if (set.sideBScore > set.sideAScore) winsB += 1;
   }
   return `${winsA} : ${winsB}`;
+}
+
+function resultWinner(result: StoredMatchResult | undefined, sideA: string, sideB: string) {
+  if (!result || result.status !== 'FINISHED') return undefined;
+  let winsA = 0;
+  let winsB = 0;
+  result.sets.forEach((set) => {
+    if (set.sideAScore > set.sideBScore) winsA += 1;
+    else if (set.sideBScore > set.sideAScore) winsB += 1;
+  });
+  if (winsA === winsB) return undefined;
+  return winsA > winsB ? sideA : sideB;
+}
+
+function groupMatches(tournament: DemoTournament, stage: TournamentStage): BaseStageMatch[] {
+  const names = getRuntimeParticipantNames(tournament);
+  const groupCount = Math.max(1, Number(stage.settings.groups) || 1);
+  const entrantCount = Math.max(groupCount, Math.min(names.length, Number(stage.settings.entrants) || names.length));
+  const participants = names.slice(0, entrantCount);
+  const assignments = getGroupAssignments(tournament, stage);
+  const groups: string[][] = Array.from({ length: groupCount }, () => []);
+  participants.forEach((name, index) => {
+    const groupIndex = assignments[name] ?? index % groupCount;
+    groups[Math.max(0, Math.min(groupCount - 1, groupIndex))].push(name);
+  });
+
+  const matches: BaseStageMatch[] = [];
+  groups.forEach((members, groupIndex) => {
+    let matchIndex = 0;
+    for (let a = 0; a < members.length; a += 1) {
+      for (let b = a + 1; b < members.length; b += 1) {
+        matchIndex += 1;
+        matches.push({
+          id: `${stage.id}-g${groupIndex + 1}-m${matchIndex}`,
+          sideA: members[a],
+          sideB: members[b],
+          round: `Gruppe ${String.fromCharCode(65 + groupIndex)}`,
+        });
+      }
+    }
+  });
+  return matches;
+}
+
+function roundRobinMatches(tournament: DemoTournament, stage: TournamentStage): BaseStageMatch[] {
+  const names = getRuntimeParticipantNames(tournament);
+  const entrantCount = Math.max(2, Math.min(names.length, Number(stage.settings.entrants) || names.length));
+  const participants = names.slice(0, entrantCount);
+  const matches: BaseStageMatch[] = [];
+  let matchIndex = 0;
+  for (let a = 0; a < participants.length; a += 1) {
+    for (let b = a + 1; b < participants.length; b += 1) {
+      matchIndex += 1;
+      matches.push({ id: `${stage.id}-rr-m${matchIndex}`, sideA: participants[a], sideB: participants[b], round: 'Jeder gegen jeden' });
+    }
+  }
+  return matches;
+}
+
+function knockoutMatches(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]): BaseStageMatch[] {
+  const slots = getBracketSlots(tournament, stage);
+  const rounds: BaseStageMatch[] = [];
+  let currentSides = [...slots];
+  let matchesInRound = slots.length / 2;
+  let roundIndex = 0;
+
+  while (matchesInRound >= 1) {
+    const label = matchesInRound === 1
+      ? 'Finale'
+      : matchesInRound === 2
+        ? 'Halbfinale'
+        : matchesInRound === 4
+          ? 'Viertelfinale'
+          : matchesInRound === 8
+            ? 'Achtelfinale'
+            : `Runde ${roundIndex + 1}`;
+    const nextSides: string[] = [];
+
+    for (let index = 0; index < matchesInRound; index += 1) {
+      const sideA = currentSides[index * 2] ?? 'TBD';
+      const sideB = currentSides[index * 2 + 1] ?? 'TBD';
+      const id = `${stage.id}-r${roundIndex + 1}-m${index + 1}`;
+      let autoWinner: string | undefined;
+      if (sideA === 'Freilos' && sideB !== 'Freilos' && sideB !== 'TBD') autoWinner = sideB;
+      if (sideB === 'Freilos' && sideA !== 'Freilos' && sideA !== 'TBD') autoWinner = sideA;
+      const winner = autoWinner ?? resultWinner(results.find((item) => item.matchId === id), sideA, sideB);
+      rounds.push({ id, sideA, sideB, round: label, autoWinner });
+      nextSides.push(winner ?? 'TBD');
+    }
+
+    currentSides = nextSides;
+    matchesInRound /= 2;
+    roundIndex += 1;
+  }
+
+  return rounds;
+}
+
+function swissRoundPairings(participants: string[], roundNumber: number) {
+  const rotated = [...participants];
+  if (rotated.length > 2) {
+    const shift = (roundNumber - 1) % rotated.length;
+    rotated.push(...rotated.splice(0, shift));
+  }
+  const pairs: Array<[string, string]> = [];
+  for (let index = 0; index < rotated.length; index += 2) {
+    pairs.push([rotated[index], rotated[index + 1] ?? 'Freilos']);
+  }
+  return pairs;
+}
+
+function swissMatches(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]): BaseStageMatch[] {
+  const names = getRuntimeParticipantNames(tournament);
+  const entrantCount = Math.max(2, Math.min(names.length, Number(stage.settings.entrants) || names.length));
+  const participants = names.slice(0, entrantCount);
+  const totalRounds = Math.max(1, Number(stage.settings.rounds) || 4);
+  const matches: BaseStageMatch[] = [];
+
+  for (let round = 1; round <= totalRounds; round += 1) {
+    const pairings = swissRoundPairings(participants, round);
+    if (round > 1) {
+      const previous = matches.filter((match) => match.round === `Runde ${round - 1}` && !match.autoWinner);
+      const previousDone = previous.every((match) => results.find((item) => item.matchId === match.id)?.status === 'FINISHED');
+      if (!previousDone) break;
+    }
+    pairings.forEach(([sideA, sideB], index) => {
+      matches.push({
+        id: `${stage.id}-sw-r${round}-m${index + 1}`,
+        sideA,
+        sideB,
+        round: `Runde ${round}`,
+        autoWinner: sideB === 'Freilos' ? sideA : undefined,
+      });
+    });
+  }
+  return matches;
+}
+
+function baseStageMatches(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]) {
+  switch (stage.type) {
+    case 'GROUPS': return groupMatches(tournament, stage);
+    case 'ROUND_ROBIN': return roundRobinMatches(tournament, stage);
+    case 'KNOCKOUT':
+    case 'DOUBLE_ELIMINATION':
+    case 'PLACEMENT': return knockoutMatches(tournament, stage, results);
+    case 'SWISS': return swissMatches(tournament, stage, results);
+    default: return [];
+  }
+}
+
+function deterministicPause(matchId: string, side: 'A' | 'B') {
+  let hash = side === 'A' ? 17 : 29;
+  for (const char of matchId) hash = (hash * 31 + char.charCodeAt(0)) % 997;
+  return 3 + (hash % 29);
 }
 
 function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchResult[], storedRuntime: StoredMatchRuntime[]) {
@@ -130,62 +269,41 @@ function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchRes
   };
 }
 
+export function getMockStageMatches(tournament: DemoTournament, stage: TournamentStage): MockRuntimeMatch[] {
+  const results = readResults();
+  const runtime = readRuntime();
+  const started = isStageStarted(tournament, stage);
+  return baseStageMatches(tournament, stage, results)
+    .filter((match) => match.sideA !== 'TBD' && match.sideB !== 'TBD' && match.sideA !== 'Freilos' && match.sideB !== 'Freilos')
+    .map((match) => applyStoredState({
+      id: match.id,
+      table: 'Noch offen',
+      sideA: match.sideA,
+      sideB: match.sideB,
+      score: '–',
+      status: started ? 'WAITING' : 'WAITING',
+      phase: stage.name,
+      stageId: stage.id,
+      round: match.round,
+      bestOf: stage.bestOf,
+      pauseA: deterministicPause(match.id, 'A'),
+      pauseB: deterministicPause(match.id, 'B'),
+      note: 'Wartet auf Tischzuweisung',
+    }, results, runtime));
+}
+
 export function getMockRuntimeMatches(tournament: DemoTournament): MockRuntimeMatch[] {
-  const names = getRuntimeParticipantNames(tournament);
   const currentStage = getActiveStage(tournament);
   if (!currentStage) return [];
-  const phase = currentStage.name;
-  const stageId = currentStage.id;
-  const bestOf = currentStage.bestOf;
-  const tableCount = Math.max(1, tournament.tables);
-  const storedResults = readResults();
-  const storedRuntime = readRuntime();
+  return getMockStageMatches(tournament, currentStage);
+}
 
-  const liveCount = tournament.status === 'RUNNING'
-    ? Math.min(Math.max(0, tournament.runningMatches), Math.min(tableCount, 4))
-    : 0;
+export function getMockStoredResult(matchId: string) {
+  return readResults().find((item) => item.matchId === matchId);
+}
 
-  const live = Array.from({ length: liveCount }, (_, index): MockRuntimeMatch => applyStoredState({
-    id: `${stageId}-live-${index + 1}`,
-    table: `Tisch ${index + 1}`,
-    sideA: participantAt(names, index * 2),
-    sideB: participantAt(names, index * 2 + 1),
-    score: index % 3 === 0 ? '2 : 1' : index % 3 === 1 ? '1 : 1' : '1 : 2',
-    status: index === liveCount - 1 && tournament.openConfirmations > 0 ? 'CONFIRMATION' : 'LIVE',
-    phase,
-    stageId,
-    bestOf,
-    pauseA: 12 + ((index * 7) % 19),
-    pauseB: 5 + ((index * 11) % 23),
-    round: currentStage?.type === 'SWISS'
-      ? 'Runde 3'
-      : currentStage?.type === 'GROUPS'
-        ? `Gruppe ${String.fromCharCode(65 + (index % Math.max(1, Number(currentStage.settings.groups) || 4)))}`
-        : 'Aktuelle Runde',
-  }, storedResults, storedRuntime));
-
-  const queuedCount = Math.min(10, Math.max(4, tournament.participants - liveCount * 2));
-  const queued = Array.from({ length: queuedCount }, (_, index): MockRuntimeMatch => applyStoredState({
-    id: `${stageId}-ready-${index + 1}`,
-    table: 'Noch offen',
-    sideA: participantAt(names, liveCount * 2 + index * 2),
-    sideB: participantAt(names, liveCount * 2 + index * 2 + 1),
-    score: '–',
-    status: 'WAITING',
-    phase,
-    stageId,
-    bestOf,
-    pauseA: 3 + ((index * 6) % 28),
-    pauseB: 8 + ((index * 9) % 24),
-    round: currentStage?.type === 'SWISS'
-      ? 'Runde 3'
-      : currentStage?.type === 'GROUPS'
-        ? `Gruppe ${String.fromCharCode(65 + (index % Math.max(1, Number(currentStage.settings.groups) || 4)))}`
-        : 'Nächstes Spiel',
-    note: 'Wartet auf Tischzuweisung',
-  }, storedResults, storedRuntime));
-
-  return [...live, ...queued];
+export function getMockStageBaseMatches(tournament: DemoTournament, stage: TournamentStage) {
+  return baseStageMatches(tournament, stage, readResults());
 }
 
 function isActiveTableMatch(match: MockRuntimeMatch) {
@@ -197,22 +315,13 @@ export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId
   const target = matches.find((match) => match.id === matchId);
   if (!target) return 'Spiel wurde nicht gefunden.';
 
-  const tableOccupied = matches.some((match) => (
-    match.id !== matchId
-    && match.table === table
-    && isActiveTableMatch(match)
-  ));
+  const tableOccupied = matches.some((match) => match.id !== matchId && match.table === table && isActiveTableMatch(match));
   if (tableOccupied) return `${table} ist bereits belegt.`;
 
   const playerConflict = matches.find((match) => (
     match.id !== matchId
     && isActiveTableMatch(match)
-    && (
-      match.sideA === target.sideA
-      || match.sideB === target.sideA
-      || match.sideA === target.sideB
-      || match.sideB === target.sideB
-    )
+    && (match.sideA === target.sideA || match.sideB === target.sideA || match.sideA === target.sideB || match.sideB === target.sideB)
   ));
 
   if (playerConflict) {
@@ -225,7 +334,6 @@ export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId
 
 export function assignMockMatchToTable(tournament: DemoTournament, matchId: string, table: string) {
   if (getMockAssignmentBlockReason(tournament, matchId, table)) return false;
-  // Eine Tischzuweisung startet die Partie sofort.
   updateRuntime(matchId, { table, status: 'LIVE' });
   return true;
 }
@@ -237,7 +345,6 @@ export function unassignMockMatch(matchId: string) {
 export function startMockMatch(matchId: string) {
   updateRuntime(matchId, { status: 'LIVE' });
 }
-
 
 export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: MockMatchState = 'LIVE') {
   const current = readResults();
@@ -252,9 +359,17 @@ function reconcileCompletedPhase(matchId: string) {
     const activeStage = getActiveStage(tournament);
     if (!activeStage || !matchId.startsWith(`${activeStage.id}-`)) continue;
 
-    const activeMatches = getMockRuntimeMatches(tournament).filter((match) => match.stageId === activeStage.id);
+    const activeMatches = getMockStageMatches(tournament, activeStage);
     const hasOpenMatches = activeMatches.some((match) => match.status !== 'FINISHED');
     if (activeMatches.length === 0 || hasOpenMatches) return;
+
+    // Bei K.-o./Swiss können durch den Abschluss der aktuellen Runde neue Spiele entstehen.
+    const refreshedMatches = getMockStageMatches(tournament, activeStage);
+    const refreshedOpen = refreshedMatches.some((match) => match.status !== 'FINISHED');
+    if (refreshedOpen) return;
+
+    const baseMatches = getMockStageBaseMatches(tournament, activeStage).filter((match) => !match.autoWinner && match.sideA !== 'TBD' && match.sideB !== 'TBD' && match.sideA !== 'Freilos' && match.sideB !== 'Freilos');
+    if (baseMatches.some((match) => readResults().find((result) => result.matchId === match.id)?.status !== 'FINISHED')) return;
 
     completeStage(tournament, activeStage);
     const isLastStage = tournament.stages[tournament.stages.length - 1]?.id === activeStage.id;
@@ -290,9 +405,8 @@ export function getMockPlayerSnapshot(tournament: DemoTournament) {
   const player = participants[0] ?? 'Max Mustermann';
   const matches = getMockRuntimeMatches(tournament);
   const ownLive = matches.find((match) => (match.status === 'LIVE' || match.status === 'CONFIRMATION') && (match.sideA === player || match.sideB === player));
-  const next = matches.find((match) => match.status === 'READY' && (match.sideA === player || match.sideB === player))
-    ?? matches.find((match) => match.status === 'WAITING' && (match.sideA === player || match.sideB === player))
-    ?? matches.find((match) => match.status === 'READY' || match.status === 'WAITING');
+  const next = matches.find((match) => match.status === 'WAITING' && (match.sideA === player || match.sideB === player))
+    ?? matches.find((match) => match.status === 'WAITING');
   return {
     player,
     playerCode: '4821',
@@ -300,9 +414,9 @@ export function getMockPlayerSnapshot(tournament: DemoTournament) {
     currentMatch: ownLive,
     nextMatch: next,
     standing: getActiveStage(tournament)?.type === 'GROUPS'
-      ? '2. Platz · Gruppe A'
+      ? 'Gruppenphase'
       : getActiveStage(tournament)?.type === 'SWISS'
-        ? 'Rang 5 · 3:1'
+        ? 'Schweizer System'
         : 'Noch im Turnier',
   };
 }
@@ -310,8 +424,10 @@ export function getMockPlayerSnapshot(tournament: DemoTournament) {
 export function findMockRuntimeMatch(matchId?: string) {
   if (!matchId) return undefined;
   for (const tournament of getAllMockTournaments()) {
-    const match = getMockRuntimeMatches(tournament).find((item) => item.id === matchId);
-    if (match) return { tournament, match };
+    for (const stage of tournament.stages) {
+      const match = getMockStageMatches(tournament, stage).find((item) => item.id === matchId);
+      if (match) return { tournament, match };
+    }
   }
   return undefined;
 }
