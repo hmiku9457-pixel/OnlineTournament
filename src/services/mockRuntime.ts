@@ -190,14 +190,43 @@ export function getMockRuntimeMatches(tournament: DemoTournament): MockRuntimeMa
   return [...live, ...queued];
 }
 
-export function assignMockMatchToTable(tournament: DemoTournament, matchId: string, table: string) {
+function isActiveTableMatch(match: MockRuntimeMatch) {
+  return ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch ');
+}
+
+export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId: string, table: string) {
   const matches = getMockRuntimeMatches(tournament);
-  const occupied = matches.some((match) => (
+  const target = matches.find((match) => match.id === matchId);
+  if (!target) return 'Spiel wurde nicht gefunden.';
+
+  const tableOccupied = matches.some((match) => (
     match.id !== matchId
     && match.table === table
-    && ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status)
+    && isActiveTableMatch(match)
   ));
-  if (occupied) return false;
+  if (tableOccupied) return `${table} ist bereits belegt.`;
+
+  const playerConflict = matches.find((match) => (
+    match.id !== matchId
+    && isActiveTableMatch(match)
+    && (
+      match.sideA === target.sideA
+      || match.sideB === target.sideA
+      || match.sideA === target.sideB
+      || match.sideB === target.sideB
+    )
+  ));
+
+  if (playerConflict) {
+    const blockedPlayer = [target.sideA, target.sideB].find((player) => player === playerConflict.sideA || player === playerConflict.sideB);
+    return `${blockedPlayer ?? 'Ein Teilnehmer'} ist bereits ${playerConflict.table} zugewiesen.`;
+  }
+
+  return null;
+}
+
+export function assignMockMatchToTable(tournament: DemoTournament, matchId: string, table: string) {
+  if (getMockAssignmentBlockReason(tournament, matchId, table)) return false;
   updateRuntime(matchId, { table, status: 'READY' });
   return true;
 }

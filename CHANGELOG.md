@@ -1,3 +1,9 @@
+
+## 0.1.5
+- Verhindert: Teilnehmer können nicht gleichzeitig zwei belegten/zugewiesenen Tischen zugeordnet werden.
+- Verbessert: Direkte Ergebniseingabe in der Turnierleitung zeigt für Best-of-3/5/7 ein separates Feld pro Satz.
+- Hinzugefügt: Jeder Eintrag unter „Nächste Spiele“ besitzt eine eigene automatische Tischzuweisung.
+
 ## 0.1.2
 - Behoben: Wizard kann Schritt 5 nicht mehr durch einen Formular-Submit in Schritt 4 überspringen.
 - Verbessert: Ergebniseingabe berücksichtigt Best-of und nutzt Kurznotation pro Satz (7 = 11:7, -7 = 7:11).

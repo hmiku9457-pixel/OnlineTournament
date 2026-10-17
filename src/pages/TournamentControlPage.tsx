@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { StageCard } from '@/components/StageCard';
 import type { MatchSet, TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
-import { assignMockMatchToTable, completeMockMatch, getMockRuntimeMatches, getRuntimeParticipantNames, startMockMatch, unassignMockMatch, type MockRuntimeMatch } from '@/services/mockRuntime';
+import { assignMockMatchToTable, completeMockMatch, getMockAssignmentBlockReason, getMockRuntimeMatches, getRuntimeParticipantNames, startMockMatch, unassignMockMatch, type MockRuntimeMatch } from '@/services/mockRuntime';
 import { getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 
 type ControlTab = 'overview' | 'flow' | 'matches' | 'participants' | 'stages';
@@ -39,28 +39,56 @@ function parseToken(token: string, number: number): MatchSet | null {
     : { number, sideAScore: loser, sideBScore: winner };
 }
 
-function parseQuickResult(value: string, bestOf: number): MatchSet[] | null {
-  const tokens = value.split(/[;,\s]+/).filter(Boolean).slice(0, bestOf);
-  const sets = tokens.map((token, index) => parseToken(token, index + 1));
-  if (sets.some((set) => !set)) return null;
-  const valid = sets as MatchSet[];
+function parseSetInputs(values: string[], bestOf: number): MatchSet[] | null {
+  const lastFilled = values.reduce((last, value, index) => value.trim() ? index : last, -1);
+  if (lastFilled < 0) return null;
+
+  const activeValues = values.slice(0, Math.min(lastFilled + 1, bestOf));
+  if (activeValues.some((value) => !value.trim())) return null;
+
+  const parsed = activeValues.map((token, index) => parseToken(token, index + 1));
+  if (parsed.some((set) => !set)) return null;
+
+  const valid = parsed as MatchSet[];
   const winsNeeded = Math.ceil(bestOf / 2);
-  const winsA = valid.filter((set) => set.sideAScore > set.sideBScore).length;
-  const winsB = valid.filter((set) => set.sideBScore > set.sideAScore).length;
+  let winsA = 0;
+  let winsB = 0;
+
+  for (let index = 0; index < valid.length; index += 1) {
+    const set = valid[index];
+    if (set.sideAScore > set.sideBScore) winsA += 1;
+    else if (set.sideBScore > set.sideAScore) winsB += 1;
+
+    const matchFinished = winsA >= winsNeeded || winsB >= winsNeeded;
+    if (matchFinished && index !== valid.length - 1) return null;
+  }
+
   return winsA >= winsNeeded || winsB >= winsNeeded ? valid : null;
 }
 
 function QuickResultEntry({ match, onSaved }: { match: MockRuntimeMatch; onSaved: () => void }) {
-  const [value, setValue] = useState('');
-  const parsed = parseQuickResult(value, match.bestOf);
+  const [values, setValues] = useState<string[]>(() => Array.from({ length: match.bestOf }, () => ''));
+  const parsed = parseSetInputs(values, match.bestOf);
+
+  function updateSet(index: number, value: string) {
+    setValues((current) => current.map((item, itemIndex) => itemIndex === index ? value : item));
+  }
+
   return (
     <div className="quick-result-entry">
-      <input
-        aria-label={`Ergebnis ${match.sideA} gegen ${match.sideB}`}
-        placeholder={match.bestOf === 1 ? 'z. B. 7' : 'z. B. 7 -8 5'}
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-      />
+      <div className="quick-result-sets" aria-label={`Ergebnis ${match.sideA} gegen ${match.sideB}`}>
+        {values.map((value, index) => (
+          <input
+            key={`${match.id}-set-${index + 1}`}
+            aria-label={`Satz ${index + 1}`}
+            inputMode="numeric"
+            placeholder={`S${index + 1}`}
+            value={value}
+            onChange={(event) => updateSet(index, event.target.value)}
+            title="7 = 11:7, -7 = 7:11"
+          />
+        ))}
+      </div>
       <button
         className="btn small primary"
         type="button"
@@ -68,7 +96,7 @@ function QuickResultEntry({ match, onSaved }: { match: MockRuntimeMatch; onSaved
         onClick={() => {
           if (!parsed) return;
           completeMockMatch(match.id, parsed, 'FINISHED');
-          setValue('');
+          setValues(Array.from({ length: match.bestOf }, () => ''));
           onSaved();
         }}
       >
@@ -163,6 +191,7 @@ export function TournamentControlPage() {
   const [participantPanel, setParticipantPanel] = useState<{ name: string; mode: 'edit' | 'games' } | null>(null);
   const [withdrawn, setWithdrawn] = useState<Set<string>>(new Set());
   const [assigningMatchId, setAssigningMatchId] = useState<string | null>(null);
+  const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament, runtimeVersion]);
   const participants = useMemo(() => getRuntimeParticipantNames(tournament), [tournament]);
   const nextMatches = matches.filter((match) => match.status === 'READY' || match.status === 'WAITING');
@@ -179,9 +208,16 @@ export function TournamentControlPage() {
   }
 
   function assignToTable(matchId: string, table: string) {
-    if (!assignMockMatchToTable(tournament, matchId, table)) return;
+    const blockReason = getMockAssignmentBlockReason(tournament, matchId, table);
+    if (blockReason) {
+      setAssignmentMessage(blockReason);
+      return false;
+    }
+    if (!assignMockMatchToTable(tournament, matchId, table)) return false;
+    setAssignmentMessage(null);
     setAssigningMatchId(null);
     refreshRuntime();
+    return true;
   }
 
   function startAssignedMatch(matchId: string) {
@@ -194,14 +230,36 @@ export function TournamentControlPage() {
     refreshRuntime();
   }
 
-  function autoAssignWaitingMatches() {
-    const waitingMatches = nextMatches.filter((match) => match.status === 'WAITING');
-    const assignments = Math.min(waitingMatches.length, freeTables.length);
-
-    for (let index = 0; index < assignments; index += 1) {
-      assignMockMatchToTable(tournament, waitingMatches[index].id, freeTables[index]);
+  function autoAssignMatch(matchId: string) {
+    for (const table of freeTables) {
+      if (assignToTable(matchId, table)) return;
     }
 
+    const firstReason = freeTables
+      .map((table) => getMockAssignmentBlockReason(tournament, matchId, table))
+      .find((reason) => reason);
+    setAssignmentMessage(firstReason ?? 'Aktuell ist kein geeigneter Tisch frei.');
+  }
+
+  function autoAssignWaitingMatches() {
+    const waitingMatches = nextMatches.filter((match) => match.status === 'WAITING');
+    let assigned = 0;
+
+    for (const match of waitingMatches) {
+      const currentMatches = getMockRuntimeMatches(tournament);
+      const currentOccupied = new Set(
+        currentMatches
+          .filter((item) => ['LIVE', 'READY', 'CONFIRMATION'].includes(item.status) && item.table.startsWith('Tisch '))
+          .map((item) => item.table),
+      );
+      const availableTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`)
+        .filter((table) => !currentOccupied.has(table));
+
+      const targetTable = availableTables.find((table) => !getMockAssignmentBlockReason(tournament, match.id, table));
+      if (targetTable && assignMockMatchToTable(tournament, match.id, targetTable)) assigned += 1;
+    }
+
+    setAssignmentMessage(assigned > 0 ? `${assigned} Spiel${assigned === 1 ? '' : 'e'} automatisch zugewiesen.` : 'Aktuell konnte kein wartendes Spiel konfliktfrei zugewiesen werden.');
     setAssigningMatchId(null);
     refreshRuntime();
   }
@@ -257,6 +315,7 @@ export function TournamentControlPage() {
                 </button>
               </div>
             </div>
+            {assignmentMessage && <div className="assignment-message" role="status">{assignmentMessage}</div>}
             <div className="overview-table-grid">
               {Array.from({ length: tournament.tables }, (_, index) => {
                 const tableName = `Tisch ${index + 1}`;
@@ -341,7 +400,10 @@ export function TournamentControlPage() {
                           <button className="btn small" type="button" onClick={() => releaseAssignedMatch(match.id)}>Lösen</button>
                         </>
                       ) : (
-                        <button className="btn small" type="button" onClick={() => setAssigningMatchId((current) => current === match.id ? null : match.id)}>Zuweisen</button>
+                        <>
+                          <button className="btn small primary" type="button" disabled={freeTables.length === 0} onClick={() => autoAssignMatch(match.id)}>Automatisch zuweisen</button>
+                          <button className="btn small" type="button" onClick={() => setAssigningMatchId((current) => current === match.id ? null : match.id)}>Zuweisen</button>
+                        </>
                       )}
                     </div>
                   </article>

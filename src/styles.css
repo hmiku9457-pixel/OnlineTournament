@@ -660,3 +660,30 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   .control-table-head-actions { justify-content: flex-start; }
   .overview-table-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
 }
+
+/* Tournament control: assignment safeguards and per-set quick scoring */
+.assignment-message {
+  margin: 6px 0 8px;
+  padding: 7px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #475467;
+  font-size: .8rem;
+  font-weight: 700;
+}
+.quick-result-sets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(38px, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+.quick-result-sets input {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  padding-inline: 4px;
+}
+.queue-row-actions .btn.primary {
+  white-space: nowrap;
+}
