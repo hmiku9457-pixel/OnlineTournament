@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { getBracketSlots } from '@/services/mockDrawStore';
-import { getMockStageMatches } from '@/services/mockRuntime';
+import { getMockStageBaseMatches } from '@/services/mockRuntime';
 
 function tournamentWith(stage: TournamentStage, participantCount: number): DemoTournament {
   return {
@@ -42,7 +42,7 @@ describe('knockout runtime', () => {
       advancement: { type: 'manual', value: 0 },
     };
     const tournament = tournamentWith(stage, 16);
-    const matches = getMockStageMatches(tournament, stage);
+    const matches = getMockStageBaseMatches(tournament, stage);
 
     expect(new Set(matches.filter((match) => match.round === 'Achtelfinale').map((match) => match.bestOf))).toEqual(new Set([1]));
     expect(new Set(matches.filter((match) => match.round === 'Viertelfinale').map((match) => match.bestOf))).toEqual(new Set([3]));

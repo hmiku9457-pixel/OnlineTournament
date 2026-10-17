@@ -1,3 +1,4 @@
+- Fix: K.-o.-Best-of-Regressionstest prüft jetzt den vollständigen Turnierbaum statt nur aktuell spielbare Matches.
 ## 0.2.2 - Turnierverlauf UX & Schweizer Pairing
 
 - Gruppen: Teilnehmer in der Tabelle sind anklickbar und öffnen alle Partien des Spielers.
