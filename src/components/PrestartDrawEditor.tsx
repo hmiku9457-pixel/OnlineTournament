@@ -5,8 +5,8 @@ import {
   canEditDraw,
   getBracketSlots,
   getGroupAssignments,
-  resetBracketSlots,
-  resetGroupAssignments,
+  randomizeBracketSlots,
+  randomizeGroupAssignments,
   setBracketSlot,
   setParticipantGroup,
 } from '@/services/mockDrawStore';
@@ -88,11 +88,10 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
             className="btn small"
             type="button"
             onClick={() => {
-              resetGroupAssignments(tournament, stage);
-              changed();
+              if (randomizeGroupAssignments(tournament, stage)) changed();
             }}
           >
-            Automatische Verteilung
+            Neue Zufallsverteilung
           </button>
         </div>
         <div className="group-dnd-grid">
@@ -146,17 +145,16 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
         <div>
           <span className="badge ready">BEARBEITBAR</span>
           <h4>{stage.type === 'DOUBLE_ELIMINATION' ? 'Doppel-K.-o.-Setzung per Drag & Drop' : 'K.-o.-Setzung per Drag & Drop'}</h4>
-          <p className="muted">Teilnehmer oder Freilos direkt auf einen anderen Startplatz ziehen. Belegte Plätze werden automatisch getauscht.</p>
+          <p className="muted">Teilnehmer oder Freilos direkt auf einen anderen Startplatz ziehen. Seed 1 und 2 bleiben in gegenüberliegenden Turnierhälften; die bestgesetzten Teilnehmer erhalten vorhandene Freilose.</p>
         </div>
         <button
           className="btn small"
           type="button"
           onClick={() => {
-            resetBracketSlots(tournament, stage);
-            changed();
+            if (randomizeBracketSlots(tournament, stage)) changed();
           }}
         >
-          Automatische Setzung
+          Neue Zufallsverteilung
         </button>
       </div>
       <div className="draw-editor-summary">
@@ -185,7 +183,7 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
                     if (setBracketSlot(tournament, stage, slotIndex, draggedValue)) changed();
                   }}
                 >
-                  <span className="seed-number">#{slotIndex + 1}</span>
+                  <span className="seed-number">Slot {slotIndex + 1}{slot !== 'Freilos' ? ` · Seed ${allowedParticipants.indexOf(slot) + 1}` : ''}</span>
                   <div
                     className={slot === 'Freilos' ? 'draw-player-chip bye-chip' : 'draw-player-chip'}
                     draggable

@@ -1,7 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet } from '@/domain/types';
-import { getAllMockTournaments } from '@/services/mockTournamentStore';
-import { getActiveStage } from '@/services/mockPhaseLifecycle';
+import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
+import { completeStage, getActiveStage } from '@/services/mockPhaseLifecycle';
 
 export type MockMatchState = 'LIVE' | 'READY' | 'WAITING' | 'CONFIRMATION' | 'FINISHED';
 
@@ -247,11 +247,28 @@ export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: Moc
   return next;
 }
 
+function reconcileCompletedPhase(matchId: string) {
+  for (const tournament of getAllMockTournaments()) {
+    const activeStage = getActiveStage(tournament);
+    if (!activeStage || !matchId.startsWith(`${activeStage.id}-`)) continue;
+
+    const activeMatches = getMockRuntimeMatches(tournament).filter((match) => match.stageId === activeStage.id);
+    const hasOpenMatches = activeMatches.some((match) => match.status !== 'FINISHED');
+    if (activeMatches.length === 0 || hasOpenMatches) return;
+
+    completeStage(tournament, activeStage);
+    const isLastStage = tournament.stages[tournament.stages.length - 1]?.id === activeStage.id;
+    updateMockTournamentStatus(tournament.id, isLastStage ? 'FINISHED' : 'PAUSED');
+    return;
+  }
+}
+
 export function completeMockMatch(matchId: string, sets: MatchSet[], status: MockMatchState = 'FINISHED') {
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
   const next: StoredMatchResult = { ...previous, matchId, sets, status };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
+  if (status === 'FINISHED') reconcileCompletedPhase(matchId);
   return next;
 }
 

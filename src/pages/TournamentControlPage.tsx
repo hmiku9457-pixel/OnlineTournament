@@ -7,7 +7,7 @@ import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
 import { assignMockMatchToTable, getMockAssignmentBlockReason, getMockRuntimeMatches, getRuntimeParticipantNames } from '@/services/mockRuntime';
 import { getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
-import { completeStage, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
+import { getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
 
 type ControlTab = 'overview' | 'flow' | 'matches' | 'participants' | 'stages';
 
@@ -133,7 +133,9 @@ export function TournamentControlPage() {
   }
 
   function refreshRuntime() {
+    setTournament(getMockTournament(tournament.id));
     setRuntimeVersion((value) => value + 1);
+    setPhaseVersion((value) => value + 1);
   }
 
   function startTournament() {
@@ -145,17 +147,6 @@ export function TournamentControlPage() {
     setPhaseVersion((value) => value + 1);
     setStatus('RUNNING');
     refreshRuntime();
-  }
-
-  function finishActiveStage() {
-    if (!activeStage) return;
-    const confirmed = window.confirm(`„${activeStage.name}“ als beendet markieren? Danach wird die nächste Phase zur Bearbeitung freigegeben.`);
-    if (!confirmed || !completeStage(tournament, activeStage)) return;
-    const isLastStage = tournament.stages[tournament.stages.length - 1]?.id === activeStage.id;
-    setPhaseVersion((value) => value + 1);
-    refreshRuntime();
-    setTab('flow');
-    if (isLastStage) setStatus('FINISHED');
   }
 
   function startNextPhase() {
@@ -243,7 +234,6 @@ export function TournamentControlPage() {
               ) : (
                 <button className="btn" type="button" onClick={() => setStatus('RUNNING')}>Turnier fortsetzen</button>
               )}
-              <button className="btn" type="button" onClick={finishActiveStage}>Phase beenden</button>
             </>
           )}
           {tournament.hasStarted && !activeStage && nextStartableStage && tournament.status !== 'FINISHED' && (
@@ -383,7 +373,7 @@ export function TournamentControlPage() {
           <div className="control-section-head">
             <div>
               <h2>Turnierverlauf</h2>
-              <p className="muted">Jede Phase wird erst nach Abschluss der vorherigen Phase bearbeitbar. Mit dem Start der Phase wird ihre Auslosung eingefroren.</p>
+              <p className="muted">Eine Phase endet automatisch mit dem letzten abgeschlossenen Spiel. Danach wird die nächste Phase bearbeitbar; mit ihrem Start wird die Auslosung eingefroren.</p>
             </div>
             {nextStartableStage && !activeStage && tournament.hasStarted && (
               <button className="btn primary" type="button" onClick={startNextPhase}>Nächste Phase starten</button>
