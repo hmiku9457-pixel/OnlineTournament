@@ -125,11 +125,7 @@ function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchRes
     status,
     score: savedResult ? scoreFromSets(savedResult.sets) : match.score,
     sets: savedResult?.sets ?? match.sets,
-    note: status === 'READY'
-      ? 'Tisch zugewiesen – wartet auf Start'
-      : status === 'WAITING'
-        ? 'Wartet auf Tischzuweisung'
-        : undefined,
+    note: status === 'WAITING' ? 'Wartet auf Tischzuweisung' : undefined,
   };
 }
 
@@ -227,7 +223,8 @@ export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId
 
 export function assignMockMatchToTable(tournament: DemoTournament, matchId: string, table: string) {
   if (getMockAssignmentBlockReason(tournament, matchId, table)) return false;
-  updateRuntime(matchId, { table, status: 'READY' });
+  // Eine Tischzuweisung startet die Partie sofort.
+  updateRuntime(matchId, { table, status: 'LIVE' });
   return true;
 }
 
@@ -237,6 +234,15 @@ export function unassignMockMatch(matchId: string) {
 
 export function startMockMatch(matchId: string) {
   updateRuntime(matchId, { status: 'LIVE' });
+}
+
+
+export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: MockMatchState = 'LIVE') {
+  const current = readResults();
+  const previous = current.find((item) => item.matchId === matchId);
+  const next: StoredMatchResult = { ...previous, matchId, sets, status };
+  writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
+  return next;
 }
 
 export function completeMockMatch(matchId: string, sets: MatchSet[], status: MockMatchState = 'FINISHED') {

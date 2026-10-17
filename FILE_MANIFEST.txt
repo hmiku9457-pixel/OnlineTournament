@@ -29,6 +29,7 @@ public/manifest.webmanifest
 public/sw.js
 src/App.tsx
 src/components/AppShell.tsx
+src/components/SetBySetEntry.tsx
 src/components/StageCard.tsx
 src/data/demoTournaments.ts
 src/domain/rules.ts
@@ -52,6 +53,7 @@ src/pages/SpectatorPage.tsx
 src/pages/TournamentControlPage.tsx
 src/pages/TournamentPage.tsx
 src/services/matchAccess.ts
+src/services/mockCompetitionViews.ts
 src/services/mockRuntime.ts
 src/services/mockTournamentStore.ts
 src/services/realtime.ts

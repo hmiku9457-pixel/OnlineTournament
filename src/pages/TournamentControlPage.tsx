@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { StageCard } from '@/components/StageCard';
-import type { MatchSet, TournamentStage, TournamentStatus } from '@/domain/types';
+import { SetBySetEntry } from '@/components/SetBySetEntry';
+import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
-import { assignMockMatchToTable, completeMockMatch, getMockAssignmentBlockReason, getMockRuntimeMatches, getRuntimeParticipantNames, startMockMatch, unassignMockMatch, type MockRuntimeMatch } from '@/services/mockRuntime';
+import { assignMockMatchToTable, getMockAssignmentBlockReason, getMockRuntimeMatches, getRuntimeParticipantNames } from '@/services/mockRuntime';
 import { getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 
 type ControlTab = 'overview' | 'flow' | 'matches' | 'participants' | 'stages';
@@ -25,85 +26,6 @@ function statusLabel(status: TournamentStatus) {
     case 'FINISHED': return 'Beendet';
     default: return status;
   }
-}
-
-function parseToken(token: string, number: number): MatchSet | null {
-  const trimmed = token.trim();
-  if (!trimmed) return null;
-  const numeric = Number(trimmed);
-  if (!Number.isFinite(numeric)) return null;
-  const loser = Math.abs(Math.trunc(numeric));
-  const winner = Math.max(11, loser + 2);
-  return numeric >= 0
-    ? { number, sideAScore: winner, sideBScore: loser }
-    : { number, sideAScore: loser, sideBScore: winner };
-}
-
-function parseSetInputs(values: string[], bestOf: number): MatchSet[] | null {
-  const lastFilled = values.reduce((last, value, index) => value.trim() ? index : last, -1);
-  if (lastFilled < 0) return null;
-
-  const activeValues = values.slice(0, Math.min(lastFilled + 1, bestOf));
-  if (activeValues.some((value) => !value.trim())) return null;
-
-  const parsed = activeValues.map((token, index) => parseToken(token, index + 1));
-  if (parsed.some((set) => !set)) return null;
-
-  const valid = parsed as MatchSet[];
-  const winsNeeded = Math.ceil(bestOf / 2);
-  let winsA = 0;
-  let winsB = 0;
-
-  for (let index = 0; index < valid.length; index += 1) {
-    const set = valid[index];
-    if (set.sideAScore > set.sideBScore) winsA += 1;
-    else if (set.sideBScore > set.sideAScore) winsB += 1;
-
-    const matchFinished = winsA >= winsNeeded || winsB >= winsNeeded;
-    if (matchFinished && index !== valid.length - 1) return null;
-  }
-
-  return winsA >= winsNeeded || winsB >= winsNeeded ? valid : null;
-}
-
-function QuickResultEntry({ match, onSaved }: { match: MockRuntimeMatch; onSaved: () => void }) {
-  const [values, setValues] = useState<string[]>(() => Array.from({ length: match.bestOf }, () => ''));
-  const parsed = parseSetInputs(values, match.bestOf);
-
-  function updateSet(index: number, value: string) {
-    setValues((current) => current.map((item, itemIndex) => itemIndex === index ? value : item));
-  }
-
-  return (
-    <div className="quick-result-entry">
-      <div className="quick-result-sets" aria-label={`Ergebnis ${match.sideA} gegen ${match.sideB}`}>
-        {values.map((value, index) => (
-          <input
-            key={`${match.id}-set-${index + 1}`}
-            aria-label={`Satz ${index + 1}`}
-            inputMode="numeric"
-            placeholder={`S${index + 1}`}
-            value={value}
-            onChange={(event) => updateSet(index, event.target.value)}
-            title="7 = 11:7, -7 = 7:11"
-          />
-        ))}
-      </div>
-      <button
-        className="btn small primary"
-        type="button"
-        disabled={!parsed}
-        onClick={() => {
-          if (!parsed) return;
-          completeMockMatch(match.id, parsed, 'FINISHED');
-          setValues(Array.from({ length: match.bestOf }, () => ''));
-          onSaved();
-        }}
-      >
-        Eintragen
-      </button>
-    </div>
-  );
 }
 
 function StageCompetitionView({ tournamentId, stage, tournament }: { tournamentId: string; stage: TournamentStage; tournament: ReturnType<typeof getMockTournament> }) {
@@ -194,7 +116,7 @@ export function TournamentControlPage() {
   const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament, runtimeVersion]);
   const participants = useMemo(() => getRuntimeParticipantNames(tournament), [tournament]);
-  const nextMatches = matches.filter((match) => match.status === 'READY' || match.status === 'WAITING');
+  const nextMatches = matches.filter((match) => match.status === 'WAITING');
   const tableMatches = matches.filter((match) => ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch '));
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table));
@@ -218,16 +140,6 @@ export function TournamentControlPage() {
     setAssigningMatchId(null);
     refreshRuntime();
     return true;
-  }
-
-  function startAssignedMatch(matchId: string) {
-    startMockMatch(matchId);
-    refreshRuntime();
-  }
-
-  function releaseAssignedMatch(matchId: string) {
-    unassignMockMatch(matchId);
-    refreshRuntime();
   }
 
   function autoAssignMatch(matchId: string) {
@@ -259,7 +171,7 @@ export function TournamentControlPage() {
       if (targetTable && assignMockMatchToTable(tournament, match.id, targetTable)) assigned += 1;
     }
 
-    setAssignmentMessage(assigned > 0 ? `${assigned} Spiel${assigned === 1 ? '' : 'e'} automatisch zugewiesen.` : 'Aktuell konnte kein wartendes Spiel konfliktfrei zugewiesen werden.');
+    setAssignmentMessage(assigned > 0 ? `${assigned} Spiel${assigned === 1 ? '' : 'e'} automatisch zugewiesen und gestartet.` : 'Aktuell konnte kein wartendes Spiel konfliktfrei zugewiesen werden.');
     setAssigningMatchId(null);
     refreshRuntime();
   }
@@ -304,7 +216,7 @@ export function TournamentControlPage() {
                 <p className="muted">Alle Spielorte auf einen Blick – auch freie Tische bleiben sichtbar.</p>
               </div>
               <div className="control-table-head-actions">
-                <span className="badge live">{tableMatches.length} belegt / zugewiesen</span>
+                <span className="badge live">{tableMatches.length} laufend</span>
                 <button
                   className="btn small primary"
                   type="button"
@@ -320,11 +232,10 @@ export function TournamentControlPage() {
               {Array.from({ length: tournament.tables }, (_, index) => {
                 const tableName = `Tisch ${index + 1}`;
                 const match = matchesByTable.get(tableName);
-                const isLive = match?.status === 'LIVE' || match?.status === 'CONFIRMATION';
-                const isReady = match?.status === 'READY';
+                const isLive = match?.status === 'LIVE' || match?.status === 'CONFIRMATION' || match?.status === 'READY';
                 return (
                   <article
-                    className={match ? `card overview-table-card busy ${isReady ? 'reserved' : ''}` : 'card overview-table-card table-drop-target'}
+                    className={match ? 'card overview-table-card busy' : 'card overview-table-card table-drop-target'}
                     key={tableName}
                     onDragOver={(event) => { if (!match) event.preventDefault(); }}
                     onDrop={(event) => {
@@ -336,20 +247,13 @@ export function TournamentControlPage() {
                   >
                     <div className="table-status-top">
                       <strong>{tableName}</strong>
-                      <span className={isLive ? 'badge live' : isReady ? 'badge ready' : 'badge'}>{isLive ? 'läuft' : isReady ? 'zugewiesen' : 'frei'}</span>
+                      <span className={isLive ? 'badge live' : 'badge'}>{isLive ? 'läuft' : 'frei'}</span>
                     </div>
                     {match ? (
                       <>
                         <span className="muted">{match.phase} · {match.round} · BO{match.bestOf}</span>
                         <div className="overview-table-match"><strong>{match.sideA}</strong><span>{match.score}</span><strong>{match.sideB}</strong></div>
-                        {isReady ? (
-                          <div className="assigned-match-actions">
-                            <button className="btn small primary" type="button" onClick={() => startAssignedMatch(match.id)}>Spiel starten</button>
-                            <button className="btn small" type="button" onClick={() => releaseAssignedMatch(match.id)}>Zuweisung lösen</button>
-                          </div>
-                        ) : (
-                          <QuickResultEntry match={match} onSaved={refreshRuntime} />
-                        )}
+                        <SetBySetEntry match={match} onSaved={refreshRuntime} compact />
                       </>
                     ) : (
                       <div className="free-table-message">
@@ -369,7 +273,7 @@ export function TournamentControlPage() {
               <div className="match-queue">
                 {nextMatches.map((match, index) => (
                   <article
-                    className={`match-queue-row expanded draggable-match ${match.status === 'READY' ? 'assigned' : ''}`}
+                    className="match-queue-row expanded draggable-match"
                     key={match.id}
                     draggable
                     onDragStart={(event) => {
@@ -392,19 +296,12 @@ export function TournamentControlPage() {
                         </div>
                       )}
                     </div>
-                    <span className={match.status === 'READY' ? 'badge ready' : 'badge'}>{match.table}</span>
+                    <span className="badge">{match.table}</span>
                     <div className="queue-row-actions">
-                      {match.status === 'READY' ? (
-                        <>
-                          <button className="btn small primary" type="button" onClick={() => startAssignedMatch(match.id)}>Starten</button>
-                          <button className="btn small" type="button" onClick={() => releaseAssignedMatch(match.id)}>Lösen</button>
-                        </>
-                      ) : (
-                        <>
-                          <button className="btn small primary" type="button" disabled={freeTables.length === 0} onClick={() => autoAssignMatch(match.id)}>Automatisch zuweisen</button>
-                          <button className="btn small" type="button" onClick={() => setAssigningMatchId((current) => current === match.id ? null : match.id)}>Zuweisen</button>
-                        </>
-                      )}
+                      <>
+                        <button className="btn small primary" type="button" disabled={freeTables.length === 0} onClick={() => autoAssignMatch(match.id)}>Automatisch zuweisen</button>
+                        <button className="btn small" type="button" onClick={() => setAssigningMatchId((current) => current === match.id ? null : match.id)}>Zuweisen</button>
+                      </>
                     </div>
                   </article>
                 ))}
@@ -414,7 +311,7 @@ export function TournamentControlPage() {
               <div className="card control-status-card">
                 <h3>Turnierstatus</h3>
                 <div className="control-metrics-grid">
-                  <div><span className="muted">Belegte/Zugewiesene Tische</span><strong>{tableMatches.length}/{tournament.tables}</strong></div>
+                  <div><span className="muted">Laufende Tische</span><strong>{tableMatches.length}/{tournament.tables}</strong></div>
                   <div><span className="muted">Wartende Spiele</span><strong>{nextMatches.length}</strong></div>
                   <div><span className="muted">Offene Bestätigungen</span><strong>{tournament.openConfirmations}</strong></div>
                   <div><span className="muted">Restzeit grob</span><strong>{tournament.estimatedDuration}</strong></div>
