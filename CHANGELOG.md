@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add per-phase match counts and rough phase durations to the right-hand Step 5 flow summary.
+- Add participant-aware Swiss round recommendations and a rough leading score distribution to Swiss phase descriptions.
+- Show the number of first-round byes directly in knockout phase descriptions.
 - Compact Step 4 recommendation cards so the wizard footer remains visible more often without scrolling; secondary estimate text now uses tighter spacing and smaller typography.
 - Add a phase-type “Ändern” control in Step 5; knockout and double-elimination can only be selected when editing the final phase.
 - Keep knockout participant entry in Custom mode even when the custom value equals a preset such as 2, 4, 8 or 16.

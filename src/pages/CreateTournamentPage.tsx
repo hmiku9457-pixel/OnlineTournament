@@ -3,11 +3,15 @@ import {
   bestOfOptions,
   createPhaseTemplate,
   defaultBestOfForStage,
+  estimatePhaseMetrics,
   estimateTournamentDurationMinutes,
   hasValidTerminalStageOrder,
   isTerminalStage,
+  knockoutByeCount,
   knockoutEntrantPresets,
   knockoutRoundLabels,
+  projectSwissTopScores,
+  recommendedSwissRounds,
   stageLabel,
   systemIdForStage,
   tournamentSystemOptions,
@@ -179,6 +183,21 @@ function formatDuration(minutes: number): string {
   if (hours === 0) return `${remainder} Min.`;
   if (remainder === 0) return `${hours} Std.`;
   return `${hours} Std. ${remainder} Min.`;
+}
+
+function formatCompactDuration(minutes: number): string {
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const remainder = safeMinutes % 60;
+  if (hours === 0) return `${remainder}min`;
+  if (remainder === 0) return `${hours}h`;
+  return `${hours}h ${remainder}min`;
+}
+
+function formatSwissProjection(entrantCount: number, rounds: number): string {
+  return projectSwissTopScores(entrantCount, rounds)
+    .map((projection) => `${projection.approximatePlayers}× ${projection.wins}:${projection.losses}`)
+    .join(' · ');
 }
 
 function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCount: number): PhaseDraft {
@@ -578,6 +597,18 @@ export function CreateTournamentPage() {
     [phaseDrafts, tables],
   );
 
+  const phaseEstimates = useMemo(
+    () => phaseDrafts.map((phase) => estimatePhaseMetrics({
+      type: phase.type,
+      entrantCount: phase.entrantCount,
+      bestOf: phase.bestOf,
+      groupCount: phase.groupCount,
+      swissRounds: phase.swissRounds,
+      knockoutBestOf: phase.knockoutBestOf,
+    }, tables)),
+    [phaseDrafts, tables],
+  );
+
   return (
     <>
       <header className="page-head">
@@ -933,13 +964,32 @@ export function CreateTournamentPage() {
                       const knockoutEntrants = knockoutEntrantPresets(maximumPhaseEntrants);
                       const knockoutRounds = phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount) : [];
                       const editingPhaseType = editingPhaseTypeId === phase.id;
+                      const swissRoundRecommendation = phase.type === 'SWISS' ? recommendedSwissRounds(phase.entrantCount) : null;
+                      const swissProjection = phase.type === 'SWISS' ? formatSwissProjection(phase.entrantCount, phase.swissRounds) : '';
+                      const knockoutByes = phase.type === 'KNOCKOUT' ? knockoutByeCount(phase.entrantCount) : 0;
                       return (
                         <article className="phase-config phase-config-expanded" key={phase.id}>
                           <div className="phase-config-head">
                             <div>
                               <span className="badge">Phase {index + 1}</span>
                               <h3>{phase.label}</h3>
-                              <p className="muted">{stageLabel(phase.type)}</p>
+                              {phase.type === 'SWISS' ? (
+                                <div className="phase-description phase-insight">
+                                  <span>Empfehlung für {phase.entrantCount} Teilnehmer: <strong>{swissRoundRecommendation} Runden</strong>.</span>
+                                  <span className="muted">Grobe Score-Verteilung nach {phase.swissRounds} Runden: ca. {swissProjection}</span>
+                                </div>
+                              ) : phase.type === 'KNOCKOUT' ? (
+                                <div className="phase-description phase-insight">
+                                  <span>Startfeld: <strong>{phase.entrantCount} Teilnehmer</strong>.</span>
+                                  <span className="muted">
+                                    {knockoutByes > 0
+                                      ? `${knockoutByes} Spieler ${knockoutByes === 1 ? 'hat' : 'haben'} in der ersten Runde ein Freilos.`
+                                      : 'Keine Freilose in der ersten Runde.'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <p className="muted">{stageLabel(phase.type)}</p>
+                              )}
                             </div>
                             <div className="phase-order-actions">
                               <button
@@ -1111,28 +1161,39 @@ export function CreateTournamentPage() {
                     <span className="muted">Noch keine Phasen festgelegt.</span>
                   ) : (
                     <div className="phase-flow">
-                      {phaseDrafts.map((phase, index) => (
-                        <div className="phase-flow-item" key={`summary-${phase.id}`}>
-                          <div className="phase-flow-node">
-                            <span className="badge">Phase {index + 1}</span>
-                            <strong>{phase.label}</strong>
-                            <span className="muted phase-flow-detail">
-                              {phase.type === 'GROUPS' && `${phase.groupCount} Gruppen · Best-of-${phase.bestOf}`}
-                              {phase.type === 'SWISS' && `${phase.swissRounds} Runden · Best-of-${phase.bestOf}`}
-                              {phase.type === 'KNOCKOUT' && `${phase.entrantCount} Teilnehmer · Best-of je Runde`}
-                              {phase.type === 'DOUBLE_ELIMINATION' && `${phase.entrantCount} Teilnehmer · Best-of-${phase.bestOf}`}
-                              {phase.type === 'ROUND_ROBIN' && `Best-of-${phase.bestOf}`}
-                              {phase.type === 'PLACEMENT' && `Best-of-${phase.bestOf}`}
-                            </span>
-                          </div>
-                          {index < phaseDrafts.length - 1 && (
-                            <div className="phase-flow-arrow" aria-label={`${phaseDrafts[index + 1].entrantCount} Teilnehmer kommen weiter`}>
-                              <span aria-hidden="true">↓</span>
-                              <small>{phaseDrafts[index + 1].entrantCount} weiter</small>
+                      {phaseDrafts.map((phase, index) => {
+                        const estimate = phaseEstimates[index];
+                        return (
+                          <div className="phase-flow-item" key={`summary-${phase.id}`}>
+                            <div className="phase-flow-node">
+                              <div className="phase-flow-node-main">
+                                <span className="badge">Phase {index + 1}</span>
+                                <strong>{phase.label}</strong>
+                                <span className="muted phase-flow-detail">
+                                  {phase.type === 'GROUPS' && `${phase.groupCount} Gruppen · Best-of-${phase.bestOf}`}
+                                  {phase.type === 'SWISS' && `${phase.swissRounds} Runden · Best-of-${phase.bestOf}`}
+                                  {phase.type === 'KNOCKOUT' && `${phase.entrantCount} Teilnehmer · Best-of je Runde`}
+                                  {phase.type === 'DOUBLE_ELIMINATION' && `${phase.entrantCount} Teilnehmer · Best-of-${phase.bestOf}`}
+                                  {phase.type === 'ROUND_ROBIN' && `Best-of-${phase.bestOf}`}
+                                  {phase.type === 'PLACEMENT' && `Best-of-${phase.bestOf}`}
+                                </span>
+                              </div>
+                              {estimate && (
+                                <div className="phase-flow-metrics" aria-label={`Phase ${index + 1}: ${estimate.estimatedMatches} Spiele, etwa ${formatCompactDuration(estimate.estimatedDurationMinutes)}`}>
+                                  <strong>{estimate.approximate ? 'ca. ' : ''}{estimate.estimatedMatches} Spiele</strong>
+                                  <span>ca. {formatCompactDuration(estimate.estimatedDurationMinutes)}</span>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      ))}
+                            {index < phaseDrafts.length - 1 && (
+                              <div className="phase-flow-arrow" aria-label={`${phaseDrafts[index + 1].entrantCount} Teilnehmer kommen weiter`}>
+                                <span aria-hidden="true">↓</span>
+                                <small>{phaseDrafts[index + 1].entrantCount} weiter</small>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

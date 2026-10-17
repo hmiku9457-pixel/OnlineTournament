@@ -25,6 +25,19 @@ export interface CreationPhaseTemplate {
 }
 
 
+
+export interface PhaseEstimate {
+  estimatedMatches: number;
+  estimatedDurationMinutes: number;
+  approximate: boolean;
+}
+
+export interface SwissScoreProjection {
+  wins: number;
+  losses: number;
+  approximatePlayers: number;
+}
+
 export interface TournamentDurationPhaseInput {
   type: StageType;
   entrantCount: number;
@@ -83,48 +96,111 @@ function knockoutRoundMatchCounts(entrantCount: number): number[] {
   return counts;
 }
 
+export function recommendedSwissRounds(entrantCount: number): number {
+  const entrants = Math.max(2, Math.trunc(entrantCount));
+  return Math.max(1, Math.min(entrants - 1, Math.ceil(Math.log2(entrants))));
+}
+
+function combination(n: number, k: number): number {
+  if (k < 0 || k > n) return 0;
+  const effectiveK = Math.min(k, n - k);
+  let result = 1;
+  for (let index = 1; index <= effectiveK; index += 1) {
+    result = (result * (n - effectiveK + index)) / index;
+  }
+  return result;
+}
+
+export function projectSwissTopScores(entrantCount: number, rounds: number): SwissScoreProjection[] {
+  const entrants = Math.max(2, Math.trunc(entrantCount));
+  const normalizedRounds = Math.max(1, Math.trunc(rounds));
+  const minimumWins = Math.max(0, normalizedRounds - 2);
+  const projections: SwissScoreProjection[] = [];
+
+  for (let wins = normalizedRounds; wins >= minimumWins; wins -= 1) {
+    const probability = combination(normalizedRounds, wins) / (2 ** normalizedRounds);
+    let approximatePlayers = Math.round(entrants * probability);
+    if (wins === normalizedRounds) approximatePlayers = Math.max(1, approximatePlayers);
+    if (approximatePlayers <= 0) continue;
+    projections.push({
+      wins,
+      losses: normalizedRounds - wins,
+      approximatePlayers,
+    });
+  }
+
+  return projections;
+}
+
+export function knockoutByeCount(entrantCount: number): number {
+  const entrants = Math.max(2, Math.trunc(entrantCount));
+  const bracketSize = 2 ** Math.ceil(Math.log2(entrants));
+  return bracketSize - entrants;
+}
+
+export function estimatePhaseMetrics(
+  phase: TournamentDurationPhaseInput,
+  tableCount: number,
+): PhaseEstimate {
+  const tables = Math.max(1, Math.trunc(tableCount));
+  const entrants = Math.max(2, Math.trunc(phase.entrantCount));
+
+  switch (phase.type) {
+    case 'ROUND_ROBIN': {
+      const matches = roundRobinMatchCount(entrants);
+      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waveMinutes(matches, tables, phase.bestOf)), approximate: false };
+    }
+    case 'GROUPS': {
+      const matches = groupMatchCount(entrants, phase.groupCount ?? 2);
+      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waveMinutes(matches, tables, phase.bestOf)), approximate: false };
+    }
+    case 'SWISS': {
+      const matchesPerRound = Math.floor(entrants / 2);
+      const rounds = Math.max(1, Math.trunc(phase.swissRounds ?? 1));
+      return {
+        estimatedMatches: matchesPerRound * rounds,
+        estimatedDurationMinutes: Math.round(rounds * waveMinutes(matchesPerRound, tables, phase.bestOf)),
+        approximate: entrants % 2 !== 0,
+      };
+    }
+    case 'KNOCKOUT': {
+      const roundMatches = knockoutRoundMatchCounts(entrants);
+      let duration = 0;
+      roundMatches.forEach((matches, roundIndex) => {
+        const bestOf = phase.knockoutBestOf?.[roundIndex] ?? phase.bestOf;
+        duration += waveMinutes(matches, tables, bestOf);
+      });
+      return {
+        estimatedMatches: roundMatches.reduce((sum, matches) => sum + matches, 0),
+        estimatedDurationMinutes: Math.round(duration),
+        approximate: false,
+      };
+    }
+    case 'DOUBLE_ELIMINATION': {
+      const approximateMatches = Math.ceil(Math.max(1, entrants * 2 - 2) * 1.25);
+      return {
+        estimatedMatches: approximateMatches,
+        estimatedDurationMinutes: Math.round(waveMinutes(approximateMatches, tables, phase.bestOf)),
+        approximate: true,
+      };
+    }
+    case 'PLACEMENT': {
+      const matches = Math.floor(entrants / 2);
+      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waveMinutes(matches, tables, phase.bestOf)), approximate: true };
+    }
+  }
+}
+
 export function estimateTournamentDurationMinutes(
   phases: TournamentDurationPhaseInput[],
   tableCount: number,
 ): number {
-  const tables = Math.max(1, Math.trunc(tableCount));
-  let total = 0;
-
-  for (const phase of phases) {
-    const entrants = Math.max(2, Math.trunc(phase.entrantCount));
-    switch (phase.type) {
-      case 'ROUND_ROBIN':
-        total += waveMinutes(roundRobinMatchCount(entrants), tables, phase.bestOf);
-        break;
-      case 'GROUPS':
-        total += waveMinutes(groupMatchCount(entrants, phase.groupCount ?? 2), tables, phase.bestOf);
-        break;
-      case 'SWISS': {
-        const matchesPerRound = Math.floor(entrants / 2);
-        const rounds = Math.max(1, Math.trunc(phase.swissRounds ?? 1));
-        total += rounds * waveMinutes(matchesPerRound, tables, phase.bestOf);
-        break;
-      }
-      case 'KNOCKOUT': {
-        const roundMatches = knockoutRoundMatchCounts(entrants);
-        roundMatches.forEach((matches, roundIndex) => {
-          const bestOf = phase.knockoutBestOf?.[roundIndex] ?? phase.bestOf;
-          total += waveMinutes(matches, tables, bestOf);
-        });
-        break;
-      }
-      case 'DOUBLE_ELIMINATION': {
-        const approximateMatches = Math.max(1, entrants * 2 - 2);
-        total += waveMinutes(Math.ceil(approximateMatches * 1.25), tables, phase.bestOf);
-        break;
-      }
-      case 'PLACEMENT':
-        total += waveMinutes(Math.floor(entrants / 2), tables, phase.bestOf);
-        break;
-    }
-  }
-
-  return Math.round(total);
+  return Math.round(
+    phases.reduce(
+      (total, phase) => total + estimatePhaseMetrics(phase, tableCount).estimatedDurationMinutes,
+      0,
+    ),
+  );
 }
 
 export const tournamentSystemOptions: TournamentSystemOption[] = [

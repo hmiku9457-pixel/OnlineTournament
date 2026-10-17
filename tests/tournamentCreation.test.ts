@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   bestOfOptions,
   createPhaseTemplate,
+  estimatePhaseMetrics,
   estimateTournamentDurationMinutes,
   hasValidTerminalStageOrder,
+  knockoutByeCount,
   knockoutEntrantPresets,
   knockoutRoundLabels,
+  projectSwissTopScores,
+  recommendedSwissRounds,
   tournamentSystemOptions,
 } from '@/domain/tournamentCreation';
 
@@ -68,6 +72,33 @@ describe('tournament creation phase model', () => {
         knockoutBestOf: [3, 5, 7],
       },
     ], 2)).toBe(218);
+  });
+
+  it('provides per-phase metrics for the phase overview', () => {
+    expect(estimatePhaseMetrics({
+      type: 'KNOCKOUT',
+      entrantCount: 12,
+      bestOf: 3,
+      knockoutBestOf: [3, 5, 5, 7],
+    }, 6)).toMatchObject({
+      estimatedMatches: 11,
+      approximate: false,
+    });
+  });
+
+  it('recommends Swiss rounds and projects the leading score groups', () => {
+    expect(recommendedSwissRounds(19)).toBe(5);
+    expect(projectSwissTopScores(19, 5)).toEqual([
+      { wins: 5, losses: 0, approximatePlayers: 1 },
+      { wins: 4, losses: 1, approximatePlayers: 3 },
+      { wins: 3, losses: 2, approximatePlayers: 6 },
+    ]);
+  });
+
+  it('calculates first-round knockout byes', () => {
+    expect(knockoutByeCount(12)).toBe(4);
+    expect(knockoutByeCount(8)).toBe(0);
+    expect(knockoutByeCount(19)).toBe(13);
   });
 
 });
