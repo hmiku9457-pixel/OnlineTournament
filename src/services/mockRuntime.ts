@@ -1,7 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
-import { completeStage, getActiveStage, isStageStarted } from '@/services/mockPhaseLifecycle';
+import { completeStage, getActiveStage, getStageEntrants, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments } from '@/services/mockDrawStore';
 
@@ -19,6 +19,7 @@ export interface MockRuntimeMatch {
   phase: string;
   stageId: string;
   round: string;
+  matchDay?: number;
   bestOf: number;
   pauseA: number;
   pauseB: number;
@@ -45,6 +46,7 @@ interface BaseStageMatch {
   sideA: string;
   sideB: string;
   round: string;
+  matchDay?: number;
   autoWinner?: string;
 }
 
@@ -113,49 +115,72 @@ function resultWinner(result: StoredMatchResult | undefined, sideA: string, side
   return winsA > winsB ? sideA : sideB;
 }
 
-function groupMatches(tournament: DemoTournament, stage: TournamentStage): BaseStageMatch[] {
-  const names = getRuntimeParticipantNames(tournament);
+function groupMembers(tournament: DemoTournament, stage: TournamentStage) {
+  const participants = getStageEntrants(tournament, stage);
   const groupCount = Math.max(1, Number(stage.settings.groups) || 1);
-  const entrantCount = Math.max(groupCount, Math.min(names.length, Number(stage.settings.entrants) || names.length));
-  const participants = names.slice(0, entrantCount);
   const assignments = getGroupAssignments(tournament, stage);
   const groups: string[][] = Array.from({ length: groupCount }, () => []);
   participants.forEach((name, index) => {
     const groupIndex = assignments[name] ?? index % groupCount;
     groups[Math.max(0, Math.min(groupCount - 1, groupIndex))].push(name);
   });
+  return groups;
+}
 
-  const matches: BaseStageMatch[] = [];
-  groups.forEach((members, groupIndex) => {
-    let matchIndex = 0;
-    for (let a = 0; a < members.length; a += 1) {
-      for (let b = a + 1; b < members.length; b += 1) {
-        matchIndex += 1;
-        matches.push({
-          id: `${stage.id}-g${groupIndex + 1}-m${matchIndex}`,
-          sideA: members[a],
-          sideB: members[b],
-          round: `Gruppe ${String.fromCharCode(65 + groupIndex)}`,
-        });
-      }
+function roundRobinSchedule(participants: string[]) {
+  const rotation: Array<string | null> = [...participants];
+  if (rotation.length % 2 === 1) rotation.push(null);
+  if (rotation.length < 2) return [] as Array<Array<[string, string]>>;
+  const rounds: Array<Array<[string, string]>> = [];
+
+  for (let roundIndex = 0; roundIndex < rotation.length - 1; roundIndex += 1) {
+    const pairings: Array<[string, string]> = [];
+    for (let index = 0; index < rotation.length / 2; index += 1) {
+      const sideA = rotation[index];
+      const sideB = rotation[rotation.length - 1 - index];
+      if (sideA && sideB) pairings.push([sideA, sideB]);
     }
-  });
+    rounds.push(pairings);
+    const fixed = rotation[0];
+    const rest = rotation.slice(1);
+    rest.unshift(rest.pop() ?? null);
+    rotation.splice(0, rotation.length, fixed, ...rest);
+  }
+  return rounds;
+}
+
+function groupMatches(tournament: DemoTournament, stage: TournamentStage): BaseStageMatch[] {
+  const groups = groupMembers(tournament, stage);
+  const schedules = groups.map((members) => roundRobinSchedule(members));
+  const maxDays = Math.max(0, ...schedules.map((schedule) => schedule.length));
+  const matches: BaseStageMatch[] = [];
+
+  for (let dayIndex = 0; dayIndex < maxDays; dayIndex += 1) {
+    schedules.forEach((schedule, groupIndex) => {
+      const groupLabel = `Gruppe ${String.fromCharCode(65 + groupIndex)}`;
+      (schedule[dayIndex] ?? []).forEach(([sideA, sideB], matchIndex) => {
+        matches.push({
+          id: `${stage.id}-g${groupIndex + 1}-d${dayIndex + 1}-m${matchIndex + 1}`,
+          sideA,
+          sideB,
+          round: groupLabel,
+          matchDay: dayIndex + 1,
+        });
+      });
+    });
+  }
   return matches;
 }
 
 function roundRobinMatches(tournament: DemoTournament, stage: TournamentStage): BaseStageMatch[] {
-  const names = getRuntimeParticipantNames(tournament);
-  const entrantCount = Math.max(2, Math.min(names.length, Number(stage.settings.entrants) || names.length));
-  const participants = names.slice(0, entrantCount);
-  const matches: BaseStageMatch[] = [];
-  let matchIndex = 0;
-  for (let a = 0; a < participants.length; a += 1) {
-    for (let b = a + 1; b < participants.length; b += 1) {
-      matchIndex += 1;
-      matches.push({ id: `${stage.id}-rr-m${matchIndex}`, sideA: participants[a], sideB: participants[b], round: 'Jeder gegen jeden' });
-    }
-  }
-  return matches;
+  const participants = getStageEntrants(tournament, stage);
+  return roundRobinSchedule(participants).flatMap((pairings, dayIndex) => pairings.map(([sideA, sideB], matchIndex) => ({
+    id: `${stage.id}-rr-d${dayIndex + 1}-m${matchIndex + 1}`,
+    sideA,
+    sideB,
+    round: `Spieltag ${dayIndex + 1}`,
+    matchDay: dayIndex + 1,
+  })));
 }
 
 function knockoutMatches(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]): BaseStageMatch[] {
@@ -211,9 +236,7 @@ function swissRoundPairings(participants: string[], roundNumber: number) {
 }
 
 function swissMatches(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]): BaseStageMatch[] {
-  const names = getRuntimeParticipantNames(tournament);
-  const entrantCount = Math.max(2, Math.min(names.length, Number(stage.settings.entrants) || names.length));
-  const participants = names.slice(0, entrantCount);
+  const participants = getStageEntrants(tournament, stage);
   const totalRounds = Math.max(1, Number(stage.settings.rounds) || 4);
   const matches: BaseStageMatch[] = [];
 
@@ -285,6 +308,7 @@ export function getMockStageMatches(tournament: DemoTournament, stage: Tournamen
       phase: stage.name,
       stageId: stage.id,
       round: match.round,
+      matchDay: match.matchDay,
       bestOf: stage.bestOf,
       pauseA: deterministicPause(match.id, 'A'),
       pauseB: deterministicPause(match.id, 'B'),
@@ -354,6 +378,122 @@ export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: Moc
   return next;
 }
 
+interface RankingRow {
+  name: string;
+  played: number;
+  wins: number;
+  losses: number;
+  setsWon: number;
+  setsLost: number;
+  ballsWon: number;
+  ballsLost: number;
+  buchholz: number;
+}
+
+function rankParticipants(participants: string[], matches: BaseStageMatch[], results: StoredMatchResult[]) {
+  const rows = new Map(participants.map((name) => [name, {
+    name,
+    played: 0,
+    wins: 0,
+    losses: 0,
+    setsWon: 0,
+    setsLost: 0,
+    ballsWon: 0,
+    ballsLost: 0,
+    buchholz: 0,
+  } satisfies RankingRow]));
+  const opponents = new Map(participants.map((name) => [name, [] as string[]]));
+
+  matches.forEach((match) => {
+    const result = results.find((item) => item.matchId === match.id && item.status === 'FINISHED');
+    if (!result?.sets.length) return;
+    const rowA = rows.get(match.sideA);
+    const rowB = rows.get(match.sideB);
+    if (!rowA || !rowB) return;
+    rowA.played += 1;
+    rowB.played += 1;
+    opponents.get(match.sideA)?.push(match.sideB);
+    opponents.get(match.sideB)?.push(match.sideA);
+    result.sets.forEach((set) => {
+      rowA.ballsWon += set.sideAScore;
+      rowA.ballsLost += set.sideBScore;
+      rowB.ballsWon += set.sideBScore;
+      rowB.ballsLost += set.sideAScore;
+      if (set.sideAScore > set.sideBScore) {
+        rowA.setsWon += 1;
+        rowB.setsLost += 1;
+      } else if (set.sideBScore > set.sideAScore) {
+        rowB.setsWon += 1;
+        rowA.setsLost += 1;
+      }
+    });
+    const winner = resultWinner(result, match.sideA, match.sideB);
+    if (winner === match.sideA) {
+      rowA.wins += 1;
+      rowB.losses += 1;
+    } else if (winner === match.sideB) {
+      rowB.wins += 1;
+      rowA.losses += 1;
+    }
+  });
+
+  rows.forEach((row) => {
+    row.buchholz = (opponents.get(row.name) ?? []).reduce((sum, opponent) => sum + (rows.get(opponent)?.wins ?? 0), 0);
+  });
+
+  return [...rows.values()].sort((a, b) => (
+    b.wins - a.wins
+    || ((b.setsWon - b.setsLost) - (a.setsWon - a.setsLost))
+    || b.setsWon - a.setsWon
+    || ((b.ballsWon - b.ballsLost) - (a.ballsWon - a.ballsLost))
+    || b.ballsWon - a.ballsWon
+    || b.buchholz - a.buchholz
+    || a.name.localeCompare(b.name, 'de')
+  ));
+}
+
+function stageQualifierCount(tournament: DemoTournament, stage: TournamentStage) {
+  const stageIndex = tournament.stages.findIndex((item) => item.id === stage.id);
+  const nextStage = tournament.stages[stageIndex + 1];
+  if (!nextStage) return 0;
+  if (stage.advancement.type === 'top_n' && stage.advancement.value > 0) return stage.advancement.value;
+  return Math.max(1, Number(nextStage.settings.entrants) || 1);
+}
+
+function computeStageQualifiers(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]) {
+  const targetCount = stageQualifierCount(tournament, stage);
+  if (targetCount <= 0) return [];
+  const matches = baseStageMatches(tournament, stage, results);
+
+  if (stage.type === 'GROUPS') {
+    const rankings = groupMembers(tournament, stage).map((members, groupIndex) => {
+      const groupLabel = `Gruppe ${String.fromCharCode(65 + groupIndex)}`;
+      return rankParticipants(members, matches.filter((match) => match.round === groupLabel), results);
+    });
+    const qualified: string[] = [];
+    for (let rankIndex = 0; qualified.length < targetCount; rankIndex += 1) {
+      const tier = rankings.map((ranking) => ranking[rankIndex]).filter((row): row is RankingRow => Boolean(row));
+      if (!tier.length) break;
+      tier.sort((a, b) => (
+        b.wins - a.wins
+        || ((b.setsWon - b.setsLost) - (a.setsWon - a.setsLost))
+        || b.setsWon - a.setsWon
+        || ((b.ballsWon - b.ballsLost) - (a.ballsWon - a.ballsLost))
+        || b.ballsWon - a.ballsWon
+        || a.name.localeCompare(b.name, 'de')
+      ));
+      qualified.push(...tier.slice(0, targetCount - qualified.length).map((row) => row.name));
+    }
+    return qualified;
+  }
+
+  if (stage.type === 'ROUND_ROBIN' || stage.type === 'SWISS') {
+    return rankParticipants(getStageEntrants(tournament, stage), matches, results).slice(0, targetCount).map((row) => row.name);
+  }
+
+  return getStageEntrants(tournament, stage).slice(0, targetCount);
+}
+
 function reconcileCompletedPhase(matchId: string) {
   for (const tournament of getAllMockTournaments()) {
     const activeStage = getActiveStage(tournament);
@@ -371,7 +511,8 @@ function reconcileCompletedPhase(matchId: string) {
     const baseMatches = getMockStageBaseMatches(tournament, activeStage).filter((match) => !match.autoWinner && match.sideA !== 'TBD' && match.sideB !== 'TBD' && match.sideA !== 'Freilos' && match.sideB !== 'Freilos');
     if (baseMatches.some((match) => readResults().find((result) => result.matchId === match.id)?.status !== 'FINISHED')) return;
 
-    completeStage(tournament, activeStage);
+    const qualifiedForNext = computeStageQualifiers(tournament, activeStage, readResults());
+    completeStage(tournament, activeStage, qualifiedForNext);
     const isLastStage = tournament.stages[tournament.stages.length - 1]?.id === activeStage.id;
     updateMockTournamentStatus(tournament.id, isLastStage ? 'FINISHED' : 'PAUSED');
     return;

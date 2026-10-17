@@ -1,8 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
-import { getRuntimeParticipantNames } from '@/services/mockParticipants';
-import { generateKnockoutFirstRound } from '@/engine/bracket';
-import { isStageEditable } from '@/services/mockPhaseLifecycle';
+import { getStageEntrants, isStageEditable } from '@/services/mockPhaseLifecycle';
 
 const DRAW_KEY = 'online-tournament:mock-draw-config:v1';
 
@@ -53,47 +51,57 @@ function shuffled<T>(values: T[]) {
   return result;
 }
 
-function seededBracketSlots(participants: string[], randomizeRest = false) {
-  const bracketSize = nextPowerOfTwo(Math.max(2, participants.length));
-  const byeCount = bracketSize - participants.length;
-  const protectedSeedCount = Math.min(participants.length, Math.max(2, byeCount));
-  const seededParticipants = randomizeRest
-    ? [...participants.slice(0, protectedSeedCount), ...shuffled(participants.slice(protectedSeedCount))]
-    : [...participants];
-
-  const pairings = generateKnockoutFirstRound(
-    seededParticipants.map((participantId, index) => ({ participantId, seed: index + 1 })),
-  );
-
-  return pairings.flatMap((pairing) => [pairing.sideAId ?? 'Freilos', pairing.sideBId ?? 'Freilos']);
+function stableShuffled(values: string[]) {
+  return [...values].sort((a, b) => {
+    const hash = (value: string) => [...value].reduce((sum, char) => ((sum * 33) ^ char.charCodeAt(0)) >>> 0, 5381);
+    return hash(a) - hash(b) || a.localeCompare(b, 'de');
+  });
 }
 
-function pairedSlotIndex(slotIndex: number) {
-  return slotIndex % 2 === 0 ? slotIndex + 1 : slotIndex - 1;
+function balancedBracketSlots(participants: string[], randomize = false) {
+  const bracketSize = nextPowerOfTwo(Math.max(2, participants.length));
+  const pairCount = bracketSize / 2;
+  const byeCount = bracketSize - participants.length;
+  const players = randomize ? shuffled(participants) : stableShuffled(participants);
+  const byePairs: number[] = [];
+  const halfPairs = pairCount / 2;
+
+  for (let offset = 0; byePairs.length < byeCount; offset += 1) {
+    const left = offset % Math.max(1, halfPairs);
+    const right = halfPairs + (offset % Math.max(1, halfPairs));
+    if (left < pairCount && !byePairs.includes(left)) byePairs.push(left);
+    if (byePairs.length < byeCount && right < pairCount && !byePairs.includes(right)) byePairs.push(right);
+  }
+
+  const slots = Array<string>(bracketSize).fill('');
+  let playerIndex = 0;
+  for (let pairIndex = 0; pairIndex < pairCount; pairIndex += 1) {
+    const slotA = pairIndex * 2;
+    const slotB = slotA + 1;
+    if (byePairs.includes(pairIndex)) {
+      slots[slotA] = players[playerIndex++] ?? 'Freilos';
+      slots[slotB] = 'Freilos';
+    } else {
+      slots[slotA] = players[playerIndex++] ?? 'Freilos';
+      slots[slotB] = players[playerIndex++] ?? 'Freilos';
+    }
+  }
+  return slots;
 }
 
 function validBracketConstraints(participants: string[], slots: string[]) {
   if (slots.length < 2) return false;
+  const expectedByeCount = Math.max(0, slots.length - participants.length);
+  if (slots.filter((slot) => slot === 'Freilos').length !== expectedByeCount) return false;
+  const playerSlots = slots.filter((slot) => slot !== 'Freilos');
+  if (playerSlots.length !== participants.length) return false;
+  if (new Set(playerSlots).size !== participants.length) return false;
+  if (participants.some((participant) => !playerSlots.includes(participant))) return false;
+  for (let index = 0; index < slots.length; index += 2) {
+    if (slots[index] === 'Freilos' && slots[index + 1] === 'Freilos') return false;
+  }
+
   const midpoint = slots.length / 2;
-  const seedOne = participants[0];
-  const seedTwo = participants[1];
-  const seedOneIndex = seedOne ? slots.indexOf(seedOne) : -1;
-  const seedTwoIndex = seedTwo ? slots.indexOf(seedTwo) : -1;
-
-  if (seedOneIndex >= 0 && seedTwoIndex >= 0) {
-    const seedOneHalf = seedOneIndex < midpoint ? 0 : 1;
-    const seedTwoHalf = seedTwoIndex < midpoint ? 0 : 1;
-    if (seedOneHalf === seedTwoHalf) return false;
-  }
-
-  const byeCount = Math.max(0, slots.length - participants.length);
-  for (let seedIndex = 0; seedIndex < byeCount; seedIndex += 1) {
-    const participant = participants[seedIndex];
-    if (!participant) continue;
-    const slotIndex = slots.indexOf(participant);
-    if (slotIndex < 0 || slots[pairedSlotIndex(slotIndex)] !== 'Freilos') return false;
-  }
-
   const playersFirstHalf = slots.slice(0, midpoint).filter((slot) => slot !== 'Freilos').length;
   const playersSecondHalf = slots.slice(midpoint).filter((slot) => slot !== 'Freilos').length;
   return Math.abs(playersFirstHalf - playersSecondHalf) <= 1;
@@ -104,9 +112,7 @@ export function canEditDraw(tournament: DemoTournament, stage: TournamentStage) 
 }
 
 export function getGroupAssignments(tournament: DemoTournament, stage: TournamentStage) {
-  const names = getRuntimeParticipantNames(tournament);
-  const entrantCount = Math.max(1, Math.min(names.length, Number(stage.settings.entrants) || names.length));
-  const participants = names.slice(0, entrantCount);
+  const participants = getStageEntrants(tournament, stage);
   const groupCount = Math.max(1, Number(stage.settings.groups) || 1);
   const existing = findConfig(tournament.id, stage.id)?.groupAssignments;
   if (existing) {
@@ -148,30 +154,25 @@ export function resetGroupAssignments(tournament: DemoTournament, stage: Tournam
 
 export function randomizeGroupAssignments(tournament: DemoTournament, stage: TournamentStage) {
   if (!canEditDraw(tournament, stage)) return false;
-  const names = getRuntimeParticipantNames(tournament);
-  const entrantCount = Math.max(1, Math.min(names.length, Number(stage.settings.entrants) || names.length));
+  const participants = getStageEntrants(tournament, stage);
   const groupCount = Math.max(1, Number(stage.settings.groups) || 1);
-  const randomized = shuffled(names.slice(0, entrantCount));
+  const randomized = shuffled(participants);
   const assignments = Object.fromEntries(randomized.map((participant, index) => [participant, index % groupCount]));
   upsert({ tournamentId: tournament.id, stageId: stage.id, groupAssignments: assignments });
   return true;
 }
 
 export function getBracketSlots(tournament: DemoTournament, stage: TournamentStage) {
-  const names = getRuntimeParticipantNames(tournament);
-  const entrants = Math.max(2, Math.min(names.length, Number(stage.settings.entrants) || names.length));
-  const participants = names.slice(0, entrants);
-  const bracketSize = nextPowerOfTwo(entrants);
+  const participants = getStageEntrants(tournament, stage);
+  const bracketSize = nextPowerOfTwo(Math.max(2, participants.length));
   const existing = findConfig(tournament.id, stage.id)?.bracketSlots;
   if (existing?.length === bracketSize && validBracketConstraints(participants, existing)) return [...existing];
-  return seededBracketSlots(participants);
+  return balancedBracketSlots(participants);
 }
 
 export function setBracketSlot(tournament: DemoTournament, stage: TournamentStage, slotIndex: number, value: string) {
   if (!canEditDraw(tournament, stage)) return false;
-  const names = getRuntimeParticipantNames(tournament);
-  const entrants = Math.max(2, Math.min(names.length, Number(stage.settings.entrants) || names.length));
-  const participants = names.slice(0, entrants);
+  const participants = getStageEntrants(tournament, stage);
   const slots = getBracketSlots(tournament, stage);
   if (slotIndex < 0 || slotIndex >= slots.length) return false;
 
@@ -192,10 +193,8 @@ export function setBracketSlot(tournament: DemoTournament, stage: TournamentStag
 
 export function randomizeBracketSlots(tournament: DemoTournament, stage: TournamentStage) {
   if (!canEditDraw(tournament, stage)) return false;
-  const names = getRuntimeParticipantNames(tournament);
-  const entrants = Math.max(2, Math.min(names.length, Number(stage.settings.entrants) || names.length));
-  const participants = names.slice(0, entrants);
-  const slots = seededBracketSlots(participants, true);
+  const participants = getStageEntrants(tournament, stage);
+  const slots = balancedBracketSlots(participants, true);
   upsert({ tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots });
   return true;
 }

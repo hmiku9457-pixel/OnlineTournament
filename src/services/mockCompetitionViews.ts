@@ -1,6 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
-import { getRuntimeParticipantNames } from '@/services/mockParticipants';
+import { getStageEntrants } from '@/services/mockPhaseLifecycle';
 import { getGroupAssignments } from '@/services/mockDrawStore';
 import {
   getMockStageBaseMatches,
@@ -15,6 +15,9 @@ export interface MockStanding {
   wins: number;
   losses: number;
   sets: string;
+  setDifference: number;
+  balls: string;
+  ballDifference: number;
 }
 
 export interface MockGroupMatch {
@@ -23,6 +26,7 @@ export interface MockGroupMatch {
   sideB: string;
   score: string;
   status: 'played' | 'live' | 'open';
+  matchDay?: number;
 }
 
 export interface MockGroupView {
@@ -66,7 +70,17 @@ function scoreFromSets(sets: MatchSet[]) {
 }
 
 function computeStandings(members: string[], matches: ReturnType<typeof getMockStageMatches>): MockStanding[] {
-  const rows = new Map(members.map((name) => [name, { rank: 0, name, played: 0, wins: 0, losses: 0, setsWon: 0, setsLost: 0 }]));
+  const rows = new Map(members.map((name) => [name, {
+    rank: 0,
+    name,
+    played: 0,
+    wins: 0,
+    losses: 0,
+    setsWon: 0,
+    setsLost: 0,
+    ballsWon: 0,
+    ballsLost: 0,
+  }]));
 
   matches.forEach((match) => {
     if (match.status !== 'FINISHED' || !match.sets?.length) return;
@@ -80,6 +94,12 @@ function computeStandings(members: string[], matches: ReturnType<typeof getMockS
     a.setsLost += winsB;
     b.setsWon += winsB;
     b.setsLost += winsA;
+    match.sets.forEach((set) => {
+      a.ballsWon += set.sideAScore;
+      a.ballsLost += set.sideBScore;
+      b.ballsWon += set.sideBScore;
+      b.ballsLost += set.sideAScore;
+    });
     if (winsA > winsB) {
       a.wins += 1;
       b.losses += 1;
@@ -94,6 +114,8 @@ function computeStandings(members: string[], matches: ReturnType<typeof getMockS
       b.wins - a.wins
       || (b.setsWon - b.setsLost) - (a.setsWon - a.setsLost)
       || b.setsWon - a.setsWon
+      || (b.ballsWon - b.ballsLost) - (a.ballsWon - a.ballsLost)
+      || b.ballsWon - a.ballsWon
       || a.name.localeCompare(b.name, 'de')
     ))
     .map((row, index) => ({
@@ -103,14 +125,15 @@ function computeStandings(members: string[], matches: ReturnType<typeof getMockS
       wins: row.wins,
       losses: row.losses,
       sets: `${row.setsWon}:${row.setsLost}`,
+      setDifference: row.setsWon - row.setsLost,
+      balls: `${row.ballsWon}:${row.ballsLost}`,
+      ballDifference: row.ballsWon - row.ballsLost,
     }));
 }
 
 export function buildMockGroups(tournament: DemoTournament, stage: TournamentStage): MockGroupView[] {
-  const names = getRuntimeParticipantNames(tournament);
+  const participants = getStageEntrants(tournament, stage);
   const groupCount = Math.max(1, Number(stage.settings.groups) || 1);
-  const entrantCount = Math.max(groupCount, Math.min(names.length, Number(stage.settings.entrants) || names.length));
-  const participants = names.slice(0, entrantCount);
   const assignments = getGroupAssignments(tournament, stage);
   const groups: string[][] = Array.from({ length: groupCount }, () => []);
   participants.forEach((name, index) => {
@@ -123,13 +146,17 @@ export function buildMockGroups(tournament: DemoTournament, stage: TournamentSta
     const label = `Gruppe ${String.fromCharCode(65 + groupIndex)}`;
     const groupMatches = stageMatches.filter((match) => match.round === label);
     const standings = computeStandings(members, groupMatches);
-    const matches: MockGroupMatch[] = groupMatches.map((match) => ({
-      id: match.id,
-      sideA: match.sideA,
-      sideB: match.sideB,
-      score: match.status === 'FINISHED' ? match.score.replace(/\s/g, '') : match.status === 'LIVE' ? match.score : '–',
-      status: match.status === 'FINISHED' ? 'played' : match.status === 'LIVE' ? 'live' : 'open',
-    }));
+    const matches: MockGroupMatch[] = groupMatches.map((match) => {
+      const status: MockGroupMatch['status'] = match.status === 'FINISHED' ? 'played' : match.status === 'LIVE' ? 'live' : 'open';
+      return {
+        id: match.id,
+        sideA: match.sideA,
+        sideB: match.sideB,
+        score: match.status === 'FINISHED' ? match.score.replace(/\s/g, '') : match.status === 'LIVE' ? match.score : '–',
+        status,
+        matchDay: match.matchDay,
+      };
+    }).sort((a, b) => (a.matchDay ?? 0) - (b.matchDay ?? 0) || a.id.localeCompare(b.id));
     return { id: `${stage.id}-group-${groupIndex + 1}`, label, standings, matches };
   });
 }
@@ -160,7 +187,5 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
 }
 
 export function buildSwissStandings(tournament: DemoTournament, stage: TournamentStage): MockStanding[] {
-  const names = getRuntimeParticipantNames(tournament);
-  const entrants = Math.max(2, Math.min(names.length, Number(stage.settings.entrants) || names.length));
-  return computeStandings(names.slice(0, entrants), getMockStageMatches(tournament, stage));
+  return computeStandings(getStageEntrants(tournament, stage), getMockStageMatches(tournament, stage));
 }

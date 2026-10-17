@@ -1,5 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
+import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 
 const PHASE_KEY = 'online-tournament:mock-phase-lifecycle:v1';
 
@@ -7,6 +8,7 @@ interface PhaseLifecycleState {
   tournamentId: string;
   startedStageIds: string[];
   completedStageIds: string[];
+  stageEntrants?: Record<string, string[]>;
 }
 
 function readAll(): PhaseLifecycleState[] {
@@ -31,6 +33,7 @@ function baseState(tournament: DemoTournament): PhaseLifecycleState {
     tournamentId: tournament.id,
     startedStageIds: tournament.hasStarted && firstStageId ? [firstStageId] : [],
     completedStageIds: [],
+    stageEntrants: {},
   };
 }
 
@@ -42,6 +45,24 @@ function saveState(tournament: DemoTournament, state: PhaseLifecycleState) {
   const all = readAll();
   writeAll([state, ...all.filter((item) => item.tournamentId !== tournament.id)]);
   return state;
+}
+
+export function getStageEntrants(tournament: DemoTournament, stage: TournamentStage) {
+  const state = getPhaseLifecycle(tournament);
+  const stored = state.stageEntrants?.[stage.id];
+  if (stored?.length) return [...stored];
+
+  const names = getRuntimeParticipantNames(tournament);
+  const configured = Math.max(1, Math.min(names.length, Number(stage.settings.entrants) || names.length));
+  return names.slice(0, configured);
+}
+
+export function setStageEntrants(tournament: DemoTournament, stage: TournamentStage, entrants: string[]) {
+  const state = getPhaseLifecycle(tournament);
+  saveState(tournament, {
+    ...state,
+    stageEntrants: { ...(state.stageEntrants ?? {}), [stage.id]: [...entrants] },
+  });
 }
 
 export function getStageIndex(tournament: DemoTournament, stage: TournamentStage) {
@@ -93,13 +114,25 @@ export function startFirstStage(tournament: DemoTournament) {
   return startStage(tournament, first);
 }
 
-export function completeStage(tournament: DemoTournament, stage: TournamentStage) {
+export function completeStage(tournament: DemoTournament, stage: TournamentStage, qualifiedForNext: string[] = []) {
   const state = getPhaseLifecycle(tournament);
   if (!state.startedStageIds.includes(stage.id)) return false;
+  const stageIndex = getStageIndex(tournament, stage);
+  const nextStage = tournament.stages[stageIndex + 1];
+  const stageEntrants = { ...(state.stageEntrants ?? {}) };
+  if (nextStage && qualifiedForNext.length) stageEntrants[nextStage.id] = [...qualifiedForNext];
+
   saveState(tournament, {
     ...state,
     completedStageIds: [...new Set([...state.completedStageIds, stage.id])],
+    stageEntrants,
   });
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('mock-phase-completed', {
+      detail: { tournamentId: tournament.id, stageId: stage.id, nextStageId: nextStage?.id ?? null },
+    }));
+  }
   return true;
 }
 

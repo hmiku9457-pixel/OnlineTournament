@@ -7,8 +7,7 @@ import {
   randomizeGroupAssignments,
   setParticipantGroup,
 } from '@/services/mockDrawStore';
-import { isStageCompleted, isStageLockedWaiting, isStageStarted } from '@/services/mockPhaseLifecycle';
-import { getRuntimeParticipantNames } from '@/services/mockParticipants';
+import { getStageEntrants, isStageCompleted, isStageLockedWaiting, isStageStarted } from '@/services/mockPhaseLifecycle';
 
 interface Props {
   tournament: DemoTournament;
@@ -34,7 +33,7 @@ function getDragValue(event: DragEvent) {
 export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
   const [revision, setRevision] = useState(0);
   const editable = canEditDraw(tournament, stage);
-  const participants = useMemo(() => getRuntimeParticipantNames(tournament), [tournament, revision]);
+  const participants = useMemo(() => getStageEntrants(tournament, stage), [tournament, stage, revision]);
   const started = isStageStarted(tournament, stage);
   const completed = isStageCompleted(tournament, stage);
   const waitingForPrevious = isStageLockedWaiting(tournament, stage);

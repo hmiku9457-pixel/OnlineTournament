@@ -888,3 +888,59 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .editable-bracket-slot.bye { background: #f8fafc; }
 .bracket-seed-label { display: block; margin-top: 2px; color: #667085; font-size: .68rem; font-weight: 700; }
 .group-match-row.live { background: #ecfdf3; }
+
+/* Tournament flow refinements: detailed tables, phase navigation and completion modal */
+.mini-standing-table.detailed { overflow-x: auto; }
+.mini-standing-table.detailed .mini-standing-head,
+.mini-standing-table.detailed .mini-standing-row {
+  grid-template-columns: 28px minmax(118px, 1.35fr) 34px 28px 28px 54px 34px 64px 36px;
+  min-width: 560px;
+}
+.group-match-day { display: grid; }
+.group-match-day + .group-match-day { margin-top: 8px; }
+.group-match-day-label {
+  padding: 7px 0 4px;
+  color: #475467;
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.phase-navigation-strip { align-items: stretch; }
+.phase-nav-button {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.phase-nav-button.selected {
+  outline: 2px solid #101828;
+  outline-offset: 1px;
+  opacity: 1;
+}
+.prototype-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(16 24 40 / 48%);
+}
+.prototype-modal {
+  width: min(520px, 100%);
+  background: white;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 24px 60px rgb(16 24 40 / 24%);
+}
+.prototype-modal h2 { margin: 12px 0 8px; }
+.prototype-modal p { margin: 0 0 18px; }
+.phase-navigation-strip {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  padding: 8px 0;
+  background: #f8fafc;
+}
+.locked-stage-placeholder { display: grid; gap: 5px; margin-top: 12px; }
