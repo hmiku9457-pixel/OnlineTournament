@@ -27,8 +27,6 @@ export interface DemoTournament {
   areas: DemoArea[];
 }
 
-const demoOwner = 'demo-owner';
-
 function stage(
   tournamentId: string,
   id: string,
