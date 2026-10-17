@@ -34,6 +34,7 @@ interface StoredMatchResult {
   status: MockMatchState;
   confirmedA?: boolean;
   confirmedB?: boolean;
+  forcedWinner?: string;
 }
 
 interface StoredMatchRuntime {
@@ -54,6 +55,30 @@ interface BaseStageMatch {
 
 const RESULT_KEY = 'online-tournament:mock-match-results:v2';
 const RUNTIME_KEY = 'online-tournament:mock-match-runtime:v1';
+const WITHDRAWAL_KEY = 'online-tournament:withdrawn-participants:v1';
+const SWISS_FIXTURE_KEY = 'online-tournament:swiss-round-fixtures:v1';
+
+interface SwissFixture { tournamentId: string; stageId: string; round: number; pairs: [string, string][] }
+
+function readSwissFixtures(): SwissFixture[] {
+  if (typeof window === 'undefined') return [];
+  try { return JSON.parse(window.localStorage.getItem(SWISS_FIXTURE_KEY) ?? '[]') as SwissFixture[]; } catch { return []; }
+}
+
+function readWithdrawn(): Record<string, string[]> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(window.localStorage.getItem(WITHDRAWAL_KEY) ?? '{}') as Record<string, string[]>; } catch { return {}; }
+}
+
+export function isMockParticipantWithdrawn(tournament: DemoTournament, name: string) {
+  return (readWithdrawn()[tournament.id] ?? []).includes(name);
+}
+
+export function canEditFinishedResults(tournament: DemoTournament, stage: TournamentStage) {
+  const next = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) + 1];
+  return !next || !isStageStarted(tournament, next);
+}
+
 
 function readResults(): StoredMatchResult[] {
   if (typeof window === 'undefined') return [];
@@ -107,6 +132,7 @@ function scoreFromSets(sets: MatchSet[]) {
 
 function resultWinner(result: StoredMatchResult | undefined, sideA: string, sideB: string) {
   if (!result || result.status !== 'FINISHED') return undefined;
+  if (result.forcedWinner) return result.forcedWinner;
   let winsA = 0;
   let winsB = 0;
   result.sets.forEach((set) => {
@@ -301,9 +327,17 @@ function swissMatches(tournament: DemoTournament, stage: TournamentStage, result
       if (!previousDone) break;
     }
 
-    const pairings = round === 1
-      ? swissRoundPairings(participants, [], results)
-      : swissRoundPairings(participants, matches, results);
+    const savedRound = readSwissFixtures().find((item) => item.tournamentId === tournament.id && item.stageId === stage.id && item.round === round);
+    const eligible = participants.filter((name) => !isMockParticipantWithdrawn(tournament, name));
+    const pairings = savedRound?.pairs ?? (round === 1
+      ? swissRoundPairings(eligible, [], results)
+      : swissRoundPairings(eligible, matches, results));
+    if (!savedRound && isStageStarted(tournament, stage) && typeof window !== 'undefined') {
+      window.localStorage.setItem(SWISS_FIXTURE_KEY, JSON.stringify([
+        ...readSwissFixtures().filter((item) => !(item.tournamentId === tournament.id && item.stageId === stage.id && item.round === round)),
+        { tournamentId: tournament.id, stageId: stage.id, round, pairs: pairings },
+      ]));
+    }
 
     pairings.forEach(([sideA, sideB], index) => {
       matches.push({
@@ -344,7 +378,7 @@ function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchRes
     ...match,
     table: savedRuntime?.table ?? match.table,
     status,
-    score: savedResult ? scoreFromSets(savedResult.sets) : match.score,
+    score: savedResult?.forcedWinner ? 'W.O.' : savedResult ? scoreFromSets(savedResult.sets) : match.score,
     sets: savedResult?.sets ?? match.sets,
     note: status === 'WAITING' ? 'Wartet auf Tischzuweisung' : undefined,
   };
@@ -431,9 +465,56 @@ export function startMockMatch(matchId: string) {
 export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: MockMatchState = 'LIVE') {
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
-  const next: StoredMatchResult = { ...previous, matchId, sets, status };
+  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   return next;
+}
+
+// Turnierweiter Rückzug: offene Partien werden als kampfloser Sieg des Gegners
+// behandelt. Bereits beendete Partien bleiben unverändert. Kommende Schweizer
+// Runden paaren nur noch aktive Teilnehmer; aktuelle Paarungen bleiben stabil.
+function settleWithdrawnMatches(tournament: DemoTournament) {
+  const active = getActiveStage(tournament);
+  if (!active) return;
+  for (let pass = 0; pass < 24; pass += 1) {
+    const pending = getMockStageMatches(tournament, active).filter((match) => (
+      match.status !== 'FINISHED' &&
+      (isMockParticipantWithdrawn(tournament, match.sideA) || isMockParticipantWithdrawn(tournament, match.sideB))
+    ));
+    if (!pending.length) break;
+    const saved = readResults();
+    let changed = false;
+    for (const match of pending) {
+      const aWithdrawn = isMockParticipantWithdrawn(tournament, match.sideA);
+      const bWithdrawn = isMockParticipantWithdrawn(tournament, match.sideB);
+      // Bei zwei Rückzügen gibt es keinen Sieger; der Ast bleibt frei.
+      // Die Begegnung zählt für beide als kampflos beendet.
+      if (saved.some((item) => item.matchId === match.id && item.status === 'FINISHED')) continue;
+      saved.unshift({ matchId: match.id, sets: [], status: 'FINISHED', forcedWinner: aWithdrawn && bWithdrawn ? 'Freilos' : aWithdrawn ? match.sideB : match.sideA });
+      changed = true;
+    }
+    if (!changed) break;
+    writeResults(saved);
+  }
+}
+
+export function reconcileWithdrawalsForTournament(tournament: DemoTournament) {
+  settleWithdrawnMatches(tournament);
+}
+
+export function withdrawMockParticipant(tournament: DemoTournament, name: string) {
+  if (!getRuntimeParticipantNames(tournament).includes(name) || isMockParticipantWithdrawn(tournament, name)) return false;
+  const current = readWithdrawn();
+  current[tournament.id] = [...(current[tournament.id] ?? []), name];
+  window.localStorage.setItem(WITHDRAWAL_KEY, JSON.stringify(current));
+  settleWithdrawnMatches(tournament);
+  const active = getActiveStage(tournament);
+  if (active) {
+    const unfinished = getMockStageMatches(tournament, active).some((match) => match.status !== 'FINISHED');
+    if (!unfinished) reconcileCompletedPhase(`${active.id}-withdrawal`);
+  }
+  window.dispatchEvent(new CustomEvent('mock-runtime-change'));
+  return true;
 }
 
 interface RankingRow {
@@ -464,7 +545,7 @@ function rankParticipants(participants: string[], matches: BaseStageMatch[], res
 
   matches.forEach((match) => {
     const result = results.find((item) => item.matchId === match.id && item.status === 'FINISHED');
-    if (!result?.sets.length) return;
+    if (!result) return;
     const rowA = rows.get(match.sideA);
     const rowB = rows.get(match.sideB);
     if (!rowA || !rowB) return;
@@ -540,16 +621,16 @@ function computeStageQualifiers(tournament: DemoTournament, stage: TournamentSta
         || b.ballsWon - a.ballsWon
         || a.name.localeCompare(b.name, 'de')
       ));
-      qualified.push(...tier.slice(0, targetCount - qualified.length).map((row) => row.name));
+      qualified.push(...tier.filter((row) => !isMockParticipantWithdrawn(tournament, row.name)).slice(0, targetCount - qualified.length).map((row) => row.name));
     }
     return qualified;
   }
 
   if (stage.type === 'ROUND_ROBIN' || stage.type === 'SWISS') {
-    return rankParticipants(getStageEntrants(tournament, stage), matches, results).slice(0, targetCount).map((row) => row.name);
+    return rankParticipants(getStageEntrants(tournament, stage), matches, results).filter((row) => !isMockParticipantWithdrawn(tournament, row.name)).slice(0, targetCount).map((row) => row.name);
   }
 
-  return getStageEntrants(tournament, stage).slice(0, targetCount);
+  return getStageEntrants(tournament, stage).filter((name) => !isMockParticipantWithdrawn(tournament, name)).slice(0, targetCount);
 }
 
 export function refreshCompletedStageQualifiers(tournament: DemoTournament, stage: TournamentStage) {
@@ -590,9 +671,19 @@ function reconcileCompletedPhase(matchId: string) {
 export function completeMockMatch(matchId: string, sets: MatchSet[], status: MockMatchState = 'FINISHED') {
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
-  const next: StoredMatchResult = { ...previous, matchId, sets, status };
+  const previousFinal = previous?.status === 'FINISHED';
+  if (previousFinal) {
+    const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
+    const stage = tournament?.stages.find((item) => matchId.startsWith(`${item.id}-`));
+    if (tournament && stage && !canEditFinishedResults(tournament, stage)) return previous;
+  }
+  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
-  if (status === 'FINISHED') reconcileCompletedPhase(matchId);
+  if (status === 'FINISHED') {
+    const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
+    if (tournament) settleWithdrawnMatches(tournament);
+    reconcileCompletedPhase(matchId);
+  }
   return next;
 }
 

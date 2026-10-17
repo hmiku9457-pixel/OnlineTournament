@@ -166,6 +166,61 @@ export function updateMockTournamentStatus(tournamentId: string, status: Tournam
   return { ...demo, status, lastUpdate: 'gerade eben' };
 }
 
+export function updateMockParticipantName(tournamentId: string, oldName: string, firstName: string, lastName: string, code: string) {
+  const first = firstName.trim();
+  const last = lastName.trim();
+  const name = `${first} ${last}`;
+  if (!first || !last || !/^\d{4,8}$/.test(code.trim())) return false;
+  const tournaments = readLocalTournaments();
+  const tournament = tournaments.find((item) => item.id === tournamentId);
+  if (!tournament || !tournament.participantNames?.includes(oldName)) return false;
+  if (name !== oldName && tournament.participantNames.includes(name)) return false;
+
+  // Für den lokalen Prototypen verwenden die Auslosungsdaten Namen als IDs.
+  // Deshalb müssen bei Umbenennung auch die bereits gespeicherten Referenzen
+  // in den Phasenzuordnungen und Schweizer Runden konsistent bleiben.
+  if (name !== oldName) {
+    const configKeys = ['online-tournament:mock-draw-config:v1', 'online-tournament:mock-phase-lifecycle:v1', 'online-tournament:swiss-round-fixtures:v1'];
+    const renameValue = (value: unknown): unknown => {
+      if (typeof value === 'string') return value === oldName ? name : value;
+      if (Array.isArray(value)) return value.map(renameValue);
+      if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([key, item]) => [key === oldName ? name : key, renameValue(item)]));
+      }
+      return value;
+    };
+    configKeys.forEach((key) => {
+      try {
+        const parsed: unknown = JSON.parse(window.localStorage.getItem(key) ?? '[]');
+        if (!Array.isArray(parsed)) return;
+        const renamed = parsed.map((entry: { tournamentId?: string }) => entry.tournamentId === tournamentId ? renameValue(entry) : entry);
+        window.localStorage.setItem(key, JSON.stringify(renamed));
+      } catch { /* Alte, fehlerhafte Testdaten nicht übernehmen. */ }
+    });
+  }
+
+  if (name !== oldName) {
+    try {
+      const withdrawn = JSON.parse(window.localStorage.getItem('online-tournament:withdrawn-participants:v1') ?? '{}') as Record<string, string[]>;
+      if (withdrawn[tournamentId]) {
+        withdrawn[tournamentId] = withdrawn[tournamentId].map((entry) => entry === oldName ? name : entry);
+        window.localStorage.setItem('online-tournament:withdrawn-participants:v1', JSON.stringify(withdrawn));
+      }
+    } catch { /* Keine gespeicherten Rückzüge vorhanden. */ }
+  }
+  const oldCodes = tournament.participantCodes ?? {};
+  const { [oldName]: _oldCode, ...restCodes } = oldCodes;
+  void _oldCode;
+  const updated: DemoTournament = {
+    ...tournament,
+    participantNames: tournament.participantNames.map((entry) => entry === oldName ? name : entry),
+    participantCodes: { ...restCodes, [name]: code.trim() },
+  };
+  writeLocalTournaments(tournaments.map((entry) => entry.id === tournamentId ? updated : entry));
+  window.dispatchEvent(new CustomEvent('mock-runtime-change'));
+  return true;
+}
+
 export function removeLocalPrototypeTournaments() {
   if (typeof window === 'undefined') return;
   window.localStorage.removeItem(STORAGE_KEY);
@@ -173,6 +228,8 @@ export function removeLocalPrototypeTournaments() {
   window.localStorage.removeItem('online-tournament:mock-match-runtime:v1');
   window.localStorage.removeItem('online-tournament:mock-draw-config:v1');
   window.localStorage.removeItem('online-tournament:mock-phase-lifecycle:v1');
+  window.localStorage.removeItem('online-tournament:withdrawn-participants:v1');
+  window.localStorage.removeItem('online-tournament:swiss-round-fixtures:v1');
 }
 
 export function countActiveMockTournaments() {

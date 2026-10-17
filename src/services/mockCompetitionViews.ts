@@ -44,6 +44,7 @@ export interface MockBracketMatch {
   score?: string;
   winner?: string;
   autoWinner?: string;
+  sets?: MatchSet[];
 }
 
 export interface MockBracketRound {
@@ -84,7 +85,19 @@ function computeStandings(members: string[], matches: ReturnType<typeof getMockS
   }]));
 
   matches.forEach((match) => {
-    if (match.status !== 'FINISHED' || !match.sets?.length) return;
+    if (match.status !== 'FINISHED') return;
+    const forceWinner = getMockStoredResult(match.id)?.forcedWinner;
+    if (forceWinner) {
+      const a = rows.get(match.sideA);
+      const b = rows.get(match.sideB);
+      if (!a || !b) return;
+      a.played += 1;
+      b.played += 1;
+      if (forceWinner === match.sideA) { a.wins += 1; b.losses += 1; }
+      else { b.wins += 1; a.losses += 1; }
+      return;
+    }
+    if (!match.sets?.length) return;
     const a = rows.get(match.sideA);
     const b = rows.get(match.sideB);
     if (!a || !b) return;
@@ -181,7 +194,10 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
     const stored = getMockStoredResult(match.id);
     let winner = match.autoWinner;
     let score: string | undefined;
-    if (stored?.sets.length) {
+    if (stored?.forcedWinner) {
+      winner = stored.forcedWinner;
+      score = 'W.O.';
+    } else if (stored?.sets.length) {
       score = scoreFromSets(stored.sets);
       if (stored.status === 'FINISHED') {
         const { winsA, winsB } = resultStats(stored.sets);
@@ -191,7 +207,7 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
       score = 'Freilos';
     }
     const list = byRound.get(match.round) ?? [];
-    list.push({ id: match.id, sideA: match.sideA, sideB: match.sideB, score, winner, autoWinner: match.autoWinner });
+    list.push({ id: match.id, sideA: match.sideA, sideB: match.sideB, score, winner, autoWinner: match.autoWinner, sets: stored?.sets });
     byRound.set(match.round, list);
   });
 

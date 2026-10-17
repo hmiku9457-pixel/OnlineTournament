@@ -26,6 +26,7 @@ export interface DemoTournament {
   stages: TournamentStage[];
   areas: DemoArea[];
   participantNames?: string[];
+  participantCodes?: Record<string, string>;
   isLocalPrototype?: boolean;
   hasStarted?: boolean;
 }

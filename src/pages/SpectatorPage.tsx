@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
-import { getMockRuntimeMatches } from '@/services/mockRuntime';
+import { getMockRuntimeMatches, getMockStageMatches, isMockParticipantWithdrawn } from '@/services/mockRuntime';
+import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { getMockTournament } from '@/services/mockTournamentStore';
 import { getActiveStage } from '@/services/mockPhaseLifecycle';
 
@@ -9,6 +10,7 @@ import { getActiveStage } from '@/services/mockPhaseLifecycle';
 export function SpectatorPage() {
   const { tournamentId } = useParams();
   const navigate = useNavigate();
+  const [selectedSwiss, setSelectedSwiss] = useState<{ name: string; stageId: string } | null>(null);
   const tournament = useMemo(() => getMockTournament(tournamentId), [tournamentId]);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament]);
   const live = matches.filter((match) => match.status === 'LIVE' || match.status === 'CONFIRMATION');
@@ -79,7 +81,7 @@ export function SpectatorPage() {
             return (
               <section className="spectator-stage-block" key={stage.id}>
                 <div className="competition-stage-head"><div><span className="badge">SCHWEIZER SYSTEM</span><h3>{stage.name}</h3></div></div>
-                <div className="card table-wrap"><table className="compact-table"><thead><tr><th>#</th><th>Teilnehmer</th><th>Sp.</th><th>Siege</th><th>N.</th><th>Sätze</th><th>Satz ±</th><th>Bälle</th><th>Ball ±</th></tr></thead><tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><strong>{row.name}</strong> <span className="swiss-record">{row.wins}:{row.losses}</span>{previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.sets}</td><td>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td>{row.balls}</td><td>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></tr>)}</tbody></table></div>
+                <div className="card table-wrap"><table className="compact-table"><thead><tr><th>#</th><th>Teilnehmer</th><th>Sp.</th><th>Siege</th><th>N.</th><th>Sätze</th><th>Satz ±</th><th>Bälle</th><th>Ball ±</th></tr></thead><tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><button type="button" className="standing-player-button" onClick={() => setSelectedSwiss({ name: row.name, stageId: stage.id })}><strong>{row.name}</strong></button> <span className="swiss-record">{row.wins}:{row.losses}</span>{previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.sets}</td><td>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td>{row.balls}</td><td>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></tr>)}</tbody></table></div>
               </section>
             );
           }
@@ -89,7 +91,7 @@ export function SpectatorPage() {
             return (
               <section className="spectator-stage-block" key={stage.id}>
                 <div className="competition-stage-head"><div><span className="badge">K.-O.</span><h3>{stage.name}</h3></div></div>
-                <div className="bracket-scroll"><div className="bracket-board">{rounds.map((round) => <div className="bracket-round" key={round.label}><h4>{round.label}</h4><div className="bracket-round-matches">{round.matches.map((match) => <article className="bracket-match" key={match.id}><div className={match.winner === match.sideA ? 'winner' : ''}><span>{match.sideA}{previousFinishLabels[match.sideA] && <small className="participant-origin">{previousFinishLabels[match.sideA]}</small>}</span><strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[0] : ''}</strong></div><div className={match.winner === match.sideB ? 'winner' : ''}><span>{match.sideB}{previousFinishLabels[match.sideB] && <small className="participant-origin">{previousFinishLabels[match.sideB]}</small>}</span><strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[1] : match.score === 'Freilos' ? 'BYE' : ''}</strong></div></article>)}</div></div>)}</div></div>
+                <div className="bracket-scroll"><div className="bracket-board">{rounds.map((round) => <div className="bracket-round" key={round.label}><h4>{round.label}</h4><div className="bracket-round-matches">{round.matches.map((match) => <article className="bracket-match" key={match.id}><div className={match.winner === match.sideA ? 'winner' : ''}><span>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Freilos (${match.sideA})` : match.sideA}{previousFinishLabels[match.sideA] && <small className="participant-origin">{previousFinishLabels[match.sideA]}</small>}</span><span className="bracket-score-cells">{(match.sets ?? []).map((set, index) => <span key={index}>{set.sideAScore}</span>)}<strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[0] : ''}</strong></span></div><div className={match.winner === match.sideB ? 'winner' : ''}><span>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Freilos (${match.sideB})` : match.sideB}{previousFinishLabels[match.sideB] && <small className="participant-origin">{previousFinishLabels[match.sideB]}</small>}</span><span className="bracket-score-cells">{(match.sets ?? []).map((set, index) => <span key={index}>{set.sideBScore}</span>)}<strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[1] : match.score === 'Freilos' ? 'BYE' : ''}</strong></span></div></article>)}</div></div>)}</div></div>
               </section>
             );
           }
@@ -97,6 +99,22 @@ export function SpectatorPage() {
           return null;
         })}
       </section>
+
+      {selectedSwiss && (() => {
+        const stage = tournament.stages.find((item) => item.id === selectedSwiss.stageId);
+        if (!stage) return null;
+        const ownMatches = getMockStageMatches(tournament, stage).filter((match) => match.sideA === selectedSwiss.name || match.sideB === selectedSwiss.name);
+        return <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setSelectedSwiss(null)}>
+          <section className="prototype-modal player-games-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="player-games-modal-head"><h2>{selectedSwiss.name} · Partien</h2><button className="btn small" type="button" onClick={() => setSelectedSwiss(null)}>Schließen</button></div>
+            <div className="player-games-list">{ownMatches.map((match) => <div className="player-game-row" key={match.id}>
+              <span className="muted">{match.round}</span>
+              <strong>vs. {match.sideA === selectedSwiss.name ? match.sideB : match.sideA}</strong>
+              <MatchResultDetails score={match.status === 'FINISHED' ? match.score : '–'} sets={match.sets} />
+            </div>)}</div>
+          </section>
+        </div>;
+      })()}
 
       <section className="card spectator-next-card">
         <div className="control-section-head"><div><h2>Nächste Spiele</h2><p className="muted">Tisch- und Warteschlangenübersicht.</p></div></div>

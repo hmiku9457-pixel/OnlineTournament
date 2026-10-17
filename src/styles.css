@@ -991,3 +991,34 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .admin-result-modal { width: min(680px, calc(100vw - 32px)); }
 .start-phase-modal { width: min(520px, calc(100vw - 32px)); }
 .compact-actions { gap: 7px; align-items: center; }
+
+/* Tournament control refinements: pinning, per-set bracket scores, responsive tables */
+.overview-table-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  align-items: stretch;
+}
+.overview-table-card { min-width: 0; width: 100%; overflow-wrap: anywhere; }
+.overview-table-card .set-by-set-entry,
+.overview-table-card .current-set-entry-row,
+.overview-table-card .set-entry-scoreline { min-width: 0; max-width: 100%; }
+.overview-table-card .current-set-entry-row { grid-template-columns: minmax(0, 80px) minmax(0, 1fr); }
+.overview-table-card .current-set-entry-row .btn { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.overview-table-card .table-status-top { flex-wrap: wrap; }
+.bracket-match > div { grid-template-columns: minmax(0, 1fr) auto; }
+.bracket-name-inline { display: flex; align-items: center; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.bracket-pin { padding: 1px 3px; border: 1px solid #d0d5dd; border-radius: 5px; background: white; cursor: pointer; font-size: .72rem; flex-shrink: 0; }
+.bracket-pin.pinned { border-color: #101828; background: #e4e7ec; }
+.pinned-slot { background: #eff4ff; cursor: default; }
+.bracket-score-cells { display: flex; justify-content: flex-end; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.bracket-score-cells > span { min-width: 17px; text-align: center; color: #667085; font-size: .77rem; }
+.bracket-score-cells > strong { padding-left: 6px; margin-left: 2px; border-left: 1px solid #e4e7ec; min-width: 20px; text-align: center; }
+.participant-edit-grid { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: 10px; width: 100%; align-items: end; }
+.participant-edit-grid .actions { grid-column: 1 / -1; }
+.participant-edit-error { grid-column: 1 / -1; }
+.participant-games-table { width: 100%; }
+.participant-games-table table { min-width: 620px; }
+.participant-inline-panel:has(.participant-games-table) { display: grid !important; width: 100%; }
+@media (max-width: 850px) { .participant-edit-grid { grid-template-columns: 1fr; } }
+
+/* Wide enough knockout cards for all set scores (BO1–BO7) */
+.bracket-board { grid-auto-columns: minmax(355px, max-content); }

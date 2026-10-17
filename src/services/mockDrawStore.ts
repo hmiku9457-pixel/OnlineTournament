@@ -9,6 +9,7 @@ interface StageDrawConfig {
   stageId: string;
   groupAssignments?: Record<string, number>;
   bracketSlots?: string[];
+  pinnedBracketSlots?: number[];
   swissOrder?: string[];
 }
 
@@ -189,6 +190,23 @@ export function randomizeSwissOrder(tournament: DemoTournament, stage: Tournamen
   return true;
 }
 
+export function getPinnedBracketSlots(tournament: DemoTournament, stage: TournamentStage): number[] {
+  const slots = getBracketSlots(tournament, stage);
+  return (findConfig(tournament.id, stage.id)?.pinnedBracketSlots ?? [])
+    .filter((index) => Number.isInteger(index) && index >= 0 && index < slots.length && slots[index] !== 'Freilos');
+}
+
+export function toggleBracketPin(tournament: DemoTournament, stage: TournamentStage, index: number) {
+  if (!canEditDraw(tournament, stage)) return false;
+  const slots = getBracketSlots(tournament, stage);
+  if (index < 0 || index >= slots.length || slots[index] === 'Freilos') return false;
+  const old = findConfig(tournament.id, stage.id);
+  const pinned = new Set(getPinnedBracketSlots(tournament, stage));
+  if (pinned.has(index)) pinned.delete(index); else pinned.add(index);
+  upsert({ ...old, tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots, pinnedBracketSlots: [...pinned] });
+  return true;
+}
+
 export function getBracketSlots(tournament: DemoTournament, stage: TournamentStage) {
   const participants = getStageEntrants(tournament, stage);
   const bracketSize = nextPowerOfTwo(Math.max(2, participants.length));
@@ -211,25 +229,61 @@ export function setBracketSlot(
   if (sourceSlotIndex === slotIndex) return true;
 
   const previous = slots[slotIndex];
+  const pinned = new Set(getPinnedBracketSlots(tournament, stage));
+  if (pinned.has(slotIndex)) return false;
   let sourceIndex = Number.isInteger(sourceSlotIndex) ? sourceSlotIndex! : -1;
   if (sourceIndex < 0 || sourceIndex >= slots.length || slots[sourceIndex] !== value) {
     sourceIndex = slots.findIndex((item, index) => index !== slotIndex && item === value);
   }
-  if (sourceIndex < 0) return false;
+  if (sourceIndex < 0 || pinned.has(sourceIndex)) return false;
 
   slots[slotIndex] = value;
   slots[sourceIndex] = previous;
   if (!validBracketConstraints(participants, slots)) return false;
-  upsert({ tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots });
+  upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots });
   return true;
 }
 
 export function randomizeBracketSlots(tournament: DemoTournament, stage: TournamentStage) {
   if (!canEditDraw(tournament, stage)) return false;
   const participants = getStageEntrants(tournament, stage);
-  const slots = balancedBracketSlots(participants, true);
-  upsert({ tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots });
-  return true;
+  const original = getBracketSlots(tournament, stage);
+  const pinned = getPinnedBracketSlots(tournament, stage);
+  const bracketSize = original.length;
+  const pairCount = bracketSize / 2;
+  const requiredFullPairs = participants.length - pairCount;
+  const fixed = new Map(pinned.map((index) => [index, original[index]]));
+  const unpinnedPlayers = participants.filter((name) => ![...fixed.values()].includes(name));
+
+  // Pinned entries keep their exact slots. Every pair must contain at least one player.
+  // Randomly choose the full pairs, then fill non-full pairs with exactly one bye.
+  for (let attempt = 0; attempt < 600; attempt += 1) {
+    const forcedFull = Array.from({ length: pairCount }, (_, pair) => pair)
+      .filter((pair) => fixed.has(pair * 2) && fixed.has(pair * 2 + 1));
+    if (forcedFull.length > requiredFullPairs) return false;
+    const remainingPairs = shuffled(Array.from({ length: pairCount }, (_, pair) => pair)
+      .filter((pair) => !forcedFull.includes(pair)));
+    const fullPairs = new Set([...forcedFull, ...remainingPairs.slice(0, requiredFullPairs - forcedFull.length)]);
+    const slots = Array<string>(bracketSize).fill('Freilos');
+    fixed.forEach((name, index) => { slots[index] = name; });
+    const free = shuffled(unpinnedPlayers);
+    let cursor = 0;
+    for (let pair = 0; pair < pairCount; pair += 1) {
+      const start = pair * 2;
+      const required = fullPairs.has(pair) ? 2 : 1;
+      const present = Number(fixed.has(start)) + Number(fixed.has(start + 1));
+      if (present > required) break;
+      const candidates = shuffled([start, start + 1].filter((index) => !fixed.has(index)));
+      for (let index = 0; index < required - present; index += 1) {
+        slots[candidates[index]] = free[cursor++];
+      }
+    }
+    if (validBracketConstraints(participants, slots) && pinned.every((index) => slots[index] === original[index])) {
+      upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots, pinnedBracketSlots: pinned });
+      return true;
+    }
+  }
+  return false;
 }
 
 export function resetBracketSlots(tournament: DemoTournament, stage: TournamentStage) {
@@ -238,7 +292,7 @@ export function resetBracketSlots(tournament: DemoTournament, stage: TournamentS
   const existing = findConfig(tournament.id, stage.id);
   if (!existing) return true;
   const remainingConfig = (existing.groupAssignments || existing.swissOrder)
-    ? { ...existing, bracketSlots: undefined }
+    ? { ...existing, bracketSlots: undefined, pinnedBracketSlots: undefined }
     : null;
   writeAll([
     ...(remainingConfig ? [remainingConfig] : []),

@@ -1,3 +1,15 @@
+# UI/UX und Mock-Runtime – 2026-10-18
+
+- K.-o.-Startplätze können einzeln mit einem Pin fixiert werden; Zufallsverteilung mischt nur die übrigen Teilnehmer/Freilose unter Einhaltung der Bracket-Constraints.
+- K.-o.-Turnierbaum zeigt bei abgeschlossenen Spielen Ballpunkte aller Sätze und den Satz-Endstand je Teilnehmer.
+- Schweizer Rangliste in Turnierleitung und Zuschaueransicht öffnet per Klick alle Partien des Spielers.
+- Tischkarten besitzen eine höhere Mindestbreite und verhindern das Überlaufen von Status und Satzerfassung.
+- Fertige Match-Ergebnisse sind nach Start der Folgephase sowohl im UI als auch in der lokalen Runtime nicht mehr änderbar.
+- Rückzüge werden lokal gespeichert: offene Partien werden als kampflose Ergebnisse gewertet; neue Schweizer Runden lassen Zurückgezogene aus und verteilen Freilose möglichst an Teilnehmer ohne voriges Freilos.
+- Teilnehmereditor bietet Vorname, Nachname und Spielercode. Namensänderungen aktualisieren lokale Auslosungsreferenzen.
+- Teilnehmer-Spielübersicht listet echte Partien mit Status, Ergebnis und zulässiger Admin-Bearbeitung.
+- Neue Regressionstests für Pins, Rückzug und Ergebnissperre.
+
 - Fix: K.-o.-Best-of-Regressionstest prüft jetzt den vollständigen Turnierbaum statt nur aktuell spielbare Matches.
 ## 0.2.2 - Turnierverlauf UX & Schweizer Pairing
 
