@@ -165,7 +165,6 @@ export function TournamentControlPage() {
   const [assigningMatchId, setAssigningMatchId] = useState<string | null>(null);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament, runtimeVersion]);
   const participants = useMemo(() => getRuntimeParticipantNames(tournament), [tournament]);
-  const liveMatches = matches.filter((match) => match.status === 'LIVE' || match.status === 'CONFIRMATION');
   const nextMatches = matches.filter((match) => match.status === 'READY' || match.status === 'WAITING');
   const tableMatches = matches.filter((match) => ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch '));
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
