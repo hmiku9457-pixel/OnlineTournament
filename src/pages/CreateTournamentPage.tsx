@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   bestOfOptions,
   createPhaseTemplate,
@@ -20,6 +21,7 @@ import {
 } from '@/domain/tournamentCreation';
 import type { Discipline, StageType } from '@/domain/types';
 import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/recommendations';
+import { createMockTournament } from '@/services/mockTournamentStore';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
@@ -281,6 +283,7 @@ function NumberChoice({
 }
 
 export function CreateTournamentPage() {
+  const navigate = useNavigate();
   const [step, setStep] = useState<WizardStep>(1);
   const [name, setName] = useState('');
   const [sport, setSport] = useState('table_tennis');
@@ -580,7 +583,28 @@ export function CreateTournamentPage() {
     setStep((step - 1) as WizardStep);
   }
 
-
+  function submitTournament() {
+    if (!phaseConfigurationValid || !participantsValid) return;
+    const tournament = createMockTournament({
+      name,
+      sport,
+      discipline,
+      tables,
+      minimumMatches,
+      participantNames: participants.map((participant) => participantDisplayName(participant, discipline)),
+      phases: phaseDrafts.map((phase) => ({
+        type: phase.type,
+        label: phase.label,
+        bestOf: phase.bestOf,
+        entrantCount: phase.entrantCount,
+        groupCount: phase.groupCount,
+        swissRounds: phase.swissRounds,
+        knockoutBestOf: phase.knockoutBestOf,
+      })),
+      estimatedDurationMinutes: estimatedTournamentDurationMinutes,
+    });
+    navigate(`/tournaments/${tournament.id}`);
+  }
 
   const estimatedTournamentDurationMinutes = useMemo(
     () => estimateTournamentDurationMinutes(
@@ -635,7 +659,7 @@ export function CreateTournamentPage() {
         })}
       </nav>
 
-      <form className="card wizard-card" onSubmit={(event) => event.preventDefault()}>
+      <form className="card wizard-card" onSubmit={(event) => { event.preventDefault(); submitTournament(); }}>
         {step === 1 && (
           <section>
             <h2>Grunddaten</h2>

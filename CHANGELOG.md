@@ -1,3 +1,14 @@
+## 0.2.0 - DB-loser UX-Prototyp
+
+- Turnier erstellen speichert den fertigen Wizard lokal im Browser (`localStorage`) und öffnet das neu erzeugte Turnier.
+- Turnier öffnen führt in eine klickbare Turnierleitungsoberfläche mit Übersicht, Spielen, Teilnehmern, Phasen und Tischen.
+- Turniere können im Prototyp gestartet, pausiert und fortgesetzt werden.
+- Neue eigenständige Spieleransicht mit aktuellem/nächstem Spiel, Spieler- und Match-Code.
+- Zuschaueransicht verwendet den gewählten Demo-/lokalen Turnierdatensatz und zeigt Live- sowie nächste Spiele.
+- Tablet-Ergebniseingabe wurde als eigenständige Oberfläche erweitert und zeigt Matchdaten aus dem Mock-Laufzeitmodell.
+- Lokale Testturniere können im Dashboard zurückgesetzt werden.
+- Spieler- und Zuschaueransichten laufen bewusst ohne Verwaltungs-Sidebar.
+
 
 ## 0.1.1
 - Hinzugefügt: großer Demo-/Testpool mit aktiven Turnieren für die grafische Beurteilung verschiedener Turnierformen.

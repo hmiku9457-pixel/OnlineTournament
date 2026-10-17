@@ -25,6 +25,8 @@ export interface DemoTournament {
   lastUpdate: string;
   stages: TournamentStage[];
   areas: DemoArea[];
+  participantNames?: string[];
+  isLocalPrototype?: boolean;
 }
 
 function stage(
@@ -286,10 +288,6 @@ export const demoTournaments: DemoTournament[] = [
   },
 ];
 
-export function getDemoTournament(tournamentId?: string) {
-  return demoTournaments.find((item) => item.id === tournamentId) ?? demoTournaments[0];
-}
-
-export function countActiveTournaments() {
-  return demoTournaments.filter((item) => ['REGISTRATION', 'READY', 'RUNNING', 'PAUSED'].includes(item.status)).length;
+export function findDemoTournament(tournamentId?: string) {
+  return demoTournaments.find((item) => item.id === tournamentId);
 }

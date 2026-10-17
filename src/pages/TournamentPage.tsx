@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { StageCard } from '@/components/StageCard';
-import { getDemoTournament } from '@/data/demoTournaments';
+import { getMockTournament } from '@/services/mockTournamentStore';
 
 function getStatusLabel(status: string) {
   switch (status) {
@@ -20,7 +20,7 @@ function getStatusLabel(status: string) {
 
 export function TournamentPage() {
   const { tournamentId } = useParams();
-  const tournament = useMemo(() => getDemoTournament(tournamentId), [tournamentId]);
+  const tournament = useMemo(() => getMockTournament(tournamentId), [tournamentId]);
 
   return (
     <>
@@ -29,12 +29,15 @@ export function TournamentPage() {
           <div className="tournament-page-status-row">
             <h1>{tournament.name}</h1>
             <span className={tournament.status === 'RUNNING' ? 'badge live' : 'badge'}>{getStatusLabel(tournament.status)}</span>
+            {tournament.isLocalPrototype && <span className="badge prototype">Lokal gespeichert</span>}
           </div>
           <p className="muted">{tournament.subtitle} · ID: {tournament.id}</p>
         </div>
         <div className="actions no-print">
           <button className="btn" onClick={() => window.print()}>Spielplan drucken</button>
-          <button className="btn primary">Turnier öffnen</button>
+          <Link className="btn" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
+          <Link className="btn" to={`/player/${tournament.id}`}>Spieleransicht</Link>
+          <Link className="btn primary" to={`/tournaments/${tournament.id}/control`}>Turnier öffnen</Link>
         </div>
       </header>
 
@@ -69,8 +72,8 @@ export function TournamentPage() {
         </div>
 
         <div className="card span-4">
-          <h2>Visualisierungs-Hinweis</h2>
-          <p className="muted">Dieses Turnier gehört zum Testpool. Nutze es, um Aufbau, Abstände, Stufen und Informationsdichte der jeweiligen Turnierform grafisch zu beurteilen.</p>
+          <h2>Prototyp-Modus</h2>
+          <p className="muted">Ab hier sind Turnierleitung, Spieler- und Zuschaueransicht ohne Datenbank klickbar. Zustände werden für lokal erstellte Turniere im Browser gespeichert.</p>
           <div className="tournament-mini-facts">
             <div><span className="muted">Status</span><strong>{getStatusLabel(tournament.status)}</strong></div>
             <div><span className="muted">Letztes Update</span><strong>{tournament.lastUpdate}</strong></div>

@@ -81,3 +81,18 @@ Short codes are stored only as hashes in PostgreSQL. The included RPCs form a se
 ## License
 
 MIT
+
+## DB-loser Prototyp-Modus
+
+Bis zur Anbindung von Supabase kann der komplette UX-Fluss lokal getestet werden. Neu erstellte Turniere werden im Browser per `localStorage` gespeichert. Das Dashboard kombiniert diese lokalen Turniere mit dem statischen Demo-Testpool.
+
+Klickbare Prototyp-Oberflächen:
+
+- Turniererstellung → lokales Turnier
+- Turnierdetail → Turnierleitung
+- Turnierleitung mit Übersicht, Spielen, Teilnehmern, Phasen und Tischen
+- Spieleransicht
+- Zuschauer-/Liveansicht
+- Tablet-Ergebniseingabe
+
+Die Laufzeitdaten für Spiele und Tischbelegung sind derzeit bewusst Mock-Daten. Sie dienen dazu, UI/UX und Informationsdichte vor der Datenbankanbindung festzulegen.

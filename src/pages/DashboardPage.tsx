@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { countActiveTournaments, demoTournaments } from '@/data/demoTournaments';
+import { countActiveMockTournaments, getAllMockTournaments, removeLocalPrototypeTournaments } from '@/services/mockTournamentStore';
 
 function getStatusLabel(status: string) {
   switch (status) {
@@ -17,10 +17,11 @@ function getStatusLabel(status: string) {
 }
 
 export function DashboardPage() {
-  const activeTournaments = countActiveTournaments();
-  const runningMatches = demoTournaments.reduce((sum, item) => sum + item.runningMatches, 0);
-  const openConfirmations = demoTournaments.reduce((sum, item) => sum + item.openConfirmations, 0);
-  const activePool = demoTournaments.filter((item) => ['REGISTRATION', 'READY', 'RUNNING', 'PAUSED'].includes(item.status));
+  const tournaments = getAllMockTournaments();
+  const activeTournaments = countActiveMockTournaments();
+  const runningMatches = tournaments.reduce((sum, item) => sum + item.runningMatches, 0);
+  const openConfirmations = tournaments.reduce((sum, item) => sum + item.openConfirmations, 0);
+  const activePool = tournaments.filter((item) => ['REGISTRATION', 'READY', 'RUNNING', 'PAUSED'].includes(item.status));
 
   return (
     <>
@@ -30,6 +31,9 @@ export function DashboardPage() {
           <p className="muted">Großer Testpool mit aktiven Demo-Turnieren zur visuellen Beurteilung der unterschiedlichen Turnierformen.</p>
         </div>
         <div className="actions">
+          <button className="btn" type="button" onClick={() => { removeLocalPrototypeTournaments(); window.location.reload(); }}>
+            Lokale Tests zurücksetzen
+          </button>
           <Link className="btn" to="/tournaments/vm-2027">
             Demo öffnen
           </Link>
@@ -67,6 +71,7 @@ export function DashboardPage() {
                 <div className="tournament-preview-title-row">
                   <h3>{tournament.name}</h3>
                   <span className={tournament.status === 'RUNNING' ? 'badge live' : 'badge'}>{getStatusLabel(tournament.status)}</span>
+                  {tournament.isLocalPrototype && <span className="badge prototype">Lokal</span>}
                 </div>
                 <p className="muted">{tournament.subtitle}</p>
               </div>
@@ -90,7 +95,7 @@ export function DashboardPage() {
         ))}
 
         <div className="card span-12">
-          <h2>Alle Testturniere</h2>
+          <h2>Alle Turniere im Prototyp</h2>
           <div className="table-wrap">
             <table>
               <thead>
@@ -104,7 +109,7 @@ export function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {demoTournaments.map((tournament) => (
+                {tournaments.map((tournament) => (
                   <tr key={tournament.id}>
                     <td>
                       <strong>{tournament.name}</strong>
