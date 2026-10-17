@@ -8,27 +8,26 @@ Registration is open. A confirmed account may create and publish tournaments. Mo
 
 ## Formats
 
-The long-term engine supports:
+The long-term engine supports independent phase building blocks:
 
 - round robin,
 - group phase,
+- Swiss system,
 - single elimination,
 - double elimination,
-- groups → knockout,
-- Swiss system,
-- Swiss → knockout,
-- placement matches,
-- consolation brackets.
+- placement/consolation stages.
 
-The UI should recommend suitable formats based on participant count, table count and desired minimum matches. The organizer may always override the recommendation, including the recommended number of Swiss rounds and the number of knockout qualifiers.
+Recommendations may combine those building blocks (for example Groups → Knockout, Swiss → Knockout, or Groups → Swiss), but combinations are never treated as indivisible tournament systems. Organizers enable/disable the individual systems and may freely edit the resulting phase sequence.
+
+The UI recommends suitable phase templates based on participant count, table count and desired minimum matches. The organizer may always override the recommendation, including the recommended number of groups, Swiss rounds and knockout entrants. A recommendation is optional rather than mandatory.
 
 Tournament creation is a staged wizard:
 
-1. enter basic data (name, sport, discipline, tables),
+1. enter basic data (name, sport, discipline, tables); 1–12 tables use quick-select buttons and larger events use Custom,
 2. enter participants; participant count is derived and is never required up front,
-3. choose desired minimum matches,
-4. choose from the calculated format recommendations; a right-side settings panel can limit the maximum group count, maximum Swiss rounds and number of knockout qualifiers, and can exclude individual tournament systems from the recommendation pool,
-5. configure Best-of independently for every generated phase.
+3. choose desired minimum matches with quick-select buttons for 1–6 or Custom,
+4. optionally choose a calculated recommendation; a right-side settings panel limits recommendation values and independently enables/disables each tournament system,
+5. configure the actual phase sequence. Phases may be added, removed, reordered and edited independently. Group count and Swiss rounds are editable again here, and knockout Best-of may differ by knockout round.
 
 ## Table tennis
 
@@ -50,7 +49,7 @@ Required person fields:
 
 Optional fields include club, rating and birth year. Persons exist only inside one tournament.
 
-A doubles pair is represented as one competitive participant with two person members. Participant entry uses one compact input mask; only completed entries are added to the participant list. Saved entries can be edited from the list, and validation identifies the concrete missing field rather than reporting an unrelated minimum-participant error.
+A doubles pair is represented as one competitive participant with two person members. Participant entry uses one compact input mask; only completed entries are added to the participant list. Saved entries can be edited from the list. Validation messages are collected beside the save action while invalid fields remain highlighted. A player name may not be entered twice; in doubles the same person also cannot appear in two pairs or occupy both positions of one pair. The wizard cannot continue until at least two complete competitive participants exist.
 
 ## Seeding & draws
 

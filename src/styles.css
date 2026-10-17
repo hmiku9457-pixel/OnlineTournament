@@ -161,3 +161,48 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color:
   .phase-config { grid-template-columns: 1fr; }
   .creation-summary dl { grid-template-columns: 1fr; }
 }
+
+/* Wizard refinements: compact numeric choices, validation and flexible phases */
+.btn:disabled, .number-choice-button:disabled { opacity: .45; cursor: not-allowed; }
+.wizard-next-group { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
+.wizard-validation-message { color: #b42318; font-size: .86rem; font-weight: 700; text-align: right; }
+.wizard-optional-note { font-size: .86rem; text-align: right; }
+.number-choice { display: grid; gap: 10px; }
+.number-choice-buttons { display: grid; grid-template-columns: repeat(7, minmax(52px, 1fr)); gap: 8px; }
+.number-choice-button { border: 1px solid #d0d5dd; border-radius: 9px; background: white; color: #344054; min-height: 42px; padding: 8px 10px; font-weight: 800; }
+.number-choice-button:hover { border-color: #667085; }
+.number-choice-button.active { background: #101828; border-color: #101828; color: white; }
+.number-choice-button.custom { min-width: 86px; }
+.custom-number-input { max-width: 220px; }
+.participant-validation { min-height: 20px; display: grid; gap: 3px; }
+.spieldaten-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; align-items: end; margin-top: 16px; }
+.phase-add-panel { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border: 1px solid #e4e7ec; background: #f9fafb; border-radius: 12px; padding: 14px 16px; margin: 16px 0; }
+.phase-add-panel > div:first-child { display: grid; gap: 3px; }
+.phase-add-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.phase-empty { margin-top: 12px; }
+.phase-config.phase-config-expanded { display: block; }
+.phase-config-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.phase-config-head h3 { margin: 8px 0 2px; }
+.phase-order-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.phase-settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #eaecf0; }
+.knockout-round-settings { margin-top: 16px; padding-top: 16px; border-top: 1px solid #eaecf0; }
+.knockout-round-head { display: flex; justify-content: space-between; gap: 14px; align-items: baseline; margin-bottom: 12px; }
+.knockout-round-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+
+@media (max-width: 900px) {
+  .number-choice-buttons { grid-template-columns: repeat(4, minmax(52px, 1fr)); }
+  .spieldaten-layout { grid-template-columns: 1fr; }
+  .phase-add-panel { flex-direction: column; }
+  .phase-add-buttons { justify-content: flex-start; }
+  .phase-settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .wizard-actions { align-items: flex-end; }
+  .wizard-next-group { flex-direction: column; align-items: flex-end; }
+  .number-choice-buttons { grid-template-columns: repeat(3, minmax(52px, 1fr)); }
+  .phase-config-head { flex-direction: column; }
+  .phase-order-actions { justify-content: flex-start; }
+  .phase-settings-grid { grid-template-columns: 1fr; }
+  .knockout-round-head { flex-direction: column; align-items: flex-start; }
+}

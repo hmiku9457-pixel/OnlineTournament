@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { recommendTournamentFormats } from '@/engine/recommendations';
 
 describe('format recommendations', () => {
-  it('includes Swiss to knockout for a larger field', () => {
+  it('prefers Swiss to knockout for a larger field', () => {
     const result = recommendTournamentFormats({ playerCount: 24, tableCount: 8, minimumMatches: 4 });
     expect(result[0].id).toBe('swiss-ko');
     expect(result.some((item) => item.id === 'groups-ko')).toBe(true);
@@ -14,9 +14,10 @@ describe('format recommendations', () => {
       { maxGroups: 3 },
     );
     expect(result.find((item) => item.id === 'groups-ko')?.label).toContain('3 Gruppen');
+    expect(result.find((item) => item.id === 'groups')?.label).toContain('3 Gruppen');
   });
 
-  it('respects Swiss round and knockout qualifier limits', () => {
+  it('respects Swiss round and knockout participant limits', () => {
     const result = recommendTournamentFormats(
       { playerCount: 24, tableCount: 8, minimumMatches: 4 },
       { maxSwissRounds: 3, knockoutQualifierCount: 6 },
@@ -26,12 +27,22 @@ describe('format recommendations', () => {
     expect(swiss?.label).toContain('6 Qualifizierte');
   });
 
-  it('omits disabled tournament systems', () => {
+  it('treats systems as independent building blocks', () => {
     const result = recommendTournamentFormats(
       { playerCount: 24, tableCount: 8, minimumMatches: 4 },
-      { enabledFormats: { 'swiss-ko': false, 'single-ko': false } },
+      { enabledSystems: { knockout: false, groups: true, swiss: true } },
     );
-    expect(result.some((item) => item.id === 'swiss-ko')).toBe(false);
-    expect(result.some((item) => item.id === 'single-ko')).toBe(false);
+    expect(result.some((item) => item.requiredSystems.includes('knockout'))).toBe(false);
+    expect(result.some((item) => item.id === 'groups-swiss')).toBe(true);
+    expect(result.some((item) => item.id === 'groups')).toBe(true);
+    expect(result.some((item) => item.id === 'swiss')).toBe(true);
+  });
+
+  it('removes group recommendations when groups are disabled', () => {
+    const result = recommendTournamentFormats(
+      { playerCount: 24, tableCount: 8, minimumMatches: 4 },
+      { enabledSystems: { groups: false } },
+    );
+    expect(result.some((item) => item.requiredSystems.includes('groups'))).toBe(false);
   });
 });
