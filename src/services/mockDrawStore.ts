@@ -59,27 +59,30 @@ function stableShuffled(values: string[]) {
   });
 }
 
+function bitReversalOrder(size: number) {
+  const bits = Math.max(1, Math.log2(size));
+  return Array.from({ length: size }, (_, value) => {
+    let reversed = 0;
+    for (let bit = 0; bit < bits; bit += 1) {
+      reversed = (reversed << 1) | ((value >> bit) & 1);
+    }
+    return reversed;
+  });
+}
+
 function balancedBracketSlots(participants: string[], randomize = false) {
   const bracketSize = nextPowerOfTwo(Math.max(2, participants.length));
   const pairCount = bracketSize / 2;
   const byeCount = bracketSize - participants.length;
   const players = randomize ? shuffled(participants) : stableShuffled(participants);
-  const byePairs: number[] = [];
-  const halfPairs = pairCount / 2;
-
-  for (let offset = 0; byePairs.length < byeCount; offset += 1) {
-    const left = offset % Math.max(1, halfPairs);
-    const right = halfPairs + (offset % Math.max(1, halfPairs));
-    if (left < pairCount && !byePairs.includes(left)) byePairs.push(left);
-    if (byePairs.length < byeCount && right < pairCount && !byePairs.includes(right)) byePairs.push(right);
-  }
+  const byePairs = new Set(bitReversalOrder(pairCount).slice(0, byeCount));
 
   const slots = Array<string>(bracketSize).fill('');
   let playerIndex = 0;
   for (let pairIndex = 0; pairIndex < pairCount; pairIndex += 1) {
     const slotA = pairIndex * 2;
     const slotB = slotA + 1;
-    if (byePairs.includes(pairIndex)) {
+    if (byePairs.has(pairIndex)) {
       slots[slotA] = players[playerIndex++] ?? 'Freilos';
       slots[slotB] = 'Freilos';
     } else {
@@ -194,22 +197,28 @@ export function getBracketSlots(tournament: DemoTournament, stage: TournamentSta
   return balancedBracketSlots(participants);
 }
 
-export function setBracketSlot(tournament: DemoTournament, stage: TournamentStage, slotIndex: number, value: string) {
+export function setBracketSlot(
+  tournament: DemoTournament,
+  stage: TournamentStage,
+  slotIndex: number,
+  value: string,
+  sourceSlotIndex?: number,
+) {
   if (!canEditDraw(tournament, stage)) return false;
   const participants = getStageEntrants(tournament, stage);
   const slots = getBracketSlots(tournament, stage);
   if (slotIndex < 0 || slotIndex >= slots.length) return false;
+  if (sourceSlotIndex === slotIndex) return true;
 
   const previous = slots[slotIndex];
-  if (value === 'Freilos') {
-    const existingByeIndex = slots.findIndex((item, index) => index !== slotIndex && item === 'Freilos');
-    if (existingByeIndex < 0) return false;
-    slots[existingByeIndex] = previous;
-  } else {
-    const existingIndex = slots.findIndex((item, index) => index !== slotIndex && item === value);
-    if (existingIndex >= 0) slots[existingIndex] = previous;
+  let sourceIndex = Number.isInteger(sourceSlotIndex) ? sourceSlotIndex! : -1;
+  if (sourceIndex < 0 || sourceIndex >= slots.length || slots[sourceIndex] !== value) {
+    sourceIndex = slots.findIndex((item, index) => index !== slotIndex && item === value);
   }
+  if (sourceIndex < 0) return false;
+
   slots[slotIndex] = value;
+  slots[sourceIndex] = previous;
   if (!validBracketConstraints(participants, slots)) return false;
   upsert({ tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots });
   return true;

@@ -43,22 +43,25 @@ interface SetBySetEntryProps {
   compact?: boolean;
   sideARecord?: string;
   sideBRecord?: string;
+  allowEditFinished?: boolean;
 }
 
-export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, sideARecord, sideBRecord }: SetBySetEntryProps) {
+export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, sideARecord, sideBRecord, allowEditFinished = false }: SetBySetEntryProps) {
   const [playedSets, setPlayedSets] = useState<MatchSet[]>(match.sets ?? []);
+  const [editingFinished, setEditingFinished] = useState(false);
   const [currentValue, setCurrentValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const winsNeeded = Math.ceil(match.bestOf / 2);
   const wins = useMemo(() => winsFromSets(playedSets), [playedSets]);
   const currentSetNumber = playedSets.length + 1;
   const parsedCurrent = parseShortSet(currentValue, currentSetNumber);
-  const alreadyFinished = wins.a >= winsNeeded || wins.b >= winsNeeded;
+  const alreadyFinished = !editingFinished && (wins.a >= winsNeeded || wins.b >= winsNeeded);
 
   useEffect(() => {
     setPlayedSets(match.sets ?? []);
     setCurrentValue('');
     setError(null);
+    setEditingFinished(false);
   }, [match.id, match.sets]);
 
   function confirmSet() {
@@ -73,13 +76,16 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
     const finished = nextWins.a >= winsNeeded || nextWins.b >= winsNeeded;
 
     if (finished) completeMockMatch(match.id, nextSets, 'FINISHED');
-    else saveMockMatchSets(match.id, nextSets, 'LIVE');
+    else if (!editingFinished) saveMockMatchSets(match.id, nextSets, 'LIVE');
 
     setPlayedSets(nextSets);
     setCurrentValue('');
     setError(null);
-    onSaved?.();
-    if (finished) onCompleted?.(nextSets);
+    if (!editingFinished || finished) onSaved?.();
+    if (finished) {
+      setEditingFinished(false);
+      onCompleted?.(nextSets);
+    }
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -126,6 +132,27 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
         </div>
       )}
 
+
+      {allowEditFinished && !editingFinished && match.status === 'FINISHED' && (match.sets?.length ?? 0) > 0 && (
+        <div className="finished-result-actions">
+          <button
+            className="btn small"
+            type="button"
+            onClick={() => {
+              setPlayedSets([]);
+              setCurrentValue('');
+              setError(null);
+              setEditingFinished(true);
+            }}
+          >
+            Ergebnis neu eingeben
+          </button>
+        </div>
+      )}
+
+      {allowEditFinished && editingFinished && (
+        <div className="field-hint">Korrekturmodus: Das bisherige Ergebnis bleibt gespeichert, bis das neue Endergebnis vollständig eingegeben wurde.</div>
+      )}
       {error && <div className="field-error">{error}</div>}
     </div>
   );

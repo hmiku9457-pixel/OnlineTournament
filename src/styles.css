@@ -980,3 +980,14 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   .player-game-row { grid-template-columns: 1fr auto; }
   .player-game-row > .muted { grid-column: 1 / -1; }
 }
+
+/* Persistent match result details + admin correction */
+.match-result-details { position: relative; display: inline-flex; justify-content: center; }
+.match-result-trigger { border: 0; background: transparent; padding: 0 4px; font: inherit; font-weight: 800; color: inherit; cursor: pointer; }
+.match-result-trigger:hover { text-decoration: underline; text-underline-offset: 3px; }
+.match-result-popover { position: absolute; z-index: 40; top: calc(100% + 7px); left: 50%; transform: translateX(-50%); min-width: 190px; display: grid; gap: 8px; padding: 10px 11px; border: 1px solid #d0d5dd; border-radius: 10px; background: white; box-shadow: 0 10px 30px rgb(16 24 40 / 14%); text-align: left; }
+.match-result-set-list { display: grid; gap: 3px; font-size: .84rem; white-space: nowrap; }
+.finished-result-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.admin-result-modal { width: min(680px, calc(100vw - 32px)); }
+.start-phase-modal { width: min(520px, calc(100vw - 32px)); }
+.compact-actions { gap: 7px; align-items: center; }

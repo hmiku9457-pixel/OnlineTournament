@@ -2,7 +2,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
 import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
-import { completeStage, getActiveStage, getStageEntrants, isStageStarted } from '@/services/mockPhaseLifecycle';
+import { completeStage, getActiveStage, getStageEntrants, isStageCompleted, isStageStarted, setStageEntrants } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 
@@ -49,6 +49,7 @@ interface BaseStageMatch {
   round: string;
   matchDay?: number;
   autoWinner?: string;
+  bestOf?: number;
 }
 
 const RESULT_KEY = 'online-tournament:mock-match-results:v2';
@@ -184,6 +185,13 @@ function roundRobinMatches(tournament: DemoTournament, stage: TournamentStage): 
   })));
 }
 
+function knockoutRoundBestOf(stage: TournamentStage, roundIndex: number) {
+  const configured = typeof stage.settings.roundBestOf === 'string'
+    ? stage.settings.roundBestOf.split(',').map((value) => Number(value.trim())).filter((value) => Number.isFinite(value) && value > 0)
+    : [];
+  return configured[roundIndex] ?? stage.bestOf;
+}
+
 function knockoutMatches(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]): BaseStageMatch[] {
   const slots = getBracketSlots(tournament, stage);
   const rounds: BaseStageMatch[] = [];
@@ -211,7 +219,7 @@ function knockoutMatches(tournament: DemoTournament, stage: TournamentStage, res
       if (sideA === 'Freilos' && sideB !== 'Freilos' && sideB !== 'TBD') autoWinner = sideB;
       if (sideB === 'Freilos' && sideA !== 'Freilos' && sideA !== 'TBD') autoWinner = sideA;
       const winner = autoWinner ?? resultWinner(results.find((item) => item.matchId === id), sideA, sideB);
-      rounds.push({ id, sideA, sideB, round: label, autoWinner });
+      rounds.push({ id, sideA, sideB, round: label, autoWinner, bestOf: knockoutRoundBestOf(stage, roundIndex) });
       nextSides.push(winner ?? 'TBD');
     }
 
@@ -359,7 +367,7 @@ export function getMockStageMatches(tournament: DemoTournament, stage: Tournamen
       stageId: stage.id,
       round: match.round,
       matchDay: match.matchDay,
-      bestOf: stage.bestOf,
+      bestOf: match.bestOf ?? stage.bestOf,
       pauseA: deterministicPause(match.id, 'A'),
       pauseB: deterministicPause(match.id, 'B'),
       note: 'Wartet auf Tischzuweisung',
@@ -542,6 +550,16 @@ function computeStageQualifiers(tournament: DemoTournament, stage: TournamentSta
   }
 
   return getStageEntrants(tournament, stage).slice(0, targetCount);
+}
+
+export function refreshCompletedStageQualifiers(tournament: DemoTournament, stage: TournamentStage) {
+  if (!isStageCompleted(tournament, stage)) return false;
+  const stageIndex = tournament.stages.findIndex((item) => item.id === stage.id);
+  const nextStage = tournament.stages[stageIndex + 1];
+  if (!nextStage || isStageStarted(tournament, nextStage)) return false;
+  const qualified = computeStageQualifiers(tournament, stage, readResults());
+  setStageEntrants(tournament, nextStage, qualified);
+  return true;
 }
 
 function reconcileCompletedPhase(matchId: string) {
