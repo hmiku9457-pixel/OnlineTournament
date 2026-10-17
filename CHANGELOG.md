@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Compact Step 4 recommendation cards so the wizard footer remains visible more often without scrolling; secondary estimate text now uses tighter spacing and smaller typography.
+- Add a phase-type “Ändern” control in Step 5; knockout and double-elimination can only be selected when editing the final phase.
+- Keep knockout participant entry in Custom mode even when the custom value equals a preset such as 2, 4, 8 or 16.
+- Move the Step 5 summary into a sticky right-hand column and render phases vertically with arrows that show how many participants advance to the next phase.
+
 - Remove the redundant "Diese Anzahl startet in Phase X" helper text from follow-up phase configuration.
 - Add a rough tournament duration estimate to the Step 5 summary using configured phases, entrants, Best-of settings, knockout round settings, available tables, and an assumption of 15 minutes per set.
 

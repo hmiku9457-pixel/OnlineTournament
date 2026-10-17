@@ -231,3 +231,54 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color:
 .phase-start-count { display: grid; gap: 4px; align-content: center; min-height: 64px; padding: 10px 12px; border: 1px solid #eaecf0; border-radius: 9px; background: #f9fafb; }
 .phase-start-count strong { font-size: 1rem; }
 .terminal-phase-note { align-self: center; max-width: 420px; text-align: right; }
+
+/* Wizard refinements: compact recommendations and phase overview */
+.recommendation-list { gap: 8px; }
+.recommendation-select { padding: 11px 13px; border-radius: 11px; }
+.recommendation-select .recommendation-head { align-items: center; gap: 8px; }
+.recommendation-select .badge { padding: 3px 8px; font-size: .72rem; }
+.recommendation-select h3 { margin: 6px 0 3px; font-size: 1rem; line-height: 1.2; }
+.recommendation-select p { margin: 2px 0; font-size: .86rem; line-height: 1.28; }
+.recommendation-select p.muted { font-size: .75rem; line-height: 1.22; }
+
+.phase-step-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+  align-items: start;
+  margin-top: 14px;
+}
+.phase-step-main { min-width: 0; }
+.creation-summary-side {
+  position: sticky;
+  top: 18px;
+  margin-top: 0;
+  padding: 15px;
+  border: 1px solid #e4e7ec;
+}
+.creation-summary-side dl { grid-template-columns: 1fr; gap: 0; }
+.creation-summary-side dl div { padding: 6px 0; }
+.creation-summary-side dt { font-size: .78rem; }
+.creation-summary-side dd { font-size: .84rem; }
+.phase-flow-summary { display: grid; gap: 9px; margin-top: 15px; padding-top: 14px; border-top: 1px solid #e4e7ec; }
+.phase-flow { display: grid; }
+.phase-flow-item { display: grid; justify-items: stretch; }
+.phase-flow-node { display: grid; gap: 3px; border: 1px solid #e4e7ec; border-radius: 10px; background: white; padding: 10px 11px; }
+.phase-flow-node .badge { justify-self: start; }
+.phase-flow-node > strong { font-size: .9rem; }
+.phase-flow-detail { font-size: .74rem; line-height: 1.25; }
+.phase-flow-arrow { min-height: 42px; display: grid; place-items: center; align-content: center; color: #667085; line-height: 1; }
+.phase-flow-arrow > span { font-size: 1.15rem; font-weight: 800; }
+.phase-flow-arrow small { margin-top: 2px; font-size: .72rem; font-weight: 800; }
+.phase-type-editor { display: grid; gap: 8px; margin-top: 13px; padding: 12px; border: 1px solid #e4e7ec; border-radius: 10px; background: #f9fafb; }
+.phase-type-options { display: flex; flex-wrap: wrap; gap: 7px; }
+.phase-type-active { background: #101828; border-color: #101828; color: white; }
+
+@media (max-width: 1040px) {
+  .phase-step-layout { grid-template-columns: 1fr; }
+  .creation-summary-side { position: static; order: 2; }
+}
+
+@media (max-width: 700px) {
+  .recommendation-select { padding: 10px 11px; }
+}

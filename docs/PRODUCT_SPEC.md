@@ -27,7 +27,7 @@ Tournament creation is a staged wizard:
 2. enter participants; participant count is derived and is never required up front,
 3. choose desired minimum matches with quick-select buttons for 1–5 or Custom,
 4. optionally choose a calculated recommendation; a right-side settings panel limits recommendation values and independently enables/disables each tournament system. Recommendations use a 15-minute-per-set baseline and are suppressed when even a one-set-per-match baseline would exceed roughly 3.5 hours for the available tables,
-5. configure the actual phase sequence. Phases may be added, removed, reordered and edited independently. Group count and Swiss rounds are editable again here, knockout Best-of may differ by knockout round, and every phase after Phase 1 explicitly states how many participants advance into it. A knockout or double-elimination phase is terminal and no later phase may follow it. Knockout advancement offers 2/4/8/16/32/64 presets up to the available field plus Custom.
+5. configure the actual phase sequence. Phases may be added, removed, reordered and edited independently, including changing the phase type after creation. Group count and Swiss rounds are editable again here, knockout Best-of may differ by knockout round, and every phase after Phase 1 explicitly states how many participants advance into it. A knockout or double-elimination phase is terminal and may only be selected for the final phase; no later phase may follow it. Knockout advancement offers 2/4/8/16/32/64 presets up to the available field plus a sticky Custom mode that also accepts preset-equivalent values. A right-hand summary visualizes the phases top-to-bottom and labels each transition with the number of advancing participants.
 
 ## Table tennis
 

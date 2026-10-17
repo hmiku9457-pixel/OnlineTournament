@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   bestOfOptions,
   createPhaseTemplate,
+  defaultBestOfForStage,
   estimateTournamentDurationMinutes,
   hasValidTerminalStageOrder,
   isTerminalStage,
@@ -171,14 +172,6 @@ function highestKnockoutPreset(maxParticipants: number): number {
   return presets[presets.length - 1] ?? 2;
 }
 
-function defaultCustomEntrantCount(maxParticipants: number): number {
-  const presets = new Set(knockoutEntrantPresets(maxParticipants));
-  for (let candidate = Math.max(2, Math.trunc(maxParticipants)); candidate >= 2; candidate -= 1) {
-    if (!presets.has(candidate)) return candidate;
-  }
-  return Math.max(2, Math.trunc(maxParticipants));
-}
-
 function formatDuration(minutes: number): string {
   const safeMinutes = Math.max(0, Math.round(minutes));
   const hours = Math.floor(safeMinutes / 60);
@@ -283,6 +276,7 @@ export function CreateTournamentPage() {
   const [customMinimumMatches, setCustomMinimumMatches] = useState(false);
   const [selectedRecommendationId, setSelectedRecommendationId] = useState<string | null>(null);
   const [phaseDrafts, setPhaseDrafts] = useState<PhaseDraft[]>([]);
+  const [editingPhaseTypeId, setEditingPhaseTypeId] = useState<string | null>(null);
   const [enabledSystems, setEnabledSystems] = useState<Record<TournamentSystemId, boolean>>(initialEnabledSystems);
   const [maxGroups, setMaxGroups] = useState<number | null>(null);
   const [maxSwissRounds, setMaxSwissRounds] = useState<number | null>(null);
@@ -443,7 +437,10 @@ export function CreateTournamentPage() {
         );
       }
       if (isTerminalStage(next[index].type) && index > 0) {
-        next[index].customEntrants = !knockoutEntrantPresets(maximum).includes(entrants);
+        // Once Custom was explicitly selected, keep that mode even if the entered
+        // value happens to equal one of the preset buttons (2/4/8/...).
+        next[index].customEntrants = next[index].customEntrants
+          || !knockoutEntrantPresets(maximum).includes(entrants);
       }
     }
     return next;
@@ -473,6 +470,7 @@ export function CreateTournamentPage() {
 
   function removePhase(id: string) {
     setSelectedRecommendationId(null);
+    if (editingPhaseTypeId === id) setEditingPhaseTypeId(null);
     setPhaseDrafts((current) => normalizePhaseEntrants(current.filter((phase) => phase.id !== id)));
   }
 
@@ -500,6 +498,31 @@ export function CreateTournamentPage() {
     setPhaseDrafts((current) => current.map((phase) => (
       phase.id === id ? { ...phase, ...patch } : phase
     )));
+  }
+
+  function changePhaseType(index: number, type: StageType) {
+    setSelectedRecommendationId(null);
+    setPhaseDrafts((current) => {
+      if (!current[index]) return current;
+      if (current[index].type === type) return current;
+      if (isTerminalStage(type) && index !== current.length - 1) return current;
+
+      const next = current.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
+      const phase = next[index];
+      const bestOf = defaultBestOfForStage(type);
+      phase.type = type;
+      phase.label = stageLabel(type);
+      phase.bestOf = bestOf;
+      phase.customEntrants = isTerminalStage(type)
+        ? phase.customEntrants || !knockoutEntrantPresets(index === 0 ? participantCount : next[index - 1].entrantCount).includes(phase.entrantCount)
+        : false;
+      phase.knockoutBestOf = type === 'KNOCKOUT'
+        ? resizeKnockoutBestOf(phase.knockoutBestOf, knockoutRoundLabels(phase.entrantCount).length, bestOf)
+        : [];
+
+      return normalizePhaseEntrants(next);
+    });
+    setEditingPhaseTypeId(null);
   }
 
   function updatePhaseEntrants(index: number, entrantCount: number, customEntrants = false) {
@@ -538,9 +561,7 @@ export function CreateTournamentPage() {
     setStep((step - 1) as WizardStep);
   }
 
-  const phaseSequenceLabel = phaseDrafts.length > 0
-    ? phaseDrafts.map((phase) => phase.label).join(' → ')
-    : 'Noch keine Phasen festgelegt';
+
 
   const estimatedTournamentDurationMinutes = useMemo(
     () => estimateTournamentDurationMinutes(
@@ -875,181 +896,253 @@ export function CreateTournamentPage() {
             <h2>Phasen konfigurieren</h2>
             <p className="muted">Die Empfehlung ist nur eine Vorlage. Phasen können ergänzt, entfernt, verschoben und unabhängig konfiguriert werden.</p>
 
-            {selectedRecommendation && (
-              <div className="selected-format-summary">
-                <span className="badge">Vorlage</span>
-                <strong>{selectedRecommendation.label}</strong>
-                <span className="muted">Alle Einstellungen unten bleiben frei änderbar.</span>
-              </div>
-            )}
+            <div className="phase-step-layout">
+              <div className="phase-step-main">
+                {selectedRecommendation && (
+                  <div className="selected-format-summary">
+                    <span className="badge">Vorlage</span>
+                    <strong>{selectedRecommendation.label}</strong>
+                    <span className="muted">Alle Einstellungen unten bleiben frei änderbar.</span>
+                  </div>
+                )}
 
-            <div className="phase-add-panel">
-              <div>
-                <strong>Phase hinzufügen</strong>
-                <span className="muted">Nur in Schritt 4 erlaubte Systeme werden angeboten.</span>
-              </div>
-              <div className="phase-add-buttons">
-                {hasTerminalPhase ? (
-                  <span className="muted terminal-phase-note">Nach einer K.-o.-Phase kann keine weitere Phase folgen.</span>
-                ) : tournamentSystemOptions
-                  .filter((system) => enabledSystems[system.id])
-                  .map((system) => (
-                    <button className="btn small" key={system.id} type="button" onClick={() => addPhase(system.stageType)}>
-                      + {system.label}
-                    </button>
-                  ))}
-              </div>
-            </div>
+                <div className="phase-add-panel">
+                  <div>
+                    <strong>Phase hinzufügen</strong>
+                    <span className="muted">Nur in Schritt 4 erlaubte Systeme werden angeboten.</span>
+                  </div>
+                  <div className="phase-add-buttons">
+                    {hasTerminalPhase ? (
+                      <span className="muted terminal-phase-note">Nach einer K.-o.-Phase kann keine weitere Phase folgen.</span>
+                    ) : tournamentSystemOptions
+                      .filter((system) => enabledSystems[system.id])
+                      .map((system) => (
+                        <button className="btn small" key={system.id} type="button" onClick={() => addPhase(system.stageType)}>
+                          + {system.label}
+                        </button>
+                      ))}
+                  </div>
+                </div>
 
-            {phaseDrafts.length === 0 ? (
-              <div className="callout phase-empty">Noch keine Phase festgelegt. Wähle oben mindestens eine Phase aus.</div>
-            ) : (
-              <div className="phase-config-list">
-                {phaseDrafts.map((phase, index) => {
-                  const maximumPhaseEntrants = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
-                  const knockoutEntrants = knockoutEntrantPresets(maximumPhaseEntrants);
-                  const knockoutRounds = phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount) : [];
-                  return (
-                    <article className="phase-config phase-config-expanded" key={phase.id}>
-                      <div className="phase-config-head">
-                        <div>
-                          <span className="badge">Phase {index + 1}</span>
-                          <h3>{phase.label}</h3>
-                          <p className="muted">{stageLabel(phase.type)}</p>
-                        </div>
-                        <div className="phase-order-actions">
-                          <button className="btn small" type="button" disabled={!canMovePhase(index, -1)} onClick={() => movePhase(index, -1)} aria-label="Phase nach oben">↑</button>
-                          <button className="btn small" type="button" disabled={!canMovePhase(index, 1)} onClick={() => movePhase(index, 1)} aria-label="Phase nach unten">↓</button>
-                          <button className="btn small" type="button" onClick={() => removePhase(phase.id)}>Entfernen</button>
-                        </div>
-                      </div>
-
-                      <div className="phase-settings-grid">
-                        {index > 0 && isTerminalStage(phase.type) && (
-                          <div className="field phase-entrant-choice field-wide">
-                            <label>Weiterkommende Teilnehmer aus Phase {index}</label>
-                            <NumberChoice
-                              ariaLabel={`Weiterkommende Teilnehmer für Phase ${index + 1}`}
-                              value={phase.entrantCount}
-                              presets={knockoutEntrants}
-                              custom={phase.customEntrants}
-                              customMinimum={2}
-                              customMaximum={maximumPhaseEntrants}
-                              onPreset={(value) => updatePhaseEntrants(index, value, false)}
-                              onCustom={() => updatePhaseEntrants(index, defaultCustomEntrantCount(maximumPhaseEntrants), true)}
-                              onCustomValue={(value) => updatePhaseEntrants(index, value, true)}
-                            />
-                            <span className="field-hint">Maximal {maximumPhaseEntrants} Teilnehmer können aus der vorherigen Phase weiterkommen.</span>
+                {phaseDrafts.length === 0 ? (
+                  <div className="callout phase-empty">Noch keine Phase festgelegt. Wähle oben mindestens eine Phase aus.</div>
+                ) : (
+                  <div className="phase-config-list">
+                    {phaseDrafts.map((phase, index) => {
+                      const maximumPhaseEntrants = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
+                      const knockoutEntrants = knockoutEntrantPresets(maximumPhaseEntrants);
+                      const knockoutRounds = phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount) : [];
+                      const editingPhaseType = editingPhaseTypeId === phase.id;
+                      return (
+                        <article className="phase-config phase-config-expanded" key={phase.id}>
+                          <div className="phase-config-head">
+                            <div>
+                              <span className="badge">Phase {index + 1}</span>
+                              <h3>{phase.label}</h3>
+                              <p className="muted">{stageLabel(phase.type)}</p>
+                            </div>
+                            <div className="phase-order-actions">
+                              <button
+                                className="btn small"
+                                type="button"
+                                onClick={() => setEditingPhaseTypeId(editingPhaseType ? null : phase.id)}
+                              >
+                                {editingPhaseType ? 'Abbrechen' : 'Ändern'}
+                              </button>
+                              <button className="btn small" type="button" disabled={!canMovePhase(index, -1)} onClick={() => movePhase(index, -1)} aria-label="Phase nach oben">↑</button>
+                              <button className="btn small" type="button" disabled={!canMovePhase(index, 1)} onClick={() => movePhase(index, 1)} aria-label="Phase nach unten">↓</button>
+                              <button className="btn small" type="button" onClick={() => removePhase(phase.id)}>Entfernen</button>
+                            </div>
                           </div>
-                        )}
 
-                        {index > 0 && !isTerminalStage(phase.type) && (
-                          <div className="field">
-                            <label htmlFor={`entrants-${phase.id}`}>Weiterkommende Teilnehmer aus Phase {index}</label>
-                            <input
-                              id={`entrants-${phase.id}`}
-                              type="number"
-                              min="2"
-                              max={maximumPhaseEntrants}
-                              value={phase.entrantCount}
-                              onChange={(event) => updatePhaseEntrants(index, Number(event.target.value))}
-                            />
-                          </div>
-                        )}
+                          {editingPhaseType && (
+                            <div className="phase-type-editor">
+                              <strong>Phasentyp ändern</strong>
+                              <div className="phase-type-options">
+                                {tournamentSystemOptions
+                                  .filter((system) => enabledSystems[system.id])
+                                  .map((system) => {
+                                    const terminalNotAllowed = isTerminalStage(system.stageType) && index !== phaseDrafts.length - 1;
+                                    return (
+                                      <button
+                                        className={`btn small ${phase.type === system.stageType ? 'phase-type-active' : ''}`}
+                                        key={system.id}
+                                        type="button"
+                                        disabled={terminalNotAllowed}
+                                        title={terminalNotAllowed ? 'Eine K.-o.-Phase kann nur die letzte Phase des Turniers sein.' : undefined}
+                                        onClick={() => changePhaseType(index, system.stageType)}
+                                      >
+                                        {system.label}
+                                      </button>
+                                    );
+                                  })}
+                              </div>
+                              {index !== phaseDrafts.length - 1 && (
+                                <span className="field-hint">K.-o. und Doppel-K.-o. stehen nur für die letzte Phase zur Verfügung.</span>
+                              )}
+                            </div>
+                          )}
 
-                        {index === 0 && (
-                          <div className="phase-start-count">
-                            <span className="field-hint">Startfeld</span>
-                            <strong>{participantCount} Teilnehmer</strong>
-                          </div>
-                        )}
+                          <div className="phase-settings-grid">
+                            {index > 0 && isTerminalStage(phase.type) && (
+                              <div className="field phase-entrant-choice field-wide">
+                                <label>Weiterkommende Teilnehmer aus Phase {index}</label>
+                                <NumberChoice
+                                  ariaLabel={`Weiterkommende Teilnehmer für Phase ${index + 1}`}
+                                  value={phase.entrantCount}
+                                  presets={knockoutEntrants}
+                                  custom={phase.customEntrants}
+                                  customMinimum={2}
+                                  customMaximum={maximumPhaseEntrants}
+                                  onPreset={(value) => updatePhaseEntrants(index, value, false)}
+                                  onCustom={() => updatePhaseEntrants(index, phase.entrantCount, true)}
+                                  onCustomValue={(value) => updatePhaseEntrants(index, value, true)}
+                                />
+                                <span className="field-hint">Maximal {maximumPhaseEntrants} Teilnehmer können aus der vorherigen Phase weiterkommen.</span>
+                              </div>
+                            )}
 
-                        {phase.type === 'GROUPS' && (
-                          <div className="field">
-                            <label htmlFor={`groups-${phase.id}`}>Anzahl Gruppen</label>
-                            <input
-                              id={`groups-${phase.id}`}
-                              type="number"
-                              min="2"
-                              max={Math.max(2, Math.floor(phase.entrantCount / 2))}
-                              value={Math.min(phase.groupCount, Math.max(2, Math.floor(phase.entrantCount / 2)))}
-                              onChange={(event) => updatePhase(phase.id, { groupCount: Math.max(2, Math.min(Math.floor(phase.entrantCount / 2), Number(event.target.value))) })}
-                            />
-                          </div>
-                        )}
+                            {index > 0 && !isTerminalStage(phase.type) && (
+                              <div className="field">
+                                <label htmlFor={`entrants-${phase.id}`}>Weiterkommende Teilnehmer aus Phase {index}</label>
+                                <input
+                                  id={`entrants-${phase.id}`}
+                                  type="number"
+                                  min="2"
+                                  max={maximumPhaseEntrants}
+                                  value={phase.entrantCount}
+                                  onChange={(event) => updatePhaseEntrants(index, Number(event.target.value))}
+                                />
+                              </div>
+                            )}
 
-                        {phase.type === 'SWISS' && (
-                          <div className="field">
-                            <label htmlFor={`swiss-rounds-${phase.id}`}>Runden</label>
-                            <input
-                              id={`swiss-rounds-${phase.id}`}
-                              type="number"
-                              min="1"
-                              max="30"
-                              value={phase.swissRounds}
-                              onChange={(event) => updatePhase(phase.id, { swissRounds: Math.max(1, Number(event.target.value)) })}
-                            />
-                          </div>
-                        )}
+                            {index === 0 && (
+                              <div className="phase-start-count">
+                                <span className="field-hint">Startfeld</span>
+                                <strong>{participantCount} Teilnehmer</strong>
+                              </div>
+                            )}
 
-                        {phase.type !== 'KNOCKOUT' && (
-                          <div className="field phase-bestof">
-                            <label htmlFor={`best-of-${phase.id}`}>Best-of</label>
-                            <select
-                              id={`best-of-${phase.id}`}
-                              value={phase.bestOf}
-                              onChange={(event) => updatePhase(phase.id, { bestOf: Number(event.target.value) })}
-                            >
-                              {bestOfOptions.map((bestOf) => <option key={bestOf} value={bestOf}>Best-of-{bestOf}</option>)}
-                            </select>
-                          </div>
-                        )}
-                      </div>
+                            {phase.type === 'GROUPS' && (
+                              <div className="field">
+                                <label htmlFor={`groups-${phase.id}`}>Anzahl Gruppen</label>
+                                <input
+                                  id={`groups-${phase.id}`}
+                                  type="number"
+                                  min="2"
+                                  max={Math.max(2, Math.floor(phase.entrantCount / 2))}
+                                  value={Math.min(phase.groupCount, Math.max(2, Math.floor(phase.entrantCount / 2)))}
+                                  onChange={(event) => updatePhase(phase.id, { groupCount: Math.max(2, Math.min(Math.floor(phase.entrantCount / 2), Number(event.target.value))) })}
+                                />
+                              </div>
+                            )}
 
-                      {phase.type === 'KNOCKOUT' && (
-                        <div className="knockout-round-settings">
-                          <div className="knockout-round-head">
-                            <strong>Best-of je K.-o.-Runde</strong>
-                            <span className="muted">Freilose bei nicht voller Zweierpotenz werden vom Bracket berücksichtigt.</span>
-                          </div>
-                          <div className="knockout-round-grid">
-                            {knockoutRounds.map((roundLabel, roundIndex) => (
-                              <div className="field" key={`${phase.id}-${roundLabel}-${roundIndex}`}>
-                                <label htmlFor={`ko-bestof-${phase.id}-${roundIndex}`}>{roundLabel}</label>
+                            {phase.type === 'SWISS' && (
+                              <div className="field">
+                                <label htmlFor={`swiss-rounds-${phase.id}`}>Runden</label>
+                                <input
+                                  id={`swiss-rounds-${phase.id}`}
+                                  type="number"
+                                  min="1"
+                                  max="30"
+                                  value={phase.swissRounds}
+                                  onChange={(event) => updatePhase(phase.id, { swissRounds: Math.max(1, Number(event.target.value)) })}
+                                />
+                              </div>
+                            )}
+
+                            {phase.type !== 'KNOCKOUT' && (
+                              <div className="field phase-bestof">
+                                <label htmlFor={`best-of-${phase.id}`}>Best-of</label>
                                 <select
-                                  id={`ko-bestof-${phase.id}-${roundIndex}`}
-                                  value={phase.knockoutBestOf[roundIndex] ?? phase.bestOf}
-                                  onChange={(event) => updateKnockoutRoundBestOf(phase, roundIndex, Number(event.target.value))}
+                                  id={`best-of-${phase.id}`}
+                                  value={phase.bestOf}
+                                  onChange={(event) => updatePhase(phase.id, { bestOf: Number(event.target.value) })}
                                 >
                                   {bestOfOptions.map((bestOf) => <option key={bestOf} value={bestOf}>Best-of-{bestOf}</option>)}
                                 </select>
                               </div>
-                            ))}
+                            )}
                           </div>
-                        </div>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
-            )}
 
-            <div className="creation-summary">
-              <h3>Zusammenfassung</h3>
-              <dl>
-                <div><dt>Turnier</dt><dd>{name}</dd></div>
-                <div><dt>Disziplin</dt><dd>{discipline === 'SINGLES' ? 'Einzel' : 'Doppel'}</dd></div>
-                <div><dt>Teilnehmer</dt><dd>{participantCount}</dd></div>
-                <div><dt>Tische</dt><dd>{tables}</dd></div>
-                <div><dt>Mindestspiele</dt><dd>{minimumMatches}</dd></div>
-                <div><dt>Phasen</dt><dd>{phaseSequenceLabel}</dd></div>
-                <div><dt>Turnierdauer (grob)</dt><dd>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : '–'}</dd></div>
-              </dl>
-              {phaseDrafts.length > 0 && (
-                <p className="muted creation-summary-note">
-                  Schätzung mit 15 Min. pro Satz, durchschnittlicher Satzanzahl je Best-of und paralleler Nutzung der verfügbaren Tische.
-                </p>
-              )}
+                          {phase.type === 'KNOCKOUT' && (
+                            <div className="knockout-round-settings">
+                              <div className="knockout-round-head">
+                                <strong>Best-of je K.-o.-Runde</strong>
+                                <span className="muted">Freilose bei nicht voller Zweierpotenz werden vom Bracket berücksichtigt.</span>
+                              </div>
+                              <div className="knockout-round-grid">
+                                {knockoutRounds.map((roundLabel, roundIndex) => (
+                                  <div className="field" key={`${phase.id}-${roundLabel}-${roundIndex}`}>
+                                    <label htmlFor={`ko-bestof-${phase.id}-${roundIndex}`}>{roundLabel}</label>
+                                    <select
+                                      id={`ko-bestof-${phase.id}-${roundIndex}`}
+                                      value={phase.knockoutBestOf[roundIndex] ?? phase.bestOf}
+                                      onChange={(event) => updateKnockoutRoundBestOf(phase, roundIndex, Number(event.target.value))}
+                                    >
+                                      {bestOfOptions.map((bestOf) => <option key={bestOf} value={bestOf}>Best-of-{bestOf}</option>)}
+                                    </select>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <aside className="creation-summary creation-summary-side">
+                <h3>Zusammenfassung</h3>
+                <dl>
+                  <div><dt>Turnier</dt><dd>{name}</dd></div>
+                  <div><dt>Disziplin</dt><dd>{discipline === 'SINGLES' ? 'Einzel' : 'Doppel'}</dd></div>
+                  <div><dt>Teilnehmer</dt><dd>{participantCount}</dd></div>
+                  <div><dt>Tische</dt><dd>{tables}</dd></div>
+                  <div><dt>Mindestspiele</dt><dd>{minimumMatches}</dd></div>
+                  <div><dt>Turnierdauer (grob)</dt><dd>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : '–'}</dd></div>
+                </dl>
+
+                <div className="phase-flow-summary">
+                  <strong>Phasen</strong>
+                  {phaseDrafts.length === 0 ? (
+                    <span className="muted">Noch keine Phasen festgelegt.</span>
+                  ) : (
+                    <div className="phase-flow">
+                      {phaseDrafts.map((phase, index) => (
+                        <div className="phase-flow-item" key={`summary-${phase.id}`}>
+                          <div className="phase-flow-node">
+                            <span className="badge">Phase {index + 1}</span>
+                            <strong>{phase.label}</strong>
+                            <span className="muted phase-flow-detail">
+                              {phase.type === 'GROUPS' && `${phase.groupCount} Gruppen · Best-of-${phase.bestOf}`}
+                              {phase.type === 'SWISS' && `${phase.swissRounds} Runden · Best-of-${phase.bestOf}`}
+                              {phase.type === 'KNOCKOUT' && `${phase.entrantCount} Teilnehmer · Best-of je Runde`}
+                              {phase.type === 'DOUBLE_ELIMINATION' && `${phase.entrantCount} Teilnehmer · Best-of-${phase.bestOf}`}
+                              {phase.type === 'ROUND_ROBIN' && `Best-of-${phase.bestOf}`}
+                              {phase.type === 'PLACEMENT' && `Best-of-${phase.bestOf}`}
+                            </span>
+                          </div>
+                          {index < phaseDrafts.length - 1 && (
+                            <div className="phase-flow-arrow" aria-label={`${phaseDrafts[index + 1].entrantCount} Teilnehmer kommen weiter`}>
+                              <span aria-hidden="true">↓</span>
+                              <small>{phaseDrafts[index + 1].entrantCount} weiter</small>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {phaseDrafts.length > 0 && (
+                  <p className="muted creation-summary-note">
+                    Schätzung mit 15 Min. pro Satz, durchschnittlicher Satzanzahl je Best-of und paralleler Nutzung der verfügbaren Tische.
+                  </p>
+                )}
+              </aside>
             </div>
           </section>
         )}
