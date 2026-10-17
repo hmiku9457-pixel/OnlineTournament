@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { hasMatchWinner, isValidFinishedSet, tableTennisRules, winsRequired } from '@/domain/rules';
 
 describe('table tennis rules', () => {
+  it('supports best of one', () => {
+    expect(winsRequired(1)).toBe(1);
+    expect(hasMatchWinner([{ number: 1, sideAScore: 11, sideBScore: 7 }], 1)).toBe('A');
+  });
+
   it('requires three set wins in best of five', () => {
     expect(winsRequired(5)).toBe(3);
   });

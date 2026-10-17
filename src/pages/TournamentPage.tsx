@@ -9,7 +9,8 @@ const stages: TournamentStage[] = [
     name: 'Schweizer System',
     type: 'SWISS',
     orderIndex: 0,
-    settings: { rounds: 5, bestOf: 5 },
+    bestOf: 5,
+    settings: { rounds: 5 },
     advancement: { type: 'top_n', value: 8 },
   },
   {
@@ -18,7 +19,8 @@ const stages: TournamentStage[] = [
     name: 'K.-o.-Runde',
     type: 'KNOCKOUT',
     orderIndex: 1,
-    settings: { bestOf: 5, avoidPriorOpponents: true },
+    bestOf: 5,
+    settings: { avoidPriorOpponents: true },
     advancement: { type: 'manual', value: 0 },
   },
 ];

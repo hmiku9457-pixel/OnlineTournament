@@ -78,3 +78,52 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color:
   body { background: white; color: black; }
   @page { size: auto; margin: 12mm; }
 }
+
+/* Tournament creation wizard */
+.wizard-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+.wizard-step { border: 0; background: transparent; color: #667085; padding: 10px 8px; display: flex; gap: 8px; align-items: center; justify-content: center; border-bottom: 3px solid #e4e7ec; font-weight: 700; }
+.wizard-step span { width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: 999px; background: #f2f4f7; }
+.wizard-step.active { color: #101828; border-bottom-color: #101828; }
+.wizard-step.active span { background: #101828; color: white; }
+.wizard-step.done { color: #344054; border-bottom-color: #98a2b3; cursor: pointer; }
+.wizard-card { max-width: 1100px; }
+.wizard-card section > h2 { margin-bottom: 4px; }
+.wizard-actions { display: flex; justify-content: space-between; gap: 12px; padding-top: 20px; margin-top: 22px; border-top: 1px solid #eaecf0; }
+.section-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 14px; }
+.section-head h2 { margin-bottom: 4px; }
+.participant-list { display: grid; gap: 12px; }
+.participant-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 12px; align-items: end; border: 1px solid #eaecf0; border-radius: 12px; padding: 14px; }
+.participant-number { width: 34px; height: 34px; display: grid; place-items: center; align-self: center; border-radius: 999px; background: #f2f4f7; font-weight: 800; }
+.participant-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.participant-remove:disabled { opacity: .45; cursor: not-allowed; }
+.summary-box { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-content: center; border: 1px solid #eaecf0; border-radius: 10px; padding: 12px 14px; }
+.summary-box strong { font-size: 1.25rem; }
+.summary-box span { color: #667085; align-self: center; }
+.recommendation-list { display: grid; gap: 12px; }
+.recommendation-select { width: 100%; text-align: left; color: inherit; cursor: pointer; }
+.recommendation-select:hover { border-color: #667085; }
+.recommendation-select.selected { outline: 3px solid rgb(16 24 40 / 12%); border-color: #101828; }
+.recommendation-head { display: flex; justify-content: space-between; gap: 10px; }
+.selected-badge { background: #101828; color: white; }
+.phase-config-list { display: grid; gap: 12px; }
+.phase-config { display: grid; grid-template-columns: 1fr 180px; gap: 18px; align-items: center; border: 1px solid #eaecf0; border-radius: 12px; padding: 16px; }
+.phase-config h3 { margin: 8px 0 2px; }
+.phase-config p { margin: 0; }
+.phase-bestof { min-width: 0; }
+.creation-summary { margin-top: 20px; background: #f9fafb; border-radius: 12px; padding: 16px; }
+.creation-summary h3 { margin-top: 0; }
+.creation-summary dl { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 20px; }
+.creation-summary dl div { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid #eaecf0; padding: 7px 0; }
+.creation-summary dt { color: #667085; }
+.creation-summary dd { margin: 0; font-weight: 700; text-align: right; }
+
+@media (max-width: 700px) {
+  .wizard-steps { grid-template-columns: 1fr; gap: 2px; }
+  .wizard-step { justify-content: flex-start; border-bottom-width: 1px; }
+  .wizard-step:not(.active):not(.done) { display: none; }
+  .participant-row { grid-template-columns: 34px minmax(0, 1fr); }
+  .participant-fields { grid-template-columns: 1fr; }
+  .participant-remove { grid-column: 2; justify-self: start; }
+  .phase-config { grid-template-columns: 1fr; }
+  .creation-summary dl { grid-template-columns: 1fr; }
+}

@@ -22,11 +22,19 @@ The long-term engine supports:
 
 The UI should recommend suitable formats based on participant count, table count and desired minimum matches. The organizer may always override the recommendation, including the recommended number of Swiss rounds and the number of knockout qualifiers.
 
+Tournament creation is a staged wizard:
+
+1. enter basic data (name, sport, discipline, tables),
+2. enter participants; participant count is derived and is never required up front,
+3. choose desired minimum matches,
+4. choose from the calculated format recommendations,
+5. configure Best-of independently for every generated phase.
+
 ## Table tennis
 
 - Singles and doubles.
 - A person may enter singles only, doubles only, or both.
-- Best-of is configurable and odd-numbered.
+- Best-of is configurable per phase and odd-numbered. Best-of-1 is explicitly supported.
 - Sets are played to 11, win by 2.
 - The product records completed sets, not individual rallies/points.
 - Default ranking order: wins → set difference → sets won → Buchholz.

@@ -24,8 +24,6 @@ docs/SCORING_AND_SECURITY.md
 docs/TOURNAMENT_ENGINE.md
 eslint.config.js
 index.html
-node_modules/.tmp/tsconfig.app.tsbuildinfo
-node_modules/.tmp/tsconfig.node.tsbuildinfo
 package.json
 public/manifest.webmanifest
 public/sw.js
@@ -33,6 +31,7 @@ src/App.tsx
 src/components/AppShell.tsx
 src/components/StageCard.tsx
 src/domain/rules.ts
+src/domain/tournamentCreation.ts
 src/domain/types.ts
 src/engine/bracket.ts
 src/engine/recommendations.ts
@@ -58,16 +57,16 @@ supabase/migrations/0001_initial_schema.sql
 supabase/migrations/0002_security_and_rpc.sql
 supabase/migrations/0003_helpers.sql
 supabase/migrations/0004_hardening.sql
+supabase/migrations/0005_stage_best_of.sql
 supabase/seed.sql
 tests/bracket.test.ts
 tests/recommendations.test.ts
 tests/rules.test.ts
 tests/standings.test.ts
 tests/swiss.test.ts
+tests/tournamentCreation.test.ts
 tests/withdrawal.test.ts
 tsconfig.app.json
 tsconfig.json
 tsconfig.node.json
 vite.config.ts
-
-Total files (excluding this manifest line count may differ): 70

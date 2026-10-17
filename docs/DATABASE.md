@@ -12,7 +12,7 @@
 
 ## Format engine
 
-- `stages`: ordered phases such as GROUPS, SWISS and KNOCKOUT.
+- `stages`: ordered phases such as GROUPS, SWISS and KNOCKOUT. Each stage owns its `best_of` value, allowing e.g. Best-of-1 groups followed by Best-of-5 knockout.
 - `stage_participants`: seeded inputs of a phase.
 - `groups` / `group_members`: group phase model.
 - `matches` / `match_sides` / `match_sets`: match model.

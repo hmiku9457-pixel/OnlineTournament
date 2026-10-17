@@ -61,6 +61,7 @@ export interface TournamentStage {
   name: string;
   type: StageType;
   orderIndex: number;
+  bestOf: number;
   settings: Record<string, string | number | boolean>;
   advancement: StageAdvancement;
 }
