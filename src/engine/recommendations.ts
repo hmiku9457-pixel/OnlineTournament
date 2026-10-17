@@ -46,12 +46,18 @@ export function recommendTournamentFormats(input: RecommendationInput): FormatRe
   }
   const qualifiers = Math.min(nextPowerOfTwo(Math.max(4, groupCount * 2)), playerCount);
   const knockoutMatches = qualifiers - 1;
+  const groupSizeFit = 100 - Math.abs(preferredGroupSize - (minimumMatches + 1)) * 5;
+  const groupTableBonus = Math.min(tableCount, groupCount) * 2;
+  // For larger fields, Swiss scales better than a full group phase and should be
+  // the primary recommendation. Groups + K.-o. remains a strong alternative.
+  const largeFieldGroupPenalty = playerCount >= 20 ? 20 : playerCount >= 16 ? 10 : 0;
+
   recommendations.push({
     id: 'groups-ko',
     label: `${groupCount} Gruppen → Top-Spieler → K.-o.`,
     description: `Gruppen à etwa ${preferredGroupSize} Spieler mit anschließender K.-o.-Phase.`,
     estimatedMatches: groupMatches + knockoutMatches,
-    score: 100 - Math.abs(preferredGroupSize - (minimumMatches + 1)) * 5 + Math.min(tableCount, groupCount) * 2,
+    score: groupSizeFit + groupTableBonus - largeFieldGroupPenalty,
   });
 
   const swissRounds = Math.max(minimumMatches, Math.ceil(Math.log2(playerCount)));
