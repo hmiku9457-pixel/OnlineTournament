@@ -715,3 +715,66 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   .set-by-set-entry.compact .current-set-entry-row { grid-template-columns: minmax(72px, 92px) minmax(0, 1fr); }
   .current-set-entry-row .btn { width: 100%; }
 }
+
+/* Pre-start draw and seeding editor */
+.prestart-stage-block { display: grid; gap: 12px; margin-bottom: 22px; }
+.draw-editor-card {
+  border: 1px solid #d0d5dd;
+  border-radius: 12px;
+  background: #f9fafb;
+  padding: 14px;
+}
+.draw-editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.draw-editor-head h4 { margin: 7px 0 3px; font-size: 1rem; }
+.draw-editor-head p { margin: 0; max-width: 760px; font-size: .86rem; }
+.group-draw-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 10px; margin-top: 12px; }
+.group-draw-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 9px;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+  background: white;
+}
+.group-draw-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-draw-row select,
+.bracket-seed-row select { width: 100%; border: 1px solid #d0d5dd; border-radius: 8px; background: white; padding: 7px 9px; }
+.draw-editor-summary { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; color: #667085; font-size: .84rem; }
+.draw-editor-summary span { display: inline-flex; gap: 4px; }
+.bracket-seed-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 10px; margin-top: 12px; }
+.bracket-seed-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 7px 9px;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+  background: white;
+}
+.seed-number { color: #667085; font-weight: 800; font-size: .8rem; }
+.draw-lock-note {
+  display: flex;
+  gap: 10px 16px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  border: 1px solid #eaecf0;
+  border-radius: 10px;
+  background: #f9fafb;
+  padding: 10px 12px;
+  color: #667085;
+  font-size: .84rem;
+}
+.draw-lock-note strong { color: #344054; }
+
+@media (max-width: 900px) {
+  .group-draw-grid,
+  .bracket-seed-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 650px) {
+  .draw-editor-head { flex-direction: column; }
+  .group-draw-row { grid-template-columns: 1fr; }
+}

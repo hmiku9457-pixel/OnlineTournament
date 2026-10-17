@@ -1,6 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { getRuntimeParticipantNames } from '@/services/mockRuntime';
+import { getBracketSlots, getGroupAssignments } from '@/services/mockDrawStore';
 
 export interface MockStanding {
   rank: number;
@@ -38,16 +39,18 @@ export interface MockBracketRound {
   matches: MockBracketMatch[];
 }
 
-function chunk<T>(items: T[], count: number) {
-  const result: T[][] = Array.from({ length: count }, () => []);
-  items.forEach((item, index) => result[index % count].push(item));
-  return result;
-}
 
 export function buildMockGroups(tournament: DemoTournament, stage: TournamentStage): MockGroupView[] {
   const names = getRuntimeParticipantNames(tournament);
   const groupCount = Math.max(1, Number(stage.settings.groups) || 1);
-  const groups = chunk(names.slice(0, Math.max(groupCount, Number(stage.settings.entrants) || names.length)), groupCount);
+  const entrantCount = Math.max(groupCount, Math.min(names.length, Number(stage.settings.entrants) || names.length));
+  const participants = names.slice(0, entrantCount);
+  const assignments = getGroupAssignments(tournament, stage);
+  const groups: string[][] = Array.from({ length: groupCount }, () => []);
+  participants.forEach((name, index) => {
+    const groupIndex = assignments[name] ?? (index % groupCount);
+    groups[Math.max(0, Math.min(groupCount - 1, groupIndex))].push(name);
+  });
 
   return groups.map((members, groupIndex) => {
     const label = `Gruppe ${String.fromCharCode(65 + groupIndex)}`;
@@ -88,7 +91,10 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
   const names = getRuntimeParticipantNames(tournament);
   const entrants = Math.max(2, Math.min(names.length, Number(stage.settings.entrants) || names.length));
   const bracketSize = nextPowerOfTwo(entrants);
-  const slots = Array.from({ length: bracketSize }, (_, index) => names[index] ?? 'Freilos');
+  const configuredSlots = getBracketSlots(tournament, stage);
+  const slots = configuredSlots.length === bracketSize
+    ? configuredSlots
+    : Array.from({ length: bracketSize }, (_, index) => names[index] ?? 'Freilos');
   const rounds: MockBracketRound[] = [];
   let current = slots;
   let matchCount = bracketSize / 2;

@@ -27,6 +27,7 @@ export interface DemoTournament {
   areas: DemoArea[];
   participantNames?: string[];
   isLocalPrototype?: boolean;
+  hasStarted?: boolean;
 }
 
 // Statische Testturniere wurden bewusst entfernt. Der UI-Prototyp arbeitet ab jetzt

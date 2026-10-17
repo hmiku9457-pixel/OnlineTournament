@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { StageCard } from '@/components/StageCard';
+import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { SetBySetEntry } from '@/components/SetBySetEntry';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
@@ -110,6 +111,7 @@ export function TournamentControlPage() {
   const [tournament, setTournament] = useState(initialTournament);
   const [tab, setTab] = useState<ControlTab>('overview');
   const [runtimeVersion, setRuntimeVersion] = useState(0);
+  const [drawVersion, setDrawVersion] = useState(0);
   const [participantPanel, setParticipantPanel] = useState<{ name: string; mode: 'edit' | 'games' } | null>(null);
   const [withdrawn, setWithdrawn] = useState<Set<string>>(new Set());
   const [assigningMatchId, setAssigningMatchId] = useState<string | null>(null);
@@ -127,6 +129,15 @@ export function TournamentControlPage() {
 
   function refreshRuntime() {
     setRuntimeVersion((value) => value + 1);
+  }
+
+  function startTournament() {
+    const hasEditableDraw = tournament.stages.some((stage) => ['GROUPS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(stage.type));
+    if (hasEditableDraw && !tournament.hasStarted) {
+      const confirmed = window.confirm('Turnier jetzt starten? Gruppen und K.-o.-Setzungen können danach nicht mehr verändert werden.');
+      if (!confirmed) return;
+    }
+    setStatus('RUNNING');
   }
 
   function assignToTable(matchId: string, table: string) {
@@ -191,10 +202,13 @@ export function TournamentControlPage() {
         <div className="actions no-print">
           <Link className="btn" to={`/player/${tournament.id}`}>Spieleransicht</Link>
           <Link className="btn" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
+          {!tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status) && tournament.stages.some((stage) => ['GROUPS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(stage.type)) && (
+            <button className="btn" type="button" onClick={() => setTab('flow')}>Gruppen / Setzung bearbeiten</button>
+          )}
           {tournament.status === 'RUNNING' ? (
             <button className="btn" type="button" onClick={() => setStatus('PAUSED')}>Turnier pausieren</button>
           ) : (
-            <button className="btn primary" type="button" onClick={() => setStatus('RUNNING')}>
+            <button className="btn primary" type="button" onClick={tournament.status === 'PAUSED' ? () => setStatus('RUNNING') : startTournament}>
               {tournament.status === 'PAUSED' ? 'Turnier fortsetzen' : 'Turnier starten'}
             </button>
           )}
@@ -328,9 +342,26 @@ export function TournamentControlPage() {
       )}
 
       {tab === 'flow' && (
-        <section className="control-tab-panel competition-flow-page">
-          <div className="control-section-head"><div><h2>Turnierverlauf</h2><p className="muted">Tabellen, Gruppenspiele und K.-o.-Bäume aller Phasen in einer sportlichen Gesamtansicht.</p></div></div>
-          {tournament.stages.map((stage) => <StageCompetitionView tournamentId={tournament.id} tournament={tournament} stage={stage} key={stage.id} />)}
+        <section className="control-tab-panel competition-flow-page" data-draw-version={drawVersion}>
+          <div className="control-section-head">
+            <div>
+              <h2>Turnierverlauf</h2>
+              <p className="muted">Tabellen, Gruppenspiele und K.-o.-Bäume aller Phasen in einer sportlichen Gesamtansicht.</p>
+            </div>
+            {!tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status) && (
+              <span className="badge ready">Vorstart-Konfiguration offen</span>
+            )}
+          </div>
+          {tournament.stages.map((stage) => (
+            <div className="prestart-stage-block" key={stage.id}>
+              <PrestartDrawEditor
+                tournament={tournament}
+                stage={stage}
+                onChanged={() => setDrawVersion((value) => value + 1)}
+              />
+              <StageCompetitionView tournamentId={tournament.id} tournament={tournament} stage={stage} />
+            </div>
+          ))}
         </section>
       )}
 

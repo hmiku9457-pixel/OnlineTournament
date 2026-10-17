@@ -107,6 +107,7 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
     areas: [{ name: 'Standardbereich', tables: `1–${input.tables}`, preferred: 'Automatische Zuweisung', mode: 'offen' }],
     participantNames: input.participantNames,
     isLocalPrototype: true,
+    hasStarted: false,
   };
 
   const existing = readLocalTournaments();
@@ -143,6 +144,7 @@ export function getMockTournament(tournamentId?: string): DemoTournament {
     areas: [{ name: 'Standardbereich', tables: '1', preferred: '–', mode: 'offen' }],
     participantNames: [],
     isLocalPrototype: true,
+    hasStarted: false,
   };
 }
 
@@ -150,7 +152,12 @@ export function updateMockTournamentStatus(tournamentId: string, status: Tournam
   const local = readLocalTournaments();
   const localTournament = local.find((item) => item.id === tournamentId);
   if (localTournament) {
-    const updated = { ...localTournament, status, lastUpdate: 'gerade eben' };
+    const updated = {
+      ...localTournament,
+      status,
+      hasStarted: localTournament.hasStarted || status === 'RUNNING',
+      lastUpdate: 'gerade eben',
+    };
     writeLocalTournaments(local.map((item) => item.id === tournamentId ? updated : item));
     return updated;
   }
@@ -164,6 +171,7 @@ export function removeLocalPrototypeTournaments() {
   window.localStorage.removeItem(STORAGE_KEY);
   window.localStorage.removeItem('online-tournament:mock-match-results:v2');
   window.localStorage.removeItem('online-tournament:mock-match-runtime:v1');
+  window.localStorage.removeItem('online-tournament:mock-draw-config:v1');
 }
 
 export function countActiveMockTournaments() {
