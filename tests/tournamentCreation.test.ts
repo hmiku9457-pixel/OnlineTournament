@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   bestOfOptions,
   createPhaseTemplate,
+  hasValidTerminalStageOrder,
+  knockoutEntrantPresets,
   knockoutRoundLabels,
   tournamentSystemOptions,
 } from '@/domain/tournamentCreation';
@@ -34,4 +36,16 @@ describe('tournament creation phase model', () => {
     expect(knockoutRoundLabels(6)).toEqual(['Viertelfinale', 'Halbfinale', 'Finale']);
     expect(knockoutRoundLabels(16)).toEqual(['Achtelfinale', 'Viertelfinale', 'Halbfinale', 'Finale']);
   });
+
+  it('offers only sensible knockout participant presets up to the available field', () => {
+    expect(knockoutEntrantPresets(19)).toEqual([2, 4, 8, 16]);
+    expect(knockoutEntrantPresets(64)).toEqual([2, 4, 8, 16, 32, 64]);
+  });
+
+  it('requires knockout stages to be terminal', () => {
+    expect(hasValidTerminalStageOrder(['GROUPS', 'SWISS', 'KNOCKOUT'])).toBe(true);
+    expect(hasValidTerminalStageOrder(['GROUPS', 'KNOCKOUT', 'SWISS'])).toBe(false);
+    expect(hasValidTerminalStageOrder(['SWISS', 'DOUBLE_ELIMINATION'])).toBe(true);
+  });
+
 });

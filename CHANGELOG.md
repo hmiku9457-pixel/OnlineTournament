@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Render Custom numeric inputs inside the same button grid so they match preset-button sizing; table Custom sits below 7 and minimum-match presets now use 1–5 plus Custom.
+- Add a 15-minute-per-set baseline duration model to format recommendations and suppress suggestions above roughly 3.5 hours for the available table count.
+- Make knockout and double-elimination stages terminal so no later phase can be added or reordered behind them.
+- Require an explicit advancing-participant count for every phase after Phase 1.
+- Add knockout participant quick-selects for 2/4/8/16/32/64, limited to the number available from the previous phase, plus Custom.
 - Replace table-count input with quick-select buttons for 1–12 tables plus an explicit Custom option for larger events.
 - Replace minimum-match input with quick-select buttons for 1–6 matches plus Custom.
 - Centralize participant validation messages beside the add/save action while keeping invalid fields highlighted.

@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   bestOfOptions,
   createPhaseTemplate,
+  hasValidTerminalStageOrder,
+  isTerminalStage,
+  knockoutEntrantPresets,
   knockoutRoundLabels,
   stageLabel,
   systemIdForStage,
@@ -37,6 +40,7 @@ type PhaseDraft = {
   swissRounds: number;
   entrantCount: number;
   knockoutBestOf: number[];
+  customEntrants: boolean;
 };
 
 const stepLabels = ['Grunddaten', 'Teilnehmer', 'Spieldaten', 'Turnierform', 'Phasen'];
@@ -161,6 +165,28 @@ function resizeKnockoutBestOf(current: number[], nextLength: number, fallback: n
   return next;
 }
 
+function highestKnockoutPreset(maxParticipants: number): number {
+  const presets = knockoutEntrantPresets(maxParticipants);
+  return presets[presets.length - 1] ?? 2;
+}
+
+function defaultCustomEntrantCount(maxParticipants: number): number {
+  const presets = new Set(knockoutEntrantPresets(maxParticipants));
+  for (let candidate = Math.max(2, Math.trunc(maxParticipants)); candidate >= 2; candidate -= 1) {
+    if (!presets.has(candidate)) return candidate;
+  }
+  return Math.max(2, Math.trunc(maxParticipants));
+}
+
+function formatDuration(minutes: number): string {
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const remainder = safeMinutes % 60;
+  if (hours === 0) return `${remainder} Min.`;
+  if (remainder === 0) return `${hours} Std.`;
+  return `${hours} Std. ${remainder} Min.`;
+}
+
 function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCount: number): PhaseDraft {
   phaseSequence += 1;
   const entrantCount = Math.max(2, Math.min(participantCount, template.entrantCount ?? participantCount));
@@ -174,6 +200,7 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
     swissRounds: Math.max(1, template.swissRounds ?? Math.ceil(Math.log2(Math.max(2, participantCount)))),
     entrantCount,
     knockoutBestOf: Array.from({ length: knockoutRounds }, () => template.defaultBestOf),
+    customEntrants: isTerminalStage(template.type) && !knockoutEntrantPresets(participantCount).includes(entrantCount),
   };
 }
 
@@ -182,6 +209,7 @@ function NumberChoice({
   presets,
   custom,
   customMinimum,
+  customMaximum,
   onPreset,
   onCustom,
   onCustomValue,
@@ -191,11 +219,17 @@ function NumberChoice({
   presets: number[];
   custom: boolean;
   customMinimum: number;
+  customMaximum?: number;
   onPreset: (value: number) => void;
   onCustom: () => void;
   onCustomValue: (value: number) => void;
   ariaLabel: string;
 }) {
+  function clampCustomValue(rawValue: number): number {
+    const minimumApplied = Math.max(customMinimum, rawValue || customMinimum);
+    return customMaximum === undefined ? minimumApplied : Math.min(customMaximum, minimumApplied);
+  }
+
   return (
     <div className="number-choice" aria-label={ariaLabel}>
       <div className="number-choice-buttons">
@@ -216,18 +250,19 @@ function NumberChoice({
         >
           Custom
         </button>
+        {custom && (
+          <input
+            className="custom-number-input"
+            type="number"
+            min={customMinimum}
+            max={customMaximum}
+            value={value}
+            onChange={(event) => onCustomValue(clampCustomValue(Number(event.target.value)))}
+            aria-label={`${ariaLabel} benutzerdefiniert`}
+            autoFocus
+          />
+        )}
       </div>
-      {custom && (
-        <input
-          className="custom-number-input"
-          type="number"
-          min={customMinimum}
-          value={value}
-          onChange={(event) => onCustomValue(Math.max(customMinimum, Number(event.target.value) || customMinimum))}
-          aria-label={`${ariaLabel} benutzerdefiniert`}
-          autoFocus
-        />
-      )}
     </div>
   );
 }
@@ -304,6 +339,10 @@ export function CreateTournamentPage() {
     if (!selectedRecommendation) return;
     setPhaseDrafts(selectedRecommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount)));
   }, [selectedRecommendation, participantCount]);
+
+  const phaseOrderValid = hasValidTerminalStageOrder(phaseDrafts.map((phase) => phase.type));
+  const hasTerminalPhase = phaseDrafts.some((phase) => isTerminalStage(phase.type));
+  const phaseConfigurationValid = phaseDrafts.length > 0 && phaseOrderValid;
 
   const canContinue =
     (step === 1 && Boolean(name.trim()) && tables >= 1) ||
@@ -383,29 +422,75 @@ export function CreateTournamentPage() {
     setPhaseDrafts(recommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount)));
   }
 
+  function normalizePhaseEntrants(phases: PhaseDraft[]): PhaseDraft[] {
+    const next = phases.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
+    for (let index = 0; index < next.length; index += 1) {
+      const maximum = index === 0 ? participantCount : next[index - 1].entrantCount;
+      const minimum = Math.min(2, maximum);
+      const entrants = index === 0
+        ? participantCount
+        : Math.max(minimum, Math.min(maximum, next[index].entrantCount));
+      next[index].entrantCount = entrants;
+      if (next[index].type === 'GROUPS') {
+        next[index].groupCount = Math.max(2, Math.min(next[index].groupCount, Math.floor(entrants / 2)));
+      }
+      if (next[index].type === 'KNOCKOUT') {
+        next[index].knockoutBestOf = resizeKnockoutBestOf(
+          next[index].knockoutBestOf,
+          knockoutRoundLabels(entrants).length,
+          next[index].bestOf,
+        );
+      }
+      if (isTerminalStage(next[index].type) && index > 0) {
+        next[index].customEntrants = !knockoutEntrantPresets(maximum).includes(entrants);
+      }
+    }
+    return next;
+  }
+
   function addPhase(type: StageType) {
+    if (phaseDrafts.some((phase) => isTerminalStage(phase.type))) return;
+    const availableEntrants = phaseDrafts.length === 0
+      ? participantCount
+      : phaseDrafts[phaseDrafts.length - 1].entrantCount;
+    const entrantCount = phaseDrafts.length === 0
+      ? participantCount
+      : isTerminalStage(type)
+        ? highestKnockoutPreset(availableEntrants)
+        : availableEntrants;
     const template = createPhaseTemplate(type, phaseDrafts.length + 1, {
-      entrantCount: participantCount,
+      entrantCount,
       groupCount: effectiveMaxGroups,
       swissRounds: effectiveMaxSwissRounds,
     });
     setSelectedRecommendationId(null);
-    setPhaseDrafts((current) => [...current, phaseDraftFromTemplate(template, participantCount)]);
+    setPhaseDrafts((current) => normalizePhaseEntrants([
+      ...current,
+      phaseDraftFromTemplate(template, participantCount),
+    ]));
   }
 
   function removePhase(id: string) {
     setSelectedRecommendationId(null);
-    setPhaseDrafts((current) => current.filter((phase) => phase.id !== id));
+    setPhaseDrafts((current) => normalizePhaseEntrants(current.filter((phase) => phase.id !== id)));
+  }
+
+  function canMovePhase(index: number, direction: -1 | 1): boolean {
+    const target = index + direction;
+    if (target < 0 || target >= phaseDrafts.length) return false;
+    const candidate = [...phaseDrafts];
+    [candidate[index], candidate[target]] = [candidate[target], candidate[index]];
+    return hasValidTerminalStageOrder(candidate.map((phase) => phase.type));
   }
 
   function movePhase(index: number, direction: -1 | 1) {
-    const target = index + direction;
-    if (target < 0 || target >= phaseDrafts.length) return;
+    if (!canMovePhase(index, direction)) return;
     setSelectedRecommendationId(null);
     setPhaseDrafts((current) => {
       const next = [...current];
+      const target = index + direction;
       [next[index], next[target]] = [next[target], next[index]];
-      return next;
+      return normalizePhaseEntrants(next);
     });
   }
 
@@ -416,12 +501,23 @@ export function CreateTournamentPage() {
     )));
   }
 
-  function updateKnockoutEntrants(phase: PhaseDraft, entrantCount: number) {
-    const nextEntrants = Math.max(2, Math.min(participantCount, entrantCount));
-    const nextRoundCount = knockoutRoundLabels(nextEntrants).length;
-    updatePhase(phase.id, {
-      entrantCount: nextEntrants,
-      knockoutBestOf: resizeKnockoutBestOf(phase.knockoutBestOf, nextRoundCount, phase.bestOf),
+  function updatePhaseEntrants(index: number, entrantCount: number, customEntrants = false) {
+    setSelectedRecommendationId(null);
+    setPhaseDrafts((current) => {
+      const next = current.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
+      if (!next[index] || index === 0) return next;
+      const maximum = next[index - 1].entrantCount;
+      const nextEntrants = Math.max(2, Math.min(maximum, entrantCount));
+      next[index].entrantCount = nextEntrants;
+      next[index].customEntrants = customEntrants;
+      if (next[index].type === 'KNOCKOUT') {
+        next[index].knockoutBestOf = resizeKnockoutBestOf(
+          next[index].knockoutBestOf,
+          knockoutRoundLabels(nextEntrants).length,
+          next[index].bestOf,
+        );
+      }
+      return normalizePhaseEntrants(next);
     });
   }
 
@@ -643,11 +739,11 @@ export function CreateTournamentPage() {
                 <NumberChoice
                   ariaLabel="Gewünschte Mindestspiele pro Teilnehmer"
                   value={minimumMatches}
-                  presets={[1, 2, 3, 4, 5, 6]}
+                  presets={[1, 2, 3, 4, 5]}
                   custom={customMinimumMatches}
-                  customMinimum={7}
+                  customMinimum={6}
                   onPreset={(value) => { setMinimumMatches(value); setCustomMinimumMatches(false); }}
-                  onCustom={() => { setCustomMinimumMatches(true); setMinimumMatches((current) => current > 6 ? current : 7); }}
+                  onCustom={() => { setCustomMinimumMatches(true); setMinimumMatches((current) => current > 5 ? current : 6); }}
                   onCustomValue={setMinimumMatches}
                 />
               </div>
@@ -669,7 +765,7 @@ export function CreateTournamentPage() {
             <div className="format-step-layout">
               <div className="recommendation-list">
                 {recommendations.length === 0 && (
-                  <div className="callout">Mit den aktuell erlaubten Systemen gibt es keinen automatischen Vorschlag. Du kannst trotzdem weitergehen und Phasen manuell anlegen.</div>
+                  <div className="callout">Mit den aktuellen Vorgaben gibt es keinen sinnvollen automatischen Vorschlag innerhalb des Zeitmodells. Du kannst trotzdem weitergehen und die Phasen manuell anlegen.</div>
                 )}
                 {recommendations.map((item, index) => (
                   <button
@@ -685,6 +781,7 @@ export function CreateTournamentPage() {
                     <h3>{item.label}</h3>
                     <p>{item.description}</p>
                     <p className="muted">Geschätzte Spiele insgesamt: {item.estimatedMatches}</p>
+                    <p className="muted">Basisdauer: ca. {formatDuration(item.estimatedDurationMinutes)} · gerechnet mit 15 Min. pro Satz und mindestens 1 Satz pro Spiel.</p>
                   </button>
                 ))}
               </div>
@@ -692,7 +789,7 @@ export function CreateTournamentPage() {
               <aside className="format-settings-panel">
                 <div className="format-settings-head">
                   <h3>Vorgaben für Vorschläge</h3>
-                  <p className="muted">Diese Grenzen beeinflussen nur die Empfehlung. In Schritt 5 kannst du sie noch ändern.</p>
+                  <p className="muted">Diese Grenzen beeinflussen nur die Empfehlung. Vorschläge werden zusätzlich auf eine Basisdauer von maximal ca. 3,5 Stunden begrenzt (15 Min. pro Satz, mindestens 1 Satz pro Spiel). In Schritt 5 kannst du alles frei ändern.</p>
                 </div>
 
                 <div className="format-setting-fields">
@@ -776,7 +873,9 @@ export function CreateTournamentPage() {
                 <span className="muted">Nur in Schritt 4 erlaubte Systeme werden angeboten.</span>
               </div>
               <div className="phase-add-buttons">
-                {tournamentSystemOptions
+                {hasTerminalPhase ? (
+                  <span className="muted terminal-phase-note">Nach einer K.-o.-Phase kann keine weitere Phase folgen.</span>
+                ) : tournamentSystemOptions
                   .filter((system) => enabledSystems[system.id])
                   .map((system) => (
                     <button className="btn small" key={system.id} type="button" onClick={() => addPhase(system.stageType)}>
@@ -791,6 +890,8 @@ export function CreateTournamentPage() {
             ) : (
               <div className="phase-config-list">
                 {phaseDrafts.map((phase, index) => {
+                  const maximumPhaseEntrants = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
+                  const knockoutEntrants = knockoutEntrantPresets(maximumPhaseEntrants);
                   const knockoutRounds = phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount) : [];
                   return (
                     <article className="phase-config phase-config-expanded" key={phase.id}>
@@ -801,13 +902,53 @@ export function CreateTournamentPage() {
                           <p className="muted">{stageLabel(phase.type)}</p>
                         </div>
                         <div className="phase-order-actions">
-                          <button className="btn small" type="button" disabled={index === 0} onClick={() => movePhase(index, -1)} aria-label="Phase nach oben">↑</button>
-                          <button className="btn small" type="button" disabled={index === phaseDrafts.length - 1} onClick={() => movePhase(index, 1)} aria-label="Phase nach unten">↓</button>
+                          <button className="btn small" type="button" disabled={!canMovePhase(index, -1)} onClick={() => movePhase(index, -1)} aria-label="Phase nach oben">↑</button>
+                          <button className="btn small" type="button" disabled={!canMovePhase(index, 1)} onClick={() => movePhase(index, 1)} aria-label="Phase nach unten">↓</button>
                           <button className="btn small" type="button" onClick={() => removePhase(phase.id)}>Entfernen</button>
                         </div>
                       </div>
 
                       <div className="phase-settings-grid">
+                        {index > 0 && isTerminalStage(phase.type) && (
+                          <div className="field phase-entrant-choice field-wide">
+                            <label>Weiterkommende Teilnehmer aus Phase {index}</label>
+                            <NumberChoice
+                              ariaLabel={`Weiterkommende Teilnehmer für Phase ${index + 1}`}
+                              value={phase.entrantCount}
+                              presets={knockoutEntrants}
+                              custom={phase.customEntrants}
+                              customMinimum={2}
+                              customMaximum={maximumPhaseEntrants}
+                              onPreset={(value) => updatePhaseEntrants(index, value, false)}
+                              onCustom={() => updatePhaseEntrants(index, defaultCustomEntrantCount(maximumPhaseEntrants), true)}
+                              onCustomValue={(value) => updatePhaseEntrants(index, value, true)}
+                            />
+                            <span className="field-hint">Maximal {maximumPhaseEntrants} Teilnehmer können aus der vorherigen Phase weiterkommen.</span>
+                          </div>
+                        )}
+
+                        {index > 0 && !isTerminalStage(phase.type) && (
+                          <div className="field">
+                            <label htmlFor={`entrants-${phase.id}`}>Weiterkommende Teilnehmer aus Phase {index}</label>
+                            <input
+                              id={`entrants-${phase.id}`}
+                              type="number"
+                              min="2"
+                              max={maximumPhaseEntrants}
+                              value={phase.entrantCount}
+                              onChange={(event) => updatePhaseEntrants(index, Number(event.target.value))}
+                            />
+                            <span className="field-hint">Diese Anzahl startet in Phase {index + 1}.</span>
+                          </div>
+                        )}
+
+                        {index === 0 && (
+                          <div className="phase-start-count">
+                            <span className="field-hint">Startfeld</span>
+                            <strong>{participantCount} Teilnehmer</strong>
+                          </div>
+                        )}
+
                         {phase.type === 'GROUPS' && (
                           <div className="field">
                             <label htmlFor={`groups-${phase.id}`}>Anzahl Gruppen</label>
@@ -815,9 +956,9 @@ export function CreateTournamentPage() {
                               id={`groups-${phase.id}`}
                               type="number"
                               min="2"
-                              max={Math.max(2, Math.floor(participantCount / 2))}
-                              value={phase.groupCount}
-                              onChange={(event) => updatePhase(phase.id, { groupCount: Math.max(2, Number(event.target.value)) })}
+                              max={Math.max(2, Math.floor(phase.entrantCount / 2))}
+                              value={Math.min(phase.groupCount, Math.max(2, Math.floor(phase.entrantCount / 2)))}
+                              onChange={(event) => updatePhase(phase.id, { groupCount: Math.max(2, Math.min(Math.floor(phase.entrantCount / 2), Number(event.target.value))) })}
                             />
                           </div>
                         )}
@@ -832,24 +973,6 @@ export function CreateTournamentPage() {
                               max="30"
                               value={phase.swissRounds}
                               onChange={(event) => updatePhase(phase.id, { swissRounds: Math.max(1, Number(event.target.value)) })}
-                            />
-                          </div>
-                        )}
-
-                        {(phase.type === 'KNOCKOUT' || phase.type === 'DOUBLE_ELIMINATION') && (
-                          <div className="field">
-                            <label htmlFor={`entrants-${phase.id}`}>Teilnehmer in dieser Phase</label>
-                            <input
-                              id={`entrants-${phase.id}`}
-                              type="number"
-                              min="2"
-                              max={Math.max(2, participantCount)}
-                              value={phase.entrantCount}
-                              onChange={(event) => {
-                                const next = Math.max(2, Number(event.target.value));
-                                if (phase.type === 'KNOCKOUT') updateKnockoutEntrants(phase, next);
-                                else updatePhase(phase.id, { entrantCount: Math.min(participantCount, next) });
-                              }}
                             />
                           </div>
                         )}
@@ -924,7 +1047,7 @@ export function CreateTournamentPage() {
             {step < 5 ? (
               <button className="btn primary" type="button" onClick={goNext} disabled={!canContinue}>Weiter</button>
             ) : (
-              <button className="btn primary" type="submit" disabled={phaseDrafts.length === 0}>Turnier erstellen</button>
+              <button className="btn primary" type="submit" disabled={!phaseConfigurationValid}>Turnier erstellen</button>
             )}
           </div>
         </footer>

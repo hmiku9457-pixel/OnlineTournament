@@ -8,9 +8,12 @@ Example:
 
 1. SWISS – 5 rounds
 2. KNOCKOUT – 8 Qualifizierte
-3. PLACEMENT – optional places 5–8
 
-A stage receives participants and produces rankings/qualifiers for the next stage. Advancement is automatic by default but may be manually overridden by authorized staff, e.g. after a withdrawal.
+A stage receives participants and produces rankings/qualifiers for the next stage. Every stage after Phase 1 has an explicit entrant/qualification count. Advancement is automatic by default but may be manually overridden by authorized staff, e.g. after a withdrawal. Single- and double-elimination stages are terminal: no later stage may follow them.
+
+## Recommendation workload model
+
+Automatic suggestions are intentionally conservative. The baseline assumes 15 minutes per set and at least one set per match, accounts for the available table count, and suppresses formats above roughly 210 baseline minutes. Best-of settings are configured later, so the displayed duration is a lower-bound planning estimate rather than a promised finish time. Organizers may still build longer formats manually.
 
 ## Table tennis standings
 

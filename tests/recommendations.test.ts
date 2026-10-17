@@ -29,7 +29,7 @@ describe('format recommendations', () => {
 
   it('treats systems as independent building blocks', () => {
     const result = recommendTournamentFormats(
-      { playerCount: 24, tableCount: 8, minimumMatches: 4 },
+      { playerCount: 12, tableCount: 8, minimumMatches: 3 },
       { enabledSystems: { knockout: false, groups: true, swiss: true } },
     );
     expect(result.some((item) => item.requiredSystems.includes('knockout'))).toBe(false);
@@ -45,4 +45,24 @@ describe('format recommendations', () => {
     );
     expect(result.some((item) => item.requiredSystems.includes('groups'))).toBe(false);
   });
+
+  it('filters formats whose one-set baseline would take too long for the available tables', () => {
+    const result = recommendTournamentFormats({ playerCount: 19, tableCount: 6, minimumMatches: 4 });
+    expect(result.some((item) => item.id === 'round-robin')).toBe(false);
+    expect(result.every((item) => item.estimatedDurationMinutes <= 210)).toBe(true);
+  });
+
+  it('does not recommend a 96-match format on six tables when the baseline exceeds the duration limit', () => {
+    const result = recommendTournamentFormats(
+      { playerCount: 24, tableCount: 6, minimumMatches: 4 },
+      {
+        maxSwissRounds: 3,
+        enabledSystems: { knockout: false, groups: true, swiss: true },
+        maxRecommendedDurationMinutes: 210,
+      },
+    );
+    expect(result.some((item) => item.id === 'groups-swiss')).toBe(false);
+    expect(result.every((item) => item.estimatedDurationMinutes <= 210)).toBe(true);
+  });
+
 });

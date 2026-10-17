@@ -34,6 +34,7 @@ export const tournamentSystemOptions: TournamentSystemOption[] = [
 ];
 
 export const bestOfOptions = [1, 3, 5, 7] as const;
+export const knockoutEntrantOptions = [2, 4, 8, 16, 32, 64] as const;
 
 export function defaultBestOfForStage(type: StageType): number {
   return type === 'GROUPS' || type === 'ROUND_ROBIN' ? 1 : 5;
@@ -92,4 +93,18 @@ export function knockoutRoundLabels(entrantCount: number): string[] {
   }
 
   return labels;
+}
+
+export function knockoutEntrantPresets(maxParticipants: number): number[] {
+  const maximum = Math.max(2, Math.trunc(maxParticipants));
+  return knockoutEntrantOptions.filter((count) => count <= maximum);
+}
+
+export function isTerminalStage(type: StageType): boolean {
+  return type === 'KNOCKOUT' || type === 'DOUBLE_ELIMINATION';
+}
+
+export function hasValidTerminalStageOrder(types: StageType[]): boolean {
+  const terminalIndex = types.findIndex(isTerminalStage);
+  return terminalIndex === -1 || terminalIndex === types.length - 1;
 }

@@ -206,3 +206,27 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color:
   .phase-settings-grid { grid-template-columns: 1fr; }
   .knockout-round-head { flex-direction: column; align-items: flex-start; }
 }
+
+/* Wizard refinements: button-sized custom values and phase qualification controls */
+.custom-number-input {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  min-height: 42px;
+  border: 1px solid #d0d5dd;
+  border-radius: 9px;
+  background: white;
+  color: #344054;
+  padding: 8px 10px;
+  font-weight: 800;
+  text-align: center;
+  appearance: textfield;
+}
+.custom-number-input:focus { border-color: #667085; outline: 2px solid rgb(102 112 133 / 14%); }
+.custom-number-input::-webkit-outer-spin-button,
+.custom-number-input::-webkit-inner-spin-button { margin: 0; }
+.field-wide { grid-column: 1 / -1; }
+.phase-entrant-choice .number-choice { margin-top: 2px; }
+.phase-start-count { display: grid; gap: 4px; align-content: center; min-height: 64px; padding: 10px 12px; border: 1px solid #eaecf0; border-radius: 9px; background: #f9fafb; }
+.phase-start-count strong { font-size: 1rem; }
+.terminal-phase-note { align-self: center; max-width: 420px; text-align: right; }
