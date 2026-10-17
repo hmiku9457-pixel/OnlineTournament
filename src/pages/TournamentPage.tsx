@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { StageCard } from '@/components/StageCard';
 import { getMockTournament } from '@/services/mockTournamentStore';
 
@@ -20,13 +20,15 @@ function getStatusLabel(status: string) {
 
 export function TournamentPage() {
   const { tournamentId } = useParams();
+  const navigate = useNavigate();
   const tournament = useMemo(() => getMockTournament(tournamentId), [tournamentId]);
 
   return (
     <>
       <header className="page-head">
         <div>
-          <div className="tournament-page-status-row">
+          <button className="btn small" type="button" onClick={() => navigate(-1)}>← Zurück</button>
+          <div className="tournament-page-status-row" style={{ marginTop: 10 }}>
             <h1>{tournament.name}</h1>
             <span className={tournament.status === 'RUNNING' ? 'badge live' : 'badge'}>{getStatusLabel(tournament.status)}</span>
             {tournament.isLocalPrototype && <span className="badge prototype">Lokal gespeichert</span>}

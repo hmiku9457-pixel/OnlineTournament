@@ -575,6 +575,13 @@ export function CreateTournamentPage() {
 
   function goNext() {
     if (!canContinue || step === 5) return;
+    if (step === 4) {
+      if (phaseDrafts.length === 0 && selectedRecommendation) {
+        setPhaseDrafts(selectedRecommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount)));
+      }
+      setStep(5);
+      return;
+    }
     setStep((step + 1) as WizardStep);
   }
 
@@ -659,7 +666,7 @@ export function CreateTournamentPage() {
         })}
       </nav>
 
-      <form className="card wizard-card" onSubmit={(event) => { event.preventDefault(); submitTournament(); }}>
+      <form className="card wizard-card" onSubmit={(event) => { event.preventDefault(); if (step === 5) submitTournament(); else goNext(); }}>
         {step === 1 && (
           <section>
             <h2>Grunddaten</h2>

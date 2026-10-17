@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { buildMockBracket, buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
 import { getMockRuntimeMatches } from '@/services/mockRuntime';
 import { getMockTournament } from '@/services/mockTournamentStore';
 
 export function SpectatorPage() {
   const { tournamentId } = useParams();
+  const navigate = useNavigate();
   const tournament = useMemo(() => getMockTournament(tournamentId), [tournamentId]);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament]);
   const live = matches.filter((match) => match.status === 'LIVE' || match.status === 'CONFIRMATION');
@@ -14,7 +16,8 @@ export function SpectatorPage() {
     <div className="spectator-shell">
       <header className="page-head spectator-head">
         <div>
-          <div className="control-kicker">Zuschaueransicht</div>
+          <button className="btn small" type="button" onClick={() => navigate(-1)}>← Zurück</button>
+          <div className="control-kicker spectator-kicker">Zuschaueransicht</div>
           <h1>{tournament.name}</h1>
           <p className="muted">{tournament.phasesLabel} · {tournament.participants} Teilnehmer</p>
         </div>
@@ -24,22 +27,72 @@ export function SpectatorPage() {
         </div>
       </header>
 
-      <section className="spectator-live-grid">
-        {live.length === 0 ? (
-          <div className="card empty-state">Aktuell laufen keine Spiele.</div>
-        ) : live.map((match) => (
-          <article className="card spectator-match-card" key={match.id}>
-            <div className="spectator-match-head"><span className="badge live">LIVE</span><strong>{match.table}</strong></div>
-            <span className="muted">{match.round}</span>
-            <div className="spectator-team">{match.sideA}</div>
-            <div className="spectator-score">{match.score}</div>
-            <div className="spectator-team">{match.sideB}</div>
-          </article>
-        ))}
+      <section className="spectator-section">
+        <div className="spectator-section-head"><h2>Live auf den Tischen</h2><span className="muted">{live.length} laufende Spiele</span></div>
+        <div className="spectator-live-grid">
+          {live.length === 0 ? (
+            <div className="card empty-state">Aktuell laufen keine Spiele.</div>
+          ) : live.map((match) => (
+            <article className="card spectator-match-card" key={match.id}>
+              <div className="spectator-match-head"><span className="badge live">LIVE</span><strong>{match.table}</strong></div>
+              <span className="muted">{match.round}</span>
+              <div className="spectator-team">{match.sideA}</div>
+              <div className="spectator-score">{match.score}</div>
+              <div className="spectator-team">{match.sideB}</div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="spectator-competition-overview">
+        <div className="spectator-section-head"><h2>Turnierstand</h2><span className="muted">Tabellen & Turnierbäume</span></div>
+        {tournament.stages.map((stage) => {
+          if (stage.type === 'GROUPS') {
+            const groups = buildMockGroups(tournament, stage);
+            return (
+              <section className="spectator-stage-block" key={stage.id}>
+                <div className="competition-stage-head"><div><span className="badge">GRUPPEN</span><h3>{stage.name}</h3></div></div>
+                <div className="spectator-group-grid">
+                  {groups.map((group) => (
+                    <article className="card spectator-standing-card" key={group.id}>
+                      <h4>{group.label}</h4>
+                      <div className="mini-standing-table">
+                        <div className="mini-standing-head"><span>#</span><span>Spieler</span><span>Sp.</span><span>S</span><span>Sätze</span></div>
+                        {group.standings.map((row) => <div className="mini-standing-row" key={row.name}><span>{row.rank}</span><strong>{row.name}</strong><span>{row.played}</span><span>{row.wins}</span><span>{row.sets}</span></div>)}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            );
+          }
+
+          if (stage.type === 'SWISS') {
+            const standings = buildSwissStandings(tournament, stage);
+            return (
+              <section className="spectator-stage-block" key={stage.id}>
+                <div className="competition-stage-head"><div><span className="badge">SCHWEIZER SYSTEM</span><h3>{stage.name}</h3></div></div>
+                <div className="card table-wrap"><table className="compact-table"><thead><tr><th>#</th><th>Teilnehmer</th><th>Sp.</th><th>Siege</th><th>N.</th><th>Sätze</th></tr></thead><tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><strong>{row.name}</strong></td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.sets}</td></tr>)}</tbody></table></div>
+              </section>
+            );
+          }
+
+          if (stage.type === 'KNOCKOUT' || stage.type === 'DOUBLE_ELIMINATION' || stage.type === 'PLACEMENT') {
+            const rounds = buildMockBracket(tournament, stage);
+            return (
+              <section className="spectator-stage-block" key={stage.id}>
+                <div className="competition-stage-head"><div><span className="badge">K.-O.</span><h3>{stage.name}</h3></div></div>
+                <div className="bracket-scroll"><div className="bracket-board">{rounds.map((round) => <div className="bracket-round" key={round.label}><h4>{round.label}</h4><div className="bracket-round-matches">{round.matches.map((match) => <article className="bracket-match" key={match.id}><div className={match.winner === match.sideA ? 'winner' : ''}><span>{match.sideA}</span><strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[0] : ''}</strong></div><div className={match.winner === match.sideB ? 'winner' : ''}><span>{match.sideB}</span><strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[1] : match.score === 'Freilos' ? 'BYE' : ''}</strong></div></article>)}</div></div>)}</div></div>
+              </section>
+            );
+          }
+
+          return null;
+        })}
       </section>
 
       <section className="card spectator-next-card">
-        <div className="control-section-head"><div><h2>Nächste Spiele</h2><p className="muted">Automatisch aktualisierte Tisch- und Warteschlangenübersicht.</p></div></div>
+        <div className="control-section-head"><div><h2>Nächste Spiele</h2><p className="muted">Tisch- und Warteschlangenübersicht.</p></div></div>
         <div className="spectator-next-list">
           {next.map((match) => (
             <div className="spectator-next-row" key={match.id}>

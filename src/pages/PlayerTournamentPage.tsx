@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getMockPlayerSnapshot, getMockRuntimeMatches } from '@/services/mockRuntime';
 import { getMockTournament } from '@/services/mockTournamentStore';
 
 export function PlayerTournamentPage() {
   const { tournamentId } = useParams();
+  const navigate = useNavigate();
   const tournament = useMemo(() => getMockTournament(tournamentId), [tournamentId]);
   const snapshot = useMemo(() => getMockPlayerSnapshot(tournament), [tournament]);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament]);
@@ -14,6 +15,7 @@ export function PlayerTournamentPage() {
     <div className="player-view-shell">
       <header className="player-view-head">
         <div>
+          <button className="btn small" type="button" onClick={() => navigate(-1)}>← Zurück</button>
           <div className="control-kicker">Spieleransicht</div>
           <h1>{tournament.name}</h1>
           <p className="muted">{snapshot.player} · {snapshot.standing}</p>
@@ -52,7 +54,7 @@ export function PlayerTournamentPage() {
             <div className="control-section-head"><h2>Deine nächsten Schritte</h2><span className="badge">Prototyp</span></div>
             <div className="player-step-list">
               <div><span>1</span><div><strong>Spielcode am Tisch</strong><p className="muted">Mit dem gemeinsamen Match-Code wird die Satzeingabe freigeschaltet.</p></div></div>
-              <div><span>2</span><div><strong>Sätze live erfassen</strong><p className="muted">Nach jedem Satz kann der Zwischenstand gespeichert werden.</p></div></div>
+              <div><span>2</span><div><strong>Sätze erfassen</strong><p className="muted">Die Sätze werden möglichst kurz eingegeben, z. B. 7 für 11:7 oder -7 für 7:11.</p></div></div>
               <div><span>3</span><div><strong>Ergebnis bestätigen</strong><p className="muted">Am Ende bestätigt jede Seite mit einem eigenen Spielercode.</p></div></div>
             </div>
           </article>

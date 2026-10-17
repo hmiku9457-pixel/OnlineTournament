@@ -1,3 +1,13 @@
+## 0.1.2
+- Behoben: Wizard kann Schritt 5 nicht mehr durch einen Formular-Submit in Schritt 4 überspringen.
+- Verbessert: Ergebniseingabe berücksichtigt Best-of und nutzt Kurznotation pro Satz (7 = 11:7, -7 = 7:11).
+- Verbessert: Spiele werden nach abgeschlossener Satzeingabe im lokalen Prototyp-State als beendet gespeichert.
+- Verbessert: Zurück-Navigation in Turnierdetail, Turnierleitung, Spieler-, Zuschauer- und Scoring-Ansicht.
+- Überarbeitet: Turnierleitungs-Übersicht zeigt alle Tische, Pausenzeiten und direkte Ergebniseingabe.
+- Neu: Turnierverlauf mit Gruppentabellen/-spielen, Schweizer Rangliste und K.-o.-Baum.
+- Überarbeitet: Teilnehmeraktionen Daten bearbeiten, Spielübersicht und Zurückziehen.
+- Überarbeitet: Zuschaueransicht zeigt Tabellen und Turnierbäume.
+
 ## 0.2.0 - DB-loser UX-Prototyp
 
 - Turnier erstellen speichert den fertigen Wizard lokal im Browser (`localStorage`) und öffnet das neu erzeugte Turnier.
