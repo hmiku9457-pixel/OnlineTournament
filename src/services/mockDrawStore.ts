@@ -1,6 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { getRuntimeParticipantNames } from '@/services/mockRuntime';
+import { isStageEditable } from '@/services/mockPhaseLifecycle';
 
 const DRAW_KEY = 'online-tournament:mock-draw-config:v1';
 
@@ -42,8 +43,8 @@ function nextPowerOfTwo(value: number) {
   return result;
 }
 
-export function canEditDraw(tournament: DemoTournament) {
-  return !tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status);
+export function canEditDraw(tournament: DemoTournament, stage: TournamentStage) {
+  return isStageEditable(tournament, stage);
 }
 
 export function getGroupAssignments(tournament: DemoTournament, stage: TournamentStage) {
@@ -65,7 +66,7 @@ export function getGroupAssignments(tournament: DemoTournament, stage: Tournamen
 }
 
 export function setParticipantGroup(tournament: DemoTournament, stage: TournamentStage, participant: string, groupIndex: number) {
-  if (!canEditDraw(tournament)) return false;
+  if (!canEditDraw(tournament, stage)) return false;
   const groupCount = Math.max(1, Number(stage.settings.groups) || 1);
   if (groupIndex < 0 || groupIndex >= groupCount) return false;
   const current = getGroupAssignments(tournament, stage);
@@ -75,7 +76,7 @@ export function setParticipantGroup(tournament: DemoTournament, stage: Tournamen
 }
 
 export function resetGroupAssignments(tournament: DemoTournament, stage: TournamentStage) {
-  if (!canEditDraw(tournament)) return false;
+  if (!canEditDraw(tournament, stage)) return false;
   const current = readAll();
   const existing = findConfig(tournament.id, stage.id);
   if (!existing) return true;
@@ -99,7 +100,7 @@ export function getBracketSlots(tournament: DemoTournament, stage: TournamentSta
 }
 
 export function setBracketSlot(tournament: DemoTournament, stage: TournamentStage, slotIndex: number, value: string) {
-  if (!canEditDraw(tournament)) return false;
+  if (!canEditDraw(tournament, stage)) return false;
   const slots = getBracketSlots(tournament, stage);
   if (slotIndex < 0 || slotIndex >= slots.length) return false;
 
@@ -118,7 +119,7 @@ export function setBracketSlot(tournament: DemoTournament, stage: TournamentStag
 }
 
 export function resetBracketSlots(tournament: DemoTournament, stage: TournamentStage) {
-  if (!canEditDraw(tournament)) return false;
+  if (!canEditDraw(tournament, stage)) return false;
   const current = readAll();
   const existing = findConfig(tournament.id, stage.id);
   if (!existing) return true;

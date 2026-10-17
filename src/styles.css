@@ -778,3 +778,103 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   .draw-editor-head { flex-direction: column; }
   .group-draw-row { grid-template-columns: 1fr; }
 }
+
+/* Phase lifecycle and drag/drop draw editor */
+.phase-lifecycle-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin: 12px 0 18px;
+}
+.phase-lifecycle-item {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+.phase-lifecycle-item > span:first-child { color: #667085; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+.phase-lifecycle-item .badge { justify-self: start; margin-top: 3px; }
+.phase-lifecycle-item.läuft { border-color: #abefc6; background: #ecfdf3; }
+.phase-lifecycle-item.bearbeitbar { border-color: #b2ccff; background: #eff4ff; }
+.phase-lifecycle-item.beendet { opacity: .82; }
+.draw-lock-note.complete { background: #f8fafc; }
+.group-dnd-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.group-dnd-column {
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  background: white;
+  min-height: 150px;
+  overflow: hidden;
+}
+.group-dnd-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border-bottom: 1px solid #eaecf0;
+  background: #f9fafb;
+}
+.group-dnd-dropzone {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  min-height: 112px;
+  padding: 8px;
+}
+.group-dnd-empty { align-self: center; justify-self: center; text-align: center; font-size: .8rem; }
+.draw-player-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: white;
+  padding: 7px 8px;
+  cursor: grab;
+  user-select: none;
+}
+.draw-player-chip:active { cursor: grabbing; }
+.draw-player-chip strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.draw-drag-handle { color: #98a2b3; font-weight: 900; letter-spacing: -2px; }
+.draw-player-chip.bye-chip { background: #f9fafb; color: #667085; border-style: dashed; }
+.bracket-dnd-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+.bracket-dnd-slot {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+  padding: 6px 8px;
+  background: #f9fafb;
+}
+.bracket-dnd-slot.bye { border-style: dashed; }
+
+@media (max-width: 760px) {
+  .bracket-dnd-grid { grid-template-columns: 1fr; }
+}
+.bracket-dnd-grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.bracket-dnd-match {
+  display: grid;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  background: white;
+}
+.bracket-dnd-match-label { color: #667085; font-size: .72rem; font-weight: 800; padding: 0 2px 2px; }
+.bracket-dnd-match .bracket-dnd-slot { border-radius: 7px; }

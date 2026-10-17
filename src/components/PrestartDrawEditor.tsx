@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type DragEvent } from 'react';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import {
@@ -10,6 +10,7 @@ import {
   setBracketSlot,
   setParticipantGroup,
 } from '@/services/mockDrawStore';
+import { isStageCompleted, isStageLockedWaiting, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockRuntime';
 
 interface Props {
@@ -18,14 +19,28 @@ interface Props {
   onChanged: () => void;
 }
 
+const DRAG_TYPE = 'text/online-tournament-draw';
+
 function groupLabel(index: number) {
   return `Gruppe ${String.fromCharCode(65 + index)}`;
 }
 
+function setDragValue(event: DragEvent, value: string) {
+  event.dataTransfer.setData(DRAG_TYPE, value);
+  event.dataTransfer.effectAllowed = 'move';
+}
+
+function getDragValue(event: DragEvent) {
+  return event.dataTransfer.getData(DRAG_TYPE);
+}
+
 export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
   const [revision, setRevision] = useState(0);
-  const editable = canEditDraw(tournament);
+  const editable = canEditDraw(tournament, stage);
   const participants = useMemo(() => getRuntimeParticipantNames(tournament), [tournament, revision]);
+  const started = isStageStarted(tournament, stage);
+  const completed = isStageCompleted(tournament, stage);
+  const waitingForPrevious = isStageLockedWaiting(tournament, stage);
 
   function changed() {
     setRevision((value) => value + 1);
@@ -36,9 +51,17 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
 
   if (!editable) {
     return (
-      <div className="draw-lock-note">
-        <strong>Auslosung gesperrt</strong>
-        <span>Seit dem ersten Turnierstart können Gruppen und Setzungen nicht mehr verändert werden.</span>
+      <div className={completed ? 'draw-lock-note complete' : 'draw-lock-note'}>
+        <strong>{completed ? 'Phase beendet' : started ? 'Setzung eingefroren' : 'Noch nicht bearbeitbar'}</strong>
+        <span>
+          {completed
+            ? 'Die Phase ist abgeschlossen und bleibt unverändert.'
+            : started
+              ? 'Seit dem Start dieser Phase können Gruppen bzw. K.-o.-Startplätze nicht mehr verändert werden.'
+              : waitingForPrevious
+                ? 'Diese Phase wird erst bearbeitbar, sobald die vorherige Phase beendet wurde.'
+                : 'Die Auslosung ist aktuell gesperrt.'}
+        </span>
       </div>
     );
   }
@@ -48,14 +71,18 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
     const entrantCount = Math.max(1, Math.min(participants.length, Number(stage.settings.entrants) || participants.length));
     const entrants = participants.slice(0, entrantCount);
     const assignments = getGroupAssignments(tournament, stage);
+    const groups = Array.from({ length: groupCount }, (_, groupIndex) => ({
+      groupIndex,
+      participants: entrants.filter((participant) => assignments[participant] === groupIndex),
+    }));
 
     return (
       <section className="draw-editor-card">
         <div className="draw-editor-head">
           <div>
-            <span className="badge">VOR DEM START BEARBEITBAR</span>
-            <h4>Gruppenauslosung</h4>
-            <p className="muted">Jeden Teilnehmer einer Gruppe zuordnen. Die Änderung wird rechts bzw. darunter sofort in der Gruppendarstellung sichtbar.</p>
+            <span className="badge ready">BEARBEITBAR</span>
+            <h4>Gruppenauslosung per Drag & Drop</h4>
+            <p className="muted">Teilnehmer direkt greifen und in die gewünschte Gruppe ziehen. Der Stand wird sofort gespeichert.</p>
           </div>
           <button
             className="btn small"
@@ -65,25 +92,44 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
               changed();
             }}
           >
-            Automatische Verteilung wiederherstellen
+            Automatische Verteilung
           </button>
         </div>
-        <div className="group-draw-grid">
-          {entrants.map((participant, index) => (
-            <label className="group-draw-row" key={`${participant}-${index}`}>
-              <span><strong>{index + 1}.</strong> {participant}</span>
-              <select
-                value={assignments[participant] ?? (index % groupCount)}
-                onChange={(event) => {
-                  setParticipantGroup(tournament, stage, participant, Number(event.target.value));
-                  changed();
-                }}
-              >
-                {Array.from({ length: groupCount }, (_, groupIndex) => (
-                  <option value={groupIndex} key={groupIndex}>{groupLabel(groupIndex)}</option>
+        <div className="group-dnd-grid">
+          {groups.map((group) => (
+            <article
+              className="group-dnd-column"
+              key={group.groupIndex}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const participant = getDragValue(event);
+                if (!participant || !entrants.includes(participant)) return;
+                if (setParticipantGroup(tournament, stage, participant, group.groupIndex)) changed();
+              }}
+            >
+              <div className="group-dnd-head">
+                <strong>{groupLabel(group.groupIndex)}</strong>
+                <span className="badge">{group.participants.length}</span>
+              </div>
+              <div className="group-dnd-dropzone">
+                {group.participants.map((participant) => (
+                  <div
+                    className="draw-player-chip"
+                    key={participant}
+                    draggable
+                    onDragStart={(event) => setDragValue(event, participant)}
+                  >
+                    <span className="draw-drag-handle">⋮⋮</span>
+                    <strong>{participant}</strong>
+                  </div>
                 ))}
-              </select>
-            </label>
+                {group.participants.length === 0 && <span className="muted group-dnd-empty">Spieler hierher ziehen</span>}
+              </div>
+            </article>
           ))}
         </div>
       </section>
@@ -98,9 +144,9 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
     <section className="draw-editor-card">
       <div className="draw-editor-head">
         <div>
-          <span className="badge">VOR DEM START BEARBEITBAR</span>
-          <h4>{stage.type === 'DOUBLE_ELIMINATION' ? 'Doppel-K.-o.-Setzung' : 'K.-o.-Setzung'}</h4>
-          <p className="muted">Startplätze im Turnierbaum festlegen. Wird ein bereits gesetzter Teilnehmer gewählt, tauschen die beiden Plätze automatisch.</p>
+          <span className="badge ready">BEARBEITBAR</span>
+          <h4>{stage.type === 'DOUBLE_ELIMINATION' ? 'Doppel-K.-o.-Setzung per Drag & Drop' : 'K.-o.-Setzung per Drag & Drop'}</h4>
+          <p className="muted">Teilnehmer oder Freilos direkt auf einen anderen Startplatz ziehen. Belegte Plätze werden automatisch getauscht.</p>
         </div>
         <button
           className="btn small"
@@ -110,7 +156,7 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
             changed();
           }}
         >
-          Automatische Setzung wiederherstellen
+          Automatische Setzung
         </button>
       </div>
       <div className="draw-editor-summary">
@@ -118,23 +164,40 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
         <span><strong>{allowedParticipants.length}</strong> Teilnehmer</span>
         <span><strong>{byeCount}</strong> Freilose</span>
       </div>
-      <div className="bracket-seed-grid">
-        {slots.map((slot, index) => (
-          <label className="bracket-seed-row" key={`slot-${index + 1}`}>
-            <span className="seed-number">#{index + 1}</span>
-            <select
-              value={slot}
-              onChange={(event) => {
-                setBracketSlot(tournament, stage, index, event.target.value);
-                changed();
-              }}
-            >
-              {byeCount > 0 && <option value="Freilos">Freilos</option>}
-              {allowedParticipants.map((participant) => (
-                <option value={participant} key={participant}>{participant}</option>
-              ))}
-            </select>
-          </label>
+      <div className="bracket-dnd-grid">
+        {Array.from({ length: slots.length / 2 }, (_, matchIndex) => (
+          <article className="bracket-dnd-match" key={`match-${matchIndex + 1}`}>
+            <span className="bracket-dnd-match-label">Startmatch {matchIndex + 1}</span>
+            {[matchIndex * 2, matchIndex * 2 + 1].map((slotIndex) => {
+              const slot = slots[slotIndex];
+              return (
+                <div
+                  className={slot === 'Freilos' ? 'bracket-dnd-slot bye' : 'bracket-dnd-slot'}
+                  key={`slot-${slotIndex + 1}`}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const draggedValue = getDragValue(event);
+                    if (!draggedValue || (!allowedParticipants.includes(draggedValue) && draggedValue !== 'Freilos')) return;
+                    if (setBracketSlot(tournament, stage, slotIndex, draggedValue)) changed();
+                  }}
+                >
+                  <span className="seed-number">#{slotIndex + 1}</span>
+                  <div
+                    className={slot === 'Freilos' ? 'draw-player-chip bye-chip' : 'draw-player-chip'}
+                    draggable
+                    onDragStart={(event) => setDragValue(event, slot)}
+                  >
+                    <span className="draw-drag-handle">⋮⋮</span>
+                    <strong>{slot}</strong>
+                  </div>
+                </div>
+              );
+            })}
+          </article>
         ))}
       </div>
     </section>

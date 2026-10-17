@@ -2,6 +2,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { getRuntimeParticipantNames } from '@/services/mockRuntime';
 import { getBracketSlots, getGroupAssignments } from '@/services/mockDrawStore';
+import { isStageStarted } from '@/services/mockPhaseLifecycle';
 
 export interface MockStanding {
   rank: number;
@@ -46,6 +47,7 @@ export function buildMockGroups(tournament: DemoTournament, stage: TournamentSta
   const entrantCount = Math.max(groupCount, Math.min(names.length, Number(stage.settings.entrants) || names.length));
   const participants = names.slice(0, entrantCount);
   const assignments = getGroupAssignments(tournament, stage);
+  const started = isStageStarted(tournament, stage);
   const groups: string[][] = Array.from({ length: groupCount }, () => []);
   participants.forEach((name, index) => {
     const groupIndex = assignments[name] ?? (index % groupCount);
@@ -55,6 +57,7 @@ export function buildMockGroups(tournament: DemoTournament, stage: TournamentSta
   return groups.map((members, groupIndex) => {
     const label = `Gruppe ${String.fromCharCode(65 + groupIndex)}`;
     const standings = members.map((name, index) => {
+      if (!started) return { rank: index + 1, name, played: 0, wins: 0, losses: 0, sets: '0:0' };
       const played = Math.max(0, Math.min(members.length - 1, members.length - 2 + (index % 2)));
       const wins = Math.max(0, played - Math.floor(index / 2));
       const losses = played - wins;
@@ -71,8 +74,8 @@ export function buildMockGroups(tournament: DemoTournament, stage: TournamentSta
         matches.push({
           sideA: members[a],
           sideB: members[b],
-          score: matchIndex < members.length - 1 ? (matchIndex % 2 ? '0:1' : '1:0') : '–',
-          status: matchIndex < members.length - 2 ? 'played' : matchIndex === members.length - 2 ? 'live' : 'open',
+          score: started && matchIndex < members.length - 1 ? (matchIndex % 2 ? '0:1' : '1:0') : '–',
+          status: !started ? 'open' : matchIndex < members.length - 2 ? 'played' : matchIndex === members.length - 2 ? 'live' : 'open',
         });
       }
     }
@@ -95,6 +98,7 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
   const slots = configuredSlots.length === bracketSize
     ? configuredSlots
     : Array.from({ length: bracketSize }, (_, index) => names[index] ?? 'Freilos');
+  const started = isStageStarted(tournament, stage);
   const rounds: MockBracketRound[] = [];
   let current = slots;
   let matchCount = bracketSize / 2;
@@ -108,13 +112,13 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
       const sideA = current[index * 2] ?? 'TBD';
       const sideB = current[index * 2 + 1] ?? 'TBD';
       const bye = sideA === 'Freilos' || sideB === 'Freilos';
-      const played = roundIndex === 0 && index < Math.max(1, Math.floor(matchCount / 3));
-      const winner = bye ? (sideA === 'Freilos' ? sideB : sideA) : played ? sideA : undefined;
+      const played = started && roundIndex === 0 && index < Math.max(1, Math.floor(matchCount / 3));
+      const winner = started && bye ? (sideA === 'Freilos' ? sideB : sideA) : played ? sideA : undefined;
       matches.push({
         id: `${stage.id}-r${roundIndex + 1}-m${index + 1}`,
         sideA,
         sideB,
-        score: bye ? 'Freilos' : played ? (stage.bestOf === 1 ? '1:0' : '3:1') : undefined,
+        score: started && bye ? 'Freilos' : played ? (stage.bestOf === 1 ? '1:0' : '3:1') : undefined,
         winner,
       });
       next.push(winner ?? `Sieger ${index + 1}`);
@@ -132,7 +136,9 @@ export function buildSwissStandings(tournament: DemoTournament, stage: Tournamen
   const names = getRuntimeParticipantNames(tournament);
   const entrants = Math.max(2, Math.min(names.length, Number(stage.settings.entrants) || names.length));
   const rounds = Math.max(1, Number(stage.settings.rounds) || 4);
+  const started = isStageStarted(tournament, stage);
   return names.slice(0, entrants).map((name, index) => {
+    if (!started) return { rank: index + 1, name, played: 0, wins: 0, losses: 0, sets: '0:0' };
     const played = Math.min(rounds, Math.max(1, rounds - (index % 2)));
     const wins = Math.max(0, played - Math.floor(index / 3));
     const losses = played - wins;

@@ -1,6 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet } from '@/domain/types';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
+import { getActiveStage } from '@/services/mockPhaseLifecycle';
 
 export type MockMatchState = 'LIVE' | 'READY' | 'WAITING' | 'CONFIRMATION' | 'FINISHED';
 
@@ -131,10 +132,11 @@ function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchRes
 
 export function getMockRuntimeMatches(tournament: DemoTournament): MockRuntimeMatch[] {
   const names = getRuntimeParticipantNames(tournament);
-  const currentStage = tournament.stages[0];
-  const phase = currentStage?.name ?? 'Turnier';
-  const stageId = currentStage?.id ?? `${tournament.id}-stage`;
-  const bestOf = currentStage?.bestOf ?? 3;
+  const currentStage = getActiveStage(tournament);
+  if (!currentStage) return [];
+  const phase = currentStage.name;
+  const stageId = currentStage.id;
+  const bestOf = currentStage.bestOf;
   const tableCount = Math.max(1, tournament.tables);
   const storedResults = readResults();
   const storedRuntime = readRuntime();
@@ -144,7 +146,7 @@ export function getMockRuntimeMatches(tournament: DemoTournament): MockRuntimeMa
     : 0;
 
   const live = Array.from({ length: liveCount }, (_, index): MockRuntimeMatch => applyStoredState({
-    id: `${tournament.id}-live-${index + 1}`,
+    id: `${stageId}-live-${index + 1}`,
     table: `Tisch ${index + 1}`,
     sideA: participantAt(names, index * 2),
     sideB: participantAt(names, index * 2 + 1),
@@ -164,7 +166,7 @@ export function getMockRuntimeMatches(tournament: DemoTournament): MockRuntimeMa
 
   const queuedCount = Math.min(10, Math.max(4, tournament.participants - liveCount * 2));
   const queued = Array.from({ length: queuedCount }, (_, index): MockRuntimeMatch => applyStoredState({
-    id: `${tournament.id}-ready-${index + 1}`,
+    id: `${stageId}-ready-${index + 1}`,
     table: 'Noch offen',
     sideA: participantAt(names, liveCount * 2 + index * 2),
     sideB: participantAt(names, liveCount * 2 + index * 2 + 1),
@@ -280,9 +282,9 @@ export function getMockPlayerSnapshot(tournament: DemoTournament) {
     matchCode: 'A7K2',
     currentMatch: ownLive,
     nextMatch: next,
-    standing: tournament.stages[0]?.type === 'GROUPS'
+    standing: getActiveStage(tournament)?.type === 'GROUPS'
       ? '2. Platz · Gruppe A'
-      : tournament.stages[0]?.type === 'SWISS'
+      : getActiveStage(tournament)?.type === 'SWISS'
         ? 'Rang 5 · 3:1'
         : 'Noch im Turnier',
   };

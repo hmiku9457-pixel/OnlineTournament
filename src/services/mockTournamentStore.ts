@@ -172,6 +172,7 @@ export function removeLocalPrototypeTournaments() {
   window.localStorage.removeItem('online-tournament:mock-match-results:v2');
   window.localStorage.removeItem('online-tournament:mock-match-runtime:v1');
   window.localStorage.removeItem('online-tournament:mock-draw-config:v1');
+  window.localStorage.removeItem('online-tournament:mock-phase-lifecycle:v1');
 }
 
 export function countActiveMockTournaments() {

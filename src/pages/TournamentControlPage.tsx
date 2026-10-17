@@ -7,6 +7,7 @@ import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
 import { assignMockMatchToTable, getMockAssignmentBlockReason, getMockRuntimeMatches, getRuntimeParticipantNames } from '@/services/mockRuntime';
 import { getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
+import { completeStage, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
 
 type ControlTab = 'overview' | 'flow' | 'matches' | 'participants' | 'stages';
 
@@ -112,6 +113,7 @@ export function TournamentControlPage() {
   const [tab, setTab] = useState<ControlTab>('overview');
   const [runtimeVersion, setRuntimeVersion] = useState(0);
   const [drawVersion, setDrawVersion] = useState(0);
+  const [phaseVersion, setPhaseVersion] = useState(0);
   const [participantPanel, setParticipantPanel] = useState<{ name: string; mode: 'edit' | 'games' } | null>(null);
   const [withdrawn, setWithdrawn] = useState<Set<string>>(new Set());
   const [assigningMatchId, setAssigningMatchId] = useState<string | null>(null);
@@ -122,6 +124,9 @@ export function TournamentControlPage() {
   const tableMatches = matches.filter((match) => ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch '));
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table));
+  const activeStage = useMemo(() => getActiveStage(tournament), [tournament, phaseVersion]);
+  const nextStartableStage = useMemo(() => getNextStartableStage(tournament), [tournament, phaseVersion]);
+  const editableStage = useMemo(() => tournament.stages.find((stage) => isStageEditable(tournament, stage)), [tournament, phaseVersion]);
 
   function setStatus(status: TournamentStatus) {
     setTournament(updateMockTournamentStatus(tournament.id, status));
@@ -132,12 +137,35 @@ export function TournamentControlPage() {
   }
 
   function startTournament() {
-    const hasEditableDraw = tournament.stages.some((stage) => ['GROUPS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(stage.type));
-    if (hasEditableDraw && !tournament.hasStarted) {
-      const confirmed = window.confirm('Turnier jetzt starten? Gruppen und K.-o.-Setzungen können danach nicht mehr verändert werden.');
-      if (!confirmed) return;
-    }
+    const firstStage = tournament.stages[0];
+    if (!firstStage) return;
+    const confirmed = window.confirm(`Turnier jetzt starten? Die Konfiguration von „${firstStage.name}“ wird damit eingefroren.`);
+    if (!confirmed) return;
+    if (!startFirstStage(tournament)) return;
+    setPhaseVersion((value) => value + 1);
     setStatus('RUNNING');
+    refreshRuntime();
+  }
+
+  function finishActiveStage() {
+    if (!activeStage) return;
+    const confirmed = window.confirm(`„${activeStage.name}“ als beendet markieren? Danach wird die nächste Phase zur Bearbeitung freigegeben.`);
+    if (!confirmed || !completeStage(tournament, activeStage)) return;
+    const isLastStage = tournament.stages[tournament.stages.length - 1]?.id === activeStage.id;
+    setPhaseVersion((value) => value + 1);
+    refreshRuntime();
+    setTab('flow');
+    if (isLastStage) setStatus('FINISHED');
+  }
+
+  function startNextPhase() {
+    if (!nextStartableStage) return;
+    const confirmed = window.confirm(`„${nextStartableStage.name}“ jetzt starten? Die aktuelle Zuordnung/Setzung wird damit eingefroren.`);
+    if (!confirmed || !startStage(tournament, nextStartableStage)) return;
+    setPhaseVersion((value) => value + 1);
+    setStatus('RUNNING');
+    refreshRuntime();
+    setTab('overview');
   }
 
   function assignToTable(matchId: string, table: string) {
@@ -202,15 +230,24 @@ export function TournamentControlPage() {
         <div className="actions no-print">
           <Link className="btn" to={`/player/${tournament.id}`}>Spieleransicht</Link>
           <Link className="btn" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
-          {!tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status) && tournament.stages.some((stage) => ['GROUPS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(stage.type)) && (
-            <button className="btn" type="button" onClick={() => setTab('flow')}>Gruppen / Setzung bearbeiten</button>
+          {editableStage && ['GROUPS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(editableStage.type) && (
+            <button className="btn" type="button" onClick={() => setTab('flow')}>Aktuelle Phase bearbeiten</button>
           )}
-          {tournament.status === 'RUNNING' ? (
-            <button className="btn" type="button" onClick={() => setStatus('PAUSED')}>Turnier pausieren</button>
-          ) : (
-            <button className="btn primary" type="button" onClick={tournament.status === 'PAUSED' ? () => setStatus('RUNNING') : startTournament}>
-              {tournament.status === 'PAUSED' ? 'Turnier fortsetzen' : 'Turnier starten'}
-            </button>
+          {!tournament.hasStarted && tournament.status !== 'FINISHED' && (
+            <button className="btn primary" type="button" onClick={startTournament}>Turnier starten</button>
+          )}
+          {tournament.hasStarted && activeStage && tournament.status !== 'FINISHED' && (
+            <>
+              {tournament.status === 'RUNNING' ? (
+                <button className="btn" type="button" onClick={() => setStatus('PAUSED')}>Turnier pausieren</button>
+              ) : (
+                <button className="btn" type="button" onClick={() => setStatus('RUNNING')}>Turnier fortsetzen</button>
+              )}
+              <button className="btn" type="button" onClick={finishActiveStage}>Phase beenden</button>
+            </>
+          )}
+          {tournament.hasStarted && !activeStage && nextStartableStage && tournament.status !== 'FINISHED' && (
+            <button className="btn primary" type="button" onClick={startNextPhase}>Nächste Phase starten</button>
           )}
         </div>
       </header>
@@ -342,15 +379,30 @@ export function TournamentControlPage() {
       )}
 
       {tab === 'flow' && (
-        <section className="control-tab-panel competition-flow-page" data-draw-version={drawVersion}>
+        <section className="control-tab-panel competition-flow-page" data-draw-version={drawVersion} data-phase-version={phaseVersion}>
           <div className="control-section-head">
             <div>
               <h2>Turnierverlauf</h2>
-              <p className="muted">Tabellen, Gruppenspiele und K.-o.-Bäume aller Phasen in einer sportlichen Gesamtansicht.</p>
+              <p className="muted">Jede Phase wird erst nach Abschluss der vorherigen Phase bearbeitbar. Mit dem Start der Phase wird ihre Auslosung eingefroren.</p>
             </div>
-            {!tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status) && (
-              <span className="badge ready">Vorstart-Konfiguration offen</span>
+            {nextStartableStage && !activeStage && tournament.hasStarted && (
+              <button className="btn primary" type="button" onClick={startNextPhase}>Nächste Phase starten</button>
             )}
+          </div>
+          <div className="phase-lifecycle-strip">
+            {tournament.stages.map((stage, index) => {
+              const completed = isStageCompleted(tournament, stage);
+              const started = isStageStarted(tournament, stage);
+              const editable = isStageEditable(tournament, stage);
+              const state = completed ? 'Beendet' : started ? 'Läuft' : editable ? 'Bearbeitbar' : 'Gesperrt';
+              return (
+                <div className={`phase-lifecycle-item ${state.toLowerCase()}`} key={stage.id}>
+                  <span>Phase {index + 1}</span>
+                  <strong>{stage.name}</strong>
+                  <span className="badge">{state}</span>
+                </div>
+              );
+            })}
           </div>
           {tournament.stages.map((stage) => (
             <div className="prestart-stage-block" key={stage.id}>
