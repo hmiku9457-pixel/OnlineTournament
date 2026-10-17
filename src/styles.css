@@ -147,6 +147,7 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color:
 .creation-summary dl div { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid #eaecf0; padding: 7px 0; }
 .creation-summary dt { color: #667085; }
 .creation-summary dd { margin: 0; font-weight: 700; text-align: right; }
+.creation-summary-note { margin: 12px 0 0; font-size: 0.875rem; }
 
 @media (max-width: 700px) {
   .wizard-steps { grid-template-columns: 1fr; gap: 2px; }

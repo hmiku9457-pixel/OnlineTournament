@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   bestOfOptions,
   createPhaseTemplate,
+  estimateTournamentDurationMinutes,
   hasValidTerminalStageOrder,
   knockoutEntrantPresets,
   knockoutRoundLabels,
@@ -46,6 +47,27 @@ describe('tournament creation phase model', () => {
     expect(hasValidTerminalStageOrder(['GROUPS', 'SWISS', 'KNOCKOUT'])).toBe(true);
     expect(hasValidTerminalStageOrder(['GROUPS', 'KNOCKOUT', 'SWISS'])).toBe(false);
     expect(hasValidTerminalStageOrder(['SWISS', 'DOUBLE_ELIMINATION'])).toBe(true);
+  });
+
+  it('estimates a rough tournament duration from tables and configured best-of values', () => {
+    expect(estimateTournamentDurationMinutes([
+      { type: 'ROUND_ROBIN', entrantCount: 4, bestOf: 1 },
+    ], 2)).toBe(45);
+
+    expect(estimateTournamentDurationMinutes([
+      { type: 'SWISS', entrantCount: 8, bestOf: 3, swissRounds: 3 },
+    ], 4)).toBe(113);
+  });
+
+  it('uses round-specific best-of settings for knockout duration estimates', () => {
+    expect(estimateTournamentDurationMinutes([
+      {
+        type: 'KNOCKOUT',
+        entrantCount: 8,
+        bestOf: 3,
+        knockoutBestOf: [3, 5, 7],
+      },
+    ], 2)).toBe(218);
   });
 
 });

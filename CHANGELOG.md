@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Remove the redundant "Diese Anzahl startet in Phase X" helper text from follow-up phase configuration.
+- Add a rough tournament duration estimate to the Step 5 summary using configured phases, entrants, Best-of settings, knockout round settings, available tables, and an assumption of 15 minutes per set.
+
 - Render Custom numeric inputs inside the same button grid so they match preset-button sizing; table Custom sits below 7 and minimum-match presets now use 1–5 plus Custom.
 - Add a 15-minute-per-set baseline duration model to format recommendations and suppress suggestions above roughly 3.5 hours for the available table count.
 - Make knockout and double-elimination stages terminal so no later phase can be added or reordered behind them.

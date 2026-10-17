@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   bestOfOptions,
   createPhaseTemplate,
+  estimateTournamentDurationMinutes,
   hasValidTerminalStageOrder,
   isTerminalStage,
   knockoutEntrantPresets,
@@ -541,6 +542,21 @@ export function CreateTournamentPage() {
     ? phaseDrafts.map((phase) => phase.label).join(' → ')
     : 'Noch keine Phasen festgelegt';
 
+  const estimatedTournamentDurationMinutes = useMemo(
+    () => estimateTournamentDurationMinutes(
+      phaseDrafts.map((phase) => ({
+        type: phase.type,
+        entrantCount: phase.entrantCount,
+        bestOf: phase.bestOf,
+        groupCount: phase.groupCount,
+        swissRounds: phase.swissRounds,
+        knockoutBestOf: phase.knockoutBestOf,
+      })),
+      tables,
+    ),
+    [phaseDrafts, tables],
+  );
+
   return (
     <>
       <header className="page-head">
@@ -938,7 +954,6 @@ export function CreateTournamentPage() {
                               value={phase.entrantCount}
                               onChange={(event) => updatePhaseEntrants(index, Number(event.target.value))}
                             />
-                            <span className="field-hint">Diese Anzahl startet in Phase {index + 1}.</span>
                           </div>
                         )}
 
@@ -1028,7 +1043,13 @@ export function CreateTournamentPage() {
                 <div><dt>Tische</dt><dd>{tables}</dd></div>
                 <div><dt>Mindestspiele</dt><dd>{minimumMatches}</dd></div>
                 <div><dt>Phasen</dt><dd>{phaseSequenceLabel}</dd></div>
+                <div><dt>Turnierdauer (grob)</dt><dd>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : '–'}</dd></div>
               </dl>
+              {phaseDrafts.length > 0 && (
+                <p className="muted creation-summary-note">
+                  Schätzung mit 15 Min. pro Satz, durchschnittlicher Satzanzahl je Best-of und paralleler Nutzung der verfügbaren Tische.
+                </p>
+              )}
             </div>
           </section>
         )}
