@@ -3,7 +3,7 @@ import type { KeyboardEvent } from 'react';
 import type { MatchSet } from '@/domain/types';
 import { completeMockMatch, saveMockMatchSets, type MockRuntimeMatch } from '@/services/mockRuntime';
 
-function parseShortSet(value: string, number: number): MatchSet | null {
+export function parseShortSet(value: string, number: number): MatchSet | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
 
@@ -15,12 +15,15 @@ function parseShortSet(value: string, number: number): MatchSet | null {
     return { number, sideAScore: Math.trunc(left), sideBScore: Math.trunc(right) };
   }
 
+  // Die Zeichenfolge -0 ist numerisch -0, und -0 >= 0 ist in JS wahr.
+  // Deshalb das Vorzeichen aus dem Originaltext lesen, nicht aus Number().
+  if (!/^[+-]?\d+$/.test(trimmed)) return null;
   const numeric = Number(trimmed);
   if (!Number.isFinite(numeric)) return null;
   const loser = Math.abs(Math.trunc(numeric));
   const winner = Math.max(11, loser + 2);
 
-  return numeric >= 0
+  return !trimmed.startsWith('-')
     ? { number, sideAScore: winner, sideBScore: loser }
     : { number, sideAScore: loser, sideBScore: winner };
 }

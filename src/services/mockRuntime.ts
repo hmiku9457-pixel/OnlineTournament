@@ -79,6 +79,19 @@ export function canEditFinishedResults(tournament: DemoTournament, stage: Tourna
   return !next || !isStageStarted(tournament, next);
 }
 
+// Zurückgezogene Gruppen-Teilnehmer verlieren ausnahmslos alle Partien 0:11.
+// Die automatisch gewerteten Begegnungen dürfen daher nicht korrigiert werden.
+export function canEditMockMatch(tournament: DemoTournament, matchId: string) {
+  const stage = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`));
+  if (!stage || !canEditFinishedResults(tournament, stage)) return false;
+  if (stage.type === 'GROUPS' || stage.type === 'ROUND_ROBIN') {
+    const match = getMockStageBaseMatches(tournament, stage).find((item) => item.id === matchId);
+    if (match && (isMockParticipantWithdrawn(tournament, match.sideA)
+      || isMockParticipantWithdrawn(tournament, match.sideB))) return false;
+  }
+  return true;
+}
+
 
 function readResults(): StoredMatchResult[] {
   if (typeof window === 'undefined') return [];
@@ -378,7 +391,7 @@ function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchRes
     ...match,
     table: savedRuntime?.table ?? match.table,
     status,
-    score: savedResult?.forcedWinner ? 'W.O.' : savedResult ? scoreFromSets(savedResult.sets) : match.score,
+    score: savedResult?.forcedWinner && !savedResult.sets.length ? 'W.O.' : savedResult ? scoreFromSets(savedResult.sets) : match.score,
     sets: savedResult?.sets ?? match.sets,
     note: status === 'WAITING' ? 'Wartet auf Tischzuweisung' : undefined,
   };
@@ -465,17 +478,51 @@ export function startMockMatch(matchId: string) {
 export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: MockMatchState = 'LIVE') {
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
+  const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
+  if (tournament && !canEditMockMatch(tournament, matchId)) return previous;
   const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   return next;
 }
 
-// Turnierweiter Rückzug: offene Partien werden als kampfloser Sieg des Gegners
-// behandelt. Bereits beendete Partien bleiben unverändert. Kommende Schweizer
-// Runden paaren nur noch aktive Teilnehmer; aktuelle Paarungen bleiben stabil.
+// Gruppen-/Jeder-gegen-jeden-Rückzug: alle Partien der laufenden Phase,
+// auch bereits gespielte, werden rückwirkend als 0:11-Satzniederlagen
+// gewertet. Außerhalb solcher Phasen gelten weiterhin Walkover-Regeln für
+// offene Spiele; abgeschlossene Partien bleiben dann unverändert.
 function settleWithdrawnMatches(tournament: DemoTournament) {
   const active = getActiveStage(tournament);
   if (!active) return;
+
+  if (active.type === 'GROUPS' || active.type === 'ROUND_ROBIN') {
+    const fixtures = baseStageMatches(tournament, active, readResults());
+    const saved = readResults();
+    const rewritten: StoredMatchResult[] = [];
+    for (const match of fixtures) {
+      const aWithdrawn = isMockParticipantWithdrawn(tournament, match.sideA);
+      const bWithdrawn = isMockParticipantWithdrawn(tournament, match.sideB);
+      if (!aWithdrawn && !bWithdrawn) continue;
+      const existing = saved.find((result) => result.matchId === match.id);
+      const wonSets = Math.ceil((match.bestOf ?? active.bestOf) / 2);
+      const sets: MatchSet[] = aWithdrawn && bWithdrawn
+        ? [] // Zwei Rückzüge im selben Spiel: Doppelniederlage, kein Sieger.
+        : Array.from({ length: wonSets }, (_, index) => ({
+          number: index + 1,
+          sideAScore: aWithdrawn ? 0 : 11,
+          sideBScore: bWithdrawn ? 0 : 11,
+        }));
+      const forcedWinner = aWithdrawn && bWithdrawn ? 'Freilos' : aWithdrawn ? match.sideB : match.sideA;
+      // Nicht bei jeder Ansicht erneut identische Resultate überschreiben.
+      if (existing?.status === 'FINISHED' && existing.forcedWinner === forcedWinner
+        && JSON.stringify(existing.sets) === JSON.stringify(sets)) continue;
+      rewritten.push({ matchId: match.id, sets, status: 'FINISHED', forcedWinner });
+    }
+    if (rewritten.length) {
+      const ids = new Set(rewritten.map((result) => result.matchId));
+      writeResults([...rewritten, ...saved.filter((result) => !ids.has(result.matchId))]);
+    }
+    return;
+  }
+
   for (let pass = 0; pass < 24; pass += 1) {
     const pending = getMockStageMatches(tournament, active).filter((match) => (
       match.status !== 'FINISHED' &&
@@ -487,8 +534,6 @@ function settleWithdrawnMatches(tournament: DemoTournament) {
     for (const match of pending) {
       const aWithdrawn = isMockParticipantWithdrawn(tournament, match.sideA);
       const bWithdrawn = isMockParticipantWithdrawn(tournament, match.sideB);
-      // Bei zwei Rückzügen gibt es keinen Sieger; der Ast bleibt frei.
-      // Die Begegnung zählt für beide als kampflos beendet.
       if (saved.some((item) => item.matchId === match.id && item.status === 'FINISHED')) continue;
       saved.unshift({ matchId: match.id, sets: [], status: 'FINISHED', forcedWinner: aWithdrawn && bWithdrawn ? 'Freilos' : aWithdrawn ? match.sideB : match.sideA });
       changed = true;
@@ -671,6 +716,8 @@ function reconcileCompletedPhase(matchId: string) {
 export function completeMockMatch(matchId: string, sets: MatchSet[], status: MockMatchState = 'FINISHED') {
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
+  const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
+  if (tournament && !canEditMockMatch(tournament, matchId)) return previous;
   const previousFinal = previous?.status === 'FINISHED';
   if (previousFinal) {
     const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));

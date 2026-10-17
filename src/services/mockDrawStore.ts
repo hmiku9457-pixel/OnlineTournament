@@ -246,44 +246,31 @@ export function setBracketSlot(
 
 export function randomizeBracketSlots(tournament: DemoTournament, stage: TournamentStage) {
   if (!canEditDraw(tournament, stage)) return false;
-  const participants = getStageEntrants(tournament, stage);
   const original = getBracketSlots(tournament, stage);
   const pinned = getPinnedBracketSlots(tournament, stage);
-  const bracketSize = original.length;
-  const pairCount = bracketSize / 2;
-  const requiredFullPairs = participants.length - pairCount;
-  const fixed = new Map(pinned.map((index) => [index, original[index]]));
-  const unpinnedPlayers = participants.filter((name) => ![...fixed.values()].includes(name));
+  const pinnedIndexes = new Set(pinned);
 
-  // Pinned entries keep their exact slots. Every pair must contain at least one player.
-  // Randomly choose the full pairs, then fill non-full pairs with exactly one bye.
-  for (let attempt = 0; attempt < 600; attempt += 1) {
-    const forcedFull = Array.from({ length: pairCount }, (_, pair) => pair)
-      .filter((pair) => fixed.has(pair * 2) && fixed.has(pair * 2 + 1));
-    if (forcedFull.length > requiredFullPairs) return false;
-    const remainingPairs = shuffled(Array.from({ length: pairCount }, (_, pair) => pair)
-      .filter((pair) => !forcedFull.includes(pair)));
-    const fullPairs = new Set([...forcedFull, ...remainingPairs.slice(0, requiredFullPairs - forcedFull.length)]);
-    const slots = Array<string>(bracketSize).fill('Freilos');
-    fixed.forEach((name, index) => { slots[index] = name; });
-    const free = shuffled(unpinnedPlayers);
-    let cursor = 0;
-    for (let pair = 0; pair < pairCount; pair += 1) {
-      const start = pair * 2;
-      const required = fullPairs.has(pair) ? 2 : 1;
-      const present = Number(fixed.has(start)) + Number(fixed.has(start + 1));
-      if (present > required) break;
-      const candidates = shuffled([start, start + 1].filter((index) => !fixed.has(index)));
-      for (let index = 0; index < required - present; index += 1) {
-        slots[candidates[index]] = free[cursor++];
-      }
-    }
-    if (validBracketConstraints(participants, slots) && pinned.every((index) => slots[index] === original[index])) {
-      upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots, pinnedBracketSlots: pinned });
-      return true;
-    }
-  }
-  return false;
+  // Freilose sind feste Positionen im Baum. Nur nicht fixierte Spieler
+  // werden neu verteilt. Dadurch bleiben das Freilosmuster und die
+  // Balance beider Hälften auch beim erneuten Würfeln unverändert.
+  const movableIndexes = original.map((name, index) => ({ name, index }))
+    .filter(({ name, index }) => name !== 'Freilos' && !pinnedIndexes.has(index))
+    .map(({ index }) => index);
+  const shuffledPlayers = shuffled(movableIndexes.map((index) => original[index]));
+  const next = [...original];
+  movableIndexes.forEach((index, position) => {
+    next[index] = shuffledPlayers[position];
+  });
+
+  if (!validBracketConstraints(getStageEntrants(tournament, stage), next)) return false;
+  upsert({
+    ...findConfig(tournament.id, stage.id),
+    tournamentId: tournament.id,
+    stageId: stage.id,
+    bracketSlots: next,
+    pinnedBracketSlots: pinned,
+  });
+  return true;
 }
 
 export function resetBracketSlots(tournament: DemoTournament, stage: TournamentStage) {

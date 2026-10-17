@@ -3,7 +3,7 @@ import { createMockTournament, updateMockTournamentStatus } from '@/services/moc
 import type { MockPhaseInput } from '@/services/mockTournamentStore';
 import { getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { buildMockGroups } from '@/services/mockCompetitionViews';
-import { canEditFinishedResults, completeMockMatch, getMockStageBaseMatches, getMockStageMatches, getMockStoredResult, withdrawMockParticipant } from '@/services/mockRuntime';
+import { canEditFinishedResults, canEditMockMatch, completeMockMatch, getMockStageBaseMatches, getMockStageMatches, getMockStoredResult, withdrawMockParticipant } from '@/services/mockRuntime';
 import { isStageCompleted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
 
 const group: MockPhaseInput = { type: 'GROUPS', label: 'Gruppen', bestOf: 1, entrantCount: 4, groupCount: 1, swissRounds: 1, knockoutBestOf: [] };
@@ -49,16 +49,72 @@ describe('Turnierleitung - Regressionen', () => {
     expect(setBracketSlot(tournament, stage, index, 'Testspieler 12')).toBe(false);
   });
 
-  it('wertet nicht gespielte Gruppenmatches eines zurückgezogenen Teilnehmers als Walkover', () => {
+  it('mischt beim Neuverteilen keine Freilose, auch nicht mit Pins', () => {
+    const tournament = makeTournament(12, [ko]);
+    const stage = tournament.stages[0];
+    const initial = getBracketSlots(tournament, stage);
+    const byePositions = initial.flatMap((value, index) => value === 'Freilos' ? [index] : []);
+    const playerPosition = initial.findIndex((value) => value !== 'Freilos');
+    expect(toggleBracketPin(tournament, stage, playerPosition)).toBe(true);
+    for (let attempt = 0; attempt < 15; attempt += 1) {
+      expect(randomizeBracketSlots(tournament, stage)).toBe(true);
+      const next = getBracketSlots(tournament, stage);
+      expect(next.flatMap((value, index) => value === 'Freilos' ? [index] : [])).toEqual(byePositions);
+      expect(next[playerPosition]).toBe(initial[playerPosition]);
+    }
+  });
+
+  it('wertet alle Gruppenpartien eines zurückgezogenen Teilnehmers als 0:11-Satzniederlagen', () => {
     const tournament = makeTournament(4, [group]);
     expect(startFirstStage(tournament)).toBe(true);
     updateMockTournamentStatus(tournament.id, 'RUNNING');
     expect(withdrawMockParticipant(tournament, 'Testspieler 1')).toBe(true);
     const matches = getMockStageMatches(tournament, tournament.stages[0]);
-    expect(matches.filter((match) => [match.sideA, match.sideB].includes('Testspieler 1') && match.score === 'W.O.')).toHaveLength(3);
+    const withdrawnGames = matches.filter((match) => [match.sideA, match.sideB].includes('Testspieler 1'));
+    expect(withdrawnGames).toHaveLength(3);
+    expect(withdrawnGames.every((match) => match.status === 'FINISHED' && match.sets?.length === 1)).toBe(true);
+    expect(withdrawnGames.every((match) => match.sets?.every((set) =>
+      match.sideA === 'Testspieler 1'
+        ? set.sideAScore === 0 && set.sideBScore === 11
+        : set.sideAScore === 11 && set.sideBScore === 0))).toBe(true);
     const row = buildMockGroups(tournament, tournament.stages[0])[0].standings.find((entry) => entry.name === 'Testspieler 1');
     expect(row?.played).toBe(3);
     expect(row?.losses).toBe(3);
+    expect(row?.balls).toBe('0:33');
+  });
+
+  it('überschreibt abgeschlossene Gruppenspiele bei einem Rückzug inklusive aller Best-of-Sätze', () => {
+    const tournament = makeTournament(4, [{ ...group, bestOf: 5 }]);
+    const stage = tournament.stages[0];
+    expect(startFirstStage(tournament)).toBe(true);
+    updateMockTournamentStatus(tournament.id, 'RUNNING');
+    const played = getMockStageMatches(tournament, stage).find((match) =>
+      match.sideA === 'Testspieler 1' || match.sideB === 'Testspieler 1');
+    expect(played).toBeDefined();
+    completeMockMatch(played!.id, [
+      { number: 1, sideAScore: 11, sideBScore: 7 },
+      { number: 2, sideAScore: 8, sideBScore: 11 },
+      { number: 3, sideAScore: 11, sideBScore: 9 },
+      { number: 4, sideAScore: 11, sideBScore: 6 },
+    ]);
+    expect(withdrawMockParticipant(tournament, 'Testspieler 1')).toBe(true);
+    const games = getMockStageMatches(tournament, stage).filter((match) =>
+      match.sideA === 'Testspieler 1' || match.sideB === 'Testspieler 1');
+    expect(games).toHaveLength(3);
+    for (const match of games) {
+      expect(match.status).toBe('FINISHED');
+      expect(match.sets).toHaveLength(3);
+      expect(match.sets?.every((set) =>
+        match.sideA === 'Testspieler 1'
+          ? set.sideAScore === 0 && set.sideBScore === 11
+          : set.sideAScore === 11 && set.sideBScore === 0)).toBe(true);
+    }
+    const standings = buildMockGroups(tournament, stage)[0].standings;
+    expect(standings.find((row) => row.name === 'Testspieler 1')?.balls).toBe('0:99');
+    expect(canEditMockMatch(tournament, played!.id)).toBe(false);
+    const previouslySaved = getMockStoredResult(played!.id);
+    completeMockMatch(played!.id, [{ number: 1, sideAScore: 11, sideBScore: 0 }]);
+    expect(getMockStoredResult(played!.id)).toEqual(previouslySaved);
   });
 
   it('paart im Schweizer System nach einem Rückzug die nächste Runde ohne den zurückgezogenen Teilnehmer', () => {

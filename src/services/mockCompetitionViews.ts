@@ -87,37 +87,32 @@ function computeStandings(members: string[], matches: ReturnType<typeof getMockS
   matches.forEach((match) => {
     if (match.status !== 'FINISHED') return;
     const forceWinner = getMockStoredResult(match.id)?.forcedWinner;
-    if (forceWinner) {
-      const a = rows.get(match.sideA);
-      const b = rows.get(match.sideB);
-      if (!a || !b) return;
-      a.played += 1;
-      b.played += 1;
-      if (forceWinner === match.sideA) { a.wins += 1; b.losses += 1; }
-      else { b.wins += 1; a.losses += 1; }
-      return;
-    }
-    if (!match.sets?.length) return;
+    const sets = match.sets ?? [];
+    if (!sets.length && !forceWinner) return;
     const a = rows.get(match.sideA);
     const b = rows.get(match.sideB);
     if (!a || !b) return;
-    const { winsA, winsB } = resultStats(match.sets);
+    const { winsA, winsB } = resultStats(sets);
     a.played += 1;
     b.played += 1;
     a.setsWon += winsA;
     a.setsLost += winsB;
     b.setsWon += winsB;
     b.setsLost += winsA;
-    match.sets.forEach((set) => {
+    sets.forEach((set) => {
       a.ballsWon += set.sideAScore;
       a.ballsLost += set.sideBScore;
       b.ballsWon += set.sideBScore;
       b.ballsLost += set.sideAScore;
     });
-    if (winsA > winsB) {
+    if (forceWinner === 'Freilos') {
+      // Beide Teilnehmer zurückgezogen: niemand bekommt einen Sieg.
+      a.losses += 1;
+      b.losses += 1;
+    } else if (forceWinner === match.sideA || (!forceWinner && winsA > winsB)) {
       a.wins += 1;
       b.losses += 1;
-    } else if (winsB > winsA) {
+    } else if (forceWinner === match.sideB || (!forceWinner && winsB > winsA)) {
       b.wins += 1;
       a.losses += 1;
     }

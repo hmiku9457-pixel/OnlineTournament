@@ -1,3 +1,11 @@
+## Korrekturen – 18.10.2026
+
+- K.-o.-Zufallsverteilung: Freilose behalten ihre bestehenden Slots; nur nicht angepinnte Spieler werden neu gemischt.
+- K.-o.-Pins: Die blaue Hervorhebung gilt nur für fixierte Plätze der bearbeitbaren ersten Runde, nicht für gleich nummerierte Plätze in späteren Runden.
+- Rückzug in einer laufenden Gruppen-/Jeder-gegen-jeden-Phase: Auch bereits abgeschlossene Partien werden rückwirkend in Satzniederlagen zu je 0:11 umgewertet (Anzahl Sätze gemäß Best-of). Die Gruppen-Tabelle berechnet Satz- und Ballwerte entsprechend neu. Automatisch gewertete Partien sind nicht manuell überschreibbar.
+- Satz-Kurznotation: `-0` wird als `0:11` erkannt; `0` und `+0` bleiben `11:0`.
+- Regressionstests für Freilospositionen, Pins, rückwirkende Gruppenergebnisse und Kurznotation ergänzt.
+
 # UI/UX und Mock-Runtime – 2026-10-18
 
 - K.-o.-Startplätze können einzeln mit einem Pin fixiert werden; Zufallsverteilung mischt nur die übrigen Teilnehmer/Freilose unter Einhaltung der Bracket-Constraints.
