@@ -1,3 +1,6 @@
+## Build-Korrektur (18.10.2026)
+- Fehlenden `StageCard`-Import in `TournamentControlPage.tsx` ergänzt; behebt `TS2304` beim Build.
+
 ## UX / Qualifikations-Fixes (18.10.2026)
 - Gruppenkarten verbreitert, Tabellen ohne horizontales Scrollen auf Desktop und Spieltage zweispaltig.
 - Spieler-Partien aus der jeweiligen Spielerperspektive dargestellt, einschließlich Satzdetail-Popup.
