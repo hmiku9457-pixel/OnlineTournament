@@ -4,7 +4,7 @@ import type { MockPhaseInput } from '@/services/mockTournamentStore';
 import { getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { buildMockGroups } from '@/services/mockCompetitionViews';
 import { canEditFinishedResults, canEditMockMatch, completeMockMatch, getMockStageBaseMatches, getMockStageMatches, getMockStoredResult, withdrawMockParticipant } from '@/services/mockRuntime';
-import { isStageCompleted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
+import { getStageEntrants, isStageCompleted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
 
 const group: MockPhaseInput = { type: 'GROUPS', label: 'Gruppen', bestOf: 1, entrantCount: 4, groupCount: 1, swissRounds: 1, knockoutBestOf: [] };
 const ko: MockPhaseInput = { type: 'KNOCKOUT', label: 'K.-o.', bestOf: 3, entrantCount: 12, groupCount: 1, swissRounds: 1, knockoutBestOf: [1, 3, 5, 7] };
@@ -148,4 +148,27 @@ describe('Turnierleitung - Regressionen', () => {
     completeMockMatch(matches[0].id, [{ number: 1, sideAScore: 7, sideBScore: 11 }]);
     expect(getMockStoredResult(matches[0].id)).toEqual(saved);
   });
+  it('besetzt nach einem Rückzug zwischen zwei Phasen die Qualifikation neu', () => {
+    const tournament = makeTournament(4, [group, { ...ko, entrantCount: 2 }]);
+    const first = tournament.stages[0];
+    const second = tournament.stages[1];
+    expect(startFirstStage(tournament)).toBe(true);
+    updateMockTournamentStatus(tournament.id, 'RUNNING');
+    const matches = getMockStageMatches(tournament, first);
+    matches.forEach((match) => completeMockMatch(match.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]));
+    expect(isStageCompleted(tournament, first)).toBe(true);
+
+    const originalQualifiers = getStageEntrants(tournament, second);
+    expect(originalQualifiers).toHaveLength(2);
+    const withdrawn = originalQualifiers[0];
+    expect(withdrawMockParticipant(tournament, withdrawn)).toBe(true);
+
+    const newQualifiers = getStageEntrants(tournament, second);
+    expect(newQualifiers).toHaveLength(2);
+    expect(newQualifiers).not.toContain(withdrawn);
+    expect(newQualifiers.some((participant) => !originalQualifiers.includes(participant))).toBe(true);
+    // Die zurückliegende Gruppenphase bleibt als Historie erhalten.
+    expect(isStageCompleted(tournament, first)).toBe(true);
+  });
+
 });

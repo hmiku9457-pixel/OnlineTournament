@@ -553,6 +553,16 @@ export function withdrawMockParticipant(tournament: DemoTournament, name: string
   current[tournament.id] = [...(current[tournament.id] ?? []), name];
   window.localStorage.setItem(WITHDRAWAL_KEY, JSON.stringify(current));
   settleWithdrawnMatches(tournament);
+  // Nach dem Phasenabschluss, aber vor dem Start der Folgephase, muss ein
+  // Rückzug die Qualifikation neu bestimmen (inklusive Nachrückern).
+  for (let index = tournament.stages.length - 2; index >= 0; index -= 1) {
+    const completed = tournament.stages[index];
+    const upcoming = tournament.stages[index + 1];
+    if (isStageCompleted(tournament, completed) && !isStageStarted(tournament, upcoming)) {
+      refreshCompletedStageQualifiers(tournament, completed);
+      break;
+    }
+  }
   const active = getActiveStage(tournament);
   if (active) {
     const unfinished = getMockStageMatches(tournament, active).some((match) => match.status !== 'FINISHED');

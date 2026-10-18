@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { StageCard } from '@/components/StageCard';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { SetBySetEntry } from '@/components/SetBySetEntry';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
+import { resultForParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { assignMockMatchToTable, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
@@ -12,14 +12,13 @@ import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSl
 import { updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
 
-type ControlTab = 'overview' | 'flow' | 'matches' | 'participants' | 'stages';
+type ControlTab = 'overview' | 'flow' | 'matches' | 'participants';
 
 const tabs: Array<{ id: ControlTab; label: string }> = [
   { id: 'overview', label: 'Übersicht' },
   { id: 'flow', label: 'Turnierverlauf' },
   { id: 'matches', label: 'Spiele' },
   { id: 'participants', label: 'Teilnehmer' },
-  { id: 'stages', label: 'Phasen' },
 ];
 
 function statusLabel(status: TournamentStatus) {
@@ -76,7 +75,7 @@ function StageCompetitionView({
                     <strong className="group-match-day-label">Spieltag {matchDay}</strong>
                     {group.matches.filter((match) => (match.matchDay ?? 0) === matchDay).map((match) => (
                       <div className={match.status === 'live' ? 'group-match-row live' : 'group-match-row'} key={match.id}>
-                        <span>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Freilos (${match.sideA})` : match.sideA}</span><MatchResultDetails score={match.score} sets={match.sets} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} /><span>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Freilos (${match.sideB})` : match.sideB}</span>
+                        <span title={match.sideA}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Rückzug (${match.sideA})` : match.sideA}</span><MatchResultDetails score={match.score} sets={match.sets} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} /><span title={match.sideB}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Rückzug (${match.sideB})` : match.sideB}</span>
                       </div>
                     ))}
                   </div>
@@ -98,11 +97,12 @@ function StageCompetitionView({
                 <div className="player-games-list">
                   {playerMatches.map((match) => {
                     const opponent = match.sideA === selectedGroupPlayer.player ? match.sideB : match.sideA;
+                    const displayedResult = resultForParticipant(match.score, match.sets, match.sideB === selectedGroupPlayer.player);
                     return (
                       <div className="player-game-row" key={match.id}>
                         <span className="muted">Spieltag {match.matchDay}</span>
                         <strong>vs. {opponent}</strong>
-                        <MatchResultDetails score={match.score} sets={match.sets} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
+                        <MatchResultDetails score={displayedResult.score} sets={displayedResult.sets} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
                       </div>
                     );
                   })}
@@ -132,13 +132,14 @@ function StageCompetitionView({
             <div className="prototype-modal player-games-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
               <div className="player-games-modal-head"><h2>{selectedSwissPlayer} · Partien</h2><button className="btn small" type="button" onClick={() => setSelectedSwissPlayer(null)}>Schließen</button></div>
               <div className="player-games-list">
-                {swissMatches.filter((match) => match.sideA === selectedSwissPlayer || match.sideB === selectedSwissPlayer).map((match) => (
-                  <div className="player-game-row" key={match.id}>
+                {swissMatches.filter((match) => match.sideA === selectedSwissPlayer || match.sideB === selectedSwissPlayer).map((match) => {
+                  const result = resultForParticipant(match.status === 'FINISHED' ? match.score : '–', match.sets, match.sideB === selectedSwissPlayer);
+                  return <div className="player-game-row" key={match.id}>
                     <span className="muted">{match.round}</span>
                     <strong>vs. {match.sideA === selectedSwissPlayer ? match.sideB : match.sideA}</strong>
-                    <MatchResultDetails score={match.status === 'FINISHED' ? match.score : '–'} sets={match.sets} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
-                  </div>
-                ))}
+                    <MatchResultDetails score={result.score} sets={result.sets} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
+                  </div>;
+                })}
               </div>
             </div>
           </div>
@@ -187,6 +188,7 @@ function StageCompetitionView({
                 <div className="bracket-round-matches">
                   {round.matches.map((match, matchIndex) => (
                     <article className="bracket-match" key={match.id}>
+                      {match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover, z. B. bei Rückzug)">Kampflos</span>}
                       {[match.sideA, match.sideB].map((side, sideIndex) => {
                         const slotIndex = matchIndex * 2 + sideIndex;
                         const isEditableSlot = editable && roundIndex === 0 && slotIndex < slots.length;
@@ -209,7 +211,7 @@ function StageCompetitionView({
                             onDrop={(event) => handleBracketDrop(event, slotIndex)}
                           >
                             <span>
-                              <span className="bracket-name-inline">{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, side) ? `Freilos (${side})` : side}{isEditableSlot && side !== 'Freilos' && (
+                              <span className="bracket-name-inline">{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, side) ? `Rückzug (${side})` : side}{isEditableSlot && side !== 'Freilos' && (
                                 <button className={pinnedSlots.has(slotIndex) ? 'bracket-pin pinned' : 'bracket-pin'} type="button"
                                   aria-label={`${side} ${pinnedSlots.has(slotIndex) ? 'lösen' : 'fixieren'}`}
                                   title={pinnedSlots.has(slotIndex) ? 'Fixierung lösen' : 'Platz fixieren'}
@@ -221,7 +223,7 @@ function StageCompetitionView({
                             </span>
                             <span className="bracket-score-cells">
                               {(match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
-                              <strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : match.score === 'Freilos' && side === 'Freilos' ? 'BYE' : ''}</strong>
+                              <strong>{match.score === 'W.O.' ? (winner ? '✓' : '–') : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : match.score === 'Freilos' && side === 'Freilos' ? 'BYE' : ''}</strong>
                             </span>
                           </div>
                         );
@@ -336,7 +338,6 @@ export function TournamentControlPage() {
     setStartModal(null);
     setPhaseVersion((value) => value + 1);
     setStatus('RUNNING');
-    reconcileWithdrawalsForTournament(tournament);
     reconcileWithdrawalsForTournament(tournament);
     refreshRuntime();
     setSelectedStageId(startedId);
@@ -672,7 +673,7 @@ export function TournamentControlPage() {
                                 return <tr key={match.id}>
                                   <td>{match.phase}</td><td>{match.round}</td>
                                   <td>{match.sideA === participant ? match.sideB : match.sideA}</td>
-                                  <td>{match.status}</td><td><MatchResultDetails score={match.score} sets={match.sets} /></td>
+                                  <td>{match.status}</td><td><MatchResultDetails {...resultForParticipant(match.score, match.sets, match.sideB === participant)} /></td>
                                   <td>{match.status === 'FINISHED' && stage && canEditMockMatch(tournament, match.id)
                                     ? <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Spiel bearbeiten</button>
                                     : stage && isStageStarted(tournament, stage) && match.status !== 'FINISHED'
@@ -693,12 +694,6 @@ export function TournamentControlPage() {
         </section>
       )}
 
-      {tab === 'stages' && (
-        <section className="control-tab-panel">
-          <div className="control-section-head"><div><h2>Phasen</h2><p className="muted">Konfiguration der Phasen; Gruppenzuordnung und Setzung bearbeiten wir anschließend separat.</p></div></div>
-          <div className="grid">{tournament.stages.map((stage) => <div className="span-6" key={stage.id}><StageCard stage={stage} /></div>)}</div>
-        </section>
-      )}
       {adminEditMatchId && (() => {
         const found = findMockRuntimeMatch(adminEditMatchId);
         if (!found) return null;

@@ -1,3 +1,10 @@
+## UX / Qualifikations-Fixes (18.10.2026)
+- Gruppenkarten verbreitert, Tabellen ohne horizontales Scrollen auf Desktop und Spieltage zweispaltig.
+- Spieler-Partien aus der jeweiligen Spielerperspektive dargestellt, einschließlich Satzdetail-Popup.
+- Ergebnisdetails in zentrierter Zweispaltenansicht; „W.O.“ durch „Kampflos“ mit Erläuterung ersetzt.
+- Rückzug qualifizierter Spieler nach dem Abschluss einer Phase berechnet Nachrücker neu, bis die Folgephase startet.
+- Unbenutzten Tab „Phasen“ aus der Turnierleitung entfernt.
+
 ## Korrekturen – 18.10.2026
 
 - K.-o.-Zufallsverteilung: Freilose behalten ihre bestehenden Slots; nur nicht angepinnte Spieler werden neu gemischt.

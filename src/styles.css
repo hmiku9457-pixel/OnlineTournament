@@ -1022,3 +1022,41 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 
 /* Wide enough knockout cards for all set scores (BO1–BO7) */
 .bracket-board { grid-auto-columns: minmax(355px, max-content); }
+
+/* More readable groups: full table without scrolling on desktop, compact match days. */
+.group-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 690px), 1fr));
+  align-items: start;
+  gap: 14px;
+}
+.group-overview-card { min-width: 0; }
+.group-overview-card .mini-standing-table.detailed { width: 100%; overflow-x: visible; }
+.group-overview-card .mini-standing-table.detailed .mini-standing-head,
+.group-overview-card .mini-standing-table.detailed .mini-standing-row {
+  min-width: 0;
+  width: 100%;
+  grid-template-columns: 26px minmax(125px, 1fr) 29px 24px 24px 50px 34px 67px 38px;
+  gap: 4px;
+  font-size: .78rem;
+}
+.group-overview-card .mini-standing-table.detailed .standing-player-button { min-width: 0; text-align: left; overflow-wrap: anywhere; }
+.group-overview-card .group-match-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; margin-top: 12px; }
+.group-overview-card .group-match-day { min-width: 0; align-content: start; margin-top: 0; border-top: 1px solid #eaecf0; }
+.group-overview-card .group-match-day + .group-match-day { margin-top: 0; }
+.group-overview-card .group-match-row { grid-template-columns: minmax(0, 1fr) 50px minmax(0, 1fr); gap: 4px; }
+.group-overview-card .group-match-row > span:first-child,
+.group-overview-card .group-match-row > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match-result-popover { text-align: center; min-width: 206px; }
+.match-result-set-list { display: grid; gap: 4px; white-space: normal; }
+.match-result-set-row { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 12px; text-align: center; padding: 3px 0; }
+.match-result-set-row > span { color: #667085; }
+.match-result-set-row > strong { font-variant-numeric: tabular-nums; }
+@media (max-width: 730px) {
+  .group-overview-card .group-match-list { grid-template-columns: 1fr; }
+  .group-overview-card .mini-standing-table.detailed { overflow-x: auto; }
+  .group-overview-card .mini-standing-table.detailed .mini-standing-head,
+  .group-overview-card .mini-standing-table.detailed .mini-standing-row { min-width: 530px; }
+}
+
+.bracket-walkover-label { display: block; text-align: center; font-size: .73rem; color: #475467; background: #f2f4f7; padding: 3px 7px; border-bottom: 1px solid #eaecf0; cursor: help; }

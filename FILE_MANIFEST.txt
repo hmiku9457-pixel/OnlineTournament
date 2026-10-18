@@ -10,7 +10,6 @@
 ./.prettierrc.json
 ./CHANGELOG.md
 ./CONTRIBUTING.md
-./FILE_MANIFEST.txt
 ./LICENSE
 ./README.md
 ./SECURITY.md
@@ -56,6 +55,7 @@
 ./src/pages/TournamentControlPage.tsx
 ./src/pages/TournamentPage.tsx
 ./src/services/matchAccess.ts
+./src/services/matchPresentation.ts
 ./src/services/mockCompetitionViews.ts
 ./src/services/mockDrawStore.ts
 ./src/services/mockParticipants.ts
@@ -73,9 +73,12 @@
 ./supabase/migrations/0005_stage_best_of.sql
 ./supabase/seed.sql
 ./tests/bracket.test.ts
+./tests/matchPresentation.test.ts
 ./tests/recommendations.test.ts
 ./tests/rules.test.ts
+./tests/runtimeAdministration.test.ts
 ./tests/runtimeKnockout.test.ts
+./tests/shortSetNotation.test.ts
 ./tests/standings.test.ts
 ./tests/swiss-score-groups.test.ts
 ./tests/swiss.test.ts
@@ -85,3 +88,4 @@
 ./tsconfig.json
 ./tsconfig.node.json
 ./vite.config.ts
+./FILE_MANIFEST.txt

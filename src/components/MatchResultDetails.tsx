@@ -31,19 +31,19 @@ export function MatchResultDetails({ score, sets, onEdit, className = '' }: Prop
       <button
         className="match-result-trigger"
         type="button"
-        title={tooltip(sets)}
+        title={score === 'W.O.' ? 'Kampflos gewertete Partie (Walkover)' : tooltip(sets)}
         onClick={(event) => {
           event.stopPropagation();
           if (sets?.length) setOpen((value) => !value);
         }}
       >
-        {score}
+        {score === 'W.O.' ? 'Kampflos' : score}
       </button>
       {open && sets?.length ? (
         <span className="match-result-popover" role="dialog" onMouseDown={(event) => event.stopPropagation()}>
           <strong>Sätze</strong>
           <span className="match-result-set-list">
-            {sets.map((set, index) => <span key={set.number}>Satz {index + 1}: {set.sideAScore}:{set.sideBScore}</span>)}
+            {sets.map((set, index) => <span className="match-result-set-row" key={set.number}><span>Satz {index + 1}</span><strong>{set.sideAScore}:{set.sideBScore}</strong></span>)}
           </span>
           {onEdit && <button className="btn small" type="button" onClick={() => { setOpen(false); onEdit(); }}>Ergebnis bearbeiten</button>}
         </span>

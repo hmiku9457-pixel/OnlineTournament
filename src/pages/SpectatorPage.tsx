@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { getMockRuntimeMatches, getMockStageMatches, isMockParticipantWithdrawn } from '@/services/mockRuntime';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
+import { resultForParticipant } from '@/services/matchPresentation';
 import { getMockTournament } from '@/services/mockTournamentStore';
 import { getActiveStage } from '@/services/mockPhaseLifecycle';
 
@@ -91,7 +92,7 @@ export function SpectatorPage() {
             return (
               <section className="spectator-stage-block" key={stage.id}>
                 <div className="competition-stage-head"><div><span className="badge">K.-O.</span><h3>{stage.name}</h3></div></div>
-                <div className="bracket-scroll"><div className="bracket-board">{rounds.map((round) => <div className="bracket-round" key={round.label}><h4>{round.label}</h4><div className="bracket-round-matches">{round.matches.map((match) => <article className="bracket-match" key={match.id}><div className={match.winner === match.sideA ? 'winner' : ''}><span>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Freilos (${match.sideA})` : match.sideA}{previousFinishLabels[match.sideA] && <small className="participant-origin">{previousFinishLabels[match.sideA]}</small>}</span><span className="bracket-score-cells">{(match.sets ?? []).map((set, index) => <span key={index}>{set.sideAScore}</span>)}<strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[0] : ''}</strong></span></div><div className={match.winner === match.sideB ? 'winner' : ''}><span>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Freilos (${match.sideB})` : match.sideB}{previousFinishLabels[match.sideB] && <small className="participant-origin">{previousFinishLabels[match.sideB]}</small>}</span><span className="bracket-score-cells">{(match.sets ?? []).map((set, index) => <span key={index}>{set.sideBScore}</span>)}<strong>{match.score && match.score !== 'Freilos' ? match.score.split(':')[1] : match.score === 'Freilos' ? 'BYE' : ''}</strong></span></div></article>)}</div></div>)}</div></div>
+                <div className="bracket-scroll"><div className="bracket-board">{rounds.map((round) => <div className="bracket-round" key={round.label}><h4>{round.label}</h4><div className="bracket-round-matches">{round.matches.map((match) => <article className="bracket-match" key={match.id}>{match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover, z. B. bei Rückzug)">Kampflos</span>}<div className={match.winner === match.sideA ? 'winner' : ''}><span>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Rückzug (${match.sideA})` : match.sideA}{previousFinishLabels[match.sideA] && <small className="participant-origin">{previousFinishLabels[match.sideA]}</small>}</span><span className="bracket-score-cells">{(match.sets ?? []).map((set, index) => <span key={index}>{set.sideAScore}</span>)}<strong>{match.score === 'W.O.' ? (match.winner === match.sideA ? '✓' : '–') : match.score && match.score !== 'Freilos' ? match.score.split(':')[0] : ''}</strong></span></div><div className={match.winner === match.sideB ? 'winner' : ''}><span>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Rückzug (${match.sideB})` : match.sideB}{previousFinishLabels[match.sideB] && <small className="participant-origin">{previousFinishLabels[match.sideB]}</small>}</span><span className="bracket-score-cells">{(match.sets ?? []).map((set, index) => <span key={index}>{set.sideBScore}</span>)}<strong>{match.score === 'W.O.' ? (match.winner === match.sideB ? '✓' : '–') : match.score && match.score !== 'Freilos' ? match.score.split(':')[1] : match.score === 'Freilos' ? 'BYE' : ''}</strong></span></div></article>)}</div></div>)}</div></div>
               </section>
             );
           }
@@ -110,7 +111,7 @@ export function SpectatorPage() {
             <div className="player-games-list">{ownMatches.map((match) => <div className="player-game-row" key={match.id}>
               <span className="muted">{match.round}</span>
               <strong>vs. {match.sideA === selectedSwiss.name ? match.sideB : match.sideA}</strong>
-              <MatchResultDetails score={match.status === 'FINISHED' ? match.score : '–'} sets={match.sets} />
+              <MatchResultDetails {...resultForParticipant(match.status === 'FINISHED' ? match.score : '–', match.sets, match.sideB === selectedSwiss.name)} />
             </div>)}</div>
           </section>
         </div>;

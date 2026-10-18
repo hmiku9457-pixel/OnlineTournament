@@ -50,7 +50,7 @@ function saveState(tournament: DemoTournament, state: PhaseLifecycleState) {
 export function getStageEntrants(tournament: DemoTournament, stage: TournamentStage) {
   const state = getPhaseLifecycle(tournament);
   const stored = state.stageEntrants?.[stage.id];
-  if (stored?.length) return [...stored];
+  if (stored) return [...stored];
 
   const names = getRuntimeParticipantNames(tournament);
   const configured = Math.max(1, Math.min(names.length, Number(stage.settings.entrants) || names.length));
