@@ -8,7 +8,8 @@ import { resultForParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { assignMockMatchToTable, findMockRuntimeMatch, getMockAssignmentBlockReason, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
-import { isMockParticipantWithdrawn, withdrawMockParticipant } from '@/services/mockRuntime';
+import { isMockParticipantWithdrawn, withdrawMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
+import { getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
@@ -127,7 +128,7 @@ function StageCompetitionView({
         <div className="card table-wrap">
           <table className="compact-table">
             <thead><tr><th>#</th><th>Teilnehmer</th><th>Spiele</th><th>Siege</th><th>Niederlagen</th><th>Sätze</th><th>Satz ±</th><th>Bälle</th><th>Ball ±</th></tr></thead>
-            <tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>} <span className="swiss-record">{row.wins}:{row.losses}</span>{previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.sets}</td><td>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td>{row.balls}</td><td>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></tr>)}</tbody>
+            <tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>} {previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.sets}</td><td>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td>{row.balls}</td><td>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></tr>)}</tbody>
           </table>
         </div>
         {selectedSwissPlayer && (
@@ -195,6 +196,7 @@ function StageCompetitionView({
                   {round.matches.map((match, matchIndex) => (
                     <article className="bracket-match" key={match.id}>
                       {match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover, z. B. bei Rückzug)">Kampflos</span>}
+                      {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz · nicht ausgetragen</span>}
                       {[match.sideA, match.sideB].map((side, sideIndex) => {
                         const slotIndex = matchIndex * 2 + sideIndex;
                         const isEditableSlot = editable && roundIndex === 0 && slotIndex < slots.length;
@@ -229,7 +231,7 @@ function StageCompetitionView({
                             </span>
                             <span className="bracket-score-cells">
                               {(match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
-                              <strong>{match.score === 'W.O.' ? (winner ? '✓' : '–') : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : match.score === 'Freilos' && side === 'Freilos' ? 'BYE' : ''}</strong>
+                              <strong>{match.score === 'W.O.' ? (winner ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : match.score === 'Freilos' && side === 'Freilos' ? 'BYE' : ''}</strong>
                             </span>
                           </div>
                         );
@@ -292,6 +294,7 @@ export function TournamentControlPage() {
   const [selectedStageId, setSelectedStageId] = useState<string>(() => initialTournament.stages[0]?.id ?? '');
   const [phaseCompletedModal, setPhaseCompletedModal] = useState<{ stageName: string; nextStageName?: string } | null>(null);
   const [startModal, setStartModal] = useState<{ kind: 'tournament' | 'phase'; stageName: string } | null>(null);
+  const [skipThirdMatchId, setSkipThirdMatchId] = useState<string | null>(null);
   const [adminEditMatchId, setAdminEditMatchId] = useState<string | null>(null);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament, runtimeVersion, restClockTick]);
   const blockedTables = useMemo(() => new Set(getBlockedMockTables(tournament)), [tournament, runtimeVersion]);
@@ -522,6 +525,11 @@ export function TournamentControlPage() {
                       <>
                         <span className="muted">{match.phase} · {match.round} · BO{match.bestOf}</span>
                         <SetBySetEntry match={match} onSaved={refreshRuntime} compact sideARecord={activeSwissRecords.get(match.sideA)} sideBRecord={activeSwissRecords.get(match.sideB)} />
+                        {isMockThirdPlaceMatch(match.id) && !match.sets?.length && (
+                          <button className="btn small third-place-skip" type="button" onClick={() => setSkipThirdMatchId(match.id)}>
+                            Nicht austragen · beide Platz 3
+                          </button>
+                        )}
                       </>
                     ) : (
                       <div className="free-table-message">
@@ -543,7 +551,7 @@ export function TournamentControlPage() {
                   <article
                     className="match-queue-row expanded draggable-match"
                     key={match.id}
-                    draggable
+                    draggable={!isMockThirdPlaceMatch(match.id)}
                     onDragStart={(event) => {
                       event.dataTransfer.setData('text/mock-match-id', match.id);
                       event.dataTransfer.effectAllowed = 'move';
@@ -567,6 +575,11 @@ export function TournamentControlPage() {
                     <span className="badge">{match.table}</span>
                     <div className="queue-row-actions">
                       <>
+                        {isMockThirdPlaceMatch(match.id) && (
+                          <button className="btn small third-place-skip" type="button" onClick={() => setSkipThirdMatchId(match.id)} title="Kein Spiel um Platz 3: beide Halbfinalverlierer werden als Dritte gewertet.">
+                            Nicht austragen · beide Platz 3
+                          </button>
+                        )}
                         <button className="btn small primary" type="button" disabled={freeTables.length === 0} onClick={() => autoAssignMatch(match.id)}>Automatisch zuweisen</button>
                         <button className="btn small" type="button" onClick={() => setAssigningMatchId((current) => current === match.id ? null : match.id)}>Zuweisen</button>
                       </>
@@ -673,11 +686,13 @@ export function TournamentControlPage() {
           <div className="control-section-head"><div><h2>Teilnehmer</h2><p className="muted">Spielercodes, Daten, Spiele und Rückzug an einer Stelle.</p></div></div>
           <div className="participant-control-list">
             {participants.map((participant, index) => {
-              const isWithdrawn = isMockParticipantWithdrawn(tournament, participant);
+              const progress = getMockParticipantProgress(tournament, participant);
+              const isWithdrawn = progress.status === 'Zurückgezogen';
+              const statusText = progress.status === 'Aktiv' && tableMatches.some((match) => match.sideA === participant || match.sideB === participant) ? 'Spielt gerade' : progress.status;
               return (
                 <article className={isWithdrawn ? 'participant-control-row withdrawn' : 'participant-control-row'} key={`${participant}-${index}`}>
                   <span className="participant-list-number">{index + 1}</span>
-                  <div className="participant-control-identity"><strong>{participant}</strong><span className={isWithdrawn ? "participant-inline-status withdrawn" : "participant-inline-status"}>{isWithdrawn ? "Zurückgezogen" : tableMatches.some((match) => match.sideA === participant || match.sideB === participant) ? "Spielt gerade" : "Aktiv"}</span></div>
+                  <div className="participant-control-identity"><strong>{participant}</strong><span className={isWithdrawn ? "participant-inline-status withdrawn" : progress.status === 'Ausgeschieden' ? 'participant-inline-status eliminated' : 'participant-inline-status'}>{statusText}</span>{progress.placement && <span className="participant-placement">{progress.placement}</span>}</div>
                   <code>{tournament.participantCodes?.[participant] ?? String(4100 + index).slice(-4)}</code>
                   <div className="participant-row-actions">
                     <button className="btn small" type="button" onClick={() => setParticipantPanel({ name: participant, mode: 'edit' })}>Daten bearbeiten</button>
@@ -755,6 +770,19 @@ export function TournamentControlPage() {
           </div>
         );
       })()}
+      {skipThirdMatchId && (
+        <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setSkipThirdMatchId(null)}>
+          <section className="prototype-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+            <span className="badge">SPIEL UM PLATZ 3</span>
+            <h2>Spiel nicht austragen?</h2>
+            <p>Die beiden Halbfinalverlierer erhalten gemeinsam Platz 3. Ein Platz 4 wird nicht vergeben.</p>
+            <div className="actions">
+              <button className="btn primary" type="button" onClick={() => { if (skipMockThirdPlaceMatch(tournament, skipThirdMatchId)) refreshRuntime(); setSkipThirdMatchId(null); }}>Beide auf Platz 3 setzen</button>
+              <button className="btn" type="button" onClick={() => setSkipThirdMatchId(null)}>Abbrechen</button>
+            </div>
+          </section>
+        </div>
+      )}
       {startModal && (
         <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setStartModal(null)}>
           <section className="prototype-modal start-phase-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>

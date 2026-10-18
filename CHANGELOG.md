@@ -1,3 +1,13 @@
+## Prototyp-Update – Teilnehmerplatzierungen und Spiel um Platz 3
+
+- Teilnehmerstatus im Verwaltungs-Tab berücksichtigt den Start der Folgephase; ausgeschiedene Spieler erscheinen nicht mehr als aktiv.
+- Endplatzierungen werden aus Gruppen-Ranglisten, Schweizer-Ranglisten bzw. den tatsächlich gespielten K.-o.-Runden berechnet (z. B. Gruppe A · Platz 3, Platz 5–8).
+- Einfache K.-o.-Phasen mit mindestens vier Teilnehmern erhalten automatisch ein Spiel um Platz 3 mit den beiden Halbfinalverlierern.
+- In der Turnierleitungs-Übersicht kann das Bronze-Spiel per gesondertem Button nicht ausgetragen werden; beide Teilnehmer erhalten dann Platz 3, es gibt keinen vierten Platz.
+- Die Phase bleibt offen, bis das Bronze-Spiel gespielt oder bewusst ausgelassen wurde; sowohl Turnierverlauf als auch Zuschauerbaum zeigen die Wertung.
+- Entfernt: redundante Sieg:Niederlage-Angabe neben dem Namen in Schweizer Tabellen (die Tabellenspalten zeigen sie bereits).
+- Neue Regressionstests für Gruppen-Ausscheiden, Bronze-Austragung und gemeinsames Platz-3-Ergebnis.
+
 ## Unreleased – UI/UX Turnierleitung (18.10.2026)
 - Teilnehmerstatus steht direkt neben dem Namen; kompaktere Zeilen.
 - Rückzüge werden in Gruppen- und Schweizer Tabellen sowie in der Zuschaueransicht gekennzeichnet.

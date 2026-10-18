@@ -189,7 +189,9 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
     const stored = getMockStoredResult(match.id);
     let winner = match.autoWinner;
     let score: string | undefined;
-    if (stored?.forcedWinner) {
+    if (stored?.thirdPlaceSkipped) {
+      score = 'Beide Platz 3';
+    } else if (stored?.forcedWinner) {
       winner = stored.forcedWinner;
       score = 'W.O.';
     } else if (stored?.sets.length) {

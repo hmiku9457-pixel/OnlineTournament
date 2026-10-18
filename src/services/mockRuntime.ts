@@ -36,6 +36,8 @@ interface StoredMatchResult {
   confirmedA?: boolean;
   confirmedB?: boolean;
   forcedWinner?: string;
+  /** Beide Halbfinalverlierer erhalten Platz 3, ohne eine Partie auszutragen. */
+  thirdPlaceSkipped?: boolean;
   /** Tatsächlicher Abschlusszeitpunkt; bei kampflosen Partien wird keine Pause ausgelöst. */
   finishedAt?: number;
 }
@@ -87,6 +89,7 @@ export function canEditFinishedResults(tournament: DemoTournament, stage: Tourna
 export function canEditMockMatch(tournament: DemoTournament, matchId: string) {
   const stage = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`));
   if (!stage || !canEditFinishedResults(tournament, stage)) return false;
+  if (readResults().find((item) => item.matchId === matchId)?.thirdPlaceSkipped) return false;
   if (stage.type === 'GROUPS' || stage.type === 'ROUND_ROBIN') {
     const match = getMockStageBaseMatches(tournament, stage).find((item) => item.id === matchId);
     if (match && (isMockParticipantWithdrawn(tournament, match.sideA)
@@ -270,7 +273,30 @@ function knockoutMatches(tournament: DemoTournament, stage: TournamentStage, res
     roundIndex += 1;
   }
 
+  if (stage.type === 'KNOCKOUT' && slots.filter((name) => name !== 'Freilos').length >= 4) {
+    const semiFinals = rounds.filter((match) => match.round === 'Halbfinale');
+    if (semiFinals.length === 2) {
+      const losers = semiFinals.map((match) => {
+        const winner = match.autoWinner ?? resultWinner(results.find((item) => item.matchId === match.id), match.sideA, match.sideB);
+        if (!winner) return 'TBD';
+        const loser = winner === match.sideA ? match.sideB : match.sideA;
+        return loser === 'Freilos' ? 'TBD' : loser;
+      });
+      rounds.push({
+        id: `${stage.id}-third-place`,
+        sideA: losers[0],
+        sideB: losers[1],
+        round: 'Spiel um Platz 3',
+        bestOf: stage.bestOf,
+      });
+    }
+  }
+
   return rounds;
+}
+
+export function isMockThirdPlaceMatch(matchId: string) {
+  return matchId.endsWith('-third-place');
 }
 
 function swissScoreState(participants: string[], matches: BaseStageMatch[], results: StoredMatchResult[]) {
@@ -416,7 +442,7 @@ function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchRes
     ...match,
     table: savedRuntime?.table ?? match.table,
     status,
-    score: savedResult?.forcedWinner && !savedResult.sets.length ? 'W.O.' : savedResult ? scoreFromSets(savedResult.sets) : match.score,
+    score: savedResult?.thirdPlaceSkipped ? 'Beide Platz 3' : savedResult?.forcedWinner && !savedResult.sets.length ? 'W.O.' : savedResult ? scoreFromSets(savedResult.sets) : match.score,
     sets: savedResult?.sets ?? match.sets,
     note: status === 'WAITING' ? 'Wartet auf Tischzuweisung' : undefined,
   };
@@ -508,7 +534,7 @@ export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: Moc
   const previous = current.find((item) => item.matchId === matchId);
   const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
   if (tournament && !canEditMockMatch(tournament, matchId)) return previous;
-  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
+  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined, thirdPlaceSkipped: undefined, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   return next;
 }
@@ -762,7 +788,7 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
     const stage = tournament?.stages.find((item) => matchId.startsWith(`${item.id}-`));
     if (tournament && stage && !canEditFinishedResults(tournament, stage)) return previous;
   }
-  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
+  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined, thirdPlaceSkipped: undefined, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   if (status === 'FINISHED') {
     const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
@@ -770,6 +796,23 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
     reconcileCompletedPhase(matchId);
   }
   return next;
+}
+
+/** Wertet das Bronze-Spiel ohne Partie: beide Halbfinalverlierer werden Dritte. */
+export function skipMockThirdPlaceMatch(tournament: DemoTournament, matchId: string) {
+  if (!isMockThirdPlaceMatch(matchId)) return false;
+  const stage = tournament.stages.find((item) => `${item.id}-third-place` === matchId);
+  if (!stage || stage.type !== 'KNOCKOUT' || !isStageStarted(tournament, stage)) return false;
+  const match = getMockStageMatches(tournament, stage).find((item) => item.id === matchId);
+  if (!match || !['WAITING', 'LIVE', 'READY'].includes(match.status)) return false;
+  const existing = readResults().find((item) => item.matchId === matchId);
+  if (existing?.sets.length || existing?.status === 'FINISHED') return false;
+  const current = readResults();
+  const skipped: StoredMatchResult = { matchId, sets: [], status: 'FINISHED', thirdPlaceSkipped: true };
+  writeResults([skipped, ...current.filter((item) => item.matchId !== matchId)]);
+  updateRuntime(matchId, { table: 'Noch offen', status: 'FINISHED' });
+  reconcileCompletedPhase(matchId);
+  return true;
 }
 
 export function confirmMockMatchSide(matchId: string, side: 'A' | 'B') {

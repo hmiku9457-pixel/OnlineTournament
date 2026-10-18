@@ -71,6 +71,10 @@ function remainingStageJobs(tournament: DemoTournament, stage: TournamentStage):
       }
       matches = round === 1 ? bracket / 4 : matches / 2;
     }
+    if (stage.type === 'KNOCKOUT' && entrants >= 4) {
+      // Bronze kann parallel zum Finale stattfinden, zählt aber als zusätzliche Partie.
+      jobs.push({ round: Math.ceil(Math.log2(bracket)), remainingMinutes: remainingMinutesForMatch(stage.bestOf, 0) });
+    }
     return jobs;
   }
 

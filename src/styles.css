@@ -1116,3 +1116,8 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   .swiss-player-game-row { grid-template-columns: 1fr auto; }
   .swiss-player-game-row > .muted { grid-column: 1 / -1; }
 }
+
+/* Elimination status, placement and third-place controls */
+.participant-inline-status.eliminated { color: #6941c6; background: #f4f3ff; }
+.participant-placement { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 8px; color: #344054; background: #f2f4f7; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.third-place-skip { white-space: normal; text-align: center; }

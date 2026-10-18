@@ -10,7 +10,6 @@
 ./.prettierrc.json
 ./CHANGELOG.md
 ./CONTRIBUTING.md
-./FILE_MANIFEST.txt
 ./LICENSE
 ./README.md
 ./SECURITY.md
@@ -60,6 +59,7 @@
 ./src/services/mockCompetitionViews.ts
 ./src/services/mockDrawStore.ts
 ./src/services/mockDuration.ts
+./src/services/mockParticipantProgress.ts
 ./src/services/mockParticipants.ts
 ./src/services/mockPhaseLifecycle.ts
 ./src/services/mockRuntime.ts
@@ -77,6 +77,8 @@
 ./supabase/seed.sql
 ./tests/bracket.test.ts
 ./tests/matchPresentation.test.ts
+./tests/participantProgressAndThirdPlace.test.ts
+./tests/playerRestTime.test.ts
 ./tests/recommendations.test.ts
 ./tests/rules.test.ts
 ./tests/runtimeAdministration.test.ts
@@ -92,3 +94,4 @@
 ./tsconfig.json
 ./tsconfig.node.json
 ./vite.config.ts
+FILE_MANIFEST.txt
