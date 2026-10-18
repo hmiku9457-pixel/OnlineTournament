@@ -7,7 +7,7 @@ import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { resultForParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
-import { assignMockMatchToTable, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
+import { assignMockMatchToTable, findMockRuntimeMatch, getMockAssignmentBlockReason, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
 import { isMockParticipantWithdrawn, withdrawMockParticipant } from '@/services/mockRuntime';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
@@ -68,7 +68,7 @@ function StageCompetitionView({
                 <div className="mini-standing-head"><span>#</span><span>Spieler</span><span>Sp.</span><span>S</span><span>N</span><span>Sätze</span><span>±</span><span>Bälle</span><span>±</span></div>
                 {group.standings.map((row) => (
                   <div className="mini-standing-row" key={row.name}>
-                    <span>{row.rank}</span><button className="standing-player-button" type="button" onClick={() => setSelectedGroupPlayer({ groupLabel: group.label, player: row.name })}><strong>{row.name}</strong>{previousFinishLabels[row.name] && <small>{previousFinishLabels[row.name]}</small>}</button><span>{row.played}</span><span>{row.wins}</span><span>{row.losses}</span><span>{row.sets}</span><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><span>{row.balls}</span><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span>
+                    <span>{row.rank}</span><button className="standing-player-button" type="button" onClick={() => setSelectedGroupPlayer({ groupLabel: group.label, player: row.name })}><strong>{row.name}</strong>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}{previousFinishLabels[row.name] && <small>{previousFinishLabels[row.name]}</small>}</button><span>{row.played}</span><span>{row.wins}</span><span>{row.losses}</span><span>{row.sets}</span><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><span>{row.balls}</span><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span>
                   </div>
                 ))}
               </div>
@@ -127,7 +127,7 @@ function StageCompetitionView({
         <div className="card table-wrap">
           <table className="compact-table">
             <thead><tr><th>#</th><th>Teilnehmer</th><th>Spiele</th><th>Siege</th><th>Niederlagen</th><th>Sätze</th><th>Satz ±</th><th>Bälle</th><th>Ball ±</th></tr></thead>
-            <tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button> <span className="swiss-record">{row.wins}:{row.losses}</span>{previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.sets}</td><td>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td>{row.balls}</td><td>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></tr>)}</tbody>
+            <tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>} <span className="swiss-record">{row.wins}:{row.losses}</span>{previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.sets}</td><td>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td>{row.balls}</td><td>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></tr>)}</tbody>
           </table>
         </div>
         {selectedSwissPlayer && (
@@ -137,10 +137,13 @@ function StageCompetitionView({
               <div className="player-games-list">
                 {swissMatches.filter((match) => match.sideA === selectedSwissPlayer || match.sideB === selectedSwissPlayer).map((match) => {
                   const result = resultForParticipant(match.status === 'FINISHED' ? match.score : '–', match.sets, match.sideB === selectedSwissPlayer);
-                  return <div className="player-game-row" key={match.id}>
+                  const score = /^\d+\s*:\s*\d+$/.exec(result.score);
+                  const [own, other] = score ? result.score.split(':').map(Number) : [0, 0];
+                  const label = match.status !== 'FINISHED' ? 'Offen' : score ? (own > other ? 'Sieg' : own < other ? 'Niederlage' : 'Unentschieden') : 'Kampflos';
+                  return <div className="player-game-row swiss-player-game-row" key={match.id}>
                     <span className="muted">{match.round}</span>
                     <strong>vs. {match.sideA === selectedSwissPlayer ? match.sideB : match.sideA}</strong>
-                    <MatchResultDetails score={result.score} sets={result.sets} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
+                    <span className="swiss-game-result"><span className="swiss-game-label">{label}</span><MatchResultDetails score={result.score} sets={result.sets} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} /></span>
                   </div>;
                 })}
               </div>
@@ -275,6 +278,11 @@ export function TournamentControlPage() {
   const [tournament, setTournament] = useState(initialTournament);
   const [tab, setTab] = useState<ControlTab>('overview');
   const [runtimeVersion, setRuntimeVersion] = useState(0);
+  const [restClockTick, setRestClockTick] = useState(0);
+  useEffect(() => {
+    const interval = window.setInterval(() => setRestClockTick((value) => value + 1), 30000);
+    return () => window.clearInterval(interval);
+  }, []);
   const [drawVersion, setDrawVersion] = useState(0);
   const [phaseVersion, setPhaseVersion] = useState(0);
   const [participantPanel, setParticipantPanel] = useState<{ name: string; mode: 'edit' | 'games' } | null>(null);
@@ -285,13 +293,13 @@ export function TournamentControlPage() {
   const [phaseCompletedModal, setPhaseCompletedModal] = useState<{ stageName: string; nextStageName?: string } | null>(null);
   const [startModal, setStartModal] = useState<{ kind: 'tournament' | 'phase'; stageName: string } | null>(null);
   const [adminEditMatchId, setAdminEditMatchId] = useState<string | null>(null);
-  const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament, runtimeVersion]);
+  const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament, runtimeVersion, restClockTick]);
   const blockedTables = useMemo(() => new Set(getBlockedMockTables(tournament)), [tournament, runtimeVersion]);
   const restTimeLabel = useMemo(
     () => formatRemainingTournamentDuration(estimateRemainingTournamentMinutes(tournament)),
     [tournament, runtimeVersion, phaseVersion],
   );
-  const allTournamentMatches = useMemo(() => tournament.stages.flatMap((stage) => getMockStageMatches(tournament, stage)), [tournament, runtimeVersion, phaseVersion]);
+  const allTournamentMatches = useMemo(() => tournament.stages.flatMap((stage) => getMockStageMatches(tournament, stage)), [tournament, runtimeVersion, phaseVersion, restClockTick]);
   const participants = useMemo(() => getRuntimeParticipantNames(tournament), [tournament, participantVersion]);
   const nextMatches = matches.filter((match) => match.status === 'WAITING');
   const tableMatches = matches.filter((match) => ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch '));
@@ -529,7 +537,7 @@ export function TournamentControlPage() {
 
           <div className="control-overview-columns">
             <main>
-              <div className="control-section-head control-section-spaced"><div><h2>Nächste Spiele</h2><p className="muted">Pausenzeit zeigt, wie lange jeder Teilnehmer seit seinem letzten Spiel frei hat.</p></div></div>
+              <div className="control-section-head control-section-spaced"><div><h2>Nächste Spiele</h2><p className="muted">Pausenzeit seit dem letzten tatsächlich gespielten Match; aktualisiert sich automatisch.</p></div></div>
               <div className="match-queue">
                 {nextMatches.map((match, index) => (
                   <article
@@ -543,8 +551,8 @@ export function TournamentControlPage() {
                   >
                     <span className="queue-position">{index + 1}</span>
                     <div className="match-queue-main">
-                      <strong>{match.sideA}{activeSwissRecords.get(match.sideA) && <span className="swiss-record">{activeSwissRecords.get(match.sideA)}</span>} <em className="pause-time">{match.pauseA} Min. Pause</em></strong>
-                      <strong>{match.sideB}{activeSwissRecords.get(match.sideB) && <span className="swiss-record">{activeSwissRecords.get(match.sideB)}</span>} <em className="pause-time">{match.pauseB} Min. Pause</em></strong>
+                      <strong>{match.sideA}{activeSwissRecords.get(match.sideA) && <span className="swiss-record">{activeSwissRecords.get(match.sideA)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseA)}</em></strong>
+                      <strong>{match.sideB}{activeSwissRecords.get(match.sideB) && <span className="swiss-record">{activeSwissRecords.get(match.sideB)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseB)}</em></strong>
                       <span className="muted">{match.phase} · {match.round}{match.matchDay ? ` · Spieltag ${match.matchDay}` : ''}{match.note ? ` · ${match.note}` : ''}</span>
                       {assigningMatchId === match.id && (
                         <div className="table-assignment-picker">
@@ -650,7 +658,7 @@ export function TournamentControlPage() {
                   <td><span className={match.status === 'LIVE' ? 'badge live' : match.status === 'READY' ? 'badge ready' : 'badge'}>{match.status}</span></td>
                   <td>{match.phase}<div className="muted">{match.round}</div></td>
                   <td><strong>{match.sideA}{activeSwissRecords.get(match.sideA) && <span className="swiss-record">{activeSwissRecords.get(match.sideA)}</span>}</strong><div>{match.sideB}{activeSwissRecords.get(match.sideB) && <span className="swiss-record">{activeSwissRecords.get(match.sideB)}</span>}</div></td>
-                  <td>{match.pauseA} / {match.pauseB} Min.</td>
+                  <td>{formatPlayerRest(match.pauseA)} / {formatPlayerRest(match.pauseB)}</td>
                   <td>{match.table}</td><td>{match.score}</td>
                   <td><div className="actions compact-actions"><Link to={`/score/${match.id}`}>Ergebnis</Link>{match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) && <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Bearbeiten</button>}</div></td>
                 </tr>
@@ -669,7 +677,7 @@ export function TournamentControlPage() {
               return (
                 <article className={isWithdrawn ? 'participant-control-row withdrawn' : 'participant-control-row'} key={`${participant}-${index}`}>
                   <span className="participant-list-number">{index + 1}</span>
-                  <div><strong>{participant}</strong><span className="muted">{isWithdrawn ? 'zurückgezogen' : tableMatches.some((match) => match.sideA === participant || match.sideB === participant) ? 'spielt gerade' : 'aktiv'}</span></div>
+                  <div className="participant-control-identity"><strong>{participant}</strong><span className={isWithdrawn ? "participant-inline-status withdrawn" : "participant-inline-status"}>{isWithdrawn ? "Zurückgezogen" : tableMatches.some((match) => match.sideA === participant || match.sideB === participant) ? "Spielt gerade" : "Aktiv"}</span></div>
                   <code>{tournament.participantCodes?.[participant] ?? String(4100 + index).slice(-4)}</code>
                   <div className="participant-row-actions">
                     <button className="btn small" type="button" onClick={() => setParticipantPanel({ name: participant, mode: 'edit' })}>Daten bearbeiten</button>

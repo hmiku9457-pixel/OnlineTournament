@@ -23,8 +23,8 @@ export interface MockRuntimeMatch {
   round: string;
   matchDay?: number;
   bestOf: number;
-  pauseA: number;
-  pauseB: number;
+  pauseA: number | null;
+  pauseB: number | null;
   sets?: MatchSet[];
   note?: string;
 }
@@ -36,6 +36,8 @@ interface StoredMatchResult {
   confirmedA?: boolean;
   confirmedB?: boolean;
   forcedWinner?: string;
+  /** Tatsächlicher Abschlusszeitpunkt; bei kampflosen Partien wird keine Pause ausgelöst. */
+  finishedAt?: number;
 }
 
 interface StoredMatchRuntime {
@@ -378,10 +380,32 @@ function baseStageMatches(tournament: DemoTournament, stage: TournamentStage, re
   }
 }
 
-function deterministicPause(matchId: string, side: 'A' | 'B') {
-  let hash = side === 'A' ? 17 : 29;
-  for (const char of matchId) hash = (hash * 31 + char.charCodeAt(0)) % 997;
-  return 3 + (hash % 29);
+/** Erfasst die letzte tatsächlich gespielte Partie pro Teilnehmer, auch aus vorherigen Phasen. */
+function getLatestFinishedTimes(tournament: DemoTournament, results: StoredMatchResult[]) {
+  const timestamps = new Map<string, number>();
+  const finalResults = new Map(results.filter((item) => item.status === 'FINISHED' && item.finishedAt).map((item) => [item.matchId, item]));
+  if (!finalResults.size) return timestamps;
+  for (const stage of tournament.stages) {
+    for (const match of baseStageMatches(tournament, stage, results)) {
+      const result = finalResults.get(match.id);
+      if (!result?.finishedAt || result.forcedWinner) continue;
+      for (const participant of [match.sideA, match.sideB]) {
+        timestamps.set(participant, Math.max(timestamps.get(participant) ?? 0, result.finishedAt));
+      }
+    }
+  }
+  return timestamps;
+}
+
+export function getElapsedRestMinutes(finishedAt: number | undefined, now = Date.now()): number | null {
+  if (finishedAt === undefined || !Number.isFinite(finishedAt)) return null;
+  return Math.max(0, Math.floor((now - finishedAt) / 60000));
+}
+
+export function formatPlayerRest(minutes: number | null): string {
+  if (minutes === null) return 'Noch kein Spiel';
+  if (minutes < 60) return `${minutes} Min. Pause`;
+  return `${Math.floor(minutes / 60)} Std. ${String(minutes % 60).padStart(2, '0')} Min. Pause`;
 }
 
 function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchResult[], storedRuntime: StoredMatchRuntime[]) {
@@ -402,6 +426,8 @@ export function getMockStageMatches(tournament: DemoTournament, stage: Tournamen
   const results = readResults();
   const runtime = readRuntime();
   const started = isStageStarted(tournament, stage);
+  const lastFinishByParticipant = getLatestFinishedTimes(tournament, results);
+  const now = Date.now();
   return baseStageMatches(tournament, stage, results)
     .filter((match) => match.sideA !== 'TBD' && match.sideB !== 'TBD' && match.sideA !== 'Freilos' && match.sideB !== 'Freilos')
     .map((match) => applyStoredState({
@@ -416,8 +442,8 @@ export function getMockStageMatches(tournament: DemoTournament, stage: Tournamen
       round: match.round,
       matchDay: match.matchDay,
       bestOf: match.bestOf ?? stage.bestOf,
-      pauseA: deterministicPause(match.id, 'A'),
-      pauseB: deterministicPause(match.id, 'B'),
+      pauseA: getElapsedRestMinutes(lastFinishByParticipant.get(match.sideA), now),
+      pauseB: getElapsedRestMinutes(lastFinishByParticipant.get(match.sideB), now),
       note: 'Wartet auf Tischzuweisung',
     }, results, runtime));
 }
@@ -482,7 +508,7 @@ export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: Moc
   const previous = current.find((item) => item.matchId === matchId);
   const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
   if (tournament && !canEditMockMatch(tournament, matchId)) return previous;
-  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined };
+  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   return next;
 }
@@ -736,7 +762,7 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
     const stage = tournament?.stages.find((item) => matchId.startsWith(`${item.id}-`));
     if (tournament && stage && !canEditFinishedResults(tournament, stage)) return previous;
   }
-  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined };
+  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   if (status === 'FINISHED') {
     const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
@@ -750,7 +776,7 @@ export function confirmMockMatchSide(matchId: string, side: 'A' | 'B') {
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId) ?? { matchId, sets: [], status: 'FINISHED' as MockMatchState };
   const next = { ...previous, [side === 'A' ? 'confirmedA' : 'confirmedB']: true };
-  if (next.confirmedA && next.confirmedB) next.status = 'FINISHED';
+  if (next.confirmedA && next.confirmedB) { next.status = 'FINISHED'; next.finishedAt ??= Date.now(); }
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   return next;
 }

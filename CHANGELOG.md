@@ -1,3 +1,11 @@
+## Unreleased – UI/UX Turnierleitung (18.10.2026)
+- Teilnehmerstatus steht direkt neben dem Namen; kompaktere Zeilen.
+- Rückzüge werden in Gruppen- und Schweizer Tabellen sowie in der Zuschaueransicht gekennzeichnet.
+- Vertikale Tabellenabstände reduziert.
+- Schweizer Spielerpartien erhalten einheitliche Resultat-Zeilen für Sieg und Niederlage.
+- Die Pausenzeit basiert auf dem Abschlusszeitpunkt der tatsächlich gespielten Partie statt auf einer zufälligen Mock-Zahl und aktualisiert sich automatisch; kampflose Wertungen zählen nicht als Spielzeit.
+- Regressionstests für Pausenzeiten und Erstspiel-Anzeige ergänzt.
+
 ## Unreleased – Tischverwaltung und Restzeit (UX)
 
 - Im Turnierverlauf schmalere Gruppenkarten und kompaktere Spielernamenspalten der Spieltage.

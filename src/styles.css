@@ -1076,3 +1076,43 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .table-lock-button { padding: 4px 7px; font-size: .68rem; white-space: nowrap; }
 .blocked-badge { background: #e4e7ec; color: #344054; }
 @media (max-width: 730px) { .group-overview-card { max-width: 100%; } }
+
+
+/* UX: kompakte Teilnehmer, eindeutiger Rückzugsstatus und einheitliche Schweizer Partien. */
+.participant-control-row > .participant-control-identity {
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+.participant-control-identity strong { overflow-wrap: anywhere; }
+.participant-inline-status, .standing-withdrawn {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  white-space: nowrap;
+  color: #667085;
+  background: #f2f4f7;
+  border-radius: 999px;
+  font-size: .67rem;
+  line-height: 1.2;
+  font-weight: 700;
+  padding: 2px 6px;
+}
+.participant-inline-status.withdrawn, .standing-withdrawn { background: #fff1f0; color: #b42318; }
+.standing-withdrawn { margin-left: 5px; vertical-align: middle; }
+/* Tabellenzeilen flacher, ohne die Schrift unleserlich zu verkleinern. */
+.mini-standing-table.detailed .mini-standing-head,
+.mini-standing-table.detailed .mini-standing-row { padding-top: 3px; padding-bottom: 3px; line-height: 1.25; }
+.compact-table th, .compact-table td { padding-top: 6px; padding-bottom: 6px; }
+.swiss-player-game-row { grid-template-columns: 90px minmax(0, 1fr) 148px; min-height: 45px; }
+.swiss-game-result { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.swiss-game-label { color: #475467; font-size: .73rem; font-weight: 600; white-space: nowrap; }
+.swiss-game-result .match-result-details { min-width: 52px; justify-content: flex-end; font-variant-numeric: tabular-nums; }
+.pause-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  .swiss-player-game-row { grid-template-columns: 1fr auto; }
+  .swiss-player-game-row > .muted { grid-column: 1 / -1; }
+}
