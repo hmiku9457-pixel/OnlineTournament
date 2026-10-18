@@ -12,6 +12,8 @@ import { isMockParticipantWithdrawn, withdrawMockParticipant } from '@/services/
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
+import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
+import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration } from '@/services/mockDuration';
 
 type ControlTab = 'overview' | 'flow' | 'matches' | 'participants';
 
@@ -284,12 +286,17 @@ export function TournamentControlPage() {
   const [startModal, setStartModal] = useState<{ kind: 'tournament' | 'phase'; stageName: string } | null>(null);
   const [adminEditMatchId, setAdminEditMatchId] = useState<string | null>(null);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament, runtimeVersion]);
+  const blockedTables = useMemo(() => new Set(getBlockedMockTables(tournament)), [tournament, runtimeVersion]);
+  const restTimeLabel = useMemo(
+    () => formatRemainingTournamentDuration(estimateRemainingTournamentMinutes(tournament)),
+    [tournament, runtimeVersion, phaseVersion],
+  );
   const allTournamentMatches = useMemo(() => tournament.stages.flatMap((stage) => getMockStageMatches(tournament, stage)), [tournament, runtimeVersion, phaseVersion]);
   const participants = useMemo(() => getRuntimeParticipantNames(tournament), [tournament, participantVersion]);
   const nextMatches = matches.filter((match) => match.status === 'WAITING');
   const tableMatches = matches.filter((match) => ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch '));
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
-  const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table));
+  const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table) && !blockedTables.has(table));
   const activeStage = useMemo(() => getActiveStage(tournament), [tournament, phaseVersion]);
   const activeSwissRecords = useMemo(() => activeStage?.type === 'SWISS'
     ? new Map(buildSwissStandings(tournament, activeStage).map((row) => [row.name, `${row.wins}:${row.losses}`]))
@@ -354,6 +361,13 @@ export function TournamentControlPage() {
     if (nextStartableStage) setStartModal({ kind: 'phase', stageName: nextStartableStage.name });
   }
 
+  function toggleTableLock(table: string) {
+    const willBlock = !blockedTables.has(table);
+    if (!setMockTableBlocked(tournament, table, willBlock)) return;
+    setAssignmentMessage(willBlock ? `${table} wurde gesperrt. Bereits laufende Spiele bleiben aktiv.` : `${table} wurde wieder freigegeben.`);
+    refreshRuntime();
+  }
+
   function assignToTable(matchId: string, table: string) {
     const blockReason = getMockAssignmentBlockReason(tournament, matchId, table);
     if (blockReason) {
@@ -390,7 +404,7 @@ export function TournamentControlPage() {
           .map((item) => item.table),
       );
       const availableTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`)
-        .filter((table) => !currentOccupied.has(table));
+        .filter((table) => !currentOccupied.has(table) && !blockedTables.has(table));
 
       const targetTable = availableTables.find((table) => !getMockAssignmentBlockReason(tournament, match.id, table));
       if (targetTable && assignMockMatchToTable(tournament, match.id, targetTable)) assigned += 1;
@@ -469,13 +483,14 @@ export function TournamentControlPage() {
                 const tableName = `Tisch ${index + 1}`;
                 const match = matchesByTable.get(tableName);
                 const isLive = match?.status === 'LIVE' || match?.status === 'CONFIRMATION' || match?.status === 'READY';
+                const isBlocked = blockedTables.has(tableName);
                 return (
                   <article
-                    className={match ? 'card overview-table-card busy' : 'card overview-table-card table-drop-target'}
+                    className={`card overview-table-card ${match ? 'busy' : isBlocked ? 'blocked' : 'table-drop-target'}`}
                     key={tableName}
-                    onDragOver={(event) => { if (!match) event.preventDefault(); }}
+                    onDragOver={(event) => { if (!match && !isBlocked) event.preventDefault(); }}
                     onDrop={(event) => {
-                      if (match) return;
+                      if (match || isBlocked) return;
                       event.preventDefault();
                       const matchId = event.dataTransfer.getData('text/mock-match-id');
                       if (matchId) assignToTable(matchId, tableName);
@@ -483,7 +498,17 @@ export function TournamentControlPage() {
                   >
                     <div className="table-status-top">
                       <strong>{tableName}</strong>
-                      <span className={isLive ? 'badge live' : 'badge'}>{isLive ? 'läuft' : 'frei'}</span>
+                      <div className="table-head-controls">
+                        <span className={isLive ? 'badge live' : isBlocked ? 'badge blocked-badge' : 'badge'}>{isLive ? 'läuft' : isBlocked ? 'gesperrt' : 'frei'}</span>
+                        {isLive && isBlocked && <span className="badge blocked-badge">gesperrt</span>}
+                        <button
+                          className="btn small table-lock-button"
+                          type="button"
+                          aria-label={`${tableName} ${isBlocked ? 'freigeben' : 'sperren'}`}
+                          aria-pressed={isBlocked}
+                          onClick={() => toggleTableLock(tableName)}
+                        >{isBlocked ? 'Freigeben' : 'Sperren'}</button>
+                      </div>
                     </div>
                     {match ? (
                       <>
@@ -492,8 +517,8 @@ export function TournamentControlPage() {
                       </>
                     ) : (
                       <div className="free-table-message">
-                        <strong>Frei für die nächste Partie</strong>
-                        <span>Spiel hierher ziehen oder über „Zuweisen“ auswählen.</span>
+                        <strong>{isBlocked ? 'Für dieses Turnier gesperrt' : 'Frei für die nächste Partie'}</strong>
+                        <span>{isBlocked ? 'Keine automatische oder manuelle Zuweisung möglich.' : 'Spiel hierher ziehen oder über „Zuweisen“ auswählen.'}</span>
                       </div>
                     )}
                   </article>
@@ -546,10 +571,10 @@ export function TournamentControlPage() {
               <div className="card control-status-card">
                 <h3>Turnierstatus</h3>
                 <div className="control-metrics-grid">
-                  <div><span className="muted">Laufende Tische</span><strong>{tableMatches.length}/{tournament.tables}</strong></div>
+                  <div><span className="muted">Tischbelegung</span><strong>{tableMatches.length}/{tournament.tables} · {blockedTables.size} gesperrt</strong></div>
                   <div><span className="muted">Wartende Spiele</span><strong>{nextMatches.length}</strong></div>
                   <div><span className="muted">Offene Bestätigungen</span><strong>{tournament.openConfirmations}</strong></div>
-                  <div><span className="muted">Restzeit grob</span><strong>{tournament.estimatedDuration}</strong></div>
+                  <div><span className="muted">Restzeit grob</span><strong title="Prognose aus offenen Spielen, Best-of und verfügbaren Tischen (15 Minuten je Satz).">{restTimeLabel}</strong></div>
                 </div>
               </div>
               <div className="card control-alert-card">

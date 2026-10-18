@@ -10,6 +10,7 @@
 ./.prettierrc.json
 ./CHANGELOG.md
 ./CONTRIBUTING.md
+./FILE_MANIFEST.txt
 ./LICENSE
 ./README.md
 ./SECURITY.md
@@ -58,9 +59,11 @@
 ./src/services/matchPresentation.ts
 ./src/services/mockCompetitionViews.ts
 ./src/services/mockDrawStore.ts
+./src/services/mockDuration.ts
 ./src/services/mockParticipants.ts
 ./src/services/mockPhaseLifecycle.ts
 ./src/services/mockRuntime.ts
+./src/services/mockTableLocks.ts
 ./src/services/mockTournamentStore.ts
 ./src/services/realtime.ts
 ./src/styles.css
@@ -82,10 +85,10 @@
 ./tests/standings.test.ts
 ./tests/swiss-score-groups.test.ts
 ./tests/swiss.test.ts
+./tests/tableLocksAndDuration.test.ts
 ./tests/tournamentCreation.test.ts
 ./tests/withdrawal.test.ts
 ./tsconfig.app.json
 ./tsconfig.json
 ./tsconfig.node.json
 ./vite.config.ts
-./FILE_MANIFEST.txt

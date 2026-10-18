@@ -1,3 +1,11 @@
+## Unreleased – Tischverwaltung und Restzeit (UX)
+
+- Im Turnierverlauf schmalere Gruppenkarten und kompaktere Spielernamenspalten der Spieltage.
+- Restzeit in der Turnierleitung wird aus offenen Spielen und Sätzen sowie den konfigurierten Best-ofs und freien, nicht gesperrten Tischen berechnet und nach bestätigten Ergebnissen aktualisiert.
+- Pro Tisch gibt es „Sperren“/„Freigeben“; die Sperre bleibt im lokalen Testmodus beim Neuladen erhalten und verhindert jede neue Zuweisung auf diesem Tisch.
+- Ein bereits laufendes Spiel kann an einem anschließend gesperrten Tisch regulär beendet werden.
+- Regressionstests für Zuweisungssperren und sinkende Restzeit ergänzt.
+
 ## Build-Korrektur (18.10.2026)
 - Fehlenden `StageCard`-Import in `TournamentControlPage.tsx` ergänzt; behebt `TS2304` beim Build.
 

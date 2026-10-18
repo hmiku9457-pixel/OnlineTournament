@@ -1060,3 +1060,19 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 }
 
 .bracket-walkover-label { display: block; text-align: center; font-size: .73rem; color: #475467; background: #f2f4f7; padding: 3px 7px; border-bottom: 1px solid #eaecf0; cursor: help; }
+
+/* Gruppenansicht: kompaktere Spieltag-Namensspalten bei vollständig sichtbarer Tabelle. */
+.group-overview-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 600px), 1fr));
+}
+.group-overview-card { max-width: 630px; }
+.group-overview-card .group-match-list { column-gap: 8px; }
+.group-overview-card .group-match-row { grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr); gap: 3px; }
+
+/* Sperrbare Tische (betrifft nur zukünftige Zuweisungen, nicht laufende Partien). */
+.overview-table-card.blocked { background: #f2f4f7; border-color: #d0d5dd; }
+.overview-table-card.blocked .free-table-message { color: #667085; border-style: solid; }
+.table-head-controls { display: flex; gap: 5px; align-items: center; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+.table-lock-button { padding: 4px 7px; font-size: .68rem; white-space: nowrap; }
+.blocked-badge { background: #e4e7ec; color: #344054; }
+@media (max-width: 730px) { .group-overview-card { max-width: 100%; } }

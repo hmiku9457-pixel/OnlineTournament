@@ -5,6 +5,7 @@ import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mo
 import { completeStage, getActiveStage, getStageEntrants, isStageCompleted, isStageStarted, setStageEntrants } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
+import { isMockTableBlocked } from '@/services/mockTableLocks';
 
 export { getRuntimeParticipantNames } from '@/services/mockParticipants';
 
@@ -440,6 +441,7 @@ function isActiveTableMatch(match: MockRuntimeMatch) {
 }
 
 export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId: string, table: string) {
+  if (isMockTableBlocked(tournament, table)) return `${table} ist für dieses Turnier gesperrt.`;
   const matches = getMockRuntimeMatches(tournament);
   const target = matches.find((match) => match.id === matchId);
   if (!target) return 'Spiel wurde nicht gefunden.';
