@@ -9,14 +9,15 @@ import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { assignMockMatchToTable, findMockRuntimeMatch, getMockAssignmentBlockReason, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
 import { isMockParticipantWithdrawn, withdrawMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
-import { getMockParticipantProgress } from '@/services/mockParticipantProgress';
+import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
+import { VenueLayoutMini } from '@/components/VenueLayout';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
 import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
 import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration } from '@/services/mockDuration';
 
-type ControlTab = 'overview' | 'flow' | 'matches' | 'participants';
+type ControlTab = 'overview' | 'flow' | 'matches' | 'participants' | 'final';
 
 const tabs: Array<{ id: ControlTab; label: string }> = [
   { id: 'overview', label: 'Übersicht' },
@@ -304,6 +305,7 @@ export function TournamentControlPage() {
   );
   const allTournamentMatches = useMemo(() => tournament.stages.flatMap((stage) => getMockStageMatches(tournament, stage)), [tournament, runtimeVersion, phaseVersion, restClockTick]);
   const participants = useMemo(() => getRuntimeParticipantNames(tournament), [tournament, participantVersion]);
+  const finalStandings = useMemo(() => tournament.status === 'FINISHED' ? getMockFinalStandings(tournament) : [], [tournament, participantVersion, phaseVersion, runtimeVersion]);
   const nextMatches = matches.filter((match) => match.status === 'WAITING');
   const tableMatches = matches.filter((match) => ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch '));
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
@@ -463,7 +465,7 @@ export function TournamentControlPage() {
       </header>
 
       <nav className="control-tabs" aria-label="Turnierleitungsbereiche">
-        {tabs.map((item) => (
+        {(tournament.status === 'FINISHED' ? [...tabs, { id: 'final' as const, label: 'Endplatzierungen' }] : tabs).map((item) => (
           <button className={tab === item.id ? 'control-tab active' : 'control-tab'} key={item.id} type="button" onClick={() => setTab(item.id)}>{item.label}</button>
         ))}
       </nav>
@@ -489,6 +491,7 @@ export function TournamentControlPage() {
               </div>
             </div>
             {assignmentMessage && <div className="assignment-message" role="status">{assignmentMessage}</div>}
+            <div className={tournament.venueLayout ? 'control-tables-with-plan' : ''}>
             <div className="overview-table-grid">
               {Array.from({ length: tournament.tables }, (_, index) => {
                 const tableName = `Tisch ${index + 1}`;
@@ -540,6 +543,13 @@ export function TournamentControlPage() {
                   </article>
                 );
               })}
+            </div>
+            {tournament.venueLayout && (
+              <aside className="card control-hall-layout">
+                <h3>Hallenlayout</h3>
+                <VenueLayoutMini layout={tournament.venueLayout} />
+              </aside>
+            )}
             </div>
           </div>
 
@@ -678,6 +688,25 @@ export function TournamentControlPage() {
               ))}</tbody>
             </table>
           </div>
+        </section>
+      )}
+
+      {tab === 'final' && tournament.status === 'FINISHED' && (
+        <section className="card control-tab-panel">
+          <div className="control-section-head"><div><h2>Endplatzierungen</h2>
+            <p className="muted">Abschlussübersicht aller Teilnehmer. Bei Ausscheiden in früheren Gruppenphasen wird der Gruppenplatz und kein erfundener Gesamtrang angezeigt.</p>
+          </div></div>
+          <div className="table-wrap final-standings-table"><table>
+            <thead><tr><th>Endplatzierung</th><th>Teilnehmer</th><th>Letzte Phase</th><th>Status</th></tr></thead>
+            <tbody>{finalStandings.map((row) => (
+              <tr key={row.name}>
+                <td><strong>{row.placement ?? (row.status === 'Zurückgezogen' ? 'Zurückgezogen' : 'Keine Platzierung')}</strong></td>
+                <td>{row.name}</td>
+                <td>{tournament.stages[row.stageIndex]?.name ?? '–'}</td>
+                <td><span className="badge">{row.status}</span></td>
+              </tr>
+            ))}</tbody>
+          </table></div>
         </section>
       )}
 

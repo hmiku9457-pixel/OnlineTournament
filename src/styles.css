@@ -1121,3 +1121,48 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .participant-inline-status.eliminated { color: #6941c6; background: #f4f3ff; }
 .participant-placement { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 8px; color: #344054; background: #f2f4f7; font-size: .78rem; font-weight: 700; white-space: nowrap; }
 .third-place-skip { white-space: normal; text-align: center; }
+
+/* Optional hall layout: editable floor plan and compact control-room overview */
+.venue-optional { margin-top: 18px; padding-top: 15px; border-top: 1px solid #e4e7ec; }
+.venue-optional > p { margin: 5px 0 10px; }
+.venue-optional .format-toggle input { width: 18px; height: 18px; }
+.hall-editor { border: 1px solid #e4e7ec; border-radius: 12px; background: #f9fafb; padding: 14px; display: grid; gap: 12px; }
+.hall-editor-controls { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.hall-editor-dimensions { display: flex; gap: 12px; flex-wrap: wrap; }
+.hall-editor-dimensions .field { width: 95px; }
+.hall-editor-dimensions input { max-width: 95px; }
+.hall-editor-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.hall-plan-scroller { overflow-x: auto; padding: 6px 0; max-width: 100%; }
+.hall-plan-wrap { width: max-content; max-width: none; min-width: 0; }
+.hall-grid-center { display: flex; align-items: stretch; gap: 6px; }
+.hall-grid { display: grid; gap: 6px; }
+.hall-cell { min-width: 62px; min-height: 48px; padding: 5px; border-radius: 8px; background: white; border: 1px dashed #cbd5e1; color: #344054; font-size: .76rem; font-weight: 700; }
+.hall-cell:not(:disabled) { cursor: grab; }
+.hall-cell:not(:disabled):hover { border-color: #475467; }
+.hall-cell.table-cell { background: #e0f2fe; border: 1px solid #7dd3fc; color: #075985; }
+.hall-cell.desk-cell { background: #fef3c7; border: 1px solid #fbbf24; color: #92400e; }
+.hall-cell.space-cell { background: #eef2f6; color: #667085; border-style: solid; }
+.hall-cell.selected { outline: 3px solid #344054; outline-offset: 1px; }
+.hall-desk-outside { display: grid; place-items: center; background: #fef3c7; border: 1px solid #fbbf24; border-radius: 7px; color: #92400e; font-weight: 800; font-size: .75rem; }
+.hall-desk-outside.top,.hall-desk-outside.bottom { min-height: 29px; margin: 5px 0; }
+.hall-desk-outside.side { min-width: 29px; padding: 6px; }
+.hall-dock-field { max-width: 320px; }
+.hall-dock-field select { width: 100%; padding: 8px; border: 1px solid #d0d5dd; border-radius: 8px; background: white; }
+.control-hall-layout h3 { margin: 0 0 8px; }
+.hall-mini-legend { display: flex; flex-wrap: wrap; gap: 7px; color: #667085; font-size: .7rem; margin-bottom: 6px; }
+.hall-plan-wrap.compact .hall-grid { gap: 3px; }
+.hall-plan-wrap.compact .hall-cell { padding: 2px; min-width: 24px; min-height: 28px; border-radius: 4px; font-size: .67rem; }
+.hall-plan-wrap.compact .hall-desk-outside.side { min-width: 25px; }
+.hall-plan-wrap.compact .hall-desk-outside.top,.hall-plan-wrap.compact .hall-desk-outside.bottom { min-height: 23px; }
+.control-hall-layout .hall-plan-scroller { padding: 2px 0; }
+.final-standings-table th,.final-standings-table td { padding-block: 9px; }
+@media (max-width: 700px) { .hall-editor-controls { align-items: start; flex-direction: column; } }
+
+.control-tables-with-plan { display: grid; grid-template-columns: minmax(0, 1fr) 230px; align-items: start; gap: 12px; }
+.control-tables-with-plan > .overview-table-grid { min-width: 0; }
+.control-tables-with-plan > .control-hall-layout { padding: 12px; min-width: 0; }
+@media (max-width: 1120px) { .control-tables-with-plan { grid-template-columns: 1fr; } }
+
+.hall-plan-wrap.compact { width: 100%; }
+.hall-plan-wrap.compact .hall-grid-center, .hall-plan-wrap.compact .hall-grid { width: 100%; min-width: 0; }
+.hall-plan-wrap.compact .hall-cell { min-width: 12px; min-height: 25px; font-size: .58rem; }

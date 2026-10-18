@@ -1,3 +1,10 @@
+## UI-Prototyp – Endplatzierungen & Hallenlayout (2026-10-18)
+
+- Neuer Tab **Endplatzierungen** für beendete Turniere. Ergebnisse stammen aus der bestehenden Platzierungslogik, gruppenbezogene Platzierungen bleiben als solche markiert.
+- Nicht mehr auswählbar: Doppel-K.-o. und Platzierungs-/Trostrunde (bisherige lokale Testdaten werden weiterhin lesbar gehalten).
+- In den Grunddaten kann optional ein Hallenlayout eingerichtet werden: Tische verschieben/tauschen, Freiflächen und Turnierleitung im/außerhalb des Rasters.
+- Das Hallenlayout wird im lokalen Turnierdatensatz gespeichert und bei der Turnierleitung rechts in der Übersicht angezeigt.
+
 ## Prototyp-Update – Teilnehmerplatzierungen und Spiel um Platz 3
 
 - Teilnehmerstatus im Verwaltungs-Tab berücksichtigt den Start der Folgephase; ausgeschiedene Spieler erscheinen nicht mehr als aktiv.

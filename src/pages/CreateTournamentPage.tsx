@@ -1,3 +1,5 @@
+import { VenueLayoutEditor } from '@/components/VenueLayout';
+import { createVenueLayout, resizeVenueLayout } from '@/domain/venueLayout';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -291,6 +293,9 @@ export function CreateTournamentPage() {
   const [discipline, setDiscipline] = useState<Discipline>('SINGLES');
   const [tables, setTables] = useState(8);
   const [customTables, setCustomTables] = useState(false);
+  const [venueLayoutEnabled, setVenueLayoutEnabled] = useState(false);
+  const [venueLayout, setVenueLayout] = useState(() => createVenueLayout(8));
+  useEffect(() => { setVenueLayout((current) => resizeVenueLayout(current, Math.max(current.columns, tables), current.rows, tables)); }, [tables]);
   const [participants, setParticipants] = useState<ParticipantDraft[]>([]);
   const [participantForm, setParticipantForm] = useState<ParticipantFields>(emptyParticipantFields());
   const [participantErrors, setParticipantErrors] = useState<ParticipantErrors>({});
@@ -632,6 +637,7 @@ export function CreateTournamentPage() {
         knockoutBestOf: phase.knockoutBestOf,
       })),
       estimatedDurationMinutes: estimatedTournamentDurationMinutes,
+      venueLayout: venueLayoutEnabled ? venueLayout : undefined,
     });
     navigate(`/tournaments/${tournament.id}`);
   }
@@ -725,6 +731,11 @@ export function CreateTournamentPage() {
                   onCustomValue={setTables}
                 />
               </div>
+            </div>
+            <div className="venue-optional">
+              <label className="format-toggle"><input type="checkbox" checked={venueLayoutEnabled} onChange={(event) => setVenueLayoutEnabled(event.target.checked)} /> <strong>Hallenlayout festlegen (optional)</strong></label>
+              <p className="field-hint">Ordne die Tische räumlich an. Das Layout erscheint später kompakt neben der Tischübersicht.</p>
+              {venueLayoutEnabled && <VenueLayoutEditor layout={venueLayout} tableCount={tables} onChange={setVenueLayout} />}
             </div>
           </section>
         )}
@@ -1085,7 +1096,7 @@ export function CreateTournamentPage() {
                                   })}
                               </div>
                               {index !== phaseDrafts.length - 1 && (
-                                <span className="field-hint">K.-o. und Doppel-K.-o. stehen nur für die letzte Phase zur Verfügung.</span>
+                                <span className="field-hint">K.-o. steht nur für die letzte Phase zur Verfügung.</span>
                               )}
                             </div>
                           )}
@@ -1230,9 +1241,9 @@ export function CreateTournamentPage() {
                                   {phase.type === 'GROUPS' && `${phase.groupCount} Gruppen · Best-of-${phase.bestOf}`}
                                   {phase.type === 'SWISS' && `${phase.swissRounds} Runden · Best-of-${phase.bestOf}`}
                                   {phase.type === 'KNOCKOUT' && `${phase.entrantCount} Teilnehmer · Best-of je Runde`}
-                                  {phase.type === 'DOUBLE_ELIMINATION' && `${phase.entrantCount} Teilnehmer · Best-of-${phase.bestOf}`}
+                                   
                                   {phase.type === 'ROUND_ROBIN' && `Best-of-${phase.bestOf}`}
-                                  {phase.type === 'PLACEMENT' && `Best-of-${phase.bestOf}`}
+                                   
                                 </span>
                               </div>
                               {estimate && (

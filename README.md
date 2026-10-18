@@ -96,3 +96,21 @@ Klickbare Prototyp-Oberflächen:
 - Tablet-Ergebniseingabe
 
 Die Laufzeitdaten für Spiele und Tischbelegung sind derzeit bewusst Mock-Daten. Sie dienen dazu, UI/UX und Informationsdichte vor der Datenbankanbindung festzulegen.
+
+
+## Aktueller lokaler UI-Prototyp
+
+Der Turnier-Wizard unterstützt optional einen Hallenplan im Grunddaten-Schritt.
+Standardmäßig liegen alle Tische in einer Reihe. Im Editor sind beliebige
+zusätzliche Reihen/Spalten, Tausch von Tischpositionen, Freiflächen sowie
+Turnierleitung im Raster oder an einer Außenseite möglich. Nur aktivierte
+Hallenpläne werden mit dem lokalen Turnier gespeichert und rechts neben den
+Tischkarten der Turnierleitung angezeigt.
+
+Nach Abschluss des Turniers erscheint in der Turnierleitung der Tab
+**Endplatzierungen**. Frühere Gruppenplatzierungen werden bewusst nicht zu
+einem künstlichen globalen Gesamtrang umgerechnet.
+
+Doppel-K.-o. und Platzierungs-/Trostrunde sind aus der Auswahl für neue
+Turniere entfernt. Alte lokale Testdaten mit diesen Typen bleiben vorerst
+lesbar; die Datenbankanbindung wird weiterhin nicht benötigt.

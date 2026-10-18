@@ -260,18 +260,6 @@ export function recommendTournamentFormats(
     });
   }
 
-  if (minimumMatches <= 2 && systemsEnabled(['double-elimination'], settings)) {
-    addRecommendation({
-      id: 'double-elimination',
-      label: 'Doppel-K.-o.',
-      description: 'Ausscheiden erst nach zwei Niederlagen; mehr Spiele als beim einfachen K.-o.',
-      minimumGuaranteedMatches: 2,
-      score: minimumMatches <= 2 ? 68 : 45,
-      requiredSystems: ['double-elimination'],
-      phases: [createPhaseTemplate('DOUBLE_ELIMINATION', 1, { entrantCount: playerCount })],
-    });
-  }
-
   if (systemsEnabled(['groups', 'knockout'], settings)) {
     const groupTableBonus = Math.min(tableCount, group.groupCount) * 2;
     const largeFieldPenalty = playerCount >= 20 ? 20 : playerCount >= 16 ? 10 : 0;

@@ -1,3 +1,4 @@
+import type { VenueLayout } from '@/domain/venueLayout';
 import { type DemoTournament } from '@/data/demoTournaments';
 import type { Discipline, StageType, TournamentStage, TournamentStatus } from '@/domain/types';
 
@@ -22,6 +23,7 @@ export interface CreateMockTournamentInput {
   participantNames: string[];
   phases: MockPhaseInput[];
   estimatedDurationMinutes: number;
+  venueLayout?: VenueLayout;
 }
 
 function readLocalTournaments(): DemoTournament[] {
@@ -108,6 +110,7 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
     participantNames: input.participantNames,
     isLocalPrototype: true,
     hasStarted: false,
+    venueLayout: input.venueLayout,
   };
 
   const existing = readLocalTournaments();

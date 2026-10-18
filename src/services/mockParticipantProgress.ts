@@ -3,6 +3,7 @@ import type { TournamentStage } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
 import { getStageEntrants, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getMockStageBaseMatches, getMockStoredResult, isMockParticipantWithdrawn } from '@/services/mockRuntime';
+import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 
 export interface MockParticipantProgress {
   status: 'Aktiv' | 'Ausgeschieden' | 'Zurückgezogen' | 'Turniersieger' | 'Beendet';
@@ -98,4 +99,15 @@ export function getMockParticipantProgress(tournament: DemoTournament, name: str
     return { status: 'Beendet', placement: placementInStage(tournament, latest, name) };
   }
   return { status: 'Aktiv' };
+}
+
+/** Completed-tournament summary: placements from older elimination phases retain their group/phase context. */
+export function getMockFinalStandings(tournament: DemoTournament) {
+  return getRuntimeParticipantNames(tournament).map((name) => {
+    const progress = getMockParticipantProgress(tournament, name);
+    const reachedIndex = [...tournament.stages].reverse().findIndex((stage) => getStageEntrants(tournament, stage).includes(name));
+    const stageIndex = reachedIndex === -1 ? -1 : tournament.stages.length - 1 - reachedIndex;
+    const placementNumber = Number(progress.placement?.match(/Platz\s+(\d+)/)?.[1] ?? Number.MAX_SAFE_INTEGER);
+    return { name, ...progress, stageIndex, placementNumber };
+  }).sort((a, b) => b.stageIndex - a.stageIndex || a.placementNumber - b.placementNumber || a.name.localeCompare(b.name, 'de'));
 }

@@ -1,3 +1,4 @@
+import type { VenueLayout } from '@/domain/venueLayout';
 import type { Discipline, TournamentStage, TournamentStatus, Visibility } from '@/domain/types';
 
 export interface DemoArea {
@@ -29,6 +30,7 @@ export interface DemoTournament {
   participantCodes?: Record<string, string>;
   isLocalPrototype?: boolean;
   hasStarted?: boolean;
+  venueLayout?: VenueLayout;
 }
 
 // Statische Testturniere wurden bewusst entfernt. Der UI-Prototyp arbeitet ab jetzt

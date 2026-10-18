@@ -4,9 +4,7 @@ export type TournamentSystemId =
   | 'round-robin'
   | 'groups'
   | 'swiss'
-  | 'knockout'
-  | 'double-elimination'
-  | 'placement';
+  | 'knockout';
 
 export interface TournamentSystemOption {
   id: TournamentSystemId;
@@ -208,8 +206,6 @@ export const tournamentSystemOptions: TournamentSystemOption[] = [
   { id: 'groups', label: 'Gruppenphase', stageType: 'GROUPS' },
   { id: 'swiss', label: 'Schweizer System', stageType: 'SWISS' },
   { id: 'knockout', label: 'K.-o.-Phase', stageType: 'KNOCKOUT' },
-  { id: 'double-elimination', label: 'Doppel-K.-o.', stageType: 'DOUBLE_ELIMINATION' },
-  { id: 'placement', label: 'Platzierungs-/Trostrunde', stageType: 'PLACEMENT' },
 ];
 
 export const bestOfOptions = [1, 3, 5, 7] as const;
@@ -236,8 +232,9 @@ export function systemIdForStage(type: StageType): TournamentSystemId {
     case 'GROUPS': return 'groups';
     case 'SWISS': return 'swiss';
     case 'KNOCKOUT': return 'knockout';
-    case 'DOUBLE_ELIMINATION': return 'double-elimination';
-    case 'PLACEMENT': return 'placement';
+    // Frühere experimentelle Formate werden nicht mehr angeboten.
+    case 'DOUBLE_ELIMINATION': return 'knockout';
+    case 'PLACEMENT': return 'groups';
   }
 }
 

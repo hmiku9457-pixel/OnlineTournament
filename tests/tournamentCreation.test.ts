@@ -31,8 +31,6 @@ describe('tournament creation phase model', () => {
       'groups',
       'swiss',
       'knockout',
-      'double-elimination',
-      'placement',
     ]);
   });
 
