@@ -1166,3 +1166,17 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .hall-plan-wrap.compact { width: 100%; }
 .hall-plan-wrap.compact .hall-grid-center, .hall-plan-wrap.compact .hall-grid { width: 100%; min-width: 0; }
 .hall-plan-wrap.compact .hall-cell { min-width: 12px; min-height: 25px; font-size: .58rem; }
+
+/* Nachmeldungen sind nur während der Vorstart-Konfiguration möglich. */
+.participant-add-panel {
+  display: grid;
+  gap: 11px;
+  background: #f9fafb;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.participant-add-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.participant-add-panel .field-error, .participant-add-panel .field-hint { margin: 0; }
+@media (max-width: 700px) { .participant-add-fields { grid-template-columns: 1fr; } }

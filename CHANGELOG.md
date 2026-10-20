@@ -1,3 +1,12 @@
+## UI-Prototyp – Hallenlayout und Nachmeldungen (2026-10-20)
+
+- Hallenlayout-Editor im ersten Erstellungsschritt standardmäßig sichtbar; ein einfacher Toggle steuert ausschließlich, ob das Layout ins Turnier übernommen wird (standardmäßig aktiviert).
+- Neues Standardraster: **10 Spalten × 3 Reihen** (bei mehr als 30 Tischen automatische Erweiterung nach unten). Eine einzelne Tischreihe bleibt über den bestehenden Button möglich.
+- Vor dem ersten Turnierstart lassen sich in der Teilnehmerverwaltung Spieler beziehungsweise Doppelpaare nachtragen; Pflichtfelder, Dubletten und Spielercode werden geprüft.
+- Vor dem ersten Start verschwinden zurückgezogene Teilnehmer aus Gruppen-, Schweizer- und K.-o.-Auslosungen sowie aus den ungespielten Paarungen; sie bleiben als „Zurückgezogen“ im Teilnehmerverzeichnis dokumentiert.
+- Bereits bearbeitete Gruppen- und K.-o.-Verteilungen werden bei Teilnehmeränderungen abgeglichen; ungültig gewordene K.-o.-Pins werden entfernt.
+- Neue Regressionstests für Vorstart-Rückzug, Nachmeldungen (Einzel/Doppel), Pins und Standardlayout.
+
 ## UI-Prototyp – Endplatzierungen & Hallenlayout (2026-10-18)
 
 - Neuer Tab **Endplatzierungen** für beendete Turniere. Ergebnisse stammen aus der bestehenden Platzierungslogik, gruppenbezogene Platzierungen bleiben als solche markiert.

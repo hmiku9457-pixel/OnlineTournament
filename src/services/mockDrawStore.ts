@@ -1,6 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
-import { getStageEntrants, isStageEditable } from '@/services/mockPhaseLifecycle';
+import { getPhaseLifecycle, getStageEntrants, isStageEditable } from '@/services/mockPhaseLifecycle';
 
 const DRAW_KEY = 'online-tournament:mock-draw-config:v1';
 
@@ -286,6 +286,39 @@ export function resetBracketSlots(tournament: DemoTournament, stage: TournamentS
     ...current.filter((item) => !(item.tournamentId === tournament.id && item.stageId === stage.id)),
   ]);
   return true;
+}
+
+/** Keep optional pre-start draw edits consistent when the roster changes.
+ * Group placements of remaining players survive; outdated bracket pins do not.
+ */
+export function reconcilePrestartDraws(tournament: DemoTournament) {
+  if (tournament.hasStarted || getPhaseLifecycle(tournament).startedStageIds.length) return;
+  const configs = readAll();
+  const next = configs.map((config) => {
+    if (config.tournamentId !== tournament.id) return config;
+    const stage = tournament.stages.find((entry) => entry.id === config.stageId);
+    if (!stage) return config;
+    const entrants = getStageEntrants(tournament, stage);
+    const valid = new Set(entrants);
+    const assignments = config.groupAssignments
+      ? Object.fromEntries(Object.entries(config.groupAssignments).filter(([name]) => valid.has(name)))
+      : undefined;
+    const swissOrder = config.swissOrder
+      ? [...config.swissOrder.filter((name) => valid.has(name)), ...entrants.filter((name) => !config.swissOrder!.includes(name))]
+      : undefined;
+    const oldSlots = config.bracketSlots;
+    const bracketValid = oldSlots
+      && oldSlots.length === nextPowerOfTwo(Math.max(2, entrants.length))
+      && validBracketConstraints(entrants, oldSlots);
+    return {
+      ...config,
+      groupAssignments: assignments,
+      swissOrder,
+      bracketSlots: oldSlots ? (bracketValid ? oldSlots : balancedBracketSlots(entrants)) : undefined,
+      pinnedBracketSlots: bracketValid ? config.pinnedBracketSlots : [],
+    };
+  });
+  if (configs.some((config) => config.tournamentId === tournament.id)) writeAll(next);
 }
 
 export function clearMockDraws() {

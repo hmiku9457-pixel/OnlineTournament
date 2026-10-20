@@ -293,9 +293,9 @@ export function CreateTournamentPage() {
   const [discipline, setDiscipline] = useState<Discipline>('SINGLES');
   const [tables, setTables] = useState(8);
   const [customTables, setCustomTables] = useState(false);
-  const [venueLayoutEnabled, setVenueLayoutEnabled] = useState(false);
+  const [venueLayoutEnabled, setVenueLayoutEnabled] = useState(true);
   const [venueLayout, setVenueLayout] = useState(() => createVenueLayout(8));
-  useEffect(() => { setVenueLayout((current) => resizeVenueLayout(current, Math.max(current.columns, tables), current.rows, tables)); }, [tables]);
+  useEffect(() => { setVenueLayout((current) => resizeVenueLayout(current, current.columns, Math.max(current.rows, Math.ceil(tables / current.columns)), tables)); }, [tables]);
   const [participants, setParticipants] = useState<ParticipantDraft[]>([]);
   const [participantForm, setParticipantForm] = useState<ParticipantFields>(emptyParticipantFields());
   const [participantErrors, setParticipantErrors] = useState<ParticipantErrors>({});
@@ -733,9 +733,10 @@ export function CreateTournamentPage() {
               </div>
             </div>
             <div className="venue-optional">
-              <label className="format-toggle"><input type="checkbox" checked={venueLayoutEnabled} onChange={(event) => setVenueLayoutEnabled(event.target.checked)} /> <strong>Hallenlayout festlegen (optional)</strong></label>
-              <p className="field-hint">Ordne die Tische räumlich an. Das Layout erscheint später kompakt neben der Tischübersicht.</p>
-              {venueLayoutEnabled && <VenueLayoutEditor layout={venueLayout} tableCount={tables} onChange={setVenueLayout} />}
+              <label className="format-toggle"><input type="checkbox" role="switch" checked={venueLayoutEnabled} onChange={(event) => setVenueLayoutEnabled(event.target.checked)} /> <strong>Hallenlayout verwenden</strong></label>
+              <p className="field-hint">Der Hallenplan ist immer sichtbar und startet mit 10 Spalten × 3 Reihen. Mit dem Schalter legst du fest, ob er im Turnier verwendet und gespeichert wird.</p>
+              <VenueLayoutEditor layout={venueLayout} tableCount={tables} onChange={setVenueLayout} />
+              {!venueLayoutEnabled && <p className="field-hint">Layout deaktiviert – deine Anordnung bleibt im Editor erhalten, wird aber nicht ins Turnier übernommen.</p>}
             </div>
           </section>
         )}

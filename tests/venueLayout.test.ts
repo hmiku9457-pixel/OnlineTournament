@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createVenueLayout, dockVenueDesk, layoutTableNumbers, placeVenueCell, resizeVenueLayout } from '@/domain/venueLayout';
 
 describe('optional hall layout', () => {
-  it('starts with all tables in a single row', () => {
+  it('starts with a 10 by 3 grid, accommodating larger tournaments', () => {
     const layout = createVenueLayout(19);
-    expect(layout.columns).toBe(19);
-    expect(layout.rows).toBe(1);
+    expect(layout.columns).toBe(10);
+    expect(layout.rows).toBe(3);
+    expect(layout.cells).toHaveLength(30);
     expect(layoutTableNumbers(layout)).toEqual(Array.from({ length: 19 }, (_, i) => i + 1));
   });
 
@@ -15,6 +16,13 @@ describe('optional hall layout', () => {
     const moved = placeVenueCell(withExtraRow, 'table:2', 7);
     expect(layoutTableNumbers(moved).sort((a, b) => a - b)).toEqual([1, 2, 3, 4]);
     expect(moved.cells[7]).toBe('table:2');
+  });
+
+  it('can use all tables in one row when explicitly requested', () => {
+    const oneRow = resizeVenueLayout(createVenueLayout(19), 19, 1, 19);
+    expect(oneRow.columns).toBe(19);
+    expect(oneRow.rows).toBe(1);
+    expect(layoutTableNumbers(oneRow)).toHaveLength(19);
   });
 
   it('can dock the tournament desk outside and retain empty gaps', () => {

@@ -1,3 +1,5 @@
+import { getPhaseLifecycle } from '@/services/mockPhaseLifecycle';
+import { reconcilePrestartDraws } from '@/services/mockDrawStore';
 import type { VenueLayout } from '@/domain/venueLayout';
 import { type DemoTournament } from '@/data/demoTournaments';
 import type { Discipline, StageType, TournamentStage, TournamentStatus } from '@/domain/types';
@@ -222,6 +224,59 @@ export function updateMockParticipantName(tournamentId: string, oldName: string,
   writeLocalTournaments(tournaments.map((entry) => entry.id === tournamentId ? updated : entry));
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
   return true;
+}
+
+/** Local prototype: registration closes permanently with the first tournament start. */
+export function addMockParticipant(
+  tournamentId: string,
+  firstName: string,
+  lastName: string,
+  partnerFirstName = '',
+  partnerLastName = '',
+): { ok: boolean; error?: string } {
+  const tournaments = readLocalTournaments();
+  const tournament = tournaments.find((item) => item.id === tournamentId);
+  if (!tournament) return { ok: false, error: 'Turnier nicht gefunden.' };
+  if (tournament.hasStarted || getPhaseLifecycle(tournament).startedStageIds.length > 0
+    || !['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status)) {
+    return { ok: false, error: 'Nachmeldungen sind nur vor dem ersten Turnierstart möglich.' };
+  }
+  const first = firstName.trim();
+  const last = lastName.trim();
+  if (!first || !last) return { ok: false, error: 'Vorname und Nachname sind erforderlich.' };
+  const person = `${first} ${last}`;
+  let displayName = person;
+  if (tournament.discipline === 'DOUBLES') {
+    const partnerFirst = partnerFirstName.trim();
+    const partnerLast = partnerLastName.trim();
+    if (!partnerFirst || !partnerLast) return { ok: false, error: 'Für Doppel werden beide vollständigen Namen benötigt.' };
+    const partner = `${partnerFirst} ${partnerLast}`;
+    const normalize = (text: string) => text.toLocaleLowerCase('de').replace(/\s+/g, ' ').trim();
+    if (normalize(person) === normalize(partner)) return { ok: false, error: 'Ein Spieler kann nicht sein eigener Doppelpartner sein.' };
+    const registered = new Set((tournament.participantNames ?? []).flatMap((pair) => pair.split(/\s+\/\s+/)).map(normalize));
+    if (registered.has(normalize(person)) || registered.has(normalize(partner))) {
+      return { ok: false, error: 'Einer der beiden Spieler ist bereits angemeldet.' };
+    }
+    displayName = `${person} / ${partner}`;
+  } else if ((tournament.participantNames ?? []).some((name) =>
+    name.toLocaleLowerCase('de') === person.toLocaleLowerCase('de'))) {
+    return { ok: false, error: 'Dieser Spieler ist bereits angemeldet.' };
+  }
+
+  const occupied = new Set(Object.values(tournament.participantCodes ?? {}));
+  let code = '';
+  do { code = String(Math.floor(100000 + Math.random() * 900000)); } while (occupied.has(code));
+  const updated: DemoTournament = {
+    ...tournament,
+    participantNames: [...(tournament.participantNames ?? []), displayName],
+    participantCodes: { ...(tournament.participantCodes ?? {}), [displayName]: code },
+    participants: (tournament.participantNames ?? []).length + 1,
+    lastUpdate: 'gerade eben',
+  };
+  writeLocalTournaments(tournaments.map((entry) => entry.id === tournamentId ? updated : entry));
+  reconcilePrestartDraws(updated);
+  window.dispatchEvent(new CustomEvent('mock-runtime-change'));
+  return { ok: true };
 }
 
 export function removeLocalPrototypeTournaments() {

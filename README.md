@@ -114,3 +114,9 @@ einem künstlichen globalen Gesamtrang umgerechnet.
 Doppel-K.-o. und Platzierungs-/Trostrunde sind aus der Auswahl für neue
 Turniere entfernt. Alte lokale Testdaten mit diesen Typen bleiben vorerst
 lesbar; die Datenbankanbindung wird weiterhin nicht benötigt.
+
+### Hallenlayout und Teilnehmer vor dem Start
+
+Im Wizard unter **Grunddaten** ist der Hallenlayout-Editor standardmäßig eingeblendet. Das anfängliche Raster hat **10 × 3 Felder**; bei mehr als 30 Tischen wird es nach unten vergrößert. Der Schalter **Hallenlayout verwenden** entscheidet, ob der Plan mit dem lokalen Turnier gespeichert und in der Tischübersicht angezeigt wird. Der Editor bleibt unabhängig vom Schalter sichtbar.
+
+Unter **Turnierleitung → Teilnehmer** können vor dem **ersten Turnierstart** weitere Einzelspieler beziehungsweise Doppelpaare nachgemeldet werden. Bereits registrierte Namen werden erkannt, ein Spielercode wird automatisch vergeben. Vor Turnierstart zurückgezogene Spieler bleiben zur Nachvollziehbarkeit im Teilnehmerverzeichnis stehen, gehören aber nicht mehr zu Gruppen, K.-o.-Startplätzen oder offenen Spielpaarungen. Nach Turnierstart sind Nachmeldungen gesperrt; für Rückzüge gelten dann weiterhin die Wettkampf-/Walkover-Regeln.

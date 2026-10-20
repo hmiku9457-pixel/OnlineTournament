@@ -1,6 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
+import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
 
 const PHASE_KEY = 'online-tournament:mock-phase-lifecycle:v1';
 
@@ -49,10 +50,18 @@ function saveState(tournament: DemoTournament, state: PhaseLifecycleState) {
 
 export function getStageEntrants(tournament: DemoTournament, stage: TournamentStage) {
   const state = getPhaseLifecycle(tournament);
+  const stageIndex = getStageIndex(tournament, stage);
+  const started = state.startedStageIds.includes(stage.id);
+  // Vor dem ersten Turnierstart bilden alle aktuell teilnahmeberechtigten
+  // Anmeldungen die erste Phase. Nachmeldungen und Rückzüge ändern so
+  // unmittelbar die Gruppenauslosung sowie den K.-o.-Baum.
+  if (stageIndex === 0 && !started && !tournament.hasStarted) {
+    return getRuntimeParticipantNames(tournament).filter((name) => !isParticipantWithdrawn(tournament, name));
+  }
   const stored = state.stageEntrants?.[stage.id];
-  if (stored) return [...stored];
+  if (stored) return started ? [...stored] : stored.filter((name) => !isParticipantWithdrawn(tournament, name));
 
-  const names = getRuntimeParticipantNames(tournament);
+  const names = getRuntimeParticipantNames(tournament).filter((name) => started || !isParticipantWithdrawn(tournament, name));
   const configured = Math.max(1, Math.min(names.length, Number(stage.settings.entrants) || names.length));
   return names.slice(0, configured);
 }
@@ -99,10 +108,16 @@ export function isStageLockedWaiting(tournament: DemoTournament, stage: Tourname
 
 export function startStage(tournament: DemoTournament, stage: TournamentStage) {
   if (!isStageEditable(tournament, stage)) return false;
+  const entrants = getStageEntrants(tournament, stage);
+  if (entrants.length < 2) return false;
   const state = getPhaseLifecycle(tournament);
+  // Die vor dem Start gültige Auslosung einfrieren. Ansonsten würden bei
+  // einem späteren Lesen die ursprüngliche Teilnehmerzahl aus dem Wizard
+  // erneut greifen und Nachmeldungen verschwinden / Rückzüge zurückkehren.
   saveState(tournament, {
     ...state,
     startedStageIds: [...new Set([...state.startedStageIds, stage.id])],
+    stageEntrants: { ...(state.stageEntrants ?? {}), [stage.id]: entrants },
   });
   return true;
 }

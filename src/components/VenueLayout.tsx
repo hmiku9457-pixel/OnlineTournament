@@ -84,7 +84,7 @@ export function VenueLayoutEditor({ layout, tableCount, onChange }: {
             <input type="number" min="1" max="40" value={layout.rows} onChange={(e) => onChange(resizeVenueLayout(layout, layout.columns, Number(e.target.value), tableCount))} />
           </label>
         </div>
-        <button type="button" className="btn small" onClick={() => onChange({ ...createVenueLayout(tableCount), deskDock: layout.deskDock })}>Tische in eine Reihe</button>
+        <button type="button" className="btn small" onClick={() => onChange({ ...resizeVenueLayout(createVenueLayout(tableCount), tableCount, 1, tableCount), deskDock: layout.deskDock })}>Tische in eine Reihe</button>
       </div>
       <p className="field-hint">Wähle einen Tisch oder ziehe ihn auf ein anderes Feld. Belegte Felder werden getauscht. Freiflächen bleiben absichtlich leer.</p>
       <div className="hall-editor-tools">

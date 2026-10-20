@@ -31,8 +31,9 @@ export function estimateRoundRemainingMinutes(remainingMatchMinutes: number[], t
 }
 
 function configuredEntrants(stage: TournamentStage, tournament: DemoTournament) {
-  if (isStageStarted(tournament, stage)) return Math.max(2, getStageEntrants(tournament, stage).length);
-  return Math.max(2, Number(stage.settings.entrants) || getStageEntrants(tournament, stage).length);
+  // Auch vor dem Start die effektive Teilnehmerliste verwenden, damit
+  // Nachmeldungen/Rückzüge die Dauerprognose sofort verändern.
+  return Math.max(2, getStageEntrants(tournament, stage).length);
 }
 
 function knockoutRoundBestOf(stage: TournamentStage, round: number) {

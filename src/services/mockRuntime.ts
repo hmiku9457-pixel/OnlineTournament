@@ -1,3 +1,5 @@
+import { isParticipantWithdrawn, saveParticipantWithdrawal } from '@/services/mockWithdrawals';
+import { reconcilePrestartDraws } from '@/services/mockDrawStore';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
@@ -60,7 +62,6 @@ interface BaseStageMatch {
 
 const RESULT_KEY = 'online-tournament:mock-match-results:v2';
 const RUNTIME_KEY = 'online-tournament:mock-match-runtime:v1';
-const WITHDRAWAL_KEY = 'online-tournament:withdrawn-participants:v1';
 const SWISS_FIXTURE_KEY = 'online-tournament:swiss-round-fixtures:v1';
 
 interface SwissFixture { tournamentId: string; stageId: string; round: number; pairs: [string, string][] }
@@ -70,13 +71,8 @@ function readSwissFixtures(): SwissFixture[] {
   try { return JSON.parse(window.localStorage.getItem(SWISS_FIXTURE_KEY) ?? '[]') as SwissFixture[]; } catch { return []; }
 }
 
-function readWithdrawn(): Record<string, string[]> {
-  if (typeof window === 'undefined') return {};
-  try { return JSON.parse(window.localStorage.getItem(WITHDRAWAL_KEY) ?? '{}') as Record<string, string[]>; } catch { return {}; }
-}
-
 export function isMockParticipantWithdrawn(tournament: DemoTournament, name: string) {
-  return (readWithdrawn()[tournament.id] ?? []).includes(name);
+  return isParticipantWithdrawn(tournament, name);
 }
 
 export function canEditFinishedResults(tournament: DemoTournament, stage: TournamentStage) {
@@ -603,10 +599,14 @@ export function reconcileWithdrawalsForTournament(tournament: DemoTournament) {
 
 export function withdrawMockParticipant(tournament: DemoTournament, name: string) {
   if (!getRuntimeParticipantNames(tournament).includes(name) || isMockParticipantWithdrawn(tournament, name)) return false;
-  const current = readWithdrawn();
-  current[tournament.id] = [...(current[tournament.id] ?? []), name];
-  window.localStorage.setItem(WITHDRAWAL_KEY, JSON.stringify(current));
-  settleWithdrawnMatches(tournament);
+  saveParticipantWithdrawal(tournament, name);
+  if (!tournament.hasStarted && !tournament.stages.some((stage) => isStageStarted(tournament, stage))) {
+    // Eine zurückgezogene Person wird vor dem Turnierbeginn ersatzlos aus
+    // der Auslosung entfernt; keine kampflosen Partien erzeugen.
+    reconcilePrestartDraws(tournament);
+  } else {
+    settleWithdrawnMatches(tournament);
+  }
   // Nach dem Phasenabschluss, aber vor dem Start der Folgephase, muss ein
   // Rückzug die Qualifikation neu bestimmen (inklusive Nachrückern).
   for (let index = tournament.stages.length - 2; index >= 0; index -= 1) {

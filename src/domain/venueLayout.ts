@@ -11,10 +11,12 @@ export interface VenueLayout {
 
 export function createVenueLayout(tableCount: number): VenueLayout {
   const tables = Math.max(1, Math.floor(tableCount));
+  const columns = 10;
+  const rows = Math.max(3, Math.ceil(tables / columns));
   return {
-    columns: tables,
-    rows: 1,
-    cells: Array.from({ length: tables }, (_, i): VenueCell => `table:${i + 1}`),
+    columns,
+    rows,
+    cells: Array.from({ length: columns * rows }, (_, i): VenueCell => i < tables ? `table:${i + 1}` : ''),
     deskDock: 'none',
   };
 }

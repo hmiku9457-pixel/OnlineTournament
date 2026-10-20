@@ -68,6 +68,7 @@ src/services/mockPhaseLifecycle.ts
 src/services/mockRuntime.ts
 src/services/mockTableLocks.ts
 src/services/mockTournamentStore.ts
+src/services/mockWithdrawals.ts
 src/services/realtime.ts
 src/styles.css
 src/vite-env.d.ts
@@ -82,6 +83,7 @@ tests/bracket.test.ts
 tests/matchPresentation.test.ts
 tests/participantProgressAndThirdPlace.test.ts
 tests/playerRestTime.test.ts
+tests/prestartRosterAndVenue.test.ts
 tests/recommendations.test.ts
 tests/rules.test.ts
 tests/runtimeAdministration.test.ts

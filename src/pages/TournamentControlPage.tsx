@@ -12,8 +12,8 @@ import { isMockParticipantWithdrawn, withdrawMockParticipant, isMockThirdPlaceMa
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { VenueLayoutMini } from '@/components/VenueLayout';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
-import { updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
-import { getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
+import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
+import { getStageEntrants, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
 import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
 import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration } from '@/services/mockDuration';
 
@@ -290,6 +290,12 @@ export function TournamentControlPage() {
   const [phaseVersion, setPhaseVersion] = useState(0);
   const [participantPanel, setParticipantPanel] = useState<{ name: string; mode: 'edit' | 'games' } | null>(null);
   const [participantVersion, setParticipantVersion] = useState(0);
+  const [showParticipantAdd, setShowParticipantAdd] = useState(false);
+  const [newParticipantFirst, setNewParticipantFirst] = useState('');
+  const [newParticipantLast, setNewParticipantLast] = useState('');
+  const [newPartnerFirst, setNewPartnerFirst] = useState('');
+  const [newPartnerLast, setNewPartnerLast] = useState('');
+  const [participantAddError, setParticipantAddError] = useState('');
   const [assigningMatchId, setAssigningMatchId] = useState<string | null>(null);
   const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null);
   const [selectedStageId, setSelectedStageId] = useState<string>(() => initialTournament.stages[0]?.id ?? '');
@@ -343,6 +349,23 @@ export function TournamentControlPage() {
     setPhaseVersion((value) => value + 1);
   }
 
+  function handleAddParticipant() {
+    const result = addMockParticipant(tournament.id, newParticipantFirst, newParticipantLast, newPartnerFirst, newPartnerLast);
+    if (!result.ok) {
+      setParticipantAddError(result.error ?? 'Nachmeldung konnte nicht gespeichert werden.');
+      return;
+    }
+    setNewParticipantFirst('');
+    setNewParticipantLast('');
+    setNewPartnerFirst('');
+    setNewPartnerLast('');
+    setParticipantAddError('');
+    setShowParticipantAdd(false);
+    setParticipantVersion((value) => value + 1);
+    setDrawVersion((value) => value + 1);
+    refreshRuntime();
+  }
+
   function performStartTournament() {
     const firstStage = tournament.stages[0];
     if (!firstStage || !startFirstStage(tournament)) return;
@@ -367,7 +390,9 @@ export function TournamentControlPage() {
 
   function requestStartTournament() {
     const firstStage = tournament.stages[0];
-    if (firstStage) setStartModal({ kind: 'tournament', stageName: firstStage.name });
+    if (firstStage && getStageEntrants(tournament, firstStage).length >= 2) {
+      setStartModal({ kind: 'tournament', stageName: firstStage.name });
+    }
   }
 
   function requestStartNextPhase() {
@@ -447,7 +472,9 @@ export function TournamentControlPage() {
             <button className="btn" type="button" onClick={() => setTab('flow')}>Aktuelle Phase bearbeiten</button>
           )}
           {!tournament.hasStarted && tournament.status !== 'FINISHED' && (
-            <button className="btn primary" type="button" onClick={requestStartTournament}>Turnier starten</button>
+            <button className="btn primary" type="button" onClick={requestStartTournament}
+              disabled={!tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
+              title={tournament.stages[0] && getStageEntrants(tournament, tournament.stages[0]).length < 2 ? 'Mindestens zwei aktive Teilnehmer erforderlich' : undefined}>Turnier starten</button>
           )}
           {tournament.hasStarted && activeStage && tournament.status !== 'FINISHED' && (
             <>
@@ -712,7 +739,32 @@ export function TournamentControlPage() {
 
       {tab === 'participants' && (
         <section className="card control-tab-panel">
-          <div className="control-section-head"><div><h2>Teilnehmer</h2><p className="muted">Spielercodes, Daten, Spiele und Rückzug an einer Stelle.</p></div></div>
+          <div className="control-section-head">
+            <div><h2>Teilnehmer</h2><p className="muted">Spielercodes, Daten, Spiele und Rückzug an einer Stelle.</p></div>
+            {!tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status) && (
+              <button className="btn primary" type="button" onClick={() => { setShowParticipantAdd((current) => !current); setParticipantAddError(''); }}>
+                {showParticipantAdd ? 'Nachmeldung schließen' : '+ Teilnehmer nachtragen'}
+              </button>
+            )}
+          </div>
+          {showParticipantAdd && !tournament.hasStarted && (
+            <form className="participant-add-panel" onSubmit={(event) => { event.preventDefault(); handleAddParticipant(); }}>
+              <strong>{tournament.discipline === 'DOUBLES' ? 'Doppelpaar nachtragen' : 'Spieler nachtragen'}</strong>
+              <div className="participant-add-fields">
+                <label className="field">Vorname<input value={newParticipantFirst} onChange={(event) => setNewParticipantFirst(event.target.value)} /></label>
+                <label className="field">Nachname<input value={newParticipantLast} onChange={(event) => setNewParticipantLast(event.target.value)} /></label>
+                {tournament.discipline === 'DOUBLES' && (
+                  <>
+                    <label className="field">Partner: Vorname<input value={newPartnerFirst} onChange={(event) => setNewPartnerFirst(event.target.value)} /></label>
+                    <label className="field">Partner: Nachname<input value={newPartnerLast} onChange={(event) => setNewPartnerLast(event.target.value)} /></label>
+                  </>
+                )}
+              </div>
+              <div className="actions"><button className="btn small primary" type="submit">Nachtragen</button><button className="btn small" type="button" onClick={() => setShowParticipantAdd(false)}>Abbrechen</button></div>
+              {participantAddError && <p role="alert" className="field-error">{participantAddError}</p>}
+              <p className="field-hint">Neue Teilnehmer werden vor Turnierstart direkt in die Auslosung aufgenommen.</p>
+            </form>
+          )}
           <div className="participant-control-list">
             {participants.map((participant, index) => {
               const progress = getMockParticipantProgress(tournament, participant);
