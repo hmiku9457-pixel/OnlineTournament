@@ -8,6 +8,7 @@ import { completeStage, getActiveStage, getStageEntrants, isStageCompleted, isSt
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import { isMockTableBlocked } from '@/services/mockTableLocks';
+import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
 
 export { getRuntimeParticipantNames } from '@/services/mockParticipants';
 
@@ -27,6 +28,8 @@ export interface MockRuntimeMatch {
   bestOf: number;
   pauseA: number | null;
   pauseB: number | null;
+  /** True pause before this match started, not the current elapsed time. */
+  startedAt?: number;
   sets?: MatchSet[];
   note?: string;
 }
@@ -48,6 +51,9 @@ interface StoredMatchRuntime {
   matchId: string;
   table?: string;
   status?: MockMatchState;
+  startedAt?: number;
+  pauseAtStartA?: number | null;
+  pauseAtStartB?: number | null;
 }
 
 interface BaseStageMatch {
@@ -424,6 +430,11 @@ export function getElapsedRestMinutes(finishedAt: number | undefined, now = Date
   return Math.max(0, Math.floor((now - finishedAt) / 60000));
 }
 
+export function formatMockMatchRest(match: MockRuntimeMatch, side: 'A' | 'B') {
+  if (match.status === 'FINISHED' && !match.startedAt) return 'Nicht erfasst';
+  return formatPlayerRest(side === 'A' ? match.pauseA : match.pauseB);
+}
+
 export function formatPlayerRest(minutes: number | null): string {
   if (minutes === null) return 'Noch kein Spiel';
   if (minutes < 60) return `${minutes} Min. Pause`;
@@ -433,11 +444,14 @@ export function formatPlayerRest(minutes: number | null): string {
 function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchResult[], storedRuntime: StoredMatchRuntime[]) {
   const savedResult = storedResults.find((item) => item.matchId === match.id);
   const savedRuntime = storedRuntime.find((item) => item.matchId === match.id);
-  const status = savedResult?.status ?? savedRuntime?.status ?? match.status;
+  const status = savedResult?.status === 'FINISHED' ? 'FINISHED' : savedRuntime?.status ?? savedResult?.status ?? match.status;
   return {
     ...match,
     table: savedRuntime?.table ?? match.table,
     status,
+    startedAt: savedRuntime?.startedAt,
+    pauseA: savedRuntime?.startedAt ? (savedRuntime.pauseAtStartA ?? null) : status === 'FINISHED' ? null : match.pauseA,
+    pauseB: savedRuntime?.startedAt ? (savedRuntime.pauseAtStartB ?? null) : status === 'FINISHED' ? null : match.pauseB,
     score: savedResult?.thirdPlaceSkipped ? 'Beide Platz 3' : savedResult?.forcedWinner && !savedResult.sets.length ? 'W.O.' : savedResult ? scoreFromSets(savedResult.sets) : match.score,
     sets: savedResult?.sets ?? match.sets,
     note: status === 'WAITING' ? 'Wartet auf Tischzuweisung' : undefined,
@@ -489,10 +503,15 @@ function isActiveTableMatch(match: MockRuntimeMatch) {
 }
 
 export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId: string, table: string) {
+  // Always read current stored status: callers can hold an older React snapshot.
+  const currentTournament = getAllMockTournaments().find((item) => item.id === tournament.id) ?? tournament;
+  if (currentTournament.status !== 'RUNNING') return 'Pause aktiv oder Turnier nicht gestartet: Neue Tischzuweisungen sind gesperrt.';
+  if (!/^Tisch [1-9]\d*$/.test(table) || Number(table.slice(6)) > tournament.tables) return 'Ungültiger Tisch.';
   if (isMockTableBlocked(tournament, table)) return `${table} ist für dieses Turnier gesperrt.`;
   const matches = getMockRuntimeMatches(tournament);
   const target = matches.find((match) => match.id === matchId);
   if (!target) return 'Spiel wurde nicht gefunden.';
+  if (target.status !== 'WAITING') return 'Dieses Spiel ist nicht mehr in der Warteschlange.';
 
   const tableOccupied = matches.some((match) => match.id !== matchId && match.table === table && isActiveTableMatch(match));
   if (tableOccupied) return `${table} ist bereits belegt.`;
@@ -511,14 +530,42 @@ export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId
   return null;
 }
 
+/** Zuweisung = Spielstart. Restzeit ist der Wert genau zum Startzeitpunkt. */
 export function assignMockMatchToTable(tournament: DemoTournament, matchId: string, table: string) {
   if (getMockAssignmentBlockReason(tournament, matchId, table)) return false;
-  updateRuntime(matchId, { table, status: 'LIVE' });
+  const match = getMockRuntimeMatches(tournament).find((item) => item.id === matchId);
+  if (!match) return false;
+  const previous = readRuntime().find((item) => item.matchId === matchId);
+  const now = Date.now();
+  const lastFinish = getLatestFinishedTimes(tournament, readResults());
+  updateRuntime(matchId, {
+    table, status: 'LIVE', startedAt: previous?.startedAt ?? now,
+    pauseAtStartA: previous?.startedAt ? previous.pauseAtStartA : getElapsedRestMinutes(lastFinish.get(match.sideA), now),
+    pauseAtStartB: previous?.startedAt ? previous.pauseAtStartB : getElapsedRestMinutes(lastFinish.get(match.sideB), now),
+  });
+  recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Turnierleitung (lokal)', action: 'MATCH_ASSIGNED', description: `${match.sideA} – ${match.sideB}: Spiel an ${table} gestartet`, after: table });
   return true;
 }
 
-export function unassignMockMatch(matchId: string) {
+/** Hebt die Tischzuweisung auf, behält bereits eingetragene Sätze. */
+export function unassignMockMatch(tournament: DemoTournament, matchId: string) {
+  const match = getMockRuntimeMatches(tournament).find((item) => item.id === matchId);
+  if (!match || !isActiveTableMatch(match)) return false;
   updateRuntime(matchId, { table: 'Noch offen', status: 'WAITING' });
+  recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Turnierleitung (lokal)', action: 'MATCH_UNASSIGNED', description: `Zuweisung von ${match.sideA} – ${match.sideB} aufgehoben (Sätze bleiben erhalten)`, before: match.table, after: 'Warteschlange' });
+  return true;
+}
+
+/** Verlegt eine bereits gestartete Partie ohne Verlust von Sätzen oder Startzeit. */
+export function moveMockMatchToTable(tournament: DemoTournament, matchId: string, table: string) {
+  const match = getMockRuntimeMatches(tournament).find((item) => item.id === matchId);
+  if (!match || !isActiveTableMatch(match) || match.table === table) return false;
+  if (!/^Tisch [1-9]\d*$/.test(table) || Number(table.slice(6)) > tournament.tables) return false;
+  if (isMockTableBlocked(tournament, table)) return false;
+  if (getMockRuntimeMatches(tournament).some((item) => item.id !== matchId && item.table === table && isActiveTableMatch(item))) return false;
+  updateRuntime(matchId, { table, status: 'LIVE' });
+  recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Turnierleitung (lokal)', action: 'MATCH_MOVED', description: `${match.sideA} – ${match.sideB} an ${table} verlegt`, before: match.table, after: table });
+  return true;
 }
 
 export function startMockMatch(matchId: string) {
@@ -530,8 +577,9 @@ export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: Moc
   const previous = current.find((item) => item.matchId === matchId);
   const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
   if (tournament && !canEditMockMatch(tournament, matchId)) return previous;
-  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined, thirdPlaceSkipped: undefined, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
+  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined, thirdPlaceSkipped: undefined, confirmedA: previous?.confirmedA, confirmedB: previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
+  if (tournament && sets.length > (previous?.sets.length ?? 0)) recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Ergebniseingabe (lokal)', action: 'SET_SAVED', description: `Satz ${sets.length} bestätigt`, before: previous?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · '), after: sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') });
   return next;
 }
 
@@ -788,8 +836,12 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
     const stage = tournament?.stages.find((item) => matchId.startsWith(`${item.id}-`));
     if (tournament && stage && !canEditFinishedResults(tournament, stage)) return previous;
   }
-  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined, thirdPlaceSkipped: undefined, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
+  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined, thirdPlaceSkipped: undefined, confirmedA: previousFinal ? false : previous?.confirmedA, confirmedB: previousFinal ? false : previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
+  if (tournament && status === 'FINISHED') {
+    const resultText = (value: StoredMatchResult | undefined) => value?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') || '–';
+    recordMockAudit({ tournamentId: tournament.id, matchId, actor: previousFinal ? 'Turnierleitung (lokal)' : 'Ergebniseingabe (lokal)', action: previousFinal ? 'RESULT_CORRECTED' : 'RESULT_RECORDED', description: previousFinal ? 'Endergebnis nachträglich korrigiert' : 'Endergebnis eingetragen', before: resultText(previous), after: resultText(next), beforeSets: previousFinal ? previous?.sets : undefined, afterSets: previousFinal ? sets : undefined });
+  }
   if (status === 'FINISHED') {
     const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
     if (tournament) settleWithdrawnMatches(tournament);
@@ -799,6 +851,24 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
 }
 
 /** Wertet das Bronze-Spiel ohne Partie: beide Halbfinalverlierer werden Dritte. */
+/** Undo only the most recent administrative correction, while the next phase is unlocked. */
+export function restoreMockCorrectedResult(tournament: DemoTournament, auditId: string) {
+  const events = getMockAudit(tournament.id);
+  const event = events.find((item) => item.id === auditId);
+  if (!event || event.action !== 'RESULT_CORRECTED' || !event.matchId || !event.beforeSets?.length || !event.afterSets?.length) return false;
+  const lastResultChange = events.find((item) => item.matchId === event.matchId && ['RESULT_RECORDED', 'RESULT_CORRECTED', 'RESULT_RESTORED'].includes(item.action));
+  if (lastResultChange?.id !== auditId || !canEditMockMatch(tournament, event.matchId)) return false;
+  const current = readResults();
+  const previous = current.find((item) => item.matchId === event.matchId);
+  if (!previous || previous.status !== 'FINISHED' || JSON.stringify(previous.sets) !== JSON.stringify(event.afterSets)) return false;
+  const restored: StoredMatchResult = { ...previous, sets: event.beforeSets, confirmedA: false, confirmedB: false };
+  writeResults([restored, ...current.filter((item) => item.matchId !== event.matchId)]);
+  const stage = tournament.stages.find((item) => event.matchId!.startsWith(`${item.id}-`));
+  if (stage) refreshCompletedStageQualifiers(tournament, stage);
+  recordMockAudit({ tournamentId: tournament.id, matchId: event.matchId, actor: 'Turnierleitung (lokal)', action: 'RESULT_RESTORED', description: 'Letzte Ergebniskorrektur rückgängig gemacht', before: event.after, after: event.before });
+  return true;
+}
+
 export function skipMockThirdPlaceMatch(tournament: DemoTournament, matchId: string) {
   if (!isMockThirdPlaceMatch(matchId)) return false;
   const stage = tournament.stages.find((item) => `${item.id}-third-place` === matchId);
@@ -815,17 +885,78 @@ export function skipMockThirdPlaceMatch(tournament: DemoTournament, matchId: str
   return true;
 }
 
-export function confirmMockMatchSide(matchId: string, side: 'A' | 'B') {
+export function getMockParticipantCode(tournament: DemoTournament, player: string) {
+  const index = getRuntimeParticipantNames(tournament).indexOf(player);
+  if (index < 0) return null;
+  return tournament.participantCodes?.[player] ?? String(4100 + index).slice(-4);
+}
+
+/** Predictable local-only preview code; never use this mechanism as production authentication. */
+export function getMockMatchCode(matchId: string) {
+  let hash = 2166136261;
+  for (const char of matchId) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+  return hash.toString(36).toUpperCase().padStart(6, '0').slice(-6);
+}
+
+export function verifyMockMatchCode(matchId: string, code: string) {
+  const current = findMockRuntimeMatch(matchId);
+  return code.trim().toUpperCase() === getMockMatchCode(matchId) && Boolean(current && current.match.status === 'LIVE' && current.match.table.startsWith('Tisch '));
+}
+
+export function confirmMockMatchSide(matchId: string, side: 'A' | 'B', playerCode: string) {
+  const found = findMockRuntimeMatch(matchId);
+  if (!found || found.match.status !== 'FINISHED') return false;
+  const player = side === 'A' ? found.match.sideA : found.match.sideB;
+  if (playerCode.trim() !== getMockParticipantCode(found.tournament, player)) return false;
   const current = readResults();
-  const previous = current.find((item) => item.matchId === matchId) ?? { matchId, sets: [], status: 'FINISHED' as MockMatchState };
-  const next = { ...previous, [side === 'A' ? 'confirmedA' : 'confirmedB']: true };
-  if (next.confirmedA && next.confirmedB) { next.status = 'FINISHED'; next.finishedAt ??= Date.now(); }
+  const previous = current.find((item) => item.matchId === matchId);
+  if (!previous || previous.status !== 'FINISHED') return false;
+  const key = side === 'A' ? 'confirmedA' : 'confirmedB';
+  if (previous[key]) return true;
+  const next = { ...previous, [key]: true };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
-  return next;
+  recordMockAudit({ tournamentId: found.tournament.id, matchId, actor: `Teilnehmerseite ${side} (lokaler Code)`, action: 'RESULT_CONFIRMED', description: `${player} hat das Endergebnis bestätigt` });
+  return true;
+}
+
+export function adminConfirmMockMatch(tournament: DemoTournament, matchId: string) {
+  const found = getMockStageMatches(tournament, tournament.stages.find((stage) => matchId.startsWith(`${stage.id}-`)) ?? tournament.stages[0]).find((item) => item.id === matchId);
+  if (!found || found.status !== 'FINISHED') return false;
+  const current = readResults();
+  const previous = current.find((item) => item.matchId === matchId);
+  if (!previous || previous.thirdPlaceSkipped || previous.forcedWinner) return false;
+  if (previous.confirmedA && previous.confirmedB) return true;
+  writeResults([{ ...previous, confirmedA: true, confirmedB: true }, ...current.filter((item) => item.matchId !== matchId)]);
+  recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Turnierleitung (lokal)', action: 'RESULT_CONFIRMED', description: `Endergebnis von ${found.sideA} – ${found.sideB} durch Turnierleitung bestätigt` });
+  return true;
+}
+
+export function countMockOpenConfirmations(tournament: DemoTournament) {
+  const results = readResults();
+  const stageIds = tournament.stages.map((stage) => `${stage.id}-`);
+  return results.filter((result) => stageIds.some((prefix) => result.matchId.startsWith(prefix)) && result.status === 'FINISHED' && result.sets.length > 0 && !result.forcedWinner && !(result.confirmedA && result.confirmedB)).length;
 }
 
 export function getMockMatchConfirmation(matchId: string) {
   return readResults().find((item) => item.matchId === matchId);
+}
+
+/** Swiss-Record des Gegners VOR dem jeweiligen Paarungsdurchgang. */
+export function getSwissRecordBeforeRound(tournament: DemoTournament, stage: TournamentStage, name: string, roundNumber: number) {
+  const results = readResults();
+  let wins = 0;
+  let losses = 0;
+  const fixtures = baseStageMatches(tournament, stage, results);
+  for (const match of fixtures) {
+    if ((Number(match.round.match(/\d+/)?.[0]) || 0) >= roundNumber) continue;
+    if (match.sideA !== name && match.sideB !== name) continue;
+    const finished = results.find((result) => result.matchId === match.id);
+    const winner = match.autoWinner ?? resultWinner(finished, match.sideA, match.sideB);
+    if (!winner) continue;
+    if (winner === name) wins += 1;
+    else losses += 1;
+  }
+  return `${wins}:${losses}`;
 }
 
 export function getMockPlayerSnapshot(tournament: DemoTournament) {
@@ -837,8 +968,8 @@ export function getMockPlayerSnapshot(tournament: DemoTournament) {
     ?? matches.find((match) => match.status === 'WAITING');
   return {
     player,
-    playerCode: '4821',
-    matchCode: 'A7K2',
+    playerCode: getMockParticipantCode(tournament, player) ?? '–',
+    matchCode: (ownLive || next) ? getMockMatchCode((ownLive || next)!.id) : '–',
     currentMatch: ownLive,
     nextMatch: next,
     standing: getActiveStage(tournament)?.type === 'GROUPS'

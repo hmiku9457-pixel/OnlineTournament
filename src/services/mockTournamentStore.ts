@@ -1,4 +1,5 @@
 import { getPhaseLifecycle } from '@/services/mockPhaseLifecycle';
+import { recordMockAudit } from '@/services/mockAudit';
 import { reconcilePrestartDraws } from '@/services/mockDrawStore';
 import type { VenueLayout } from '@/domain/venueLayout';
 import { type DemoTournament } from '@/data/demoTournaments';
@@ -164,6 +165,9 @@ export function updateMockTournamentStatus(tournamentId: string, status: Tournam
       lastUpdate: 'gerade eben',
     };
     writeLocalTournaments(local.map((item) => item.id === tournamentId ? updated : item));
+    if (localTournament.status !== status && (status === 'PAUSED' || (status === 'RUNNING' && localTournament.status === 'PAUSED'))) {
+      recordMockAudit({ tournamentId, actor: 'Turnierleitung (lokal)', action: status === 'PAUSED' ? 'TOURNAMENT_PAUSED' : 'TOURNAMENT_RESUMED', description: status === 'PAUSED' ? 'Turnier pausiert – neue Zuweisungen gesperrt' : 'Turnier fortgesetzt', before: localTournament.status, after: status });
+    }
     return updated;
   }
 
@@ -282,6 +286,7 @@ export function addMockParticipant(
 export function removeLocalPrototypeTournaments() {
   if (typeof window === 'undefined') return;
   window.localStorage.removeItem(STORAGE_KEY);
+  window.localStorage.removeItem('online-tournament:mock-audit:v1');
   window.localStorage.removeItem('online-tournament:mock-match-results:v2');
   window.localStorage.removeItem('online-tournament:mock-match-runtime:v1');
   window.localStorage.removeItem('online-tournament:mock-blocked-tables:v1');

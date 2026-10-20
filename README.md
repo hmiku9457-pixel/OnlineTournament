@@ -120,3 +120,9 @@ lesbar; die Datenbankanbindung wird weiterhin nicht benötigt.
 Im Wizard unter **Grunddaten** ist der Hallenlayout-Editor standardmäßig eingeblendet. Das anfängliche Raster hat **10 × 3 Felder**; bei mehr als 30 Tischen wird es nach unten vergrößert. Der Schalter **Hallenlayout verwenden** entscheidet, ob der Plan mit dem lokalen Turnier gespeichert und in der Tischübersicht angezeigt wird. Der Editor bleibt unabhängig vom Schalter sichtbar.
 
 Unter **Turnierleitung → Teilnehmer** können vor dem **ersten Turnierstart** weitere Einzelspieler beziehungsweise Doppelpaare nachgemeldet werden. Bereits registrierte Namen werden erkannt, ein Spielercode wird automatisch vergeben. Vor Turnierstart zurückgezogene Spieler bleiben zur Nachvollziehbarkeit im Teilnehmerverzeichnis stehen, gehören aber nicht mehr zu Gruppen, K.-o.-Startplätzen oder offenen Spielpaarungen. Nach Turnierstart sind Nachmeldungen gesperrt; für Rückzüge gelten dann weiterhin die Wettkampf-/Walkover-Regeln.
+
+### Lokaler Betriebsmodus (ohne Datenbank)
+
+Die Turnierleitung arbeitet weiterhin mit Browser-`localStorage`. Laufende Spiele können an einen anderen Tisch verlegt oder mitsamt Satzergebnissen wieder in die Warteschlange gesetzt werden. Während einer Pause sind neue Tischzuweisungen gesperrt. Der neue Tab **Protokoll** dokumentiert lokale Änderungen; bei der neuesten Korrektur kann der vorherige Endstand wiederhergestellt werden, solange die Folgephase noch nicht gestartet ist.
+
+**Codes im Prototyp:** Der Match-Code wird für jede Partie aus ihrer ID abgeleitet; der Spielercode stammt aus den Teilnehmerdaten beziehungsweise aus einer lokalen Testnummer. Das ist ausschließlich ein Testmechanismus und **kein Produktions-Sicherheitsmodell**. Vor einem Go-live sind Authentifizierung, serverseitige Autorisierung und sichere zufällige Codes erforderlich. Die lokale Audit-Historie ist nicht manipulationssicher.

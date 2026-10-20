@@ -1,3 +1,5 @@
+OnlineTournament – Dateien im Projekt
+
 .editorconfig
 .env.example
 .github/ISSUE_TEMPLATE/bug_report.md
@@ -10,7 +12,6 @@
 .prettierrc.json
 CHANGELOG.md
 CONTRIBUTING.md
-FILE_MANIFEST.txt
 LICENSE
 README.md
 SECURITY.md
@@ -59,6 +60,7 @@ src/pages/TournamentControlPage.tsx
 src/pages/TournamentPage.tsx
 src/services/matchAccess.ts
 src/services/matchPresentation.ts
+src/services/mockAudit.ts
 src/services/mockCompetitionViews.ts
 src/services/mockDrawStore.ts
 src/services/mockDuration.ts
@@ -93,6 +95,7 @@ tests/standings.test.ts
 tests/swiss-score-groups.test.ts
 tests/swiss.test.ts
 tests/tableLocksAndDuration.test.ts
+tests/tournamentControlOperations.test.ts
 tests/tournamentCreation.test.ts
 tests/venueLayout.test.ts
 tests/withdrawal.test.ts

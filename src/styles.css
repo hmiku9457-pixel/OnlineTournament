@@ -1180,3 +1180,40 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .participant-add-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .participant-add-panel .field-error, .participant-add-panel .field-hint { margin: 0; }
 @media (max-width: 700px) { .participant-add-fields { grid-template-columns: 1fr; } }
+
+/* Final tournament-control layout: one right rail with three equal-width cards. */
+@media (min-width: 1101px) {
+  .control-overview-stack {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 12px;
+    align-items: start;
+  }
+  .control-overview-stack > div:first-child { grid-column: 1; grid-row: 1; min-width: 0; }
+  .control-overview-columns { display: contents; }
+  .control-overview-columns > main { grid-column: 1; grid-row: 2; min-width: 0; }
+  .control-overview-columns > .control-side {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    width: 280px;
+    min-width: 0;
+    align-self: start;
+    position: sticky;
+    top: 14px;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
+.control-overview-columns .control-side > .card { width: 100%; min-width: 0; }
+.control-hall-layout .hall-mini { min-width: 0; width: 100%; }
+.control-hall-layout .hall-plan-scroller { max-width: 100%; }
+.table-operational-actions { display: flex; gap: 5px; flex-wrap: wrap; padding-top: 5px; border-top: 1px solid #eaecf0; }
+.table-operational-actions > .btn { flex: 1 1 120px; min-width: 0; font-size: .75rem; }
+.swiss-opponent-record { color: #667085; font-weight: 600; font-size: .8rem; margin-left: 5px; white-space: nowrap; }
+.audit-list { display: grid; margin-top: 12px; }
+.audit-row { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 16px; align-items: start; padding: 14px 0; border-bottom: 1px solid #eaecf0; overflow-wrap: anywhere; }
+.audit-row:last-child { border-bottom: 0; }
+.audit-row .muted { font-size: .8rem; }
+.audit-values { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 6px; font-size: .84rem; }
+.audit-values > span { background: #f9fafb; padding: 5px 8px; border-radius: 6px; }
+@media (max-width: 700px) { .audit-row { grid-template-columns: 1fr; gap: 5px; } }

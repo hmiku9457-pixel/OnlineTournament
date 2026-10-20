@@ -1,3 +1,14 @@
+## Unreleased – Turnierleitung: Zuweisung, Bestätigungen und Betrieb
+
+- Laufende Spiele können auf einen freien Tisch verlegt oder mitsamt vorhandener Sätze in die Warteschlange zurückgestellt werden. Der ursprüngliche Startzeitpunkt und der Pausenwert bleiben erhalten.
+- Während einer Turnierpause verbietet die gemeinsame Runtime jegliche neue Zuweisung (Button, Auto-Zuweisung, Drag & Drop); laufende Spiele dürfen abgeschlossen werden.
+- Offene Ergebnisbestätigungen werden aus echten, gespeicherten Ergebnissen ermittelt. Tablet-Codes werden nun im lokalen Prototyp geprüft; die Turnierleitung kann ein Ergebnis selbst bestätigen.
+- Neuer Protokoll-Tab für Tischaktionen, Satzspeicherung, Ergebniskorrekturen, Bestätigungen und Pause/Fortsetzen; die letzte Ergebniskorrektur kann vor dem Start der Folgephase sicher zurückgenommen werden. Audit-Akteure sind lokale Rollenbezeichnungen, keine Authentifizierung.
+- Schweizer Spielerhistorie zeigt pro Runde die Gegnerbilanz **vor** der Begegnung.
+- Turnierstatus, Hallenlayout und Schnellzugriff stehen als gleich breite Karten gemeinsam rechts neben den Tischen und der Warteschlange.
+- Pausenzeiten werden bei Beginn einer Partie eingefroren und bleiben bei Abschluss, Navigation und Tischverlegung identisch. Für ältere Partien ohne gespeicherten Startzeitpunkt wird kein erfundener Wert angezeigt.
+- Neue Regressionstests und separater Runtime-Smoke-Test für Zuweisung, Pausen, Codes, Audit und Schweizer Matchups.
+
 ## UI-Prototyp – Hallenlayout und Nachmeldungen (2026-10-20)
 
 - Hallenlayout-Editor im ersten Erstellungsschritt standardmäßig sichtbar; ein einfacher Toggle steuert ausschließlich, ob das Layout ins Turnier übernommen wird (standardmäßig aktiviert).

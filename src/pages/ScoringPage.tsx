@@ -8,6 +8,8 @@ import {
   confirmMockMatchSide,
   findMockRuntimeMatch,
   getMockMatchConfirmation,
+  getMockMatchCode,
+  verifyMockMatchCode,
 } from '@/services/mockRuntime';
 
 function winsFromSets(sets: MatchSet[]) {
@@ -28,6 +30,9 @@ export function ScoringPage() {
   const existing = matchId ? getMockMatchConfirmation(matchId) : undefined;
   const [unlocked, setUnlocked] = useState(false);
   const [matchCode, setMatchCode] = useState('');
+  const [codeA, setCodeA] = useState('');
+  const [codeB, setCodeB] = useState('');
+  const [codeError, setCodeError] = useState('');
   const [completed, setCompleted] = useState(runtime?.match.status === 'FINISHED');
   const [completedSets, setCompletedSets] = useState<MatchSet[]>(runtime?.match.sets ?? existing?.sets ?? []);
   const [confirmedA, setConfirmedA] = useState(Boolean(existing?.confirmedA));
@@ -44,9 +49,22 @@ export function ScoringPage() {
 
   function confirm(side: 'A' | 'B') {
     if (!matchId) return;
-    confirmMockMatchSide(matchId, side);
+    if (!confirmMockMatchSide(matchId, side, side === 'A' ? codeA : codeB)) {
+      setCodeError(`Spielercode von ${side === 'A' ? sideA : sideB} ungültig.`);
+      return;
+    }
+    setCodeError('');
     if (side === 'A') setConfirmedA(true);
     else setConfirmedB(true);
+  }
+
+  function unlock() {
+    if (!matchId || !verifyMockMatchCode(matchId, matchCode)) {
+      setCodeError('Falscher Match-Code. Bitte den Code aus der Spieleransicht verwenden.');
+      return;
+    }
+    setCodeError('');
+    setUnlocked(true);
   }
 
   if (!runtime) {
@@ -81,12 +99,14 @@ export function ScoringPage() {
               placeholder="z. B. A7K2"
               onChange={(e: ChangeEvent<HTMLInputElement>) => setMatchCode(e.target.value.toUpperCase())}
               onKeyDown={(event) => {
-                if (event.key === 'Enter' && matchCode.trim()) setUnlocked(true);
+                if (event.key === 'Enter') unlock();
               }}
             />
           </div>
+          <p className="field-hint">Testcode dieser Partie: <strong>{matchId ? getMockMatchCode(matchId) : '–'}</strong> (nur lokaler Prototyp)</p>
+          {codeError && <p className="field-error" role="alert">{codeError}</p>}
           <div className="actions" style={{ marginTop: 16 }}>
-            <button className="btn primary" disabled={!matchCode.trim()} onClick={() => setUnlocked(true)}>Freischalten</button>
+            <button className="btn primary" disabled={!matchCode.trim()} onClick={unlock}>Freischalten</button>
             <Link className="btn" to={`/player/${runtime.tournament.id}`}>Spieleransicht</Link>
           </div>
         </div>
@@ -118,15 +138,16 @@ export function ScoringPage() {
           <div className="confirmation-grid">
             <div className={confirmedA ? 'confirmation-side confirmed' : 'confirmation-side'}>
               <strong>{sideA}</strong>
-              <input className="code-box" placeholder="Spielercode" disabled={confirmedA} />
+              <input className="code-box" aria-label={`Spielercode ${sideA}`} placeholder="Spielercode" value={codeA} onChange={(event) => setCodeA(event.target.value)} disabled={confirmedA} />
               <button className="btn" type="button" onClick={() => confirm('A')} disabled={confirmedA}>{confirmedA ? 'Bestätigt ✓' : 'Bestätigen'}</button>
             </div>
             <div className={confirmedB ? 'confirmation-side confirmed' : 'confirmation-side'}>
               <strong>{sideB}</strong>
-              <input className="code-box" placeholder="Spielercode" disabled={confirmedB} />
+              <input className="code-box" aria-label={`Spielercode ${sideB}`} placeholder="Spielercode" value={codeB} onChange={(event) => setCodeB(event.target.value)} disabled={confirmedB} />
               <button className="btn" type="button" onClick={() => confirm('B')} disabled={confirmedB}>{confirmedB ? 'Bestätigt ✓' : 'Bestätigen'}</button>
             </div>
           </div>
+          {codeError && <p className="field-error" role="alert">{codeError}</p>}
           {confirmedA && confirmedB && <div className="score-confirmed-banner">Ergebnis vollständig bestätigt ✓</div>}
         </div>
       </section>
