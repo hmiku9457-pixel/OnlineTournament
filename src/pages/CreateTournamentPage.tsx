@@ -290,6 +290,13 @@ export function CreateTournamentPage() {
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(false);
   const [name, setName] = useState('');
   const [sport, setSport] = useState('table_tennis');
+  const timedSport = sport !== 'table_tennis';
+  const [timedMatchMinutes, setTimedMatchMinutes] = useState('');
+  const [venueTurnoverMinutes, setVenueTurnoverMinutes] = useState('');
+  const validMatchDuration = !timedSport || (timedMatchMinutes.trim() !== '' && Number.isInteger(Number(timedMatchMinutes)) && Number(timedMatchMinutes) > 0);
+  const validTurnover = venueTurnoverMinutes.trim() === '' || (Number.isInteger(Number(venueTurnoverMinutes)) && Number(venueTurnoverMinutes) >= 0);
+  const matchDurationMinutes = timedSport ? Number(timedMatchMinutes) || 15 : 15;
+  const breakMinutes = timedSport ? Number(venueTurnoverMinutes) || 0 : 0;
   const [discipline, setDiscipline] = useState<Discipline>('SINGLES');
   const [tables, setTables] = useState(8);
   const [customTables, setCustomTables] = useState(false);
@@ -327,7 +334,7 @@ export function CreateTournamentPage() {
 
   const recommendations = useMemo(
     () => recommendTournamentFormats(
-      { playerCount: participantCount, tableCount: tables, minimumMatches },
+      { playerCount: participantCount, tableCount: tables, minimumMatches, matchDurationMinutes, venueTurnoverMinutes: breakMinutes },
       {
         enabledSystems,
         maxGroups: effectiveMaxGroups,
@@ -339,6 +346,8 @@ export function CreateTournamentPage() {
       participantCount,
       tables,
       minimumMatches,
+      matchDurationMinutes,
+      breakMinutes,
       enabledSystems,
       effectiveMaxGroups,
       effectiveMaxSwissRounds,
@@ -370,7 +379,7 @@ export function CreateTournamentPage() {
   const canContinue =
     (step === 1 && Boolean(name.trim()) && tables >= 1) ||
     (step === 2 && participantsValid) ||
-    (step === 3 && minimumMatches >= 1) ||
+    (step === 3 && minimumMatches >= 1 && validMatchDuration && validTurnover) ||
     step === 4 ||
     step === 5;
 
@@ -626,6 +635,8 @@ export function CreateTournamentPage() {
       discipline,
       tables,
       minimumMatches,
+      matchDurationMinutes,
+      venueTurnoverMinutes: breakMinutes,
       participantNames: participants.map((participant) => participantDisplayName(participant, discipline)),
       phases: phaseDrafts.map((phase) => ({
         type: phase.type,
@@ -653,8 +664,9 @@ export function CreateTournamentPage() {
         knockoutBestOf: phase.knockoutBestOf,
       })),
       tables,
+      timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : undefined,
     ),
-    [phaseDrafts, tables],
+    [phaseDrafts, tables, timedSport, matchDurationMinutes, breakMinutes],
   );
 
   const phaseEstimates = useMemo(
@@ -665,8 +677,8 @@ export function CreateTournamentPage() {
       groupCount: phase.groupCount,
       swissRounds: phase.swissRounds,
       knockoutBestOf: phase.knockoutBestOf,
-    }, tables)),
-    [phaseDrafts, tables],
+    }, tables, timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : undefined)),
+    [phaseDrafts, tables, timedSport, matchDurationMinutes, breakMinutes],
   );
 
   return (
@@ -709,6 +721,9 @@ export function CreateTournamentPage() {
                 <label htmlFor="sport">Sportart</label>
                 <select id="sport" value={sport} onChange={(event) => setSport(event.target.value)}>
                   <option value="table_tennis">Tischtennis</option>
+                  <option value="football">Fußball (auf Zeit)</option>
+                  <option value="handball">Handball (auf Zeit)</option>
+                  <option value="basketball">Basketball (auf Zeit)</option>
                 </select>
               </div>
               <div className="field">
@@ -884,6 +899,17 @@ export function CreateTournamentPage() {
                   onCustomValue={setMinimumMatches}
                 />
               </div>
+              <div className="field match-timing-fields">
+                <label htmlFor="match-duration">{timedSport ? 'Spieldauer (Minuten) *' : 'Satzdauer (Minuten)'}</label>
+                <input id="match-duration" type="number" min="1" step="1" required={timedSport} value={timedSport ? timedMatchMinutes : '15'} disabled={!timedSport} placeholder={timedSport ? 'Pflichtfeld – z. B. 12' : undefined} onChange={(event) => setTimedMatchMinutes(event.target.value)} />
+                {!timedSport && <span className="field-hint">Tischtennis: fest 15 Minuten je Satz.</span>}
+                {timedSport && <>
+                  <label htmlFor="venue-turnover">Pause zwischen Spielen am selben Platz (Minuten)</label>
+                  <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => setVenueTurnoverMinutes(event.target.value)} />
+                  <span className="field-hint">Die Pause wird in der groben Spielplan-Dauer berücksichtigt; leer bedeutet 0 Minuten.</span>
+                  {(!validMatchDuration || !validTurnover) && <span className="field-error">Bitte gültige ganze Minutenwerte angeben. Die Spieldauer ist erforderlich.</span>}
+                </>}
+              </div>
               <div className="summary-box">
                 <strong>{participantCount}</strong>
                 <span>{discipline === 'SINGLES' ? 'Teilnehmer' : 'Doppel'}</span>
@@ -918,7 +944,7 @@ export function CreateTournamentPage() {
                     <h3>{item.label}</h3>
                     <p>{item.description}</p>
                     <p className="muted">Geschätzte Spiele insgesamt: {item.estimatedMatches}</p>
-                    <p className="muted">Basisdauer: ca. {formatDuration(item.estimatedDurationMinutes)} · gerechnet mit 15 Min. pro Satz und mindestens 1 Satz pro Spiel.</p>
+                    <p className="muted">Basisdauer: ca. {formatDuration(item.estimatedDurationMinutes)} · {timedSport ? `${matchDurationMinutes} Min. Spieldauer + ${breakMinutes} Min. Platzwechsel` : '15 Min. pro Satz und mindestens 1 Satz pro Spiel'}.</p>
                   </button>
                 ))}
               </div>

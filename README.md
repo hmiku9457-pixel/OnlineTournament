@@ -126,3 +126,12 @@ Unter **Turnierleitung → Teilnehmer** können vor dem **ersten Turnierstart** 
 Die Turnierleitung arbeitet weiterhin mit Browser-`localStorage`. Laufende Spiele können an einen anderen Tisch verlegt oder mitsamt Satzergebnissen wieder in die Warteschlange gesetzt werden. Während einer Pause sind neue Tischzuweisungen gesperrt. Der neue Tab **Protokoll** dokumentiert lokale Änderungen; bei der neuesten Korrektur kann der vorherige Endstand wiederhergestellt werden, solange die Folgephase noch nicht gestartet ist.
 
 **Codes im Prototyp:** Der Match-Code wird für jede Partie aus ihrer ID abgeleitet; der Spielercode stammt aus den Teilnehmerdaten beziehungsweise aus einer lokalen Testnummer. Das ist ausschließlich ein Testmechanismus und **kein Produktions-Sicherheitsmodell**. Vor einem Go-live sind Authentifizierung, serverseitige Autorisierung und sichere zufällige Codes erforderlich. Die lokale Audit-Historie ist nicht manipulationssicher.
+
+
+### Turnierleitung – lokale UX-Erweiterungen (Oktober 2026)
+
+Der Hallenlayout-Editor hat weiterhin ein 10×3-Ausgangsraster. „Freifläche setzen“ markiert einen Laufweg; ein erneuter Klick auf die Markierung mit aktivem Werkzeug entfernt ihn. Eine echte Server-/Datenbankanbindung ist nicht nötig.
+
+Bei Tischtennis dient die feste Satzdauer von **15 Minuten** als Planungsannahme. Bei zeitbasierten Sportarten werden eine verpflichtende **Spieldauer in Minuten** und optional die **Pause zwischen Spielen am selben Platz** erfasst. Die Zeiterfassung und Eingabe sportartspezifischer Ergebnisse (z. B. Tore statt TT-Satzpunkte) bleibt eine spätere Erweiterung; die neuen Werte dienen vorerst der Planung und Zuweisung im lokalen Prototyp.
+
+Bei einem Best-of-3/5/7 bleibt der entscheidende Satz zunächst ein *vorläufiges Ergebnis*. „Endergebnis bestätigen“ schließt das Match und gibt den Tisch frei; zuvor können einzelne Sätze geändert werden. Best-of-1 endet wie bisher sofort nach der Satzbestätigung.

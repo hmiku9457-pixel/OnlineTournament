@@ -27,6 +27,8 @@ export interface CreateMockTournamentInput {
   phases: MockPhaseInput[];
   estimatedDurationMinutes: number;
   venueLayout?: VenueLayout;
+  matchDurationMinutes?: number;
+  venueTurnoverMinutes?: number;
 }
 
 function readLocalTournaments(): DemoTournament[] {
@@ -98,7 +100,7 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
     subtitle: `${input.discipline === 'DOUBLES' ? 'Doppel' : 'Einzel'} · ${phaseLabel(input.phases)}`,
     status: 'READY',
     visibility: 'PRIVATE',
-    sport: input.sport === 'table_tennis' ? 'Tischtennis' : input.sport,
+    sport: ({ table_tennis: 'Tischtennis', football: 'Fußball', handball: 'Handball', basketball: 'Basketball' } as Record<string, string>)[input.sport] ?? input.sport,
     discipline: input.discipline,
     participants: input.participantNames.length,
     tables: input.tables,
@@ -114,6 +116,8 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
     isLocalPrototype: true,
     hasStarted: false,
     venueLayout: input.venueLayout,
+    matchDurationMinutes: input.matchDurationMinutes ?? 15,
+    venueTurnoverMinutes: input.venueTurnoverMinutes ?? 0,
   };
 
   const existing = readLocalTournaments();
@@ -217,6 +221,18 @@ export function updateMockParticipantName(tournamentId: string, oldName: string,
       }
     } catch { /* Keine gespeicherten Rückzüge vorhanden. */ }
   }
+  if (name !== oldName) {
+    try {
+      const key = 'online-tournament:withdrawal-restore:v1';
+      const records = JSON.parse(window.localStorage.getItem(key) ?? '{}') as Record<string, Record<string, unknown>>;
+      const current = records[tournamentId];
+      if (current?.[oldName]) {
+        current[name] = current[oldName];
+        delete current[oldName];
+        window.localStorage.setItem(key, JSON.stringify(records));
+      }
+    } catch { /* Ignore broken legacy mock data. */ }
+  }
   const oldCodes = tournament.participantCodes ?? {};
   const { [oldName]: _oldCode, ...restCodes } = oldCodes;
   void _oldCode;
@@ -293,6 +309,7 @@ export function removeLocalPrototypeTournaments() {
   window.localStorage.removeItem('online-tournament:mock-draw-config:v1');
   window.localStorage.removeItem('online-tournament:mock-phase-lifecycle:v1');
   window.localStorage.removeItem('online-tournament:withdrawn-participants:v1');
+  window.localStorage.removeItem('online-tournament:withdrawal-restore:v1');
   window.localStorage.removeItem('online-tournament:swiss-round-fixtures:v1');
 }
 

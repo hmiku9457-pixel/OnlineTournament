@@ -61,7 +61,7 @@ export function placeVenueCell(layout: VenueLayout, cell: VenueCell, target: num
     // A table may never be erased by painting a walkway/blank cell.
     if (next[target].startsWith('table:')) return layout;
     if (next[target] === 'desk') return layout;
-    next[target] = cell;
+    next[target] = cell === 'space' && next[target] === 'space' ? '' : cell;
     return { ...layout, cells: next };
   }
   const source = next.findIndex((entry) => entry === cell);

@@ -1,4 +1,4 @@
-OnlineTournament – Dateien im Projekt
+OnlineTournament – project file manifest
 
 .editorconfig
 .env.example
@@ -12,6 +12,7 @@ OnlineTournament – Dateien im Projekt
 .prettierrc.json
 CHANGELOG.md
 CONTRIBUTING.md
+FILE_MANIFEST.txt
 LICENSE
 README.md
 SECURITY.md
@@ -36,6 +37,7 @@ src/components/SetBySetEntry.tsx
 src/components/StageCard.tsx
 src/components/VenueLayout.tsx
 src/data/demoTournaments.ts
+src/domain/matchFinalization.ts
 src/domain/rules.ts
 src/domain/tournamentCreation.ts
 src/domain/types.ts
@@ -97,6 +99,7 @@ tests/swiss.test.ts
 tests/tableLocksAndDuration.test.ts
 tests/tournamentControlOperations.test.ts
 tests/tournamentCreation.test.ts
+tests/uxFinalizeAndWithdraw.test.ts
 tests/venueLayout.test.ts
 tests/withdrawal.test.ts
 tsconfig.app.json

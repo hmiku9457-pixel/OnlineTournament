@@ -1,10 +1,10 @@
-import { isParticipantWithdrawn, saveParticipantWithdrawal } from '@/services/mockWithdrawals';
+import { isParticipantWithdrawn, saveParticipantWithdrawal, removeParticipantWithdrawal, markWithdrawalRestoreEligibility, getWithdrawalRestoreEligibility } from '@/services/mockWithdrawals';
 import { reconcilePrestartDraws } from '@/services/mockDrawStore';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
 import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
-import { completeStage, getActiveStage, getStageEntrants, isStageCompleted, isStageStarted, setStageEntrants } from '@/services/mockPhaseLifecycle';
+import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, isStageCompleted, isStageStarted, setStageEntrants } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import { isMockTableBlocked } from '@/services/mockTableLocks';
@@ -508,6 +508,21 @@ export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId
   if (currentTournament.status !== 'RUNNING') return 'Pause aktiv oder Turnier nicht gestartet: Neue Tischzuweisungen sind gesperrt.';
   if (!/^Tisch [1-9]\d*$/.test(table) || Number(table.slice(6)) > tournament.tables) return 'Ungültiger Tisch.';
   if (isMockTableBlocked(tournament, table)) return `${table} ist für dieses Turnier gesperrt.`;
+  // Timed sports: keep the configured turnover interval between consecutive
+  // matches on this venue; the completed match retains its final table ID.
+  const turnover = currentTournament.sport !== 'Tischtennis' ? Math.max(0, currentTournament.venueTurnoverMinutes ?? 0) : 0;
+  if (turnover > 0) {
+    const runtime = readRuntime();
+    const latestFinish = readResults()
+      .filter((result) => result.status === 'FINISHED' && typeof result.finishedAt === 'number'
+        && currentTournament.stages.some((stage) => result.matchId.startsWith(`${stage.id}-`))
+        && runtime.some((entry) => entry.matchId === result.matchId && entry.table === table))
+      .reduce((latest, result) => Math.max(latest, result.finishedAt ?? 0), 0);
+    if (latestFinish && Date.now() - latestFinish < turnover * 60_000) {
+      const remaining = Math.ceil((turnover * 60_000 - (Date.now() - latestFinish)) / 60_000);
+      return `${table}: noch ${remaining} Min. Pause bis zur nächsten Partie.`;
+    }
+  }
   const matches = getMockRuntimeMatches(tournament);
   const target = matches.find((match) => match.id === matchId);
   if (!target) return 'Spiel wurde nicht gefunden.';
@@ -647,6 +662,14 @@ export function reconcileWithdrawalsForTournament(tournament: DemoTournament) {
 
 export function withdrawMockParticipant(tournament: DemoTournament, name: string) {
   if (!getRuntimeParticipantNames(tournament).includes(name) || isMockParticipantWithdrawn(tournament, name)) return false;
+  const activeAtWithdrawal = getActiveStage(tournament);
+  const next = getNextStartableStage(tournament);
+  const beforeFirstStart = !tournament.hasStarted && !tournament.stages.some((stage) => isStageStarted(tournament, stage));
+  const qualifiedForUpcoming = Boolean(!activeAtWithdrawal && next && getStageEntrants(tournament, next).includes(name));
+  markWithdrawalRestoreEligibility(tournament.id, name,
+    beforeFirstStart ? { kind: 'PRESTART', phaseId: tournament.stages[0]?.id ?? null }
+      : qualifiedForUpcoming && next ? { kind: 'BETWEEN_PHASES', phaseId: next.id }
+      : null);
   saveParticipantWithdrawal(tournament, name);
   if (!tournament.hasStarted && !tournament.stages.some((stage) => isStageStarted(tournament, stage))) {
     // Eine zurückgezogene Person wird vor dem Turnierbeginn ersatzlos aus
@@ -670,6 +693,38 @@ export function withdrawMockParticipant(tournament: DemoTournament, name: string
     const unfinished = getMockStageMatches(tournament, active).some((match) => match.status !== 'FINISHED');
     if (!unfinished) reconcileCompletedPhase(`${active.id}-withdrawal`);
   }
+  window.dispatchEvent(new CustomEvent('mock-runtime-change'));
+  return true;
+}
+
+/** Undo is allowed only if withdrawal happened BEFORE a phase started, and
+ * for later phases only when the participant had qualified at withdrawal time. */
+export function canRestoreMockParticipant(tournament: DemoTournament, name: string) {
+  if (!isMockParticipantWithdrawn(tournament, name)) return false;
+  const record = getWithdrawalRestoreEligibility(tournament.id, name);
+  if (!record) return false;
+  if (record.kind === 'PRESTART') {
+    return !tournament.hasStarted && !tournament.stages.some((stage) => isStageStarted(tournament, stage));
+  }
+  const stage = tournament.stages.find((item) => item.id === record.phaseId);
+  if (!stage || isStageStarted(tournament, stage) || getActiveStage(tournament)) return false;
+  const previous = tournament.stages[tournament.stages.indexOf(stage) - 1];
+  return Boolean(previous && isStageCompleted(tournament, previous));
+}
+
+export function restoreMockParticipant(tournament: DemoTournament, name: string) {
+  if (!canRestoreMockParticipant(tournament, name)) return false;
+  const record = getWithdrawalRestoreEligibility(tournament.id, name)!;
+  removeParticipantWithdrawal(tournament, name);
+  if (record.kind === 'PRESTART') reconcilePrestartDraws(tournament);
+  else {
+    const upcoming = tournament.stages.find((stage) => stage.id === record.phaseId);
+    if (upcoming) {
+      const previous = tournament.stages[tournament.stages.indexOf(upcoming) - 1];
+      if (previous) refreshCompletedStageQualifiers(tournament, previous);
+    }
+  }
+  recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'PARTICIPANT_RESTORED', description: `${name}: Rückzug vor Phasenstart rückgängig gemacht` });
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
   return true;
 }

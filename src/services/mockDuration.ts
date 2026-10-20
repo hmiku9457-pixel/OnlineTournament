@@ -95,7 +95,11 @@ function remainingStageJobs(tournament: DemoTournament, stage: TournamentStage):
 
 export function estimateRemainingTournamentMinutes(tournament: DemoTournament): number | null {
   const availableTables = tournament.tables - getBlockedMockTables(tournament).length;
-  const stageJobs = tournament.stages.map((stage) => ({ stage, jobs: remainingStageJobs(tournament, stage) }));
+  const timedSport = tournament.sport !== 'Tischtennis';
+  const gameMinutes = Math.max(1, tournament.matchDurationMinutes ?? 15) + Math.max(0, tournament.venueTurnoverMinutes ?? 0);
+  const stageJobs = tournament.stages.map((stage) => ({ stage, jobs: remainingStageJobs(tournament, stage).map((job) => ({
+    ...job, remainingMinutes: timedSport ? gameMinutes : job.remainingMinutes,
+  })) }));
   if (stageJobs.every(({ jobs }) => jobs.length === 0)) return 0;
   if (availableTables <= 0) return null;
 

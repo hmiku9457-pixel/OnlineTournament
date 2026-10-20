@@ -31,6 +31,8 @@ export interface DemoTournament {
   isLocalPrototype?: boolean;
   hasStarted?: boolean;
   venueLayout?: VenueLayout;
+  matchDurationMinutes?: number;
+  venueTurnoverMinutes?: number;
 }
 
 // Statische Testturniere wurden bewusst entfernt. Der UI-Prototyp arbeitet ab jetzt

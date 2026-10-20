@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { MatchSet } from '@/domain/types';
+import { getMatchFinalization } from '@/domain/matchFinalization';
 import { completeMockMatch, saveMockMatchSets, type MockRuntimeMatch } from '@/services/mockRuntime';
 
 export function parseShortSet(value: string, number: number): MatchSet | null {
@@ -53,18 +54,21 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
   const [playedSets, setPlayedSets] = useState<MatchSet[]>(match.sets ?? []);
   const [editingFinished, setEditingFinished] = useState(false);
   const [currentValue, setCurrentValue] = useState('');
+  const [editingSetIndex, setEditingSetIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const winsNeeded = Math.ceil(match.bestOf / 2);
   const wins = useMemo(() => winsFromSets(playedSets), [playedSets]);
-  const currentSetNumber = playedSets.length + 1;
+  const currentSetNumber = editingSetIndex === null ? playedSets.length + 1 : editingSetIndex + 1;
   const parsedCurrent = parseShortSet(currentValue, currentSetNumber);
-  const alreadyFinished = !editingFinished && (wins.a >= winsNeeded || wins.b >= winsNeeded);
+  const resultReached = getMatchFinalization(match.bestOf, playedSets) !== 'IN_PROGRESS';
+  const alreadyFinished = !editingFinished && match.status === 'FINISHED';
+  const needsFinalApproval = match.bestOf > 1 && resultReached && !alreadyFinished;
 
   useEffect(() => {
     setPlayedSets(match.sets ?? []);
     setCurrentValue('');
     setError(null);
     setEditingFinished(false);
+    setEditingSetIndex(null);
   }, [match.id, match.sets]);
 
   function confirmSet() {
@@ -74,21 +78,46 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
       return;
     }
 
-    const nextSets = [...playedSets, parsedCurrent];
-    const nextWins = winsFromSets(nextSets);
-    const finished = nextWins.a >= winsNeeded || nextWins.b >= winsNeeded;
-
-    if (finished) completeMockMatch(match.id, nextSets, 'FINISHED');
-    else if (!editingFinished) saveMockMatchSets(match.id, nextSets, 'LIVE');
+    const nextSets = editingSetIndex === null
+      ? [...playedSets, parsedCurrent]
+      : playedSets.map((set, index) => index === editingSetIndex ? parsedCurrent : set);
+    const nextFinalization = getMatchFinalization(match.bestOf, nextSets);
 
     setPlayedSets(nextSets);
     setCurrentValue('');
+    setEditingSetIndex(null);
     setError(null);
-    if (!editingFinished || finished) onSaved?.();
-    if (finished) {
+    // Best-of-1 is unambiguous and finishes after its single confirmed set.
+    if (nextFinalization === 'AUTO_FINISH') {
+      completeMockMatch(match.id, nextSets, 'FINISHED');
       setEditingFinished(false);
+      onSaved?.();
       onCompleted?.(nextSets);
+      return;
     }
+    // With BO3/BO5/BO7 the winning set is saved only as a *live draft*.
+    // The table stays occupied until the separate final result confirmation.
+    if (!editingFinished) {
+      saveMockMatchSets(match.id, nextSets, 'LIVE');
+      onSaved?.();
+    }
+  }
+
+  function finalizeResult() {
+    if (!needsFinalApproval) return;
+    completeMockMatch(match.id, playedSets, 'FINISHED');
+    setEditingFinished(false);
+    setError(null);
+    onSaved?.();
+    onCompleted?.(playedSets);
+  }
+
+  function correctSet(index: number) {
+    const previous = playedSets[index];
+    if (!previous || alreadyFinished) return;
+    setEditingSetIndex(index);
+    setCurrentValue(`${previous.sideAScore}:${previous.sideBScore}`);
+    setError(null);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -109,16 +138,19 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
         <div className="played-set-history" aria-label="Bisher gespielte Sätze">
           <ul>
             {playedSets.map((set) => (
-              <li key={set.number}>{set.sideAScore}:{set.sideBScore}</li>
+              <li key={set.number} className="played-set-item">
+                <span>{set.sideAScore}:{set.sideBScore}</span>
+                {!alreadyFinished && <button className="set-correct-button" type="button" onClick={() => correctSet(set.number - 1)} aria-label={`Satz ${set.number} korrigieren`}>Ändern</button>}
+              </li>
             ))}
           </ul>
         </div>
       )}
 
-      {!alreadyFinished && currentSetNumber <= match.bestOf && (
+      {!alreadyFinished && (!needsFinalApproval || editingSetIndex !== null) && currentSetNumber <= match.bestOf && (
         <div className="current-set-entry-row">
           <label className="current-set-field">
-            <span>Satz {currentSetNumber}</span>
+            <span>Satz {currentSetNumber}{editingSetIndex !== null ? ' korrigieren' : ''}</span>
             <input
               aria-label={`Satz ${currentSetNumber}`}
               inputMode="numeric"
@@ -130,11 +162,19 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
             />
           </label>
           <button className="btn small primary" type="button" disabled={!parsedCurrent} onClick={confirmSet}>
-            Satz {currentSetNumber} bestätigen
+            Satz {currentSetNumber} {editingSetIndex !== null ? 'korrigieren' : 'bestätigen'}
           </button>
         </div>
       )}
 
+
+      {needsFinalApproval && editingSetIndex === null && (
+        <div className="result-approval-panel" role="status">
+          <strong>Vorläufiges Endergebnis: {wins.a}:{wins.b}</strong>
+          <p>Bitte alle Sätze prüfen. Erst mit der Bestätigung wird das Spiel abgeschlossen und der Tisch wieder frei.</p>
+          <button className="btn small primary" type="button" onClick={finalizeResult}>Endergebnis bestätigen</button>
+        </div>
+      )}
 
       {allowEditFinished && !editingFinished && match.status === 'FINISHED' && (match.sets?.length ?? 0) > 0 && (
         <div className="finished-result-actions">
@@ -146,6 +186,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
               setCurrentValue('');
               setError(null);
               setEditingFinished(true);
+              setEditingSetIndex(null);
             }}
           >
             Ergebnis neu eingeben

@@ -83,22 +83,21 @@ export function VenueLayoutEditor({ layout, tableCount, onChange }: {
           <label className="field">Reihen
             <input type="number" min="1" max="40" value={layout.rows} onChange={(e) => onChange(resizeVenueLayout(layout, layout.columns, Number(e.target.value), tableCount))} />
           </label>
+          <label className="field hall-dock-field">Turnierleitung außerhalb
+            <select value={layout.deskDock} onChange={(e) => { onChange(dockVenueDesk(layout, e.target.value as DeskDock)); setSelected(null); }}>
+              {Object.entries(dockNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
         </div>
-        <button type="button" className="btn small" onClick={() => onChange({ ...resizeVenueLayout(createVenueLayout(tableCount), tableCount, 1, tableCount), deskDock: layout.deskDock })}>Tische in eine Reihe</button>
       </div>
       <p className="field-hint">Wähle einen Tisch oder ziehe ihn auf ein anderes Feld. Belegte Felder werden getauscht. Freiflächen bleiben absichtlich leer.</p>
       <div className="hall-editor-tools">
         <button type="button" className={`btn small ${selected === 'space' ? 'primary' : ''}`} onClick={() => setSelected('space')}>Freifläche setzen</button>
-        <button type="button" className={`btn small ${selected === '' ? 'primary' : ''}`} onClick={() => setSelected('')}>Freies Feld</button>
         <button type="button" className={`btn small ${selected === 'desk' ? 'primary' : ''}`} onClick={() => setSelected('desk')}>Turnierleitung im Raster</button>
+        <button type="button" className="btn small" onClick={() => onChange({ ...resizeVenueLayout(createVenueLayout(tableCount), tableCount, 1, tableCount), deskDock: layout.deskDock })}>Tische in eine Reihe</button>
         {selected !== null && <button type="button" className="btn small" onClick={() => setSelected(null)}>Auswahl aufheben</button>}
       </div>
       <HallGrid layout={layout} compact={false} selected={selected} onPlace={place} onSelect={setSelected} />
-      <label className="field hall-dock-field">Turnierleitung außerhalb des Rasters
-        <select value={layout.deskDock} onChange={(e) => { onChange(dockVenueDesk(layout, e.target.value as DeskDock)); setSelected(null); }}>
-          {Object.entries(dockNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-      </label>
     </div>
   );
 }

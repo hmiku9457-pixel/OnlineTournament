@@ -1,3 +1,13 @@
+## 0.1.0 – Turnierleitungs-UX und Spieldaten (20.10.2026)
+
+- Hallenlayout: funktionslosen „Freies Feld“-Button entfernt; die „Freifläche setzen“-Funktion lässt sich auf einem markierten Feld erneut anklicken, um es zu leeren. Raster horizontal zentriert. Außenposition der Turnierleitung direkt neben Spalten/Reihen und „Tische in eine Reihe“ neben „Turnierleitung im Raster“.
+- Spieldaten: Tischtennis besitzt eine feste Satzdauer von 15 Minuten. Fußball, Handball und Basketball erlauben eine verpflichtende, zunächst leere Spieldauer und eine optionale Platzpause zwischen Spielen. Die Werte werden im lokalen Turnier gespeichert und bei zeitbasierten Sportarten in Vorschlägen, Phasenschätzungen, Restdauer und Tischzuweisung berücksichtigt.
+- Spiele: Vor Beginn der ersten Phase ist die Spielliste leer und erklärt, wann die Paarungen sichtbar werden.
+- Rückzug: Rückgängigmachen nur vor dem ersten Start bzw. nach Qualifikation und vor dem Start der Folgephase; ein Rückzug während einer laufenden Runde bleibt endgültig. Wiederaufnahme wird im lokalen Audit-Log dokumentiert.
+- Turnierleitung: „Ergebnis anzeigen“ ist ein Button, der die interne Verwaltungsmaske statt der Spieler-/Tablet-Ansicht öffnet; bereits gesperrte historische Ergebnisse bleiben lesbar.
+- Satzweise Ergebniseingabe: BO1 bleibt ein direkter Spielabschluss; BO3/5/7 verlangt nach dem entscheidenden Satz eine zusätzliche Bestätigung des kompletten Endergebnisses. Bis dahin bleibt das Spiel LIVE und alle bisherigen Sätze können korrigiert werden.
+- Regressionstests ergänzt: Vorab-Rückzüge, Wiederaufnahme zwischen Phasen, BO-Endbestätigung und zeitbasierte Platzwechsel.
+
 ## Unreleased – Turnierleitung: Zuweisung, Bestätigungen und Betrieb
 
 - Laufende Spiele können auf einen freien Tisch verlegt oder mitsamt vorhandener Sätze in die Warteschlange zurückgestellt werden. Der ursprüngliche Startzeitpunkt und der Pausenwert bleiben erhalten.

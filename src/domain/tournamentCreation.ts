@@ -136,28 +136,36 @@ export function knockoutByeCount(entrantCount: number): number {
   return bracketSize - entrants;
 }
 
+export interface TimedMatchSettings { matchDurationMinutes: number; venueTurnoverMinutes?: number }
+
 export function estimatePhaseMetrics(
   phase: TournamentDurationPhaseInput,
   tableCount: number,
+  timing?: TimedMatchSettings,
 ): PhaseEstimate {
   const tables = Math.max(1, Math.trunc(tableCount));
   const entrants = Math.max(2, Math.trunc(phase.entrantCount));
+  // Timed sports use one match duration per fixture, plus a preparation break between slots.
+  const gameMinutes = timing ? Math.max(1, timing.matchDurationMinutes) + Math.max(0, timing.venueTurnoverMinutes ?? 0) : 0;
+  const waveDurationForPhase = (count: number, bo: number) => timing
+    ? Math.ceil(count / tables) * gameMinutes
+    : waveMinutes(count, tables, bo);
 
   switch (phase.type) {
     case 'ROUND_ROBIN': {
       const matches = roundRobinMatchCount(entrants);
-      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waveMinutes(matches, tables, phase.bestOf)), approximate: false };
+      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waveDurationForPhase(matches, phase.bestOf)), approximate: false };
     }
     case 'GROUPS': {
       const matches = groupMatchCount(entrants, phase.groupCount ?? 2);
-      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waveMinutes(matches, tables, phase.bestOf)), approximate: false };
+      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waveDurationForPhase(matches, phase.bestOf)), approximate: false };
     }
     case 'SWISS': {
       const matchesPerRound = Math.floor(entrants / 2);
       const rounds = Math.max(1, Math.trunc(phase.swissRounds ?? 1));
       return {
         estimatedMatches: matchesPerRound * rounds,
-        estimatedDurationMinutes: Math.round(rounds * waveMinutes(matchesPerRound, tables, phase.bestOf)),
+        estimatedDurationMinutes: Math.round(rounds * waveDurationForPhase(matchesPerRound, phase.bestOf)),
         approximate: entrants % 2 !== 0,
       };
     }
@@ -166,7 +174,7 @@ export function estimatePhaseMetrics(
       let duration = 0;
       roundMatches.forEach((matches, roundIndex) => {
         const bestOf = phase.knockoutBestOf?.[roundIndex] ?? phase.bestOf;
-        duration += waveMinutes(matches, tables, bestOf);
+        duration += waveDurationForPhase(matches, bestOf);
       });
       return {
         estimatedMatches: roundMatches.reduce((sum, matches) => sum + matches, 0),
@@ -184,7 +192,7 @@ export function estimatePhaseMetrics(
     }
     case 'PLACEMENT': {
       const matches = Math.floor(entrants / 2);
-      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waveMinutes(matches, tables, phase.bestOf)), approximate: true };
+      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waveDurationForPhase(matches, phase.bestOf)), approximate: true };
     }
   }
 }
@@ -192,10 +200,11 @@ export function estimatePhaseMetrics(
 export function estimateTournamentDurationMinutes(
   phases: TournamentDurationPhaseInput[],
   tableCount: number,
+  timing?: TimedMatchSettings,
 ): number {
   return Math.round(
     phases.reduce(
-      (total, phase) => total + estimatePhaseMetrics(phase, tableCount).estimatedDurationMinutes,
+      (total, phase) => total + estimatePhaseMetrics(phase, tableCount, timing).estimatedDurationMinutes,
       0,
     ),
   );

@@ -1217,3 +1217,22 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .audit-values { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 6px; font-size: .84rem; }
 .audit-values > span { background: #f9fafb; padding: 5px 8px; border-radius: 6px; }
 @media (max-width: 700px) { .audit-row { grid-template-columns: 1fr; gap: 5px; } }
+
+/* Hall editor: centered grid, uniform configuration and compact actions. */
+.hall-editor-controls { justify-content: flex-start; }
+.hall-editor-dimensions { align-items: end; }
+.hall-editor-dimensions .hall-dock-field { width: 245px; max-width: 245px; }
+.hall-plan-scroller:not(.compact) { display: flex; justify-content: center; }
+.hall-plan-scroller:not(.compact) .hall-plan-wrap { flex: 0 0 auto; }
+@media (max-width: 950px) { .hall-plan-scroller:not(.compact) { justify-content: flex-start; } }
+.spieldaten-layout { grid-template-columns: minmax(220px,1fr) minmax(210px,.6fr) 170px; align-items: start; }
+.match-timing-fields input:disabled { background: #f2f4f7; color: #475467; }
+@media (max-width: 950px) { .spieldaten-layout { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px) { .spieldaten-layout { grid-template-columns: 1fr; } }
+
+/* Confirmation of multi-set match results before finalizing. */
+.played-set-item { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.set-correct-button { border: 0; background: transparent; color: #475467; cursor: pointer; text-decoration: underline; padding: 0 3px; font-size: .74rem; }
+.result-approval-panel { display: grid; gap: 6px; padding: 10px; border: 1px solid #b2ddff; border-radius: 9px; background: #eff8ff; margin-top: 8px; }
+.result-approval-panel p { margin: 0; font-size: .8rem; line-height: 1.35; }
+.result-approval-panel .btn { justify-self: start; }

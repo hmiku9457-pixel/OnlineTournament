@@ -4,7 +4,8 @@ import type { MatchSet } from '@/domain/types';
 export type MockAuditAction =
   | 'MATCH_ASSIGNED' | 'MATCH_MOVED' | 'MATCH_UNASSIGNED'
   | 'SET_SAVED' | 'RESULT_RECORDED' | 'RESULT_CORRECTED' | 'RESULT_RESTORED'
-  | 'RESULT_CONFIRMED' | 'TOURNAMENT_PAUSED' | 'TOURNAMENT_RESUMED';
+  | 'RESULT_CONFIRMED' | 'TOURNAMENT_PAUSED' | 'TOURNAMENT_RESUMED'
+  | 'PARTICIPANT_RESTORED';
 
 export interface MockAuditEntry {
   id: string;

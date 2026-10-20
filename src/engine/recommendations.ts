@@ -8,6 +8,8 @@ export interface RecommendationInput {
   playerCount: number;
   tableCount: number;
   minimumMatches: number;
+  matchDurationMinutes?: number;
+  venueTurnoverMinutes?: number;
 }
 
 export interface RecommendationSettings {
@@ -198,7 +200,8 @@ export function recommendTournamentFormats(
   const qualifiers = clampInteger(settings.knockoutQualifierCount, defaultQualifiers, 2, playerCount);
 
   function addRecommendation(candidate: Omit<FormatRecommendation, 'estimatedDurationMinutes' | 'estimatedMatches'>) {
-    const estimatedDurationMinutes = estimateDurationMinutes(candidate.phases, playerCount, tableCount);
+    const baselineDuration = estimateDurationMinutes(candidate.phases, playerCount, tableCount);
+    const estimatedDurationMinutes = Math.round(baselineDuration * (Math.max(1, input.matchDurationMinutes ?? 15) + Math.max(0, input.venueTurnoverMinutes ?? 0)) / MINUTES_PER_SET);
     const estimatedMatches = totalEstimatedMatches(candidate.phases, playerCount);
 
     if (estimatedDurationMinutes > maxDuration) return;
