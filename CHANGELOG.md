@@ -1,3 +1,9 @@
+## Testfix: Spielerperspektive (24.10.2026)
+
+- Widerspruechliche Fixture im Heimsieg-Test berichtigt: Gespeicherte Saetze stimmen jetzt mit dem erwarteten 2:0 ueberein.
+- Zusaetzlicher Regressionstest: Ein veralteter 2:0-Text wird bei tatsaechlichen 0:2-Saetzen als 0:2 angezeigt.
+- Keine Aenderung an der produktiven Ergebnisberechnung.
+
 ## UI: Spielerhistorie und Teilnehmerstatistik (24.10.2026)
 
 - Die Schweizer Spielerhistorie trennt Gegnerbilanz **vor** der Runde und tatsächliches Partieergebnis in eindeutig beschriftete Spalten. Das doppelte „vs.“ hinter den Gegnernamen entfällt.
