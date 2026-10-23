@@ -1298,3 +1298,83 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   .result-correction-sets { grid-template-columns: 1fr; }
   .set-by-set-entry.compact .result-approval-actions > .btn { font-size: .62rem; padding-inline: 2px; }
 }
+
+
+/* Teilnehmerverwaltung: drei feste Aktionsspalten für alle Teilnehmerstatus. */
+.participant-row-actions {
+  display: grid !important;
+  grid-template-columns: repeat(3, 156px);
+  justify-content: end;
+  align-items: stretch;
+  gap: 6px;
+  width: max-content;
+  max-width: 100%;
+}
+.participant-row-actions > .btn,
+.participant-row-actions > .withdrawal-locked {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  padding-inline: 4px;
+  font-size: .77rem;
+  line-height: 1.2;
+}
+@media (max-width: 560px) {
+  .participant-row-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    gap: 4px;
+  }
+  .participant-row-actions > .btn,
+  .participant-row-actions > .withdrawal-locked {
+    white-space: normal;
+    font-size: .74rem;
+    padding: 5px 3px;
+  }
+}
+
+/* Korrekturmodal: Satznummer | bisheriger Satz | leere Korrektureingabe. */
+.result-correction-table {
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.result-correction-row {
+  display: grid;
+  grid-template-columns: minmax(52px, .55fr) minmax(72px, 1fr) minmax(142px, 1.45fr);
+  gap: 10px;
+  padding: 8px 12px;
+  align-items: center;
+  text-align: center;
+  border-bottom: 1px solid #eaecf0;
+}
+.result-correction-row:last-child { border-bottom: 0; }
+.result-correction-header {
+  background: #f9fafb;
+  color: #667085;
+  font-size: .76rem;
+  font-weight: 750;
+}
+.result-correction-row > strong { font-variant-numeric: tabular-nums; }
+.result-correction-row input {
+  min-width: 0;
+  width: 100%;
+  height: 36px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: white;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding: 6px 8px;
+}
+.result-correction-row input:focus { outline: 2px solid rgb(102 112 133 / 20%); border-color: #667085; }
+@media (max-width: 440px) {
+  .result-correction-row { grid-template-columns: 42px 68px minmax(0, 1fr); gap: 5px; padding-inline: 7px; }
+}

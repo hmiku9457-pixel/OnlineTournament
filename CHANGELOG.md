@@ -1,3 +1,9 @@
+## UI-Korrektur: einheitliche Teilnehmeraktionen und Satz-Korrekturtabelle (2026-10-23)
+- Teilnehmeraktionen erhalten in jeder Zeile identische feste Spaltenbreiten (mobil responsiv).
+- Das Ergebnis-Korrekturmodal zeigt Satznummer, bisheriges Satzergebnis und ein zunächst leeres Eingabefeld je Satz.
+- Leere Eingabefelder behalten den bisherigen Satz; nur ausgefüllte Felder überschreiben ihn.
+- Hauptaktion des Modals heißt „Ergebnisse korrigieren“ und steht im Footer.
+
 ## UI-Korrektur: Satzergebnisse im Modal und kompakte Tischkarten (2026-10-23)
 
 - Vorläufige Ergebnisse: Korrektur der bisherigen Sätze im Modal; erst "Korrektur speichern" übernimmt die Anpassung.

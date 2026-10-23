@@ -29,6 +29,15 @@ export function parseShortSet(value: string, number: number): MatchSet | null {
     : { number, sideAScore: loser, sideBScore: winner };
 }
 
+/** Leere Felder sind keine Änderung; nur explizite Eingaben ersetzen bestehende Sätze. */
+export function applySetCorrections(playedSets: MatchSet[], corrections: string[]): MatchSet[] | null {
+  const updated = corrections.map((value, index) =>
+    value.trim() === '' ? playedSets[index] : parseShortSet(value, index + 1),
+  );
+  if (updated.some((set) => !set)) return null;
+  return updated.filter((set): set is MatchSet => set !== null && set !== undefined);
+}
+
 function winsFromSets(sets: MatchSet[]) {
   return sets.reduce(
     (wins, set) => {
@@ -115,38 +124,37 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
 
   function openCorrection() {
     if (alreadyFinished || playedSets.length === 0) return;
-    setCorrectionValues(playedSets.map((set) => `${set.sideAScore}:${set.sideBScore}`));
+    setCorrectionValues(playedSets.map(() => ''));
     setCorrectionError(null);
     setCorrectionOpen(true);
   }
 
   function saveCorrection() {
-    const corrected = correctionValues.map((value, index) => parseShortSet(value, index + 1));
-    if (corrected.some((set) => set === null)) {
-      setCorrectionError('Bitte alle Sätze gültig eingeben (z. B. 11:7 oder -7).');
+    const validSets = applySetCorrections(playedSets, correctionValues);
+    if (!validSets) {
+      setCorrectionError('Bitte gültige Satzergebnisse eingeben (z. B. 11:7 oder -7).');
       return;
     }
-    const nextSets = corrected.filter((set): set is MatchSet => set !== null);
-    if (nextSets.length === 0) {
+    if (validSets.length === 0) {
       setCorrectionError('Mindestens ein Satz muss erhalten bleiben.');
       return;
     }
-    if (nextSets.length > match.bestOf) {
+    if (validSets.length > match.bestOf) {
       setCorrectionError('Es sind mehr Sätze als im gewählten Best-of vorhanden.');
       return;
     }
     // Ein Match darf nicht nach einem bereits entscheidenden Satz fortgesetzt werden.
-    if (nextSets.slice(0, -1).some((_, index) => getMatchFinalization(match.bestOf, nextSets.slice(0, index + 1)) !== 'IN_PROGRESS')) {
+    if (validSets.slice(0, -1).some((_, index) => getMatchFinalization(match.bestOf, validSets.slice(0, index + 1)) !== 'IN_PROGRESS')) {
       setCorrectionError('Nach einem entscheidenden Satz dürfen keine weiteren Sätze stehen. Bitte den letzten Satz entfernen.');
       return;
     }
-    setPlayedSets(nextSets);
+    setPlayedSets(validSets);
     setCurrentValue('');
     setError(null);
     setCorrectionOpen(false);
     setCorrectionError(null);
     // Nur den laufenden Entwurf speichern, das Spiel nicht automatisch abschließen.
-    saveMockMatchSets(match.id, nextSets, 'LIVE');
+    saveMockMatchSets(match.id, validSets, 'LIVE');
     onSaved?.();
   }
 
@@ -223,24 +231,34 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
               </div>
               <button type="button" className="btn small" onClick={() => setCorrectionOpen(false)}>Schließen</button>
             </div>
-            <p className="field-hint">Kurzeingabe: 7 = 11:7, -7 = 7:11. Änderungen werden erst beim Speichern übernommen.</p>
-            <div className="result-correction-sets">
+            <p className="field-hint">Nur die zu ändernden Sätze ausfüllen. Leere Felder übernehmen das bisherige Ergebnis. Eingabe: 7 = 11:7, -7 = 7:11.</p>
+            <div className="result-correction-table" role="table" aria-label="Satzergebnisse korrigieren">
+              <div className="result-correction-row result-correction-header" role="row">
+                <span role="columnheader">Satz</span>
+                <span role="columnheader">Bisher</span>
+                <span role="columnheader">Neues Ergebnis</span>
+              </div>
               {correctionValues.map((value, index) => (
-                <label className="field" key={index}>
-                  <span>Satz {index + 1}</span>
-                  <input
-                    aria-label={`Satz ${index + 1} korrigieren`}
-                    autoFocus={index === 0}
-                    value={value}
-                    onChange={(event) => {
-                      setCorrectionValues((previous) => previous.map((entry, entryIndex) => entryIndex === index ? event.target.value : entry));
-                      setCorrectionError(null);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') { event.preventDefault(); saveCorrection(); }
-                    }}
-                  />
-                </label>
+                <div className="result-correction-row" role="row" key={index}>
+                  <span role="cell">{index + 1}</span>
+                  <strong role="cell">{playedSets[index].sideAScore}:{playedSets[index].sideBScore}</strong>
+                  <div role="cell">
+                    <input
+                      aria-label={`Neues Ergebnis für Satz ${index + 1}`}
+                      autoFocus={index === 0}
+                      inputMode="text"
+                      placeholder="unverändert"
+                      value={value}
+                      onChange={(event) => {
+                        setCorrectionValues((previous) => previous.map((entry, entryIndex) => entryIndex === index ? event.target.value : entry));
+                        setCorrectionError(null);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') { event.preventDefault(); saveCorrection(); }
+                      }}
+                    />
+                  </div>
+                </div>
               ))}
             </div>
             {correctionValues.length > 1 && (
@@ -252,7 +270,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
             {correctionError && <p className="field-error" role="alert">{correctionError}</p>}
             <div className="result-correction-actions">
               <button className="btn" type="button" onClick={() => setCorrectionOpen(false)}>Abbrechen</button>
-              <button className="btn primary" type="button" onClick={saveCorrection}>Korrektur speichern</button>
+              <button className="btn primary" type="button" disabled={correctionValues.length === playedSets.length && correctionValues.every((value) => !value.trim())} onClick={saveCorrection}>Ergebnisse korrigieren</button>
             </div>
           </section>
         </div>
