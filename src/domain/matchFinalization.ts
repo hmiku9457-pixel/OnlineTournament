@@ -14,3 +14,10 @@ export function getMatchFinalization(bestOf: number, sets: MatchSet[]): MatchFin
   if (a < needed && b < needed) return 'IN_PROGRESS';
   return bestOf === 1 ? 'AUTO_FINISH' : 'NEEDS_CONFIRMATION';
 }
+
+/** Auch bei BO1 bestätigt die Turnierleitung Schweizer Ergebnisse explizit.
+ *  Bei Spielereingaben ersetzen die beiden Spielercodes diese Admin-Bestätigung. */
+export function requiresFinalApproval(bestOf: number, sets: MatchSet[], swissAdminEntry: boolean): boolean {
+  return getMatchFinalization(bestOf, sets) !== 'IN_PROGRESS' &&
+    (bestOf > 1 || swissAdminEntry);
+}

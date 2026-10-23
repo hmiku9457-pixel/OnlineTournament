@@ -1,3 +1,10 @@
+## Unreleased – Tischwechselzeit und Schweizer Ergebnisbestätigung
+
+- Die eingestellte Wechselzeit zwischen Spielen auf demselben Platz fließt weiterhin in die Planung ein, sperrt aber keine Tischzuweisung mehr.
+- Schweizer System: Bei Eingabe durch die Turnierleitung ist das Endergebnis ausdrücklich zu bestätigen, auch bei Best-of-1. Bis dahin bleibt das Match offen.
+- Diese Admin-Bestätigung markiert das Schweizer Ergebnis als bestätigt. Von Spielern eingetragene und über beide Spielercodes bestätigte Ergebnisse benötigen keine zusätzliche Bestätigung durch die Turnierleitung.
+- Regressionstests für beide Abläufe ergänzt.
+
 ## 0.1.0 – Turnierleitungs-UX und Spieldaten (20.10.2026)
 
 - Hallenlayout: funktionslosen „Freies Feld“-Button entfernt; die „Freifläche setzen“-Funktion lässt sich auf einem markierten Feld erneut anklicken, um es zu leeren. Raster horizontal zentriert. Außenposition der Turnierleitung direkt neben Spalten/Reihen und „Tische in eine Reihe“ neben „Turnierleitung im Raster“.

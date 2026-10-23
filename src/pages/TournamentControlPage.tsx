@@ -576,7 +576,7 @@ export function TournamentControlPage() {
                     {match ? (
                       <>
                         <span className="muted">{match.phase} · {match.round} · BO{match.bestOf}</span>
-                        <SetBySetEntry match={match} onSaved={refreshRuntime} compact sideARecord={activeSwissRecords.get(match.sideA)} sideBRecord={activeSwissRecords.get(match.sideB)} />
+                        <SetBySetEntry match={match} swissAdminEntry={activeStage?.type === 'SWISS'} onSaved={refreshRuntime} compact sideARecord={activeSwissRecords.get(match.sideA)} sideBRecord={activeSwissRecords.get(match.sideB)} />
                         <div className="table-operational-actions">
                           <button className="btn small" type="button" onClick={() => setMovingMatchId((old) => old === match.id ? null : match.id)}>Tisch wechseln</button>
                           <button className="btn small" type="button" onClick={() => unassignFromTable(match.id)}>Zuweisung aufheben</button>
@@ -894,6 +894,7 @@ export function TournamentControlPage() {
               <p className="muted">{found.match.sideA} gegen {found.match.sideB} · {found.match.round} · Best-of-{found.match.bestOf}</p>
               <SetBySetEntry
                 match={found.match}
+                swissAdminEntry={stage?.type === 'SWISS'}
                 allowEditFinished={canEditMockMatch(tournament, found.match.id)}
                 onSaved={refreshRuntime}
                 onCompleted={() => {

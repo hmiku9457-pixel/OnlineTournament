@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { MatchSet } from '@/domain/types';
-import { getMatchFinalization } from '@/domain/matchFinalization';
+import { getMatchFinalization, requiresFinalApproval } from '@/domain/matchFinalization';
 import { completeMockMatch, saveMockMatchSets, type MockRuntimeMatch } from '@/services/mockRuntime';
 
 export function parseShortSet(value: string, number: number): MatchSet | null {
@@ -48,9 +48,11 @@ interface SetBySetEntryProps {
   sideARecord?: string;
   sideBRecord?: string;
   allowEditFinished?: boolean;
+  /** Schweizer System: Admin muss auch BO1 nach der Satzeingabe ausdrücklich bestätigen. */
+  swissAdminEntry?: boolean;
 }
 
-export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, sideARecord, sideBRecord, allowEditFinished = false }: SetBySetEntryProps) {
+export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, sideARecord, sideBRecord, allowEditFinished = false, swissAdminEntry = false }: SetBySetEntryProps) {
   const [playedSets, setPlayedSets] = useState<MatchSet[]>(match.sets ?? []);
   const [editingFinished, setEditingFinished] = useState(false);
   const [currentValue, setCurrentValue] = useState('');
@@ -59,9 +61,8 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
   const wins = useMemo(() => winsFromSets(playedSets), [playedSets]);
   const currentSetNumber = editingSetIndex === null ? playedSets.length + 1 : editingSetIndex + 1;
   const parsedCurrent = parseShortSet(currentValue, currentSetNumber);
-  const resultReached = getMatchFinalization(match.bestOf, playedSets) !== 'IN_PROGRESS';
   const alreadyFinished = !editingFinished && match.status === 'FINISHED';
-  const needsFinalApproval = match.bestOf > 1 && resultReached && !alreadyFinished;
+  const needsFinalApproval = requiresFinalApproval(match.bestOf, playedSets, swissAdminEntry) && !alreadyFinished;
 
   useEffect(() => {
     setPlayedSets(match.sets ?? []);
@@ -88,7 +89,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
     setEditingSetIndex(null);
     setError(null);
     // Best-of-1 is unambiguous and finishes after its single confirmed set.
-    if (nextFinalization === 'AUTO_FINISH') {
+    if (nextFinalization === 'AUTO_FINISH' && !swissAdminEntry) {
       completeMockMatch(match.id, nextSets, 'FINISHED');
       setEditingFinished(false);
       onSaved?.();
@@ -105,7 +106,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
 
   function finalizeResult() {
     if (!needsFinalApproval) return;
-    completeMockMatch(match.id, playedSets, 'FINISHED');
+    completeMockMatch(match.id, playedSets, 'FINISHED', swissAdminEntry);
     setEditingFinished(false);
     setError(null);
     onSaved?.();
@@ -171,7 +172,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
       {needsFinalApproval && editingSetIndex === null && (
         <div className="result-approval-panel" role="status">
           <strong>Vorläufiges Endergebnis: {wins.a}:{wins.b}</strong>
-          <p>Bitte alle Sätze prüfen. Erst mit der Bestätigung wird das Spiel abgeschlossen und der Tisch wieder frei.</p>
+          <p>{swissAdminEntry ? 'Schweizer System: Bitte das Endergebnis als Turnierleitung ausdrücklich bestätigen. Erst danach ist das Spiel endgültig abgeschlossen.' : 'Bitte alle Sätze prüfen. Erst mit der Bestätigung wird das Spiel abgeschlossen und der Tisch wieder frei.'}</p>
           <button className="btn small primary" type="button" onClick={finalizeResult}>Endergebnis bestätigen</button>
         </div>
       )}

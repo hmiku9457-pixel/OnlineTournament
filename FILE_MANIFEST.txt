@@ -106,3 +106,4 @@ tsconfig.app.json
 tsconfig.json
 tsconfig.node.json
 vite.config.ts
+tests/turnoverAndSwissApproval.test.ts

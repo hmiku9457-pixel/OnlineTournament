@@ -508,21 +508,9 @@ export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId
   if (currentTournament.status !== 'RUNNING') return 'Pause aktiv oder Turnier nicht gestartet: Neue Tischzuweisungen sind gesperrt.';
   if (!/^Tisch [1-9]\d*$/.test(table) || Number(table.slice(6)) > tournament.tables) return 'Ungültiger Tisch.';
   if (isMockTableBlocked(tournament, table)) return `${table} ist für dieses Turnier gesperrt.`;
-  // Timed sports: keep the configured turnover interval between consecutive
-  // matches on this venue; the completed match retains its final table ID.
-  const turnover = currentTournament.sport !== 'Tischtennis' ? Math.max(0, currentTournament.venueTurnoverMinutes ?? 0) : 0;
-  if (turnover > 0) {
-    const runtime = readRuntime();
-    const latestFinish = readResults()
-      .filter((result) => result.status === 'FINISHED' && typeof result.finishedAt === 'number'
-        && currentTournament.stages.some((stage) => result.matchId.startsWith(`${stage.id}-`))
-        && runtime.some((entry) => entry.matchId === result.matchId && entry.table === table))
-      .reduce((latest, result) => Math.max(latest, result.finishedAt ?? 0), 0);
-    if (latestFinish && Date.now() - latestFinish < turnover * 60_000) {
-      const remaining = Math.ceil((turnover * 60_000 - (Date.now() - latestFinish)) / 60_000);
-      return `${table}: noch ${remaining} Min. Pause bis zur nächsten Partie.`;
-    }
-  }
+  // Die Wechselzeit ist eine unverbindliche Planungsgröße (Dauerprognose),
+  // kein Sperrgrund. Nur gesperrte oder belegte Tische und Spielerkonflikte
+  // verhindern eine neue Zuweisung.
   const matches = getMockRuntimeMatches(tournament);
   const target = matches.find((match) => match.id === matchId);
   if (!target) return 'Spiel wurde nicht gefunden.';
@@ -880,7 +868,7 @@ function reconcileCompletedPhase(matchId: string) {
   }
 }
 
-export function completeMockMatch(matchId: string, sets: MatchSet[], status: MockMatchState = 'FINISHED') {
+export function completeMockMatch(matchId: string, sets: MatchSet[], status: MockMatchState = 'FINISHED', confirmedByAdmin = false) {
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
   const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
@@ -891,11 +879,21 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
     const stage = tournament?.stages.find((item) => matchId.startsWith(`${item.id}-`));
     if (tournament && stage && !canEditFinishedResults(tournament, stage)) return previous;
   }
-  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined, thirdPlaceSkipped: undefined, confirmedA: previousFinal ? false : previous?.confirmedA, confirmedB: previousFinal ? false : previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
+  const stage = tournament?.stages.find((item) => matchId.startsWith(`${item.id}-`));
+  const swissAdminConfirmation = status === 'FINISHED' && confirmedByAdmin && stage?.type === 'SWISS';
+  const next: StoredMatchResult = {
+    ...previous, matchId, sets, status, forcedWinner: undefined, thirdPlaceSkipped: undefined,
+    confirmedA: swissAdminConfirmation ? true : previousFinal ? false : previous?.confirmedA,
+    confirmedB: swissAdminConfirmation ? true : previousFinal ? false : previous?.confirmedB,
+    finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt,
+  };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   if (tournament && status === 'FINISHED') {
     const resultText = (value: StoredMatchResult | undefined) => value?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') || '–';
     recordMockAudit({ tournamentId: tournament.id, matchId, actor: previousFinal ? 'Turnierleitung (lokal)' : 'Ergebniseingabe (lokal)', action: previousFinal ? 'RESULT_CORRECTED' : 'RESULT_RECORDED', description: previousFinal ? 'Endergebnis nachträglich korrigiert' : 'Endergebnis eingetragen', before: resultText(previous), after: resultText(next), beforeSets: previousFinal ? previous?.sets : undefined, afterSets: previousFinal ? sets : undefined });
+  }
+  if (tournament && swissAdminConfirmation) {
+    recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Turnierleitung (lokal)', action: 'RESULT_CONFIRMED', description: 'Schweizer Endergebnis ausdrücklich durch die Turnierleitung bestätigt' });
   }
   if (status === 'FINISHED') {
     const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
