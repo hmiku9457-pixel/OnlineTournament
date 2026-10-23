@@ -1448,3 +1448,64 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .swiss-game-result:has(.player-game-outcome-tag.loss) .match-result-trigger { color: #b42318; }
 .player-game-result-cell:has(.player-game-outcome-tag.open) .match-result-trigger,
 .swiss-game-result:has(.player-game-outcome-tag.open) .match-result-trigger { color: #175cd3; }
+
+/* Spielerpartien: Gegnerbilanz klar vom tatsächlichen Satzergebnis trennen. */
+.swiss-history-list { margin-top: 14px; }
+.swiss-history-head,
+.player-game-row.swiss-player-game-row {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr) 96px 64px;
+  column-gap: 12px;
+  align-items: center;
+}
+.swiss-history-head {
+  padding: 8px 0;
+  border-bottom: 1px solid #eaecf0;
+  color: #667085;
+  font-size: .7rem;
+  font-weight: 750;
+}
+.swiss-history-head > :nth-child(3),
+.swiss-history-head > :nth-child(4) { text-align: center; }
+.player-game-row.swiss-player-game-row { padding: 9px 0; }
+.swiss-history-opponent { display: grid; gap: 3px; min-width: 0; }
+.swiss-history-opponent strong { overflow-wrap: anywhere; }
+.swiss-history-opponent small { color: #667085; font-size: .72rem; font-weight: 550; }
+.swiss-player-game-row > .player-game-outcome-tag { width: 100%; }
+.swiss-player-game-row > .match-result-details { min-width: 0; justify-content: center; }
+.swiss-player-game-row .match-result-trigger { min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+.swiss-player-game-row:has(.player-game-outcome-tag.win) .match-result-trigger { color: #027a48; }
+.swiss-player-game-row:has(.player-game-outcome-tag.loss) .match-result-trigger { color: #b42318; }
+.swiss-player-game-row:has(.player-game-outcome-tag.open) .match-result-trigger { color: #175cd3; }
+
+/* Kompakte Teilnehmerstatistik oberhalb der Liste. */
+.participant-statistics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+.participant-statistics > div {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+  background: #f9fafb;
+}
+.participant-statistics strong { font-size: 1.17rem; font-variant-numeric: tabular-nums; }
+.participant-statistics span { color: #667085; font-size: .8rem; }
+@media (max-width: 950px) {
+  .participant-statistics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .swiss-history-head { display: none; }
+  .player-game-row.swiss-player-game-row {
+    grid-template-columns: minmax(0, 1fr) 96px 64px;
+    row-gap: 6px;
+  }
+  .swiss-player-game-row > .swiss-history-round { grid-column: 1 / -1; }
+  .participant-statistics > div { flex-direction: column; gap: 2px; }
+}

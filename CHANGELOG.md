@@ -1,3 +1,10 @@
+## UI: Spielerhistorie und Teilnehmerstatistik (24.10.2026)
+
+- Die Schweizer Spielerhistorie trennt Gegnerbilanz **vor** der Runde und tatsächliches Partieergebnis in eindeutig beschriftete Spalten. Das doppelte „vs.“ hinter den Gegnernamen entfällt.
+- Spielausgänge und Satzergebnisse stehen in einheitlich ausgerichteten Spalten; Sieg/Niederlage/Offen bleiben farblich gekennzeichnet, Details bleiben anklickbar.
+- Teilnehmerverwaltung: vier kompakte Kennzahlen (Gesamt, noch im Turnier, ausgeschieden, zurückgezogen) direkt oberhalb der Teilnehmerliste.
+- Teilnehmerstatistik aus dem tatsächlichen Teilnehmerstatus abgeleitet; Regressionstests für verschiedene Statuskombinationen ergänzt.
+
 ## UX-Korrekturen – 23.10.2026 (Spielerpartien & K.-o.)
 - Teilnehmerliste vertikal kompakter (Zeilenhöhe, Code und Aktionsbuttons).
 - Nach einem sportlichen Ausscheiden aus der K.-o.-Phase ist ein Rückzug nicht mehr möglich; die Regel gilt auch im Runtime-Service. Halbfinalverlierer bleiben für ein offenes Spiel um Platz 3 teilnahmeberechtigt.

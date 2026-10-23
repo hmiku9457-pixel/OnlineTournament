@@ -38,6 +38,7 @@ src/components/StageCard.tsx
 src/components/VenueLayout.tsx
 src/data/demoTournaments.ts
 src/domain/matchFinalization.ts
+src/domain/participantStatistics.ts
 src/domain/playerGameOutcome.ts
 src/domain/rules.ts
 src/domain/tournamentCreation.ts
@@ -88,6 +89,7 @@ tests/bracket.test.ts
 tests/knockoutWithdrawalLocked.test.ts
 tests/matchPresentation.test.ts
 tests/participantProgressAndThirdPlace.test.ts
+tests/participantStatistics.test.ts
 tests/playerGameOutcome.test.ts
 tests/playerRestTime.test.ts
 tests/prestartRosterAndVenue.test.ts

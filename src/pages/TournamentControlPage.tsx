@@ -6,6 +6,7 @@ import { SetBySetEntry } from '@/components/SetBySetEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
+import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
 import { resultForParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
@@ -143,13 +144,18 @@ function StageCompetitionView({
           <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setSelectedSwissPlayer(null)}>
             <div className="prototype-modal player-games-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
               <div className="player-games-modal-head"><h2>{selectedSwissPlayer} · Partien</h2><button className="btn small" type="button" onClick={() => setSelectedSwissPlayer(null)}>Schließen</button></div>
-              <div className="player-games-list">
+              <div className="player-games-list swiss-history-list">
+                <div className="swiss-history-head" aria-hidden="true"><span>Runde</span><span>Gegner · Bilanz vor Runde</span><span>Ausgang</span><span>Ergebnis</span></div>
                 {swissMatches.filter((match) => match.sideA === selectedSwissPlayer || match.sideB === selectedSwissPlayer).map((match) => {
+                  const opponent = match.sideA === selectedSwissPlayer ? match.sideB : match.sideA;
+                  const roundNumber = Number(match.round.match(/\d+/)?.[0]) || 1;
+                  const opponentRecord = getSwissRecordBeforeRound(tournament, stage, opponent, roundNumber);
                   const result = resultForParticipant(match.status === 'FINISHED' ? match.score : '–', match.sets, match.sideB === selectedSwissPlayer);
                   return <div className="player-game-row swiss-player-game-row" key={match.id}>
-                    <span className="muted">{match.round}</span>
-                    <strong>vs. {match.sideA === selectedSwissPlayer ? match.sideB : match.sideA} <span className="swiss-opponent-record">vs. {getSwissRecordBeforeRound(tournament, stage, match.sideA === selectedSwissPlayer ? match.sideB : match.sideA, Number(match.round.match(/\d+/)?.[0]) || 1)}</span></strong>
-                    <span className="swiss-game-result"><PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} /><MatchResultDetails score={result.score} sets={result.sets} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} /></span>
+                    <span className="muted swiss-history-round">{match.round}</span>
+                    <span className="swiss-history-opponent"><strong>{opponent}</strong><small>Bilanz vor Runde: {opponentRecord}</small></span>
+                    <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} />
+                    <MatchResultDetails score={result.score} sets={result.sets} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
                   </div>;
                 })}
               </div>
@@ -339,6 +345,13 @@ export function TournamentControlPage() {
   const auditEntries = useMemo(() => getMockAudit(tournament.id), [tournament.id, runtimeVersion]);
   const allTournamentMatches = useMemo(() => tournament.stages.filter((stage) => isStageStarted(tournament, stage)).flatMap((stage) => getMockStageMatches(tournament, stage)), [tournament, runtimeVersion, phaseVersion, restClockTick]);
   const participants = useMemo(() => getRuntimeParticipantNames(tournament), [tournament, participantVersion]);
+  const participantProgress = useMemo(() => participants.map((name) => ({
+    name,
+    progress: getMockParticipantProgress(tournament, name),
+  })), [participants, tournament, runtimeVersion, phaseVersion, drawVersion]);
+  const participantStatistics = useMemo(() => summarizeParticipantStatuses(
+    participantProgress.map(({ progress }) => progress.status),
+  ), [participantProgress]);
   const finalStandings = useMemo(() => tournament.status === 'FINISHED' ? getMockFinalStandings(tournament) : [], [tournament, participantVersion, phaseVersion, runtimeVersion]);
   const nextMatches = matches.filter((match) => match.status === 'WAITING');
   const tableMatches = matches.filter((match) => ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch '));
@@ -824,6 +837,12 @@ export function TournamentControlPage() {
               </button>
             )}
           </div>
+          <div className="participant-statistics" role="group" aria-label="Teilnehmerstatistik">
+            <div><strong>{participantStatistics.total}</strong><span>Teilnehmer gesamt</span></div>
+            <div><strong>{participantStatistics.remaining}</strong><span>Noch im Turnier</span></div>
+            <div><strong>{participantStatistics.eliminated}</strong><span>Ausgeschieden</span></div>
+            <div><strong>{participantStatistics.withdrawn}</strong><span>Zurückgezogen</span></div>
+          </div>
           {showParticipantAdd && !tournament.hasStarted && (
             <form className="participant-add-panel" onSubmit={(event) => { event.preventDefault(); handleAddParticipant(); }}>
               <strong>{tournament.discipline === 'DOUBLES' ? 'Doppelpaar nachtragen' : 'Spieler nachtragen'}</strong>
@@ -843,8 +862,7 @@ export function TournamentControlPage() {
             </form>
           )}
           <div className="participant-control-list">
-            {participants.map((participant, index) => {
-              const progress = getMockParticipantProgress(tournament, participant);
+            {participantProgress.map(({ name: participant, progress }, index) => {
               const isWithdrawn = progress.status === 'Zurückgezogen';
               const statusText = progress.status === 'Aktiv' && tableMatches.some((match) => match.sideA === participant || match.sideB === participant) ? 'Spielt gerade' : progress.status;
               return (
