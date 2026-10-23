@@ -648,8 +648,39 @@ export function reconcileWithdrawalsForTournament(tournament: DemoTournament) {
   settleWithdrawnMatches(tournament);
 }
 
-export function withdrawMockParticipant(tournament: DemoTournament, name: string) {
+/** Ein sportlich ausgeschiedener K.-o.-Teilnehmer darf nicht nachträglich
+ * als Rückzug behandelt werden. Halbfinalverlierer können noch am Spiel um
+ * Platz 3 teilnehmen, bis dieses entschieden wurde. */
+export function canWithdrawMockParticipant(tournament: DemoTournament, name: string): boolean {
   if (!getRuntimeParticipantNames(tournament).includes(name) || isMockParticipantWithdrawn(tournament, name)) return false;
+  const started = tournament.stages.filter((stage) => isStageStarted(tournament, stage));
+  const latest = started[started.length - 1];
+  // Bereits vor einer laufenden Folgephase ausgeschiedene Teilnehmer
+  // können nicht im Nachhinein als freiwilliger Rückzug geführt werden.
+  if (latest && !getStageEntrants(tournament, latest).includes(name)) return false;
+  for (const stage of tournament.stages) {
+    if (stage.type !== 'KNOCKOUT' || !isStageStarted(tournament, stage)) continue;
+    const matches = getMockStageBaseMatches(tournament, stage);
+    const bronze = matches.find((match) => match.round === 'Spiel um Platz 3');
+    const bronzePending = bronze && getMockStoredResult(bronze.id)?.status !== 'FINISHED';
+    for (const match of matches) {
+      if (match.sideA !== name && match.sideB !== name) continue;
+      const result = getMockStoredResult(match.id);
+      if (result?.status !== 'FINISHED') continue;
+      const winner = match.autoWinner ?? result.forcedWinner ?? resultWinner(result, match.sideA, match.sideB);
+      if (winner && winner !== name) {
+        // Nach Halbfinal-Niederlage ist der Spieler noch für Bronze aktiv.
+        if (match.round === 'Halbfinale' && bronzePending) continue;
+        return false;
+      }
+    }
+    if (isStageCompleted(tournament, stage)) return false;
+  }
+  return true;
+}
+
+export function withdrawMockParticipant(tournament: DemoTournament, name: string) {
+  if (!canWithdrawMockParticipant(tournament, name)) return false;
   const activeAtWithdrawal = getActiveStage(tournament);
   const next = getNextStartableStage(tournament);
   const beforeFirstStart = !tournament.hasStarted && !tournament.stages.some((stage) => isStageStarted(tournament, stage));

@@ -5,11 +5,12 @@ import { StageCard } from '@/components/StageCard';
 import { SetBySetEntry } from '@/components/SetBySetEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
+import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { resultForParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, countMockOpenConfirmations, adminConfirmMockMatch, getMockMatchConfirmation, getSwissRecordBeforeRound, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
-import { isMockParticipantWithdrawn, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
+import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { VenueLayoutMini } from '@/components/VenueLayout';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
@@ -110,7 +111,10 @@ function StageCompetitionView({
                       <div className="player-game-row" key={match.id}>
                         <span className="muted">Spieltag {match.matchDay}</span>
                         <strong>vs. {opponent}</strong>
-                        <MatchResultDetails score={displayedResult.score} sets={displayedResult.sets} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
+                        <span className="player-game-result-cell">
+                          <PlayerGameOutcome score={displayedResult.score} finished={match.status === 'played'} />
+                          <MatchResultDetails score={displayedResult.score} sets={displayedResult.sets} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
+                        </span>
                       </div>
                     );
                   })}
@@ -142,13 +146,10 @@ function StageCompetitionView({
               <div className="player-games-list">
                 {swissMatches.filter((match) => match.sideA === selectedSwissPlayer || match.sideB === selectedSwissPlayer).map((match) => {
                   const result = resultForParticipant(match.status === 'FINISHED' ? match.score : '–', match.sets, match.sideB === selectedSwissPlayer);
-                  const score = /^\d+\s*:\s*\d+$/.exec(result.score);
-                  const [own, other] = score ? result.score.split(':').map(Number) : [0, 0];
-                  const label = match.status !== 'FINISHED' ? 'Offen' : score ? (own > other ? 'Sieg' : own < other ? 'Niederlage' : 'Unentschieden') : 'Kampflos';
                   return <div className="player-game-row swiss-player-game-row" key={match.id}>
                     <span className="muted">{match.round}</span>
                     <strong>vs. {match.sideA === selectedSwissPlayer ? match.sideB : match.sideA} <span className="swiss-opponent-record">vs. {getSwissRecordBeforeRound(tournament, stage, match.sideA === selectedSwissPlayer ? match.sideB : match.sideA, Number(match.round.match(/\d+/)?.[0]) || 1)}</span></strong>
-                    <span className="swiss-game-result"><span className="swiss-game-label">{label}</span><MatchResultDetails score={result.score} sets={result.sets} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} /></span>
+                    <span className="swiss-game-result"><PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} /><MatchResultDetails score={result.score} sets={result.sets} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} /></span>
                   </div>;
                 })}
               </div>
@@ -198,7 +199,7 @@ function StageCompetitionView({
             {rounds.map((round, roundIndex) => (
               <div className="bracket-round" key={round.label}>
                 <h4>{round.label}</h4>
-                <div className="bracket-round-matches">
+                <div className={roundIndex === rounds.length - 1 ? 'bracket-round-matches bracket-final-round-matches' : 'bracket-round-matches'}>
                   {round.matches.map((match, matchIndex) => (
                     <article className="bracket-match" key={match.id}>
                       {match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover, z. B. bei Rückzug)">Kampflos</span>}
@@ -244,7 +245,6 @@ function StageCompetitionView({
                       })}
                     </article>
                   ))}
-                </div>
                 {roundIndex === rounds.length - 1 && thirdPlaceRound && (
                   <div className="bracket-third-place-block">
                     <h4>Spiel um Platz 3</h4>
@@ -264,6 +264,7 @@ function StageCompetitionView({
                     ))}
                   </div>
                 )}
+                </div>
               </div>
             ))}
           </div>
@@ -858,8 +859,8 @@ export function TournamentControlPage() {
                       canRestoreMockParticipant(tournament, participant)
                         ? <button className="btn small" type="button" onClick={() => { if (restoreMockParticipant(tournament, participant)) { setParticipantVersion((value) => value + 1); setDrawVersion((value) => value + 1); refreshRuntime(); } }}>Rückzug rückgängig</button>
                         : <span className="btn small withdrawal-locked" aria-disabled="true" title="Nur vor einem Phasenstart und bei vorheriger Qualifikation möglich; nicht bei Rückzug während einer Runde.">Rückzug gesperrt</span>
-                    ) : progress.status === 'Ausgeschieden'
-                      ? <span className="btn small withdrawal-locked" aria-disabled="true" title="Bereits ausgeschiedene Teilnehmer können nicht zurückgezogen werden.">Rückzug gesperrt</span>
+                    ) : progress.status === 'Ausgeschieden' || progress.status === 'Beendet' || progress.status === 'Turniersieger' || !canWithdrawMockParticipant(tournament, participant)
+                      ? <span className="btn small withdrawal-locked" aria-disabled="true" title="Nach einem Ausscheiden in der K.-o.-Phase ist kein Rückzug mehr möglich.">Rückzug gesperrt</span>
                       : <button className="btn small danger-outline" type="button" onClick={() => { if (withdrawMockParticipant(tournament, participant)) refreshRuntime(); }}>Zurückziehen</button>}
                   </div>
                   {participantPanel?.name === participant && (

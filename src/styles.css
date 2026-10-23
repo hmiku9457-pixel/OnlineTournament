@@ -1378,3 +1378,73 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 @media (max-width: 440px) {
   .result-correction-row { grid-template-columns: 42px 68px minmax(0, 1fr); gap: 5px; padding-inline: 7px; }
 }
+
+/* Abschluss der Turnierleitungs-UX: kompaktere Teilnehmerliste */
+.participant-control-row {
+  padding-top: 5px;
+  padding-bottom: 5px;
+  gap: 8px;
+}
+.participant-control-row code { padding-block: 4px; }
+.participant-row-actions > .btn,
+.participant-row-actions > .withdrawal-locked { min-height: 30px; }
+.participant-inline-status { padding-block: 1px; }
+
+/* Bronze-Spiel direkt unter dem Finale, gemeinsam in derselben Spalte zentriert. */
+.bracket-round-matches.bracket-final-round-matches {
+  justify-content: center;
+  gap: 10px;
+}
+.bracket-final-round-matches .bracket-third-place-block {
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid #eaecf0;
+}
+.bracket-final-round-matches .bracket-third-place-block h4 { margin-bottom: 7px; }
+
+/* Spielerpartien: feste Ergebnis-/Statusspalten für beide Seiten des Matches. */
+.player-game-row { grid-template-columns: 90px minmax(0, 1fr) 168px; }
+.swiss-player-game-row { grid-template-columns: 90px minmax(0, 1fr) 168px; }
+.player-game-result-cell,
+.swiss-game-result {
+  display: grid;
+  grid-template-columns: 94px minmax(54px, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.player-game-result-cell .match-result-details,
+.swiss-game-result .match-result-details {
+  width: 100%;
+  min-width: 54px;
+  justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+.player-game-result-cell .match-result-trigger,
+.swiss-game-result .match-result-trigger { text-align: right; min-width: 46px; }
+.player-game-outcome-tag {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 750;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.player-game-outcome-tag.win { color: #027a48; background: #ecfdf3; }
+.player-game-outcome-tag.loss { color: #b42318; background: #fff1f0; }
+.player-game-outcome-tag.open { color: #175cd3; background: #eff8ff; }
+.player-game-outcome-tag.neutral { color: #475467; background: #f2f4f7; }
+@media (max-width: 600px) {
+  .player-game-row, .swiss-player-game-row { grid-template-columns: minmax(0, 1fr) 168px; }
+  .player-game-row > .muted, .swiss-player-game-row > .muted { grid-column: 1 / -1; }
+}
+.player-game-result-cell:has(.player-game-outcome-tag.win) .match-result-trigger,
+.swiss-game-result:has(.player-game-outcome-tag.win) .match-result-trigger { color: #027a48; }
+.player-game-result-cell:has(.player-game-outcome-tag.loss) .match-result-trigger,
+.swiss-game-result:has(.player-game-outcome-tag.loss) .match-result-trigger { color: #b42318; }
+.player-game-result-cell:has(.player-game-outcome-tag.open) .match-result-trigger,
+.swiss-game-result:has(.player-game-outcome-tag.open) .match-result-trigger { color: #175cd3; }

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { getMockRuntimeMatches, getMockStageMatches, isMockParticipantWithdrawn } from '@/services/mockRuntime';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
+import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { resultForParticipant } from '@/services/matchPresentation';
 import { getMockTournament } from '@/services/mockTournamentStore';
 import { getActiveStage } from '@/services/mockPhaseLifecycle';
@@ -117,13 +118,15 @@ export function SpectatorPage() {
                   {rounds.map((round, roundIndex) => (
                     <div className="bracket-round" key={round.label}>
                       <h4>{round.label}</h4>
-                      <div className="bracket-round-matches">{round.matches.map(renderMatch)}</div>
+                      <div className={roundIndex === rounds.length - 1 ? 'bracket-round-matches bracket-final-round-matches' : 'bracket-round-matches'}>
+                        {round.matches.map(renderMatch)}
                       {roundIndex === rounds.length - 1 && thirdPlaceRound && (
                         <div className="bracket-third-place-block">
                           <h4>Spiel um Platz 3</h4>
                           {thirdPlaceRound.matches.map(renderMatch)}
                         </div>
                       )}
+                      </div>
                     </div>
                   ))}
                 </div></div>
@@ -142,11 +145,14 @@ export function SpectatorPage() {
         return <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setSelectedSwiss(null)}>
           <section className="prototype-modal player-games-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
             <div className="player-games-modal-head"><h2>{selectedSwiss.name} · Partien</h2><button className="btn small" type="button" onClick={() => setSelectedSwiss(null)}>Schließen</button></div>
-            <div className="player-games-list">{ownMatches.map((match) => <div className="player-game-row" key={match.id}>
-              <span className="muted">{match.round}</span>
-              <strong>vs. {match.sideA === selectedSwiss.name ? match.sideB : match.sideA}</strong>
-              <MatchResultDetails {...resultForParticipant(match.status === 'FINISHED' ? match.score : '–', match.sets, match.sideB === selectedSwiss.name)} />
-            </div>)}</div>
+            <div className="player-games-list">{ownMatches.map((match) => {
+              const result = resultForParticipant(match.status === 'FINISHED' ? match.score : '–', match.sets, match.sideB === selectedSwiss.name);
+              return <div className="player-game-row" key={match.id}>
+                <span className="muted">{match.round}</span>
+                <strong>vs. {match.sideA === selectedSwiss.name ? match.sideB : match.sideA}</strong>
+                <span className="player-game-result-cell"><PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} /><MatchResultDetails {...result} /></span>
+              </div>;
+            })}</div>
           </section>
         </div>;
       })()}
