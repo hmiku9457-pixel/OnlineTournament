@@ -104,8 +104,9 @@ describe('Hallenraster und zeitbasierte Sportarten', () => {
       matchDurationMinutes: 12, venueTurnoverMinutes: 5,
     }).estimatedDurationMinutes).toBe(51);
   });
-  it('blocks a venue until its turnaround interval has elapsed', () => {
+  it('allows immediately reassigning a free venue despite configured turnaround time', () => {
     const tournament = makeTournament(1, 'football');
+    expect(tournament.venueTurnoverMinutes).toBe(5);
     startFirstStage(tournament);
     const running = updateMockTournamentStatus(tournament.id, 'RUNNING');
     const first = getMockRuntimeMatches(running)[0];
@@ -113,8 +114,8 @@ describe('Hallenraster und zeitbasierte Sportarten', () => {
     completeMockMatch(first.id, scores);
     const next = getMockRuntimeMatches(running).find((match) => match.status === 'WAITING');
     expect(next).toBeDefined();
-    expect(getMockAssignmentBlockReason(running, next!.id, 'Tisch 1')).toContain('Pause');
-    vi.advanceTimersByTime(5 * 60_000);
+    // Turnover is a scheduling estimate, not an assignment restriction.
     expect(getMockAssignmentBlockReason(running, next!.id, 'Tisch 1')).toBeNull();
+    expect(assignMockMatchToTable(running, next!.id, 'Tisch 1')).toBe(true);
   });
 });

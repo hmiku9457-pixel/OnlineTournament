@@ -1,5 +1,7 @@
 ## Unreleased – Tischwechselzeit und Schweizer Ergebnisbestätigung
 
+- Veralteten Turnover-Regressionstest korrigiert: Die 5-minütige Wechselzeit blockiert keinen freien Tisch; der Test prüft nun die sofort mögliche Zuweisung.
+
 - Die eingestellte Wechselzeit zwischen Spielen auf demselben Platz fließt weiterhin in die Planung ein, sperrt aber keine Tischzuweisung mehr.
 - Schweizer System: Bei Eingabe durch die Turnierleitung ist das Endergebnis ausdrücklich zu bestätigen, auch bei Best-of-1. Bis dahin bleibt das Match offen.
 - Diese Admin-Bestätigung markiert das Schweizer Ergebnis als bestätigt. Von Spielern eingetragene und über beide Spielercodes bestätigte Ergebnisse benötigen keine zusätzliche Bestätigung durch die Turnierleitung.
