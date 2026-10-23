@@ -8,7 +8,16 @@ const sets = [
 
 describe('Spielerperspektive in Spielübersichten', () => {
   it('zeigt ein Heimsieg-Ergebnis unverändert an', () => {
-    expect(resultForParticipant('2:0', sets, false)).toEqual({ score: '2:0', sets });
+    const homeWinSets = sets.map((set) => ({
+      ...set,
+      sideAScore: set.sideBScore,
+      sideBScore: set.sideAScore,
+    }));
+    expect(resultForParticipant('2:0', homeWinSets, false)).toEqual({ score: '2:0', sets: homeWinSets });
+  });
+
+  it('nutzt die Satzergebnisse, wenn der angezeigte Ergebnistext veraltet ist', () => {
+    expect(resultForParticipant('2:0', sets, false)).toEqual({ score: '0:2', sets });
   });
 
   it('dreht Gast-Ergebnis und Satzergebnisse korrekt um', () => {
