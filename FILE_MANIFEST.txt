@@ -1,5 +1,3 @@
-OnlineTournament – project file manifest
-
 .editorconfig
 .env.example
 .github/ISSUE_TEMPLATE/bug_report.md
@@ -71,6 +69,7 @@ src/services/mockDuration.ts
 src/services/mockParticipantProgress.ts
 src/services/mockParticipants.ts
 src/services/mockPhaseLifecycle.ts
+src/services/mockPlayerCodes.ts
 src/services/mockRuntime.ts
 src/services/mockTableLocks.ts
 src/services/mockTournamentStore.ts
@@ -101,6 +100,7 @@ tests/shortSetNotation.test.ts
 tests/standings.test.ts
 tests/swiss-score-groups.test.ts
 tests/swiss.test.ts
+tests/swissPlayerHistoryPerspective.test.ts
 tests/tableLocksAndDuration.test.ts
 tests/tournamentControlOperations.test.ts
 tests/tournamentCreation.test.ts
@@ -108,6 +108,7 @@ tests/turnoverAndSwissApproval.test.ts
 tests/uxFinalizeAndWithdraw.test.ts
 tests/venueLayout.test.ts
 tests/withdrawal.test.ts
+tests/withdrawalPlacementBronzeCodes.test.ts
 tsconfig.app.json
 tsconfig.json
 tsconfig.node.json

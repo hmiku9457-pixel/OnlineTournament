@@ -289,7 +289,8 @@ function knockoutMatches(tournament: DemoTournament, stage: TournamentStage, res
         sideA: losers[0],
         sideB: losers[1],
         round: 'Spiel um Platz 3',
-        bestOf: stage.bestOf,
+        // The bronze match has the same Best-of as the final round.
+        bestOf: knockoutRoundBestOf(stage, roundIndex - 1),
       });
     }
   }

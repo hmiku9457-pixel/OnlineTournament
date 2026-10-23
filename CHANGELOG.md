@@ -1,3 +1,11 @@
+## 0.1.0 – UX- und Logikkorrekturen (24.10.2026)
+
+- Sicherheits-Modal beim Rückzug während einer aktiven Phase (Zurückziehen / Abbrechen), inklusive Hinweis auf rückwirkende Gruppenwertung.
+- Neue Turniere vergeben sofort eindeutige zufällige sechsstellige Spielercodes (auch im LocalStorage hinterlegt).
+- Das Spiel um Platz 3 übernimmt das konfigurierte Best-of des Finales, nicht mehr den globalen Phasen-Standard.
+- Zurückgezogene Teilnehmer behalten ihren aus den Ergebnissen berechneten Rang in der Endplatzierung, insbesondere im Schweizer System.
+- Regressionstests für Codes, Bronze-Best-of und Platzierung bei Rückzug ergänzt.
+
 ## Testfix: Spielerperspektive (24.10.2026)
 
 - Widerspruechliche Fixture im Heimsieg-Test berichtigt: Gespeicherte Saetze stimmen jetzt mit dem erwarteten 2:0 ueberein.

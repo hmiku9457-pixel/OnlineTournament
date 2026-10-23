@@ -320,6 +320,7 @@ export function TournamentControlPage() {
   const [drawVersion, setDrawVersion] = useState(0);
   const [phaseVersion, setPhaseVersion] = useState(0);
   const [participantPanel, setParticipantPanel] = useState<{ name: string; mode: 'edit' | 'games' } | null>(null);
+  const [pendingWithdrawal, setPendingWithdrawal] = useState<string | null>(null);
   const [participantVersion, setParticipantVersion] = useState(0);
   const [showParticipantAdd, setShowParticipantAdd] = useState(false);
   const [newParticipantFirst, setNewParticipantFirst] = useState('');
@@ -388,6 +389,23 @@ export function TournamentControlPage() {
     setTournament(getMockTournament(tournament.id));
     setRuntimeVersion((value) => value + 1);
     setPhaseVersion((value) => value + 1);
+  }
+
+  function requestParticipantWithdrawal(name: string) {
+    if (!canWithdrawMockParticipant(tournament, name)) return;
+    // Only an ongoing phase needs the explicit destructive-action warning.
+    if (getActiveStage(tournament)) {
+      setPendingWithdrawal(name);
+      return;
+    }
+    if (withdrawMockParticipant(tournament, name)) refreshRuntime();
+  }
+
+  function confirmParticipantWithdrawal() {
+    const name = pendingWithdrawal;
+    if (!name) return;
+    setPendingWithdrawal(null);
+    if (withdrawMockParticipant(tournament, name)) refreshRuntime();
   }
 
   function handleAddParticipant() {
@@ -879,7 +897,7 @@ export function TournamentControlPage() {
                         : <span className="btn small withdrawal-locked" aria-disabled="true" title="Nur vor einem Phasenstart und bei vorheriger Qualifikation möglich; nicht bei Rückzug während einer Runde.">Rückzug gesperrt</span>
                     ) : progress.status === 'Ausgeschieden' || progress.status === 'Beendet' || progress.status === 'Turniersieger' || !canWithdrawMockParticipant(tournament, participant)
                       ? <span className="btn small withdrawal-locked" aria-disabled="true" title="Nach einem Ausscheiden in der K.-o.-Phase ist kein Rückzug mehr möglich.">Rückzug gesperrt</span>
-                      : <button className="btn small danger-outline" type="button" onClick={() => { if (withdrawMockParticipant(tournament, participant)) refreshRuntime(); }}>Zurückziehen</button>}
+                      : <button className="btn small danger-outline" type="button" onClick={() => requestParticipantWithdrawal(participant)}>Zurückziehen</button>}
                   </div>
                   {participantPanel?.name === participant && (
                     <div className="participant-inline-panel">
@@ -925,6 +943,20 @@ export function TournamentControlPage() {
         </section>
       )}
 
+      {pendingWithdrawal && (
+        <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setPendingWithdrawal(null)}>
+          <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="withdrawal-warning-title" onMouseDown={(event) => event.stopPropagation()}>
+            <span className="badge">RÜCKZUG WÄHREND EINER PHASE</span>
+            <h2 id="withdrawal-warning-title">{pendingWithdrawal} zurückziehen?</h2>
+            <p>Die aktuelle Phase läuft bereits. Der Rückzug kann danach nicht mehr rückgängig gemacht werden. Betroffene Spiele werden kampflos gewertet.</p>
+            {activeStage?.type === 'GROUPS' && <p className="muted">In der Gruppenphase werden auch bereits gespielte Begegnungen mit 0:11 je Satz gegen diesen Teilnehmer gewertet. Tabellen und Qualifikation ändern sich entsprechend.</p>}
+            <div className="actions">
+              <button className="btn danger" type="button" onClick={confirmParticipantWithdrawal}>Zurückziehen</button>
+              <button className="btn" type="button" onClick={() => setPendingWithdrawal(null)}>Abbrechen</button>
+            </div>
+          </section>
+        </div>
+      )}
       {adminEditMatchId && (() => {
         const found = findMockRuntimeMatch(adminEditMatchId);
         if (!found) return null;

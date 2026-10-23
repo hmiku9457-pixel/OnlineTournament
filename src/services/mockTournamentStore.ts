@@ -1,4 +1,5 @@
 import { getPhaseLifecycle } from '@/services/mockPhaseLifecycle';
+import { generatePlayerCodes, generateUniquePlayerCode } from '@/services/mockPlayerCodes';
 import { recordMockAudit } from '@/services/mockAudit';
 import { reconcilePrestartDraws } from '@/services/mockDrawStore';
 import type { VenueLayout } from '@/domain/venueLayout';
@@ -113,6 +114,7 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
     stages,
     areas: [{ name: 'Standardbereich', tables: `1–${input.tables}`, preferred: 'Automatische Zuweisung', mode: 'offen' }],
     participantNames: input.participantNames,
+    participantCodes: generatePlayerCodes(input.participantNames),
     isLocalPrototype: true,
     hasStarted: false,
     venueLayout: input.venueLayout,
@@ -284,8 +286,7 @@ export function addMockParticipant(
   }
 
   const occupied = new Set(Object.values(tournament.participantCodes ?? {}));
-  let code = '';
-  do { code = String(Math.floor(100000 + Math.random() * 900000)); } while (occupied.has(code));
+  const code = generateUniquePlayerCode(occupied);
   const updated: DemoTournament = {
     ...tournament,
     participantNames: [...(tournament.participantNames ?? []), displayName],

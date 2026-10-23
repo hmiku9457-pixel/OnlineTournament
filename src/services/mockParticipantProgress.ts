@@ -76,10 +76,18 @@ function placementInStage(tournament: DemoTournament, stage: TournamentStage, na
 }
 
 export function getMockParticipantProgress(tournament: DemoTournament, name: string): MockParticipantProgress {
-  if (isMockParticipantWithdrawn(tournament, name)) return { status: 'Zurückgezogen' };
+  const withdrawn = isMockParticipantWithdrawn(tournament, name);
   const started = tournament.stages.filter((stage) => isStageStarted(tournament, stage));
-  if (!started.length) return { status: 'Aktiv' };
+  if (!started.length) return { status: withdrawn ? 'Zurückgezogen' : 'Aktiv' };
   const latest = started[started.length - 1];
+
+  // A withdrawal is a status, not a placement: players retain the rank
+  // earned in their last actually entered stage (including Swiss standings).
+  // Never treat withdrawal as an automatic last place in the final ranking.
+  if (withdrawn) {
+    const lastPlayed = [...started].reverse().find((stage) => getStageEntrants(tournament, stage).includes(name));
+    return { status: 'Zurückgezogen', placement: lastPlayed ? placementInStage(tournament, lastPlayed, name) : undefined };
+  }
 
   if (!getStageEntrants(tournament, latest).includes(name)) {
     // Teilnehmer hat sich nicht für die gestartete Folgephase qualifiziert.
@@ -105,8 +113,8 @@ export function getMockParticipantProgress(tournament: DemoTournament, name: str
 export function getMockFinalStandings(tournament: DemoTournament) {
   return getRuntimeParticipantNames(tournament).map((name) => {
     const progress = getMockParticipantProgress(tournament, name);
-    const reachedIndex = [...tournament.stages].reverse().findIndex((stage) => getStageEntrants(tournament, stage).includes(name));
-    const stageIndex = reachedIndex === -1 ? -1 : tournament.stages.length - 1 - reachedIndex;
+    const stageIndex = tournament.stages.reduce((latest, stage, index) =>
+      isStageStarted(tournament, stage) && getStageEntrants(tournament, stage).includes(name) ? index : latest, -1);
     const placementNumber = Number(progress.placement?.match(/Platz\s+(\d+)/)?.[1] ?? Number.MAX_SAFE_INTEGER);
     return { name, ...progress, stageIndex, placementNumber };
   }).sort((a, b) => b.stageIndex - a.stageIndex || a.placementNumber - b.placementNumber || a.name.localeCompare(b.name, 'de'));
