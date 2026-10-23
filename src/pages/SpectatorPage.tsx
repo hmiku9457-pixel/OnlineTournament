@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
-import { getMockRuntimeMatches, getMockStageMatches, isMockParticipantWithdrawn, getSwissRecordBeforeRound } from '@/services/mockRuntime';
+import { getMockRuntimeMatches, getMockStageMatches, isMockParticipantWithdrawn, getSwissRecordBeforeRound, getSwissCurrentRecord } from '@/services/mockRuntime';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
@@ -150,9 +150,10 @@ export function SpectatorPage() {
               const opponent = match.sideA === selectedSwiss.name ? match.sideB : match.sideA;
               const roundNumber = Number(match.round.match(/\d+/)?.[0]) || 1;
               const opponentRecord = getSwissRecordBeforeRound(tournament, stage, opponent, roundNumber);
+              const opponentCurrentRecord = getSwissCurrentRecord(tournament, stage, opponent);
               return <div className="player-game-row" key={match.id}>
                 <span className="muted">{match.round}</span>
-                <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor dieser Runde">{opponentRecord}</span></span>
+                <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor dieser Runde">Vor Runde: {opponentRecord}</span><span className="swiss-record swiss-record-current" title="Aktuelle Bilanz des Gegners">Aktuell: {opponentCurrentRecord}</span></span>
                 <span className="player-game-result-cell"><PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} /><MatchResultDetails {...result} /></span>
               </div>;
             })}</div>

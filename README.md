@@ -6,7 +6,7 @@ A public, browser-based tournament platform with a primary focus on table tennis
 
 - Open registration for organizers.
 - Singles and doubles.
-- Round robin, groups, Swiss, knockout, double elimination, placement and consolation formats.
+- Round robin, groups, Swiss and single-elimination knockout formats.
 - Multi-stage combinations such as **Swiss → Top 8 knockout** and **Groups → knockout**.
 - Automatic format recommendations based on participant count, tables and desired minimum matches.
 - Automatic draw, scheduling and table assignment with manual override.
@@ -49,7 +49,7 @@ Tournament
 └── Competition (Singles / Doubles)
     ├── Stage 1: Groups / Swiss / Round Robin
     ├── Stage 2: Knockout
-    └── Stage 3: Placement (optional)
+
 ```
 
 This avoids hard-coding combinations and supports Swiss → knockout as a first-class workflow.

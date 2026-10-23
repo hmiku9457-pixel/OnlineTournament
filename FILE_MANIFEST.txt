@@ -20,6 +20,7 @@ docs/DEVELOPMENT.md
 docs/PRODUCT_SPEC.md
 docs/ROADMAP.md
 docs/SCORING_AND_SECURITY.md
+docs/SEEDING.md
 docs/TOURNAMENT_ENGINE.md
 eslint.config.js
 index.html
@@ -45,6 +46,7 @@ src/domain/venueLayout.ts
 src/engine/bracket.ts
 src/engine/recommendations.ts
 src/engine/scheduler.ts
+src/engine/seededDraws.ts
 src/engine/standings.ts
 src/engine/swiss.ts
 src/engine/swissScoreGroups.ts
@@ -96,6 +98,7 @@ tests/recommendations.test.ts
 tests/rules.test.ts
 tests/runtimeAdministration.test.ts
 tests/runtimeKnockout.test.ts
+tests/seededDraws.test.ts
 tests/shortSetNotation.test.ts
 tests/standings.test.ts
 tests/swiss-score-groups.test.ts
@@ -113,4 +116,3 @@ tsconfig.app.json
 tsconfig.json
 tsconfig.node.json
 vite.config.ts
-FILE_MANIFEST.txt

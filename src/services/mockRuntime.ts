@@ -1044,6 +1044,11 @@ export function getSwissRecordBeforeRound(tournament: DemoTournament, stage: Tou
   return `${wins}:${losses}`;
 }
 
+/** Current, completed Swiss record (including earlier-round byes). */
+export function getSwissCurrentRecord(tournament: DemoTournament, stage: TournamentStage, name: string) {
+  return getSwissRecordBeforeRound(tournament, stage, name, Number.POSITIVE_INFINITY);
+}
+
 export function getMockPlayerSnapshot(tournament: DemoTournament) {
   const participants = getRuntimeParticipantNames(tournament);
   const player = participants[0] ?? 'Max Mustermann';

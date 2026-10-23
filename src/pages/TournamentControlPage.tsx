@@ -10,11 +10,11 @@ import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, countMockOpenConfirmations, adminConfirmMockMatch, getMockMatchConfirmation, getSwissRecordBeforeRound, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, countMockOpenConfirmations, adminConfirmMockMatch, getMockMatchConfirmation, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
 import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { VenueLayoutMini } from '@/components/VenueLayout';
-import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
+import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getStageEntrants, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
 import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
@@ -133,7 +133,10 @@ function StageCompetitionView({
     const swissMatches = getMockStageMatches(tournament, stage);
     return (
       <section className="competition-stage-section">
-        <div className="competition-stage-head"><div><span className="badge">SCHWEIZER SYSTEM</span><h3>{stage.name}</h3></div><div className="actions"><span className="muted">{Number(stage.settings.rounds) || 4} Runden</span>{canEditDraw(tournament, stage) && <button className="btn small" type="button" onClick={() => { if (randomizeSwissOrder(tournament, stage)) onDrawChanged?.(); }}>Neue Zufallsreihenfolge</button>}</div></div>
+        <div className="competition-stage-head"><div><span className="badge">SCHWEIZER SYSTEM</span><h3>{stage.name}</h3></div><div className="actions"><span className="muted">{Number(stage.settings.rounds) || 4} Runden</span>{canEditDraw(tournament, stage) && <button className="btn small" type="button" onClick={() => { if (randomizeSwissOrder(tournament, stage)) onDrawChanged?.(); }}>Neue Zufallsreihenfolge</button>}{canEditDraw(tournament, stage) && tournament.stages[tournament.stages.findIndex((entry) => entry.id === stage.id) - 1]?.type === 'GROUPS' && <button className="btn small" type="button" title="Nach Gruppenplatzierung: A–D, D–A, A–D …" onClick={() => {
+                  const previous = tournament.stages[tournament.stages.findIndex((entry) => entry.id === stage.id) - 1];
+                  if (previous && applySeededSwissOrder(tournament, stage, buildMockGroups(tournament, previous).map((group) => group.standings.map((row) => row.name)))) onDrawChanged?.();
+                }}>Seeded Zuteilung</button>}</div></div>
         <div className="card table-wrap">
           <table className="compact-table">
             <thead><tr><th>#</th><th>Teilnehmer</th><th>Spiele</th><th>Siege</th><th>Niederlagen</th><th>Sätze</th><th>Satz ±</th><th>Bälle</th><th>Ball ±</th></tr></thead>
@@ -150,10 +153,11 @@ function StageCompetitionView({
                   const opponent = match.sideA === selectedSwissPlayer ? match.sideB : match.sideA;
                   const roundNumber = Number(match.round.match(/\d+/)?.[0]) || 1;
                   const opponentRecord = getSwissRecordBeforeRound(tournament, stage, opponent, roundNumber);
+                  const opponentCurrentRecord = getSwissCurrentRecord(tournament, stage, opponent);
                   const result = resultForMatchParticipant({ ...match, score: match.status === 'FINISHED' ? match.score : '–' }, selectedSwissPlayer);
                   return <div className="player-game-row swiss-player-game-row" key={match.id}>
                     <span className="muted swiss-history-round">{match.round}</span>
-                    <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor dieser Runde">{opponentRecord}</span></span>
+                    <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz vor dieser Runde">Vor Runde: {opponentRecord}</span><span className="swiss-record swiss-record-current" title="Aktuelle Bilanz des Gegners">Aktuell: {opponentCurrentRecord}</span></span>
                     <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} />
                     <MatchResultDetails score={result.score} sets={result.sets} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
                   </div>;
@@ -195,9 +199,14 @@ function StageCompetitionView({
             {editable && <p className="muted bracket-edit-hint">Startplätze per Drag & Drop verschieben oder mit der Stecknadel fixieren.</p>}
           </div>
           {editable && (
-            <button className="btn small" type="button" onClick={() => { if (randomizeBracketSlots(tournament, stage)) onDrawChanged?.(); }}>
-              Neue Zufallsverteilung
-            </button>
+            <div className="actions">
+              {stage.type === 'KNOCKOUT' && ['GROUPS', 'SWISS'].includes(tournament.stages[tournament.stages.findIndex((entry) => entry.id === stage.id) - 1]?.type ?? '') && (
+                <button className="btn small" type="button" title="Setzliste aus der Vorphase: P1 gegen Pn, P1/P2 in verschiedenen Hälften; Freilose an die bestplatzierten Teilnehmer. Vorherige Pins werden gelöst." onClick={() => { if (applySeededBracketSlots(tournament, stage)) onDrawChanged?.(); }}>Seeded Zuteilung</button>
+              )}
+              <button className="btn small" type="button" onClick={() => { if (randomizeBracketSlots(tournament, stage)) onDrawChanged?.(); }}>
+                Neue Zufallsverteilung
+              </button>
+            </div>
           )}
         </div>
         <div className="bracket-scroll">
@@ -544,7 +553,7 @@ export function TournamentControlPage() {
         <div className="actions no-print">
           <Link className="btn" to={`/player/${tournament.id}`}>Spieleransicht</Link>
           <Link className="btn" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
-          {editableStage && ['GROUPS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(editableStage.type) && (
+          {editableStage && ['GROUPS', 'SWISS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(editableStage.type) && (
             <button className="btn" type="button" onClick={() => setTab('flow')}>Aktuelle Phase bearbeiten</button>
           )}
           {!tournament.hasStarted && tournament.status !== 'FINISHED' && (

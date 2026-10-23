@@ -1,5 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
+import { seededKnockoutSlots, snakeSeededGroupOrder } from '@/engine/seededDraws';
+import { isStageCompleted } from '@/services/mockPhaseLifecycle';
 import { getPhaseLifecycle, getStageEntrants, isStageEditable } from '@/services/mockPhaseLifecycle';
 
 const DRAW_KEY = 'online-tournament:mock-draw-config:v1';
@@ -187,6 +189,30 @@ export function randomizeSwissOrder(tournament: DemoTournament, stage: Tournamen
     bracketSlots: config?.bracketSlots,
     swissOrder: shuffled(participants),
   });
+  return true;
+}
+
+/** Seed the Swiss opening order from the completed groups using snake ranks. */
+export function applySeededSwissOrder(tournament: DemoTournament, stage: TournamentStage, rankedGroups: string[][]) {
+  const previous = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) - 1];
+  if (stage.type !== 'SWISS' || previous?.type !== 'GROUPS' || !isStageCompleted(tournament, previous) || !canEditDraw(tournament, stage)) return false;
+  const entrants = getStageEntrants(tournament, stage);
+  const order = snakeSeededGroupOrder(rankedGroups, entrants);
+  if (order.length !== entrants.length || new Set(order).size !== entrants.length) return false;
+  upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, swissOrder: order });
+  return true;
+}
+
+/** Apply conventional ranking seeds from the preceding completed phase. */
+export function applySeededBracketSlots(tournament: DemoTournament, stage: TournamentStage) {
+  const previous = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) - 1];
+  if (stage.type !== 'KNOCKOUT' || !previous || !['GROUPS', 'SWISS'].includes(previous.type) || !isStageCompleted(tournament, previous) || !canEditDraw(tournament, stage)) return false;
+  // Qualifier ordering is the ranking order of the completed prior stage.
+  const entrants = getStageEntrants(tournament, stage);
+  const slots = seededKnockoutSlots(entrants);
+  if (!validBracketConstraints(entrants, slots)) return false;
+  // An explicit re-seeding supersedes old manual positions and pins.
+  upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots, pinnedBracketSlots: [] });
   return true;
 }
 

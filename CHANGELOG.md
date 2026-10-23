@@ -1,3 +1,10 @@
+## UX: Seeded-Zuteilung und Schweizer Spielverlauf (2026-10-24)
+- Schweizer Spielerpartien: zusätzliche aktuelle Gegnerbilanz als zweiter Tag hinter der Bilanz vor der Runde (auch in der Zuschaueransicht).
+- Gruppen → Schweizer System: Seeded-Zuteilung aus den tatsächlichen Gruppenplatzierungen als Schlangenfolge A–D, D–A, ...; nur vor dem Start der Folgephase.
+- Gruppen/Schweizer System → K.-o.: Setzpositionen nach Abschlussrang der Vorphase; Favorit 1 und Favorit 2 in unterschiedlichen Baumhälften, erste Runde P1 gegen Pn bei voller Feldgröße, Freilose für die bestplatzierten Teilnehmer bei unvollständigem Baum.
+- Manuelle K.-o.-Setzung, Pins und Zufallsverteilung bleiben verfügbar. Ausdrückliches Neu-Setzen löst bisherige Pins.
+- Neue Regressionstests in `tests/seededDraws.test.ts`.
+
 ## 0.1.0 – UX- und Logikkorrekturen (24.10.2026)
 
 - Sicherheits-Modal beim Rückzug während einer aktiven Phase (Zurückziehen / Abbrechen), inklusive Hinweis auf rückwirkende Gruppenwertung.

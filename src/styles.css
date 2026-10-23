@@ -1509,3 +1509,7 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   .swiss-player-game-row > .swiss-history-round { grid-column: 1 / -1; }
   .participant-statistics > div { flex-direction: column; gap: 2px; }
 }
+
+/* Swiss match history: show before-round and current opponent records side by side. */
+.swiss-history-opponent .swiss-record-current { background: #eff8ff; color: #175cd3; }
+.swiss-history-opponent { row-gap: 4px; }
