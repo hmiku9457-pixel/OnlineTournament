@@ -912,11 +912,11 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
     if (tournament && stage && !canEditFinishedResults(tournament, stage)) return previous;
   }
   const stage = tournament?.stages.find((item) => matchId.startsWith(`${item.id}-`));
-  const swissAdminConfirmation = status === 'FINISHED' && confirmedByAdmin && stage?.type === 'SWISS';
+  const adminPhaseConfirmation = status === 'FINISHED' && confirmedByAdmin && (stage?.type === 'SWISS' || stage?.type === 'KNOCKOUT');
   const next: StoredMatchResult = {
     ...previous, matchId, sets, status, forcedWinner: undefined, thirdPlaceSkipped: undefined,
-    confirmedA: swissAdminConfirmation ? true : previousFinal ? false : previous?.confirmedA,
-    confirmedB: swissAdminConfirmation ? true : previousFinal ? false : previous?.confirmedB,
+    confirmedA: adminPhaseConfirmation ? true : previousFinal ? false : previous?.confirmedA,
+    confirmedB: adminPhaseConfirmation ? true : previousFinal ? false : previous?.confirmedB,
     finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt,
   };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
@@ -924,8 +924,8 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
     const resultText = (value: StoredMatchResult | undefined) => value?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') || '–';
     recordMockAudit({ tournamentId: tournament.id, matchId, actor: previousFinal ? 'Turnierleitung (lokal)' : 'Ergebniseingabe (lokal)', action: previousFinal ? 'RESULT_CORRECTED' : 'RESULT_RECORDED', description: previousFinal ? 'Endergebnis nachträglich korrigiert' : 'Endergebnis eingetragen', before: resultText(previous), after: resultText(next), beforeSets: previousFinal ? previous?.sets : undefined, afterSets: previousFinal ? sets : undefined });
   }
-  if (tournament && swissAdminConfirmation) {
-    recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Turnierleitung (lokal)', action: 'RESULT_CONFIRMED', description: 'Schweizer Endergebnis ausdrücklich durch die Turnierleitung bestätigt' });
+  if (tournament && adminPhaseConfirmation) {
+    recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Turnierleitung (lokal)', action: 'RESULT_CONFIRMED', description: 'Phasen-Endergebnis ausdrücklich durch die Turnierleitung bestätigt' });
   }
   if (status === 'FINISHED') {
     const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));

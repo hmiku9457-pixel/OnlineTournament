@@ -1,3 +1,10 @@
+## 2026-10-24 – Phasen-Setzung, Spielerhistorie und Endplatzierungen
+- Spielerhistorie: Gegnerbilanzen ohne Labels in Tags; Spaltenheader erläutert beide Werte.
+- Schweizer → Gruppen: Seeded-Verteilung und vorangegangene Platzierung direkt in der Gruppenauslosung.
+- Gruppen/Schweizer → K.-o.: „Brackets nach Seeding zuteilen“; gruppenübergreifende Rematches werden unter Wahrung von Freilosen und Top-Seeds verzögert.
+- Admin-Erfassung in K.-o.: zusätzliche Endergebnisbestätigung auch bei BO1.
+- Gruppenendplätze: gemeinsame Platzierungsbereiche nach Gruppenrang, z. B. Rang 3 in vier Vierergruppen = Platz 9–12.
+
 ## UX: Seeded-Zuteilung und Schweizer Spielverlauf (2026-10-24)
 - Schweizer Spielerpartien: zusätzliche aktuelle Gegnerbilanz als zweiter Tag hinter der Bilanz vor der Runde (auch in der Zuschaueransicht).
 - Gruppen → Schweizer System: Seeded-Zuteilung aus den tatsächlichen Gruppenplatzierungen als Schlangenfolge A–D, D–A, ...; nur vor dem Start der Folgephase.

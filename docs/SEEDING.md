@@ -22,3 +22,10 @@ Die Qualifikanten werden entsprechend der gespeicherten Abschlussrangfolge ihrer
 Bei 12 Spielern im 16er-Feld erhalten **P1–P4** jeweils ein Freilos. In diesem Fall tritt P1 nicht direkt gegen P12 an, sondern spielt erst in Runde 2 gegen den Gewinner des entsprechenden Erstrundenmatches. Freilose werden verteilt, sodass nicht direkt in Runde 2 zwei Freilosgewinner aufeinandertreffen, soweit dies mathematisch möglich ist.
 
 Der Button verändert den noch nicht gestarteten Baum und entfernt bisherige Pins, da er eine *ausdrücklich neu gewählte vollständige Setzung* erzeugt. Danach können Startplätze wieder frei per Drag & Drop bearbeitet oder gepinnt werden. Der Button **Neue Zufallsverteilung** bleibt separat verfügbar.
+
+
+## Erweiterung: Schweizer → Gruppen und Gruppen → K.-o.
+
+- Nach einer abgeschlossenen Schweizer Phase kann die Gruppen-Auslosung per **„Tabellen nach Seeding erstellen“** aus der sichtbaren Schweizer Schlussrangliste neu gesetzt werden (A–B–C–D / D–C–B–A). Die Herkunftsplatzierung steht direkt neben dem Teilnehmernamen.
+- **„Brackets nach Seeding zuteilen“** verwendet weiterhin die Qualifikationsreihenfolge und gewährt Freilose zuerst den besten Setzpositionen. Bei vorherigen Gruppen wird die erste K.-o.-Runde zusätzlich hinsichtlich früher Gruppenrematches optimiert. Ein Konflikt zwischen klassischer Paarung P1–Plast und Vermeidung eines Gruppenrematches wird zugunsten des späteren Wiedersehens aufgelöst.
+- Die Setzung bleibt bis zum jeweiligen Phasenstart manuell bearbeitbar.

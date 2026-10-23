@@ -99,6 +99,7 @@ tests/rules.test.ts
 tests/runtimeAdministration.test.ts
 tests/runtimeKnockout.test.ts
 tests/seededDraws.test.ts
+tests/seededFollowupAndPlacement.test.ts
 tests/shortSetNotation.test.ts
 tests/standings.test.ts
 tests/swiss-score-groups.test.ts

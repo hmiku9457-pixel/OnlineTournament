@@ -145,16 +145,16 @@ export function SpectatorPage() {
         return <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setSelectedSwiss(null)}>
           <section className="prototype-modal player-games-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
             <div className="player-games-modal-head"><h2>{selectedSwiss.name} · Partien</h2><button className="btn small" type="button" onClick={() => setSelectedSwiss(null)}>Schließen</button></div>
-            <div className="player-games-list">{ownMatches.map((match) => {
+            <div className="player-games-list swiss-history-list"><div className="swiss-history-head" aria-hidden="true"><span>Runde</span><span>Gegner · Bilanz vor Runde / Aktuelle Bilanz</span><span>Ausgang</span><span>Ergebnis</span></div>{ownMatches.map((match) => {
               const result = resultForMatchParticipant({ ...match, score: match.status === 'FINISHED' ? match.score : '–' }, selectedSwiss.name);
               const opponent = match.sideA === selectedSwiss.name ? match.sideB : match.sideA;
               const roundNumber = Number(match.round.match(/\d+/)?.[0]) || 1;
               const opponentRecord = getSwissRecordBeforeRound(tournament, stage, opponent, roundNumber);
               const opponentCurrentRecord = getSwissCurrentRecord(tournament, stage, opponent);
-              return <div className="player-game-row" key={match.id}>
+              return <div className="player-game-row swiss-player-game-row" key={match.id}>
                 <span className="muted">{match.round}</span>
-                <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor dieser Runde">Vor Runde: {opponentRecord}</span><span className="swiss-record swiss-record-current" title="Aktuelle Bilanz des Gegners">Aktuell: {opponentCurrentRecord}</span></span>
-                <span className="player-game-result-cell"><PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} /><MatchResultDetails {...result} /></span>
+                <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor dieser Runde">{opponentRecord}</span><span className="swiss-record swiss-record-current" title="Aktuelle Bilanz des Gegners">{opponentCurrentRecord}</span></span>
+                <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} /><MatchResultDetails {...result} />
               </div>;
             })}</div>
           </section>

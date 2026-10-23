@@ -5,9 +5,11 @@ import {
   canEditDraw,
   getGroupAssignments,
   randomizeGroupAssignments,
+  applySeededGroupAssignments,
   setParticipantGroup,
 } from '@/services/mockDrawStore';
 import { getStageEntrants, isStageCompleted, isStageLockedWaiting, isStageStarted } from '@/services/mockPhaseLifecycle';
+import { getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 
 interface Props {
   tournament: DemoTournament;
@@ -35,6 +37,9 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
   const editable = canEditDraw(tournament, stage);
   const participants = useMemo(() => getStageEntrants(tournament, stage), [tournament, stage, revision]);
   const started = isStageStarted(tournament, stage);
+  const stageIndex = tournament.stages.findIndex((item) => item.id === stage.id);
+  const precededBySwiss = tournament.stages[stageIndex - 1]?.type === 'SWISS';
+  const previousFinishLabels = getPreviousStageFinishLabels(tournament, stage);
   const completed = isStageCompleted(tournament, stage);
   const waitingForPrevious = isStageLockedWaiting(tournament, stage);
 
@@ -80,15 +85,16 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
             <h4>Gruppenauslosung per Drag & Drop</h4>
             <p className="muted">Teilnehmer direkt greifen und in die gewünschte Gruppe ziehen. Der Stand wird sofort gespeichert.</p>
           </div>
-          <button
-            className="btn small"
-            type="button"
-            onClick={() => {
+          <div className="actions">
+            {precededBySwiss && <button className="btn small" type="button"
+              title="Nach Platzierung der abgeschlossenen Schweizer Phase schlangenförmig auf die Gruppen verteilen"
+              onClick={() => { if (applySeededGroupAssignments(tournament, stage)) changed(); }}>
+              Tabellen nach Seeding erstellen
+            </button>}
+            <button className="btn small" type="button" onClick={() => {
               if (randomizeGroupAssignments(tournament, stage)) changed();
-            }}
-          >
-            Neue Zufallsverteilung
-          </button>
+            }}>Neue Zufallsverteilung</button>
+          </div>
         </div>
         <div className="group-dnd-grid">
           {groups.map((group) => (
@@ -119,7 +125,7 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
                     onDragStart={(event) => setDragValue(event, participant)}
                   >
                     <span className="draw-drag-handle">⋮⋮</span>
-                    <strong>{participant}</strong>
+                    <span className="draw-player-name"><strong>{participant}</strong>{previousFinishLabels[participant] && <small className="participant-origin">{previousFinishLabels[participant]}</small>}</span>
                   </div>
                 ))}
                 {group.participants.length === 0 && <span className="muted group-dnd-empty">Spieler hierher ziehen</span>}

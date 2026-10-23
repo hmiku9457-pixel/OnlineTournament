@@ -56,9 +56,15 @@ function knockoutPlacement(tournament: DemoTournament, stage: TournamentStage, n
 
 function placementInStage(tournament: DemoTournament, stage: TournamentStage, name: string): string | undefined {
   if (stage.type === 'GROUPS') {
-    for (const group of buildMockGroups(tournament, stage)) {
+    const groups = buildMockGroups(tournament, stage);
+    for (const group of groups) {
       const row = group.standings.find((item) => item.name === name);
-      if (row) return `${group.label} · Platz ${row.rank}`;
+      if (!row) continue;
+      const before = groups.reduce((sum, item) => sum + item.standings.filter((entry) => entry.rank < row.rank).length, 0);
+      const shared = groups.reduce((sum, item) => sum + item.standings.filter((entry) => entry.rank === row.rank).length, 0);
+      const first = before + 1;
+      const last = before + shared;
+      return `${group.label} · Platz ${first}${last > first ? `–${last}` : ''}`;
     }
   }
   if (stage.type === 'SWISS') {

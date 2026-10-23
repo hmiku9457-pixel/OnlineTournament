@@ -148,7 +148,7 @@ function StageCompetitionView({
             <div className="prototype-modal player-games-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
               <div className="player-games-modal-head"><h2>{selectedSwissPlayer} · Partien</h2><button className="btn small" type="button" onClick={() => setSelectedSwissPlayer(null)}>Schließen</button></div>
               <div className="player-games-list swiss-history-list">
-                <div className="swiss-history-head" aria-hidden="true"><span>Runde</span><span>Gegner · Bilanz vor Runde</span><span>Ausgang</span><span>Ergebnis</span></div>
+                <div className="swiss-history-head" aria-hidden="true"><span>Runde</span><span>Gegner · Bilanz vor Runde / Aktuelle Bilanz</span><span>Ausgang</span><span>Ergebnis</span></div>
                 {swissMatches.filter((match) => match.sideA === selectedSwissPlayer || match.sideB === selectedSwissPlayer).map((match) => {
                   const opponent = match.sideA === selectedSwissPlayer ? match.sideB : match.sideA;
                   const roundNumber = Number(match.round.match(/\d+/)?.[0]) || 1;
@@ -157,7 +157,7 @@ function StageCompetitionView({
                   const result = resultForMatchParticipant({ ...match, score: match.status === 'FINISHED' ? match.score : '–' }, selectedSwissPlayer);
                   return <div className="player-game-row swiss-player-game-row" key={match.id}>
                     <span className="muted swiss-history-round">{match.round}</span>
-                    <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz vor dieser Runde">Vor Runde: {opponentRecord}</span><span className="swiss-record swiss-record-current" title="Aktuelle Bilanz des Gegners">Aktuell: {opponentCurrentRecord}</span></span>
+                    <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor der Runde">{opponentRecord}</span><span className="swiss-record swiss-record-current" title="Aktuelle Bilanz des Gegners">{opponentCurrentRecord}</span></span>
                     <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} />
                     <MatchResultDetails score={result.score} sets={result.sets} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
                   </div>;
@@ -201,7 +201,7 @@ function StageCompetitionView({
           {editable && (
             <div className="actions">
               {stage.type === 'KNOCKOUT' && ['GROUPS', 'SWISS'].includes(tournament.stages[tournament.stages.findIndex((entry) => entry.id === stage.id) - 1]?.type ?? '') && (
-                <button className="btn small" type="button" title="Setzliste aus der Vorphase: P1 gegen Pn, P1/P2 in verschiedenen Hälften; Freilose an die bestplatzierten Teilnehmer. Vorherige Pins werden gelöst." onClick={() => { if (applySeededBracketSlots(tournament, stage)) onDrawChanged?.(); }}>Seeded Zuteilung</button>
+                <button className="btn small" type="button" title="Setzliste aus der Vorphase: P1 gegen Pn, P1/P2 in verschiedenen Hälften; Freilose an die bestplatzierten Teilnehmer. Vorherige Pins werden gelöst." onClick={() => { if (applySeededBracketSlots(tournament, stage)) onDrawChanged?.(); }}>Brackets nach Seeding zuteilen</button>
               )}
               <button className="btn small" type="button" onClick={() => { if (randomizeBracketSlots(tournament, stage)) onDrawChanged?.(); }}>
                 Neue Zufallsverteilung
@@ -368,7 +368,7 @@ export function TournamentControlPage() {
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table) && !blockedTables.has(table));
   const activeStage = useMemo(() => getActiveStage(tournament), [tournament, phaseVersion]);
-  const activeSwissRecords = useMemo(() => activeStage?.type === 'SWISS'
+  const activeSwissRecords = useMemo(() => (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')
     ? new Map(buildSwissStandings(tournament, activeStage).map((row) => [row.name, `${row.wins}:${row.losses}`]))
     : new Map<string, string>(), [tournament, activeStage, runtimeVersion]);
   const nextStartableStage = useMemo(() => getNextStartableStage(tournament), [tournament, phaseVersion]);
@@ -612,7 +612,7 @@ export function TournamentControlPage() {
                 const isBlocked = blockedTables.has(tableName);
                 return (
                   <article
-                    className={`card overview-table-card ${match ? 'busy' : isBlocked ? 'blocked' : 'table-drop-target'}${match && requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED' ? ' awaiting-approval' : ''}`}
+                    className={`card overview-table-card ${match ? 'busy' : isBlocked ? 'blocked' : 'table-drop-target'}${match && requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED' ? ' awaiting-approval' : ''}`}
                     key={tableName}
                     onDragOver={(event) => { if (tournament.status === 'RUNNING' && !match && !isBlocked) event.preventDefault(); }}
                     onDrop={(event) => {
@@ -639,14 +639,14 @@ export function TournamentControlPage() {
                     {match ? (
                       <>
                         <span className="muted">{match.phase} · {match.round} · BO{match.bestOf}</span>
-                        <SetBySetEntry match={match} swissAdminEntry={activeStage?.type === 'SWISS'} onSaved={refreshRuntime} compact sideARecord={activeSwissRecords.get(match.sideA)} sideBRecord={activeSwissRecords.get(match.sideB)} />
-                        {!(requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED') && (
+                        <SetBySetEntry match={match} swissAdminEntry={(activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')} onSaved={refreshRuntime} compact sideARecord={activeSwissRecords.get(match.sideA)} sideBRecord={activeSwissRecords.get(match.sideB)} />
+                        {!(requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED') && (
                           <div className="table-operational-actions">
                             <button className="btn small" type="button" onClick={() => setMovingMatchId((old) => old === match.id ? null : match.id)}>Tisch wechseln</button>
                             <button className="btn small" type="button" onClick={() => unassignFromTable(match.id)}>Zuweisung aufheben</button>
                           </div>
                         )}
-                        {movingMatchId === match.id && !(requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED') && (
+                        {movingMatchId === match.id && !(requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED') && (
                           <div className="table-assignment-picker" role="group" aria-label="Neuen Tisch auswählen">
                             {freeTables.length ? freeTables.map((table) => (
                               <button key={table} className="btn small" type="button" onClick={() => moveToTable(match.id, table)}>{table}</button>
@@ -980,7 +980,7 @@ export function TournamentControlPage() {
               <p className="muted">{found.match.sideA} gegen {found.match.sideB} · {found.match.round} · Best-of-{found.match.bestOf}</p>
               <SetBySetEntry
                 match={found.match}
-                swissAdminEntry={stage?.type === 'SWISS'}
+                swissAdminEntry={stage?.type === 'SWISS' || stage?.type === 'KNOCKOUT'}
                 allowEditFinished={canEditMockMatch(tournament, found.match.id)}
                 onSaved={refreshRuntime}
                 onCompleted={() => {

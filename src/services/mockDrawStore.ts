@@ -1,8 +1,9 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
-import { seededKnockoutSlots, snakeSeededGroupOrder } from '@/engine/seededDraws';
+import { seededGroupAssignments, seededKnockoutSlots, seededKnockoutSlotsAvoidingGroups, snakeSeededGroupOrder } from '@/engine/seededDraws';
 import { isStageCompleted } from '@/services/mockPhaseLifecycle';
 import { getPhaseLifecycle, getStageEntrants, isStageEditable } from '@/services/mockPhaseLifecycle';
+import { buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
 
 const DRAW_KEY = 'online-tournament:mock-draw-config:v1';
 
@@ -203,13 +204,38 @@ export function applySeededSwissOrder(tournament: DemoTournament, stage: Tournam
   return true;
 }
 
+/** Group draw from previous completed Swiss ranking: A-B-C-D / D-C-B-A. */
+export function applySeededGroupAssignments(tournament: DemoTournament, stage: TournamentStage) {
+  const previous = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) - 1];
+  if (stage.type !== 'GROUPS' || previous?.type !== 'SWISS' || !isStageCompleted(tournament, previous) || !canEditDraw(tournament, stage)) return false;
+  const entrants = getStageEntrants(tournament, stage);
+  // Read the displayed Swiss table rather than relying on registration order
+  // or a stored entrant array that may have a different tie-break ordering.
+  const eligible = new Set(entrants);
+  const ranked = buildSwissStandings(tournament, previous).map((row) => row.name).filter((name) => eligible.has(name));
+  const missing = entrants.filter((name) => !ranked.includes(name));
+  const groupCount = Math.max(1, Number(stage.settings.groups) || 1);
+  const assignments = seededGroupAssignments([...ranked, ...missing], groupCount);
+  if (Object.keys(assignments).length !== entrants.length) return false;
+  upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, groupAssignments: assignments });
+  return true;
+}
+
 /** Apply conventional ranking seeds from the preceding completed phase. */
 export function applySeededBracketSlots(tournament: DemoTournament, stage: TournamentStage) {
   const previous = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) - 1];
   if (stage.type !== 'KNOCKOUT' || !previous || !['GROUPS', 'SWISS'].includes(previous.type) || !isStageCompleted(tournament, previous) || !canEditDraw(tournament, stage)) return false;
   // Qualifier ordering is the ranking order of the completed prior stage.
   const entrants = getStageEntrants(tournament, stage);
-  const slots = seededKnockoutSlots(entrants);
+  const groupByPlayer: Record<string, string> = {};
+  if (previous.type === 'GROUPS') {
+    buildMockGroups(tournament, previous).forEach((group) => group.standings.forEach((row) => {
+      groupByPlayer[row.name] = group.label;
+    }));
+  }
+  const slots = previous.type === 'GROUPS'
+    ? seededKnockoutSlotsAvoidingGroups(entrants, groupByPlayer)
+    : seededKnockoutSlots(entrants);
   if (!validBracketConstraints(entrants, slots)) return false;
   // An explicit re-seeding supersedes old manual positions and pins.
   upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots, pinnedBracketSlots: [] });
