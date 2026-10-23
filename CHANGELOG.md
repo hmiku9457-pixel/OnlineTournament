@@ -1,3 +1,10 @@
+## UX-Korrekturen – 23.10.2026 (Spielerpartien & K.-o.)
+- Teilnehmerliste vertikal kompakter (Zeilenhöhe, Code und Aktionsbuttons).
+- Nach einem sportlichen Ausscheiden aus der K.-o.-Phase ist ein Rückzug nicht mehr möglich; die Regel gilt auch im Runtime-Service. Halbfinalverlierer bleiben für ein offenes Spiel um Platz 3 teilnahmeberechtigt.
+- Das Spiel um Platz 3 steht innerhalb der Finalspalte direkt unter dem Finale, in Turnierleitung und Zuschaueransicht.
+- Spieler-Partien nutzen einheitliche Ergebnisspalten aus eigener Perspektive; Sieg = grün, Niederlage = rot, Offen = blau.
+- Regressionstests für Gast-Ergebnisdarstellung und Rückzugssperre.
+
 ## UI-Korrektur: einheitliche Teilnehmeraktionen und Satz-Korrekturtabelle (2026-10-23)
 - Teilnehmeraktionen erhalten in jeder Zeile identische feste Spaltenbreiten (mobil responsiv).
 - Das Ergebnis-Korrekturmodal zeigt Satznummer, bisheriges Satzergebnis und ein zunächst leeres Eingabefeld je Satz.

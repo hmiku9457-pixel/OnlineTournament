@@ -12,7 +12,6 @@ OnlineTournament – project file manifest
 .prettierrc.json
 CHANGELOG.md
 CONTRIBUTING.md
-FILE_MANIFEST.txt
 LICENSE
 README.md
 SECURITY.md
@@ -32,12 +31,14 @@ public/sw.js
 src/App.tsx
 src/components/AppShell.tsx
 src/components/MatchResultDetails.tsx
+src/components/PlayerGameOutcome.tsx
 src/components/PrestartDrawEditor.tsx
 src/components/SetBySetEntry.tsx
 src/components/StageCard.tsx
 src/components/VenueLayout.tsx
 src/data/demoTournaments.ts
 src/domain/matchFinalization.ts
+src/domain/playerGameOutcome.ts
 src/domain/rules.ts
 src/domain/tournamentCreation.ts
 src/domain/types.ts
@@ -84,8 +85,10 @@ supabase/migrations/0004_hardening.sql
 supabase/migrations/0005_stage_best_of.sql
 supabase/seed.sql
 tests/bracket.test.ts
+tests/knockoutWithdrawalLocked.test.ts
 tests/matchPresentation.test.ts
 tests/participantProgressAndThirdPlace.test.ts
+tests/playerGameOutcome.test.ts
 tests/playerRestTime.test.ts
 tests/prestartRosterAndVenue.test.ts
 tests/recommendations.test.ts
@@ -99,6 +102,7 @@ tests/swiss.test.ts
 tests/tableLocksAndDuration.test.ts
 tests/tournamentControlOperations.test.ts
 tests/tournamentCreation.test.ts
+tests/turnoverAndSwissApproval.test.ts
 tests/uxFinalizeAndWithdraw.test.ts
 tests/venueLayout.test.ts
 tests/withdrawal.test.ts
@@ -106,4 +110,4 @@ tsconfig.app.json
 tsconfig.json
 tsconfig.node.json
 vite.config.ts
-tests/turnoverAndSwissApproval.test.ts
+FILE_MANIFEST.txt
