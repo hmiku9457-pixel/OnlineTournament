@@ -571,7 +571,7 @@ export function TournamentControlPage() {
                 const isBlocked = blockedTables.has(tableName);
                 return (
                   <article
-                    className={`card overview-table-card ${match ? 'busy' : isBlocked ? 'blocked' : 'table-drop-target'}`}
+                    className={`card overview-table-card ${match ? 'busy' : isBlocked ? 'blocked' : 'table-drop-target'}${match && requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED' ? ' awaiting-approval' : ''}`}
                     key={tableName}
                     onDragOver={(event) => { if (tournament.status === 'RUNNING' && !match && !isBlocked) event.preventDefault(); }}
                     onDrop={(event) => {
@@ -599,13 +599,12 @@ export function TournamentControlPage() {
                       <>
                         <span className="muted">{match.phase} · {match.round} · BO{match.bestOf}</span>
                         <SetBySetEntry match={match} swissAdminEntry={activeStage?.type === 'SWISS'} onSaved={refreshRuntime} compact sideARecord={activeSwissRecords.get(match.sideA)} sideBRecord={activeSwissRecords.get(match.sideB)} />
-                        <div
-                          className={`table-operational-actions${requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED' ? ' approval-hidden-actions' : ''}`}
-                          aria-hidden={requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED'}
-                        >
-                          <button className="btn small" type="button" disabled={requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED'} onClick={() => setMovingMatchId((old) => old === match.id ? null : match.id)}>Tisch wechseln</button>
-                          <button className="btn small" type="button" disabled={requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED'} onClick={() => unassignFromTable(match.id)}>Zuweisung aufheben</button>
-                        </div>
+                        {!(requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED') && (
+                          <div className="table-operational-actions">
+                            <button className="btn small" type="button" onClick={() => setMovingMatchId((old) => old === match.id ? null : match.id)}>Tisch wechseln</button>
+                            <button className="btn small" type="button" onClick={() => unassignFromTable(match.id)}>Zuweisung aufheben</button>
+                          </div>
+                        )}
                         {movingMatchId === match.id && !(requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED') && (
                           <div className="table-assignment-picker" role="group" aria-label="Neuen Tisch auswählen">
                             {freeTables.length ? freeTables.map((table) => (

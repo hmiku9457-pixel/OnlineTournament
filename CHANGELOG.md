@@ -1,3 +1,9 @@
+## UI-Korrektur: Satzergebnisse im Modal und kompakte Tischkarten (2026-10-23)
+
+- Vorläufige Ergebnisse: Korrektur der bisherigen Sätze im Modal; erst "Korrektur speichern" übernimmt die Anpassung.
+- Satzergebnisse bleiben direkt anklickbar und öffnen denselben Korrekturdialog.
+- Tischkarten: Bestätigungsaktionen in einer kompakten zweispaltigen Zeile; Tischwechsel-/Zuweisungsaktionen werden während der Endbestätigung nicht mehr im Layout reserviert.
+
 ## Unreleased – Turnierleitungs-UX (23.10.2026)
 
 - Nicht mögliche Rückzüge und die Rückzugssperre für ausgeschiedene Teilnehmer erscheinen als deaktivierte, optisch buttonartige Elemente.

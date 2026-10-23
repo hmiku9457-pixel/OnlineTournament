@@ -1250,3 +1250,51 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 
 /* Behält beim vorläufigen Ergebnis die Kartenhöhe bei, ohne Tischaktionen anzuzeigen. */
 .table-operational-actions.approval-hidden-actions { visibility: hidden; pointer-events: none; }
+
+
+/* Compact end-result confirmation: replace the input/actions instead of enlarging the table card. */
+.set-by-set-entry.compact .result-approval-panel {
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  min-width: 0;
+}
+.set-by-set-entry.compact .result-approval-panel > strong {
+  font-size: .73rem;
+  line-height: 1.15;
+}
+.set-by-set-entry.compact .result-approval-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1.24fr) minmax(0, 1fr);
+  gap: 5px;
+  min-width: 0;
+}
+.set-by-set-entry.compact .result-approval-actions > .btn {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  min-height: 30px;
+  padding: 3px 4px;
+  justify-self: stretch;
+  white-space: nowrap;
+  font-size: .66rem;
+  font-weight: 750;
+  letter-spacing: -.015em;
+}
+.overview-table-card.awaiting-approval .table-operational-actions { display: none; }
+.result-correction-modal { width: min(470px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow-y: auto; }
+.result-correction-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.result-correction-heading h2 { margin: 0 0 6px; }
+.result-correction-heading p { margin: 0 0 10px; }
+.result-correction-modal .field-hint { margin: 8px 0 12px; }
+.result-correction-sets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.result-correction-sets input { font-variant-numeric: tabular-nums; text-align: center; }
+.result-correction-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+@media (max-width: 440px) {
+  .result-correction-sets { grid-template-columns: 1fr; }
+  .set-by-set-entry.compact .result-approval-actions > .btn { font-size: .62rem; padding-inline: 2px; }
+}
