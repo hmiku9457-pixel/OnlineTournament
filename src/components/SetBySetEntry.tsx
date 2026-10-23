@@ -140,8 +140,11 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
           <ul>
             {playedSets.map((set) => (
               <li key={set.number} className="played-set-item">
-                <span>{set.sideAScore}:{set.sideBScore}</span>
-                {!alreadyFinished && <button className="set-correct-button" type="button" onClick={() => correctSet(set.number - 1)} aria-label={`Satz ${set.number} korrigieren`}>Ändern</button>}
+                {alreadyFinished ? <span>{set.sideAScore}:{set.sideBScore}</span> : (
+                  <button className="played-set-result" type="button" onClick={() => correctSet(set.number - 1)} title={`Satz ${set.number} korrigieren`} aria-label={`Satz ${set.number}: ${set.sideAScore}:${set.sideBScore} korrigieren`}>
+                    {set.sideAScore}:{set.sideBScore}
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -171,9 +174,11 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
 
       {needsFinalApproval && editingSetIndex === null && (
         <div className="result-approval-panel" role="status">
-          <strong>Vorläufiges Endergebnis: {wins.a}:{wins.b}</strong>
-          <p>{swissAdminEntry ? 'Schweizer System: Bitte das Endergebnis als Turnierleitung ausdrücklich bestätigen. Erst danach ist das Spiel endgültig abgeschlossen.' : 'Bitte alle Sätze prüfen. Erst mit der Bestätigung wird das Spiel abgeschlossen und der Tisch wieder frei.'}</p>
-          <button className="btn small primary" type="button" onClick={finalizeResult}>Endergebnis bestätigen</button>
+          <strong>Vorläufiges Ergebnis</strong>
+          <div className="result-approval-actions">
+            <button className="btn small primary" type="button" onClick={finalizeResult}>Endergebnis bestätigen</button>
+            <button className="btn small" type="button" onClick={() => correctSet(playedSets.length - 1)}>Ergebnis korrigieren</button>
+          </div>
         </div>
       )}
 

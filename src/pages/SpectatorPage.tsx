@@ -88,11 +88,45 @@ export function SpectatorPage() {
           }
 
           if (stage.type === 'KNOCKOUT' || stage.type === 'DOUBLE_ELIMINATION' || stage.type === 'PLACEMENT') {
-            const rounds = buildMockBracket(tournament, stage);
+            const allRounds = buildMockBracket(tournament, stage);
+            const rounds = allRounds.filter((round) => round.label !== 'Spiel um Platz 3');
+            const thirdPlaceRound = allRounds.find((round) => round.label === 'Spiel um Platz 3');
+            type BracketMatch = (typeof allRounds)[number]['matches'][number];
+            const renderMatch = (match: BracketMatch) => (
+              <article className="bracket-match" key={match.id}>
+                {match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover)">Kampflos</span>}
+                {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz</span>}
+                {[match.sideA, match.sideB].map((side, sideIndex) => (
+                  <div className={match.winner === side ? 'winner' : ''} key={`${match.id}-${sideIndex}`}>
+                    <span>
+                      {match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, side) ? `Rückzug (${side})` : side}
+                      {previousFinishLabels[side] && <small className="participant-origin">{previousFinishLabels[side]}</small>}
+                    </span>
+                    <span className="bracket-score-cells">
+                      {(match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
+                      <strong>{match.score === 'W.O.' ? (match.winner === side ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : sideIndex === 1 && match.score === 'Freilos' ? 'BYE' : ''}</strong>
+                    </span>
+                  </div>
+                ))}
+              </article>
+            );
             return (
               <section className="spectator-stage-block" key={stage.id}>
                 <div className="competition-stage-head"><div><span className="badge">K.-O.</span><h3>{stage.name}</h3></div></div>
-                <div className="bracket-scroll"><div className="bracket-board">{rounds.map((round) => <div className="bracket-round" key={round.label}><h4>{round.label}</h4><div className="bracket-round-matches">{round.matches.map((match) => <article className="bracket-match" key={match.id}>{match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover, z. B. bei Rückzug)">Kampflos</span>}{match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz</span>}<div className={match.winner === match.sideA ? 'winner' : ''}><span>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Rückzug (${match.sideA})` : match.sideA}{previousFinishLabels[match.sideA] && <small className="participant-origin">{previousFinishLabels[match.sideA]}</small>}</span><span className="bracket-score-cells">{(match.sets ?? []).map((set, index) => <span key={index}>{set.sideAScore}</span>)}<strong>{match.score === 'W.O.' ? (match.winner === match.sideA ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[0] : ''}</strong></span></div><div className={match.winner === match.sideB ? 'winner' : ''}><span>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Rückzug (${match.sideB})` : match.sideB}{previousFinishLabels[match.sideB] && <small className="participant-origin">{previousFinishLabels[match.sideB]}</small>}</span><span className="bracket-score-cells">{(match.sets ?? []).map((set, index) => <span key={index}>{set.sideBScore}</span>)}<strong>{match.score === 'W.O.' ? (match.winner === match.sideB ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[1] : match.score === 'Freilos' ? 'BYE' : ''}</strong></span></div></article>)}</div></div>)}</div></div>
+                <div className="bracket-scroll"><div className="bracket-board">
+                  {rounds.map((round, roundIndex) => (
+                    <div className="bracket-round" key={round.label}>
+                      <h4>{round.label}</h4>
+                      <div className="bracket-round-matches">{round.matches.map(renderMatch)}</div>
+                      {roundIndex === rounds.length - 1 && thirdPlaceRound && (
+                        <div className="bracket-third-place-block">
+                          <h4>Spiel um Platz 3</h4>
+                          {thirdPlaceRound.matches.map(renderMatch)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div></div>
               </section>
             );
           }

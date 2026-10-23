@@ -1,3 +1,12 @@
+## Unreleased – Turnierleitungs-UX (23.10.2026)
+
+- Nicht mögliche Rückzüge und die Rückzugssperre für ausgeschiedene Teilnehmer erscheinen als deaktivierte, optisch buttonartige Elemente.
+- Das Spiel um Platz 3 wird in Turnierleitung und Zuschaueransicht unterhalb des Finales in derselben K.-o.-Spalte angezeigt.
+- Bereits bestätigte Sätze lassen sich durch Klick auf das Satzergebnis korrigieren; der separate „Ändern“-Link entfällt.
+- Der vorläufige Endstand zeigt nur „Vorläufiges Ergebnis“ mit „Endergebnis bestätigen“ und „Ergebnis korrigieren“ nebeneinander.
+- Tischwechsel und Aufheben der Zuweisung sind während der Endbestätigung unsichtbar, ohne die Kartenhöhe durch Entfernen der Aktionszeile zu verändern.
+- Die Tabs „Teilnehmer“ und „Spiele“ haben ihre Reihenfolge getauscht.
+
 ## Unreleased – Tischwechselzeit und Schweizer Ergebnisbestätigung
 
 - Veralteten Turnover-Regressionstest korrigiert: Die 5-minütige Wechselzeit blockiert keinen freien Tisch; der Test prüft nun die sofort mögliche Zuweisung.

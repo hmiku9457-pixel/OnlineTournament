@@ -1236,3 +1236,17 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .result-approval-panel { display: grid; gap: 6px; padding: 10px; border: 1px solid #b2ddff; border-radius: 9px; background: #eff8ff; margin-top: 8px; }
 .result-approval-panel p { margin: 0; font-size: .8rem; line-height: 1.35; }
 .result-approval-panel .btn { justify-self: start; }
+
+/* Turnierleitung: Abschlusskarte ohne Sprünge, anklickbare Satzergebnisse. */
+.played-set-result { border: 0; border-radius: 5px; background: transparent; padding: 2px 9px; color: inherit; font: inherit; font-variant-numeric: tabular-nums; cursor: pointer; }
+.played-set-result:hover, .played-set-result:focus-visible { background: #e4e7ec; outline: 1px solid #98a2b3; }
+.result-approval-panel { gap: 8px; }
+.result-approval-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.result-approval-actions .btn { min-height: 30px; }
+.withdrawal-locked { display: inline-flex; align-items: center; justify-content: center; background: #f2f4f7; border-color: #e4e7ec; color: #98a2b3; cursor: not-allowed; user-select: none; opacity: .9; }
+.bracket-third-place-block { margin-top: 24px; padding-top: 15px; border-top: 1px solid #eaecf0; }
+.bracket-third-place-block h4 { margin: 0 0 12px; }
+.bracket-third-place-block .bracket-match { width: 100%; }
+
+/* Behält beim vorläufigen Ergebnis die Kartenhöhe bei, ohne Tischaktionen anzuzeigen. */
+.table-operational-actions.approval-hidden-actions { visibility: hidden; pointer-events: none; }

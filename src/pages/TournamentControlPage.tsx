@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { StageCard } from '@/components/StageCard';
 import { SetBySetEntry } from '@/components/SetBySetEntry';
+import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { resultForParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
@@ -23,8 +24,8 @@ type ControlTab = 'overview' | 'flow' | 'matches' | 'participants' | 'final' | '
 const tabs: Array<{ id: ControlTab; label: string }> = [
   { id: 'overview', label: 'Übersicht' },
   { id: 'flow', label: 'Turnierverlauf' },
-  { id: 'matches', label: 'Spiele' },
   { id: 'participants', label: 'Teilnehmer' },
+  { id: 'matches', label: 'Spiele' },
   { id: 'audit', label: 'Protokoll' },
 ];
 
@@ -159,7 +160,9 @@ function StageCompetitionView({
   }
 
   if (stage.type === 'KNOCKOUT' || stage.type === 'DOUBLE_ELIMINATION' || stage.type === 'PLACEMENT') {
-    const rounds = buildMockBracket(tournament, stage);
+    const fullBracket = buildMockBracket(tournament, stage);
+    const rounds = fullBracket.filter((round) => round.label !== 'Spiel um Platz 3');
+    const thirdPlaceRound = fullBracket.find((round) => round.label === 'Spiel um Platz 3');
     const editable = canEditDraw(tournament, stage) && (stage.type === 'KNOCKOUT' || stage.type === 'DOUBLE_ELIMINATION');
     const slots = editable ? getBracketSlots(tournament, stage) : [];
     const pinnedSlots = editable ? new Set(getPinnedBracketSlots(tournament, stage)) : new Set<number>();
@@ -242,6 +245,25 @@ function StageCompetitionView({
                     </article>
                   ))}
                 </div>
+                {roundIndex === rounds.length - 1 && thirdPlaceRound && (
+                  <div className="bracket-third-place-block">
+                    <h4>Spiel um Platz 3</h4>
+                    {thirdPlaceRound.matches.map((match) => (
+                      <article className="bracket-match" key={match.id}>
+                        {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz · nicht ausgetragen</span>}
+                        {[match.sideA, match.sideB].map((side, sideIndex) => (
+                          <div className={match.winner === side ? 'winner' : ''} key={`${match.id}-${sideIndex}`}>
+                            <span>{side}</span>
+                            <span className="bracket-score-cells">
+                              {(match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
+                              <strong>{match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : ''}</strong>
+                            </span>
+                          </div>
+                        ))}
+                      </article>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -577,11 +599,14 @@ export function TournamentControlPage() {
                       <>
                         <span className="muted">{match.phase} · {match.round} · BO{match.bestOf}</span>
                         <SetBySetEntry match={match} swissAdminEntry={activeStage?.type === 'SWISS'} onSaved={refreshRuntime} compact sideARecord={activeSwissRecords.get(match.sideA)} sideBRecord={activeSwissRecords.get(match.sideB)} />
-                        <div className="table-operational-actions">
-                          <button className="btn small" type="button" onClick={() => setMovingMatchId((old) => old === match.id ? null : match.id)}>Tisch wechseln</button>
-                          <button className="btn small" type="button" onClick={() => unassignFromTable(match.id)}>Zuweisung aufheben</button>
+                        <div
+                          className={`table-operational-actions${requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED' ? ' approval-hidden-actions' : ''}`}
+                          aria-hidden={requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED'}
+                        >
+                          <button className="btn small" type="button" disabled={requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED'} onClick={() => setMovingMatchId((old) => old === match.id ? null : match.id)}>Tisch wechseln</button>
+                          <button className="btn small" type="button" disabled={requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED'} onClick={() => unassignFromTable(match.id)}>Zuweisung aufheben</button>
                         </div>
-                        {movingMatchId === match.id && (
+                        {movingMatchId === match.id && !(requiresFinalApproval(match.bestOf, match.sets ?? [], activeStage?.type === 'SWISS') && match.status !== 'FINISHED') && (
                           <div className="table-assignment-picker" role="group" aria-label="Neuen Tisch auswählen">
                             {freeTables.length ? freeTables.map((table) => (
                               <button key={table} className="btn small" type="button" onClick={() => moveToTable(match.id, table)}>{table}</button>
@@ -833,8 +858,10 @@ export function TournamentControlPage() {
                     {isWithdrawn ? (
                       canRestoreMockParticipant(tournament, participant)
                         ? <button className="btn small" type="button" onClick={() => { if (restoreMockParticipant(tournament, participant)) { setParticipantVersion((value) => value + 1); setDrawVersion((value) => value + 1); refreshRuntime(); } }}>Rückzug rückgängig</button>
-                        : <span className="field-hint" title="Nur vor einem Phasenstart und bei vorheriger Qualifikation möglich; nicht bei Rückzug während einer Runde.">Rückzug gesperrt</span>
-                    ) : <button className="btn small danger-outline" type="button" onClick={() => { if (withdrawMockParticipant(tournament, participant)) refreshRuntime(); }}>Zurückziehen</button>}
+                        : <span className="btn small withdrawal-locked" aria-disabled="true" title="Nur vor einem Phasenstart und bei vorheriger Qualifikation möglich; nicht bei Rückzug während einer Runde.">Rückzug gesperrt</span>
+                    ) : progress.status === 'Ausgeschieden'
+                      ? <span className="btn small withdrawal-locked" aria-disabled="true" title="Bereits ausgeschiedene Teilnehmer können nicht zurückgezogen werden.">Rückzug gesperrt</span>
+                      : <button className="btn small danger-outline" type="button" onClick={() => { if (withdrawMockParticipant(tournament, participant)) refreshRuntime(); }}>Zurückziehen</button>}
                   </div>
                   {participantPanel?.name === participant && (
                     <div className="participant-inline-panel">
