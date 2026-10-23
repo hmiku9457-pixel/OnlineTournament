@@ -1468,9 +1468,9 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .swiss-history-head > :nth-child(3),
 .swiss-history-head > :nth-child(4) { text-align: center; }
 .player-game-row.swiss-player-game-row { padding: 9px 0; }
-.swiss-history-opponent { display: grid; gap: 3px; min-width: 0; }
+.swiss-history-opponent { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
 .swiss-history-opponent strong { overflow-wrap: anywhere; }
-.swiss-history-opponent small { color: #667085; font-size: .72rem; font-weight: 550; }
+.swiss-history-opponent .swiss-record { margin-left: 0; flex-shrink: 0; white-space: nowrap; }
 .swiss-player-game-row > .player-game-outcome-tag { width: 100%; }
 .swiss-player-game-row > .match-result-details { min-width: 0; justify-content: center; }
 .swiss-player-game-row .match-result-trigger { min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }

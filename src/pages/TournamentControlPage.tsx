@@ -7,7 +7,7 @@ import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
-import { resultForParticipant } from '@/services/matchPresentation';
+import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, countMockOpenConfirmations, adminConfirmMockMatch, getMockMatchConfirmation, getSwissRecordBeforeRound, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
@@ -107,7 +107,7 @@ function StageCompetitionView({
                 <div className="player-games-list">
                   {playerMatches.map((match) => {
                     const opponent = match.sideA === selectedGroupPlayer.player ? match.sideB : match.sideA;
-                    const displayedResult = resultForParticipant(match.score, match.sets, match.sideB === selectedGroupPlayer.player);
+                    const displayedResult = resultForMatchParticipant(match, selectedGroupPlayer.player);
                     return (
                       <div className="player-game-row" key={match.id}>
                         <span className="muted">Spieltag {match.matchDay}</span>
@@ -150,10 +150,10 @@ function StageCompetitionView({
                   const opponent = match.sideA === selectedSwissPlayer ? match.sideB : match.sideA;
                   const roundNumber = Number(match.round.match(/\d+/)?.[0]) || 1;
                   const opponentRecord = getSwissRecordBeforeRound(tournament, stage, opponent, roundNumber);
-                  const result = resultForParticipant(match.status === 'FINISHED' ? match.score : '–', match.sets, match.sideB === selectedSwissPlayer);
+                  const result = resultForMatchParticipant({ ...match, score: match.status === 'FINISHED' ? match.score : '–' }, selectedSwissPlayer);
                   return <div className="player-game-row swiss-player-game-row" key={match.id}>
                     <span className="muted swiss-history-round">{match.round}</span>
-                    <span className="swiss-history-opponent"><strong>{opponent}</strong><small>Bilanz vor Runde: {opponentRecord}</small></span>
+                    <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor dieser Runde">{opponentRecord}</span></span>
                     <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} />
                     <MatchResultDetails score={result.score} sets={result.sets} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
                   </div>;
@@ -904,7 +904,7 @@ export function TournamentControlPage() {
                                 return <tr key={match.id}>
                                   <td>{match.phase}</td><td>{match.round}</td>
                                   <td>{match.sideA === participant ? match.sideB : match.sideA}</td>
-                                  <td>{match.status}</td><td><MatchResultDetails {...resultForParticipant(match.score, match.sets, match.sideB === participant)} /></td>
+                                  <td>{match.status}</td><td><MatchResultDetails {...resultForMatchParticipant(match, participant)} /></td>
                                   <td>{match.status === 'FINISHED' && stage && canEditMockMatch(tournament, match.id)
                                     ? <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Spiel bearbeiten</button>
                                     : stage && isStageStarted(tournament, stage) && match.status !== 'FINISHED'

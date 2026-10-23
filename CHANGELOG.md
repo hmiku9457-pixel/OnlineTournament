@@ -182,6 +182,10 @@
 
 ## Unreleased
 
+- Spielerpartien im Schweizer System: Gegnerbilanz als Tag unmittelbar hinter dem Namen (auch in der Zuschaueransicht).
+- Spielerbezogene Match-Ergebnisse und Satzdetails werden konsistent aus Sicht des ausgewählten Teilnehmers aus den gespeicherten Satzpunkten berechnet; der Endstandstext ist nicht länger die alleinige Quelle.
+- Regressionstests für linke/rechte Matchseite, Ergebnisumkehr, veralteten Ergebnistext und noch offene Spiele ergänzt.
+
 - Add per-phase match counts and rough phase durations to the right-hand Step 5 flow summary.
 - Add participant-aware Swiss round recommendations and a rough leading score distribution to Swiss phase descriptions.
 - Show the number of first-round byes directly in knockout phase descriptions.
