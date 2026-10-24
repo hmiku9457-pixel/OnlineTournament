@@ -12,7 +12,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, countMockOpenConfirmations, adminConfirmMockMatch, getMockMatchConfirmation, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
 import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { VenueLayoutMini } from '@/components/VenueLayout';
@@ -41,7 +41,6 @@ const matchFilterOptions: Array<{ value: ControlMatchFilter; label: string }> = 
   { value: 'all', label: 'Alle' },
   { value: 'live', label: 'Laufend / zugewiesen' },
   { value: 'waiting', label: 'Wartend' },
-  { value: 'confirmation', label: 'Bestätigung offen' },
   { value: 'finished', label: 'Abgeschlossen' },
 ];
 
@@ -63,7 +62,7 @@ function matchStatusLabel(status: string) {
     case 'WAITING': return 'Wartet';
     case 'READY': return 'Bereit';
     case 'LIVE': return 'Läuft';
-    case 'CONFIRMATION': return 'Bestätigung offen';
+    case 'CONFIRMATION': return 'Endergebnis prüfen';
     case 'FINISHED': return 'Abgeschlossen';
     default: return status;
   }
@@ -402,15 +401,9 @@ export function TournamentControlPage() {
     () => formatRemainingTournamentDuration(estimateRemainingTournamentMinutes(phaseRuntimeSource.tournament)),
     [phaseRuntimeSource],
   );
-  const openConfirmations = useMemo(() => countMockOpenConfirmations(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   const auditEntries = useMemo(() => getMockAudit(runtimeSource.tournament.id), [runtimeSource]);
   const allTournamentMatches = useMemo(() => phaseClockSource.tournament.stages.filter((stage) => isStageStarted(phaseClockSource.tournament, stage)).flatMap((stage) => getMockStageMatches(phaseClockSource.tournament, stage)), [phaseClockSource]);
-  const openConfirmationIds = useMemo(() => new Set(allTournamentMatches.filter((match) => {
-    if (match.status !== 'FINISHED' || !match.sets?.length) return false;
-    const approval = getMockMatchConfirmation(match.id);
-    return approval && !(approval.confirmedA && approval.confirmedB);
-  }).map((match) => match.id)), [allTournamentMatches]);
-  const filteredTournamentMatches = useMemo(() => filterControlMatches(allTournamentMatches, matchFilters, openConfirmationIds), [allTournamentMatches, matchFilters, openConfirmationIds]);
+  const filteredTournamentMatches = useMemo(() => filterControlMatches(allTournamentMatches, matchFilters), [allTournamentMatches, matchFilters]);
   const matchFilterPhases = useMemo(() => [...new Set(allTournamentMatches.map((match) => match.phase))], [allTournamentMatches]);
   const matchFilterTables = useMemo(() => [...new Set(allTournamentMatches.map((match) => match.table).filter((table) => table.startsWith('Tisch ')))], [allTournamentMatches]);
   const participants = useMemo(() => getRuntimeParticipantNames(participantSource.tournament), [participantSource]);
@@ -495,11 +488,6 @@ export function TournamentControlPage() {
     setTournament(getMockTournament(tournament.id));
     setRuntimeVersion((value) => value + 1);
     setPhaseVersion((value) => value + 1);
-  }
-
-  function openConfirmationView() {
-    setMatchFilters({ status: 'confirmation', phase: '', table: '', search: '' });
-    setTab('matches');
   }
 
   function openWaitingQueue() {
@@ -797,20 +785,13 @@ export function TournamentControlPage() {
       </nav>
 
       <div className="control-guide-strip no-print">
-        <div><strong>{guide.title}</strong><span>{guide.text}</span></div>
-        <ControlHelpButton topic={guide.topic} onOpen={setHelpTopic} label="So geht's →" />
+        <div className="control-guide-copy"><strong>{guide.title}</strong><span>{guide.text}</span></div>
+        <div className="control-guide-actions">
+          {nextMatches.length > 0 && freeTables.length > 0 && tournament.status === 'RUNNING' && <button type="button" className="btn small control-guide-action" onClick={openWaitingQueue}>{nextMatches.length} {nextMatches.length === 1 ? 'Spiel' : 'Spiele'} anzeigen →</button>}
+          {nextStartableStage && !activeStage && <button type="button" className="btn small control-guide-action" onClick={openNextStagePreparation}>Phase vorbereiten →</button>}
+          <ControlHelpButton topic={guide.topic} onOpen={setHelpTopic} label="So geht's →" />
+        </div>
       </div>
-
-      {(openConfirmations > 0 || (nextMatches.length > 0 && freeTables.length > 0 && tournament.status === 'RUNNING') || (nextStartableStage && !activeStage)) && (
-        <section className="control-attention-strip no-print" aria-label="Handlungsbedarf">
-          <strong className="control-attention-title"><span className="control-attention-dot" aria-hidden="true" />Jetzt wichtig</strong>
-          <div className="control-attention-actions">
-            {openConfirmations > 0 && <button type="button" className="control-attention-action" onClick={openConfirmationView}><strong>{openConfirmations}</strong> {openConfirmations === 1 ? 'Bestätigung prüfen' : 'Bestätigungen prüfen'} <span aria-hidden="true">→</span></button>}
-            {nextMatches.length > 0 && freeTables.length > 0 && tournament.status === 'RUNNING' && <button type="button" className="control-attention-action" onClick={openWaitingQueue}><strong>{nextMatches.length}</strong> {nextMatches.length === 1 ? 'wartendes Spiel' : 'wartende Spiele'} zuweisen <span aria-hidden="true">→</span></button>}
-            {nextStartableStage && !activeStage && <button type="button" className="control-attention-action" onClick={openNextStagePreparation}>„{nextStartableStage.name}“ vorbereiten <span aria-hidden="true">→</span></button>}
-          </div>
-        </section>
-      )}
 
       {tab === 'overview' && (
         <section className="control-overview-stack">
@@ -940,7 +921,6 @@ export function TournamentControlPage() {
                 <div className="control-metrics-grid">
                   <div><span className="muted">Tischbelegung</span><strong>{tableMatches.length}/{tournament.tables} · {blockedTables.size} gesperrt</strong></div>
                   <div><button className="control-metric-link" type="button" disabled={nextMatches.length === 0} onClick={openWaitingQueue} title={nextMatches.length ? 'Zu den wartenden Spielen springen' : undefined}><span className="muted">Wartende Spiele</span><strong>{nextMatches.length}</strong></button></div>
-                  <div><button className="control-metric-link" type="button" disabled={openConfirmations === 0} onClick={openConfirmationView} title={openConfirmations ? 'Spiele mit offenen Bestätigungen anzeigen' : undefined}><span className="muted">Offene Bestätigungen</span><strong>{openConfirmations}</strong></button></div>
                   <div><span className="muted">Restzeit grob</span><strong title="Prognose aus offenen Spielen, Best-of und verfügbaren Tischen (15 Minuten je Satz).">{restTimeLabel}</strong></div>
                 </div>
               </div>
@@ -1065,12 +1045,12 @@ export function TournamentControlPage() {
               <thead><tr><th>Status</th><th>Phase</th><th>Spiel</th><th>Pausenzeit</th><th>Tisch</th><th>Stand</th><th></th></tr></thead>
               <tbody>{filteredTournamentMatches.map((match) => (
                 <tr key={match.id}>
-                  <td><span className={match.status === 'LIVE' ? 'badge live' : match.status === 'READY' ? 'badge ready' : 'badge'}>{openConfirmationIds.has(match.id) ? 'Bestätigung offen' : matchStatusLabel(match.status)}</span></td>
+                  <td><span className={match.status === 'LIVE' ? 'badge live' : match.status === 'READY' ? 'badge ready' : 'badge'}>{matchStatusLabel(match.status)}</span></td>
                   <td>{match.phase}<div className="muted">{match.round}</div></td>
                   <td><strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>}</strong><div>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>}</div></td>
                   <td>{formatMockMatchRest(match, 'A')} / {formatMockMatchRest(match, 'B')}</td>
                   <td>{match.table}</td><td>{match.score}</td>
-                  <td><div className="actions compact-actions"><button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Ergebnis anzeigen</button>{match.status === 'FINISHED' && (match.sets?.length ?? 0) > 0 && !((getMockMatchConfirmation(match.id)?.confirmedA) && (getMockMatchConfirmation(match.id)?.confirmedB)) && <button className="btn small" type="button" onClick={() => { if (adminConfirmMockMatch(tournament, match.id)) refreshRuntime(); }}>Als Turnierleitung bestätigen</button>}{match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) && <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Bearbeiten</button>}</div></td>
+                  <td><div className="actions compact-actions"><button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Ergebnis anzeigen</button>{match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) && <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Bearbeiten</button>}</div></td>
                 </tr>
               ))}</tbody>
             </table>

@@ -37,7 +37,7 @@ const topics: Array<{ id: ControlHelpTopic; label: string; intro: string; steps:
       { title: 'Kurz eingeben', description: '7 bedeutet 11:7, −7 bedeutet 7:11 und 10 bedeutet 12:10. Auch eine vollständige Eingabe wie 11:9 ist möglich.' },
       { title: 'Jeden Satz bestätigen', description: 'Mit Enter oder „Satz bestätigen“ speichern. Gespeicherte Sätze lassen sich durch Anklicken des Satzstands korrigieren.' },
       { title: 'Endergebnis abschließen', description: 'Bei längeren Best-of-Partien und im Schweizer System bzw. K.-o.-Modus das vorläufige Endergebnis ausdrücklich bestätigen. Erst dann wird der Tisch wieder frei.' },
-      { title: 'Spielerbestätigung', description: 'Nach dem Spiel können beide Seiten mit ihren Spielercodes separat bestätigen. Unter „Spiele“ kann die Turnierleitung offene Bestätigungen übernehmen oder ein Ergebnis korrigieren, solange es noch bearbeitbar ist.' },
+      { title: 'Danach ist das Spiel abgeschlossen', description: 'Nach dem endgültigen Speichern wird der Tisch frei. Im Bereich „Spiele“ bleibt das Ergebnis einsehbar und kann bei Bedarf korrigiert werden, solange die Phase es zulässt.' },
     ],
   },
   {
@@ -63,7 +63,7 @@ const topics: Array<{ id: ControlHelpTopic; label: string; intro: string; steps:
     steps: [
       { title: 'Status erkennen', description: '„Wartet“: noch nicht zugewiesen. „Läuft“: am Tisch. „Abgeschlossen“: Ergebnis gespeichert.' },
       { title: 'Details ansehen', description: '„Ergebnis anzeigen“ öffnet die Satzergebnisse. Abgeschlossene, noch bearbeitbare Partien können dort korrigiert werden.' },
-      { title: 'Offene Bestätigung', description: 'Nach dem Abschluss können Spieler ihre Ergebnisse zusätzlich bestätigen. Bei Bedarf kann die Turnierleitung das in der Spieleliste übernehmen.' },
+      { title: 'Gezielt finden', description: 'Mit Status, Phase, Tisch und der Namenssuche lassen sich Partien auch bei größeren Turnieren schnell finden.' },
     ],
   },
   {

@@ -18,6 +18,6 @@ export function getControlGuide(state: ControlGuideState): { title: string; text
   if (!state.hasActiveStage && state.hasNextStage) return { title: 'Nächste Phase vorbereiten', text: 'Im Turnierverlauf die neue Auslosung kontrollieren und danach die nächste Phase starten.', topic: 'phases' };
   if (state.status === 'PAUSED') return { title: 'Turnier pausiert', text: 'Laufende Spiele dürfen enden. Neue Tischzuweisungen sind erst nach „Turnier fortsetzen“ möglich.', topic: 'tables' };
   if (state.waitingMatches > 0 && state.freeTables > 0) return { title: 'Wartende Spiele zuweisen', text: 'Eine Partie unter „Nächste Spiele“ auswählen oder freie Tische automatisch belegen.', topic: 'queue' };
-  if (state.activeMatches > 0) return { title: 'Laufende Spiele betreuen', text: 'Tisch wählen, Sätze eingeben und fertige Ergebnisse bestätigen. Frei gewordene Tische können neu belegt werden.', topic: 'results' };
+  if (state.activeMatches > 0) return { title: 'Laufende Spiele betreuen', text: 'Tisch wählen, Sätze eingeben und Endergebnisse abschließen. Frei gewordene Tische können neu belegt werden.', topic: 'results' };
   return { title: 'Turnier im Blick behalten', text: 'Neue Begegnungen erscheinen unter „Nächste Spiele“, sobald sie bereitstehen.', topic: 'queue' };
 }

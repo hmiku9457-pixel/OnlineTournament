@@ -1664,9 +1664,12 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   background: #eff6ff;
   color: #1e3a8a;
 }
-.control-guide-strip > div { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; min-width: 0; font-size: .79rem; }
+.control-guide-strip > .control-guide-copy { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; min-width: 0; font-size: .79rem; }
 .control-guide-strip strong { white-space: nowrap; }
 .control-guide-strip span { color: #344054; }
+.control-guide-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px; flex-shrink: 0; }
+.control-guide-action { white-space: nowrap; color: #1d4ed8; border-color: #bfdbfe; background: white; }
+.control-guide-action:hover { border-color: #93c5fd; background: #dbeafe; }
 .control-help-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .control-help-title h2, .control-help-title h3 { margin: 0; }
 .control-help-button {
@@ -1725,7 +1728,8 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .control-help-body .control-help-notice { margin: 14px 0 0; padding: 10px 12px; border: 1px solid #fedf89; border-radius: 9px; background: #fffaeb; color: #7a2e0e; line-height: 1.45; }
 @media (max-width: 640px) {
   .control-guide-strip { align-items: flex-start; }
-  .control-guide-strip > div { display: grid; gap: 2px; }
+  .control-guide-strip > .control-guide-copy { display: grid; gap: 2px; }
+  .control-guide-actions { justify-content: flex-start; }
   .control-help-backdrop { padding: 9px; }
   .control-help-dialog { max-height: 95dvh; padding: 14px; gap: 10px; }
   .control-help-heading { gap: 7px; }
@@ -1886,37 +1890,8 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   .control-primary-actions .btn { white-space: normal; }
 }
 
-/* Leitungs-Dashboard: kompakte, sofort ausführbare Hinweise statt zusätzlicher großer Karten. */
-.control-attention-strip {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin: -3px 0 14px;
-  padding: 10px 12px;
-  border: 1px solid #fedf89;
-  border-radius: 10px;
-  background: #fffaeb;
-}
-.control-attention-title { display: inline-flex; align-items: center; gap: 7px; color: #92400e; font-size: .82rem; white-space: nowrap; }
-.control-attention-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #f79009; }
-.control-attention-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.control-attention-action {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px 9px;
-  border: 1px solid #fedf89;
-  border-radius: 8px;
-  background: white;
-  color: #7a2e0e;
-  font-size: .76rem;
-  font-weight: 650;
-  text-align: left;
-}
-.control-attention-action:hover { border-color: #fdb022; background: #fff3d1; }
-.control-attention-action:focus-visible, .control-metric-link:focus-visible, .control-match-status-filters button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+/* Zahlen im Statusbereich bleiben bei Bedarf direkt anklickbar. */
+.control-guide-action:focus-visible, .control-metric-link:focus-visible, .control-match-status-filters button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
 .control-metric-link { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; width: 100%; min-width: 0; gap: 4px 12px; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; }
 .control-metric-link:not(:disabled):hover { color: #175cd3; }
 .control-metric-link:disabled { cursor: default; }
@@ -1975,10 +1950,11 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 
 @media (max-width: 760px) { .control-match-filter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .control-match-filter-fields label:first-child { grid-column: 1 / -1; } }
 @media (max-width: 500px) {
-  .control-attention-strip { align-items: flex-start; flex-direction: column; }
+  .control-guide-strip { flex-wrap: wrap; }
+  .control-guide-actions { width: 100%; }
   .control-match-filter-fields { grid-template-columns: 1fr; }
   .control-match-filter-fields label:first-child { grid-column: auto; }
   .control-correction-toast { left: 16px; right: 16px; bottom: 16px; width: auto; flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) { .control-progress-fill { transition: none; } }
-@media print { .control-attention-strip, .control-match-filters, .control-correction-toast { display: none !important; } }
+@media print { .control-match-filters, .control-correction-toast { display: none !important; } }

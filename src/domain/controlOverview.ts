@@ -1,4 +1,4 @@
-export type ControlMatchFilter = 'all' | 'waiting' | 'live' | 'confirmation' | 'finished';
+export type ControlMatchFilter = 'all' | 'waiting' | 'live' | 'finished';
 
 export interface ControlMatchFilters {
   status: ControlMatchFilter;
@@ -19,7 +19,6 @@ interface FilterableMatch {
 export function filterControlMatches<T extends FilterableMatch>(
   matches: T[],
   filters: ControlMatchFilters,
-  openConfirmationIds: ReadonlySet<string>,
 ): T[] {
   const query = filters.search.trim().toLocaleLowerCase('de-DE');
   return matches.filter((match) => {
@@ -28,8 +27,7 @@ export function filterControlMatches<T extends FilterableMatch>(
     if (query && !`${match.sideA} ${match.sideB}`.toLocaleLowerCase('de-DE').includes(query)) return false;
     switch (filters.status) {
       case 'waiting': return match.status === 'WAITING';
-      case 'live': return match.status === 'LIVE' || match.status === 'READY';
-      case 'confirmation': return match.status === 'CONFIRMATION' || openConfirmationIds.has(match.id);
+      case 'live': return ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status);
       case 'finished': return match.status === 'FINISHED';
       default: return true;
     }

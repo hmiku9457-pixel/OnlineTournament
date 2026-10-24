@@ -11,19 +11,15 @@ const matches = [
 const all = { status: 'all' as const, phase: '', table: '', search: '' };
 
 describe('Filter für alle Turnierspiele', () => {
-  it('findet abgeschlossene Partien mit offenen Ergebnisbestätigungen', () => {
-    expect(filterControlMatches(matches, { ...all, status: 'confirmation' }, new Set(['c'])).map((match) => match.id)).toEqual(['c', 'd']);
-  });
-
   it('kombiniert Teilnehmersuche, Phase und Tisch', () => {
-    expect(filterControlMatches(matches, { ...all, phase: 'Gruppen', table: 'Tisch 2', search: '  MÜLLER ' }, new Set()).map((match) => match.id)).toEqual(['c']);
-    expect(filterControlMatches(matches, { ...all, search: 'NiemAnd' }, new Set())).toEqual([]);
+    expect(filterControlMatches(matches, { ...all, phase: 'Gruppen', table: 'Tisch 2', search: '  MÜLLER ' }).map((match) => match.id)).toEqual(['c']);
+    expect(filterControlMatches(matches, { ...all, search: 'NiemAnd' })).toEqual([]);
   });
 
   it('unterscheidet wartende, zugewiesene/laufende und abgeschlossene Spiele', () => {
-    expect(filterControlMatches(matches, { ...all, status: 'waiting' }, new Set()).map((match) => match.id)).toEqual(['b']);
-    expect(filterControlMatches(matches, { ...all, status: 'live' }, new Set()).map((match) => match.id)).toEqual(['a', 'e']);
-    expect(filterControlMatches(matches, { ...all, status: 'finished' }, new Set()).map((match) => match.id)).toEqual(['c']);
+    expect(filterControlMatches(matches, { ...all, status: 'waiting' }).map((match) => match.id)).toEqual(['b']);
+    expect(filterControlMatches(matches, { ...all, status: 'live' }).map((match) => match.id)).toEqual(['a', 'd', 'e']);
+    expect(filterControlMatches(matches, { ...all, status: 'finished' }).map((match) => match.id)).toEqual(['c']);
   });
 });
 

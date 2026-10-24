@@ -1,3 +1,8 @@
+## 2026-10-24 – Schlankere Leitungs-Hinweise und Ergebnisliste
+- Die Schnellaktionen für wartende Spiele und den nächsten Phasenwechsel stehen direkt in der vorhandenen blauen Hinweisleiste. Das zusätzliche „Jetzt wichtig“-Banner entfällt.
+- Hinweise, Kennzahlen, Filter und der Button für eine erneute Bestätigung bereits abgeschlossener Spiele entfallen aus der Turnierleitung. Die ausdrückliche Freigabe des Endergebnisses während der Satzeingabe bleibt unverändert.
+- „Alle Spiele“ bündelt zugewiesene, laufende und noch abzuschließende Spiele im laufenden Statusfilter; der bislang missverständliche Status heißt dort „Endergebnis prüfen“.
+
 ## 2026-10-24 – Leitungsübersicht mit direkten Aktionen und Fortschritt
 - „Jetzt wichtig“ hebt offene Ergebnisbestätigungen, zuweisbare Wartespiele und die Vorbereitung der nächsten Phase hervor; die Aktionen führen direkt zum betreffenden Bereich.
 - „Alle Spiele“ bietet kombinierbare Status-, Phasen-, Tisch- und Teilnehmerfilter mit Trefferzahl und Zurücksetzen. Abgeschlossene, noch unbestätigte Partien lassen sich gezielt finden.
