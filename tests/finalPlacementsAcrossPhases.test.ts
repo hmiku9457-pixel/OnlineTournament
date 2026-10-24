@@ -35,7 +35,7 @@ function finish(t: ReturnType<typeof tournament>, index: number) {
   const stage = t.stages[index];
   for (let attempt = 0; attempt < 15 && !isStageCompleted(t, stage); attempt += 1) {
     for (const match of getMockStageMatches(t, stage)) {
-      if (match.status !== 'FINISHED' && !match.autoWinner && !['Freilos', 'TBD'].includes(match.sideA) && !['Freilos', 'TBD'].includes(match.sideB)) {
+      if (match.status !== 'FINISHED' && !['Freilos', 'TBD'].includes(match.sideA) && !['Freilos', 'TBD'].includes(match.sideB)) {
         completeMockMatch(match.id, result);
       }
     }
