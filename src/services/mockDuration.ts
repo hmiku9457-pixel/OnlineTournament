@@ -3,6 +3,7 @@ import type { TournamentStage } from '@/domain/types';
 import { getMockStageBaseMatches, getMockStoredResult } from '@/services/mockRuntime';
 import { getStageEntrants, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getBlockedMockTables } from '@/services/mockTableLocks';
+import { sportScoring } from '@/domain/sportScoring';
 
 const MINUTES_PER_SET = 15;
 
@@ -95,7 +96,7 @@ function remainingStageJobs(tournament: DemoTournament, stage: TournamentStage):
 
 export function estimateRemainingTournamentMinutes(tournament: DemoTournament): number | null {
   const availableTables = tournament.tables - getBlockedMockTables(tournament).length;
-  const timedSport = tournament.sport !== 'Tischtennis';
+  const timedSport = sportScoring(tournament.sport).mode === 'score';
   const gameMinutes = Math.max(1, tournament.matchDurationMinutes ?? 15) + Math.max(0, tournament.venueTurnoverMinutes ?? 0);
   const stageJobs = tournament.stages.map((stage) => ({ stage, jobs: remainingStageJobs(tournament, stage).map((job) => ({
     ...job, remainingMinutes: timedSport ? gameMinutes : job.remainingMinutes,

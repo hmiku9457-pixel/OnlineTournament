@@ -694,6 +694,19 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 
 /* Satzweise Ergebniseingabe */
 .set-by-set-entry { display: grid; gap: 10px; }
+.sport-score-fields { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 8px; }
+.sport-score-fields .current-set-field { min-width: 0; }
+.sport-score-fields .current-set-field input { width: 100%; min-width: 0; font-variant-numeric: tabular-nums; font-size: 1.1rem; }
+.sport-score-colon { font-weight: 900; padding-bottom: 6px; color: #667085; }
+.sport-score-decision { display: grid; gap: 7px; border: 1px solid #b2ddff; background: #f0f8ff; border-radius: 10px; padding: 12px; min-width: 0; }
+.sport-score-decision legend { font-size: .78rem; font-weight: 800; color: #175cd3; padding-inline: 4px; }
+.sport-score-decision label { display: flex; align-items: center; gap: 8px; font-size: .8rem; }
+.sport-score-decision input { accent-color: #175cd3; }
+.sport-score-decision p { margin: 0; }
+.sport-score-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sport-score-actions .btn { white-space: normal; text-wrap: balance; }
+.sport-score-entry .set-entry-scoreline > strong { font-variant-numeric: tabular-nums; }
+.sport-score-entry.compact .sport-score-fields .current-set-field input { width: 100%; }
 .current-set-entry-row { display: grid; grid-template-columns: 92px max-content; gap: 8px; align-items: end; }
 .current-set-field { display: grid; gap: 4px; }
 .current-set-field > span { color: #667085; font-size: .74rem; font-weight: 800; }
@@ -1043,6 +1056,12 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   grid-template-columns: 26px minmax(125px, 1fr) 29px 24px 24px 50px 34px 67px 38px;
   gap: 4px;
   font-size: .78rem;
+}
+.group-overview-card .mini-standing-table.detailed.score-standing-table .mini-standing-head,
+.group-overview-card .mini-standing-table.detailed.score-standing-table .mini-standing-row,
+.mini-standing-table.detailed.score-standing-table .mini-standing-head,
+.mini-standing-table.detailed.score-standing-table .mini-standing-row {
+  grid-template-columns: 26px minmax(125px, 1fr) 29px 24px 24px 29px 70px 38px 38px;
 }
 .group-overview-card .mini-standing-table.detailed .standing-player-button { min-width: 0; text-align: left; overflow-wrap: anywhere; }
 .group-overview-card .group-match-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; margin-top: 12px; }

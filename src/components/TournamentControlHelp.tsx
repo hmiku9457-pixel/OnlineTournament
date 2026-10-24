@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ControlHelpTopic } from '@/domain/controlGuide';
 import { getVenueTerminology } from '@/domain/venueTerminology';
+import { sportScoring } from '@/domain/sportScoring';
 
 type HelpStep = { title: string; description: string };
 
 function getTopics(sport: string): Array<{ id: ControlHelpTopic; label: string; intro: string; steps: HelpStep[] }> {
   const venue = getVenueTerminology(sport);
+  const rules = sportScoring(sport);
+  const scoreSport = rules.mode === 'score';
   return [
   {
     id: 'start', label: 'Schnellstart', intro: 'Der Ablauf von der Vorbereitung bis zur letzten Partie.',
@@ -13,7 +16,7 @@ function getTopics(sport: string): Array<{ id: ControlHelpTopic; label: string; 
       { title: 'Teilnehmer prüfen', description: 'Unter „Teilnehmer“ Namen und Spielercodes kontrollieren. Vor dem ersten Start sind Nachmeldungen möglich.' },
       { title: 'Auslosung vorbereiten', description: 'Im „Turnierverlauf“ die erste Phase auswählen und gegebenenfalls Gruppen oder Startplätze verändern.' },
       { title: 'Turnier starten', description: 'Oben „Turnier starten“ wählen. Die Auslosung dieser Phase wird dabei festgeschrieben.' },
-      { title: 'Spiele abwickeln', description: `Unter „Übersicht“ wartende Partien ${venue.dativePlural} zuweisen, Sätze erfassen und Endergebnisse abschließen. Die nächste Phase startet später ausdrücklich durch die Turnierleitung.` },
+      { title: 'Spiele abwickeln', description: `Unter „Übersicht“ wartende Partien ${venue.dativePlural} zuweisen, ${scoreSport ? 'Spielstände' : 'Sätze'} erfassen und Endergebnisse abschließen. Die nächste Phase startet später ausdrücklich durch die Turnierleitung.` },
     ],
   },
   {
@@ -21,7 +24,7 @@ function getTopics(sport: string): Array<{ id: ControlHelpTopic; label: string; 
     steps: [
       { title: `${venue.singular} öffnen`, description: `In der Planansicht auf die gewünschte Spielfläche klicken: Die Bedienung öffnet sich im Fenster. In der Kartenansicht stehen die Bedienelemente direkt auf der Karte.` },
       { title: 'Spiel zuweisen', description: 'Ein wartendes Spiel auswählen oder aus „Nächste Spiele“ auf eine freie Spielfläche ziehen. Mit der Zuweisung beginnt die Partie.' },
-      { title: `${venue.singular} wechseln oder freigeben`, description: 'Bei laufenden Spielen lassen sich Spielort und Zuweisung ändern. Bereits erfasste Sätze bleiben dabei erhalten.' },
+      { title: `${venue.singular} wechseln oder freigeben`, description: 'Bei laufenden Spielen lassen sich Spielort und Zuweisung ändern. Bereits erfasste Ergebnisse bleiben dabei erhalten.' },
       { title: `${venue.singular} sperren`, description: `Gesperrte ${venue.plural} erhalten keine neuen Spiele. Eine bereits laufende Partie wird dadurch nicht abgebrochen.` },
     ],
   },
@@ -36,9 +39,14 @@ function getTopics(sport: string): Array<{ id: ControlHelpTopic; label: string; 
     ],
   },
   {
-    id: 'results', label: 'Ergebnisse', intro: 'Sätze aus Sicht des links angezeigten Spielers eintragen.',
-    steps: [
-      { title: 'Kurz eingeben', description: '7 bedeutet 11:7, −7 bedeutet 7:11 und 10 bedeutet 12:10. Auch eine vollständige Eingabe wie 11:9 ist möglich.' },
+    id: 'results', label: 'Ergebnisse', intro: scoreSport ? `${rules.plural} der beiden Seiten erfassen und die Partie abschließen.` : 'Sätze aus Sicht des links angezeigten Spielers eintragen.',
+    steps: scoreSport ? [
+      { title: 'Spielstand erfassen', description: `Die ${rules.plural.toLowerCase()} beider Seiten als ganze Zahlen eingeben. „Zwischenstand speichern“ aktualisiert die Live-Anzeige, ohne die Partie zu beenden.` },
+      { title: 'Unentschieden und Entscheidung', description: rules.allowsDraw ? 'In Gruppen sind Remis möglich. Im K.-o.-Modus und Schweizer System bei Gleichstand zusätzlich den Sieger nach Entscheidung auswählen.' : 'Bei Basketball bitte den Spielstand nach Verlängerung eingeben; ein Unentschieden ist nicht zulässig.' },
+      { title: 'Spiel abschließen', description: 'Mit „Spiel abschließen“ den Endstand speichern. Die Spielfläche wird wieder frei und die Tabelle wird aktualisiert.' },
+      { title: 'Korrekturen', description: 'Unter „Spiele“ kann die Turnierleitung ein abgeschlossenes Ergebnis bearbeiten, solange noch keine Folgephase die Korrektur sperrt.' },
+    ] : [
+      { title: 'Sätze eingeben', description: rules.shortSetEntry ? 'Kurzform: 7 bedeutet 11:7, −7 bedeutet 7:11 und 10 bedeutet 12:10. Auch 11:9 ist möglich.' : 'Jeden Satz als Punkte links:rechts eingeben. Die Gewinnpunkte und ein möglicher Entscheidungssatz richten sich nach der Sportart.' },
       { title: 'Jeden Satz bestätigen', description: 'Mit Enter oder „Satz bestätigen“ speichern. Gespeicherte Sätze lassen sich durch Anklicken des Satzstands korrigieren.' },
       { title: 'Endergebnis abschließen', description: 'Bei längeren Best-of-Partien und im Schweizer System bzw. K.-o.-Modus das vorläufige Endergebnis ausdrücklich bestätigen. Erst dann wird die Spielfläche wieder frei.' },
       { title: 'Danach ist das Spiel abgeschlossen', description: 'Nach dem endgültigen Speichern wird die Spielfläche frei. Im Bereich „Spiele“ bleibt das Ergebnis einsehbar und kann bei Bedarf korrigiert werden, solange die Phase es zulässt.' },
@@ -66,7 +74,7 @@ function getTopics(sport: string): Array<{ id: ControlHelpTopic; label: string; 
     id: 'matches', label: 'Spiele', intro: 'Die vollständige Liste hilft bei der Kontrolle und Korrektur.',
     steps: [
       { title: 'Status erkennen', description: '„Wartet“: noch nicht zugewiesen. „Läuft“: am Spielort. „Abgeschlossen“: Ergebnis gespeichert.' },
-      { title: 'Details ansehen', description: '„Ergebnis anzeigen“ öffnet die Satzergebnisse. Abgeschlossene, noch bearbeitbare Partien können dort korrigiert werden.' },
+      { title: 'Details ansehen', description: `„Ergebnis anzeigen“ öffnet ${scoreSport ? 'den Spielstand' : 'die Satzergebnisse'}. Abgeschlossene, noch bearbeitbare Partien können dort korrigiert werden.` },
       { title: 'Gezielt finden', description: 'Mit Status, Phase, Spielort und der Namenssuche lassen sich Partien auch bei größeren Turnieren schnell finden.' },
     ],
   },

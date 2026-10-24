@@ -4,20 +4,20 @@ import { buildMockBracket, buildMockGroups, buildSwissStandings } from '@/servic
 import { getStageEntrants, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getMockStageBaseMatches, getMockStoredResult, isMockParticipantWithdrawn } from '@/services/mockRuntime';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
+import { resultWinnerSide } from '@/domain/sportScoring';
 
 export interface MockParticipantProgress {
   status: 'Aktiv' | 'Ausgeschieden' | 'Zurückgezogen' | 'Turniersieger' | 'Beendet';
   placement?: string;
 }
 
-function winnerFor(matchId: string, sideA: string, sideB: string, autoWinner?: string): string | undefined {
+function winnerFor(matchId: string, sideA: string, sideB: string, sport: string, autoWinner?: string): string | undefined {
   if (autoWinner) return autoWinner;
   const result = getMockStoredResult(matchId);
   if (!result || result.status !== 'FINISHED' || result.thirdPlaceSkipped) return undefined;
   if (result.forcedWinner) return result.forcedWinner;
-  const winsA = result.sets.filter((set) => set.sideAScore > set.sideBScore).length;
-  const winsB = result.sets.filter((set) => set.sideBScore > set.sideAScore).length;
-  return winsA > winsB ? sideA : winsB > winsA ? sideB : undefined;
+  const winner = resultWinnerSide(sport, result.sets, result.decisionSide);
+  return winner === 'A' ? sideA : winner === 'B' ? sideB : undefined;
 }
 
 function knockoutPlacement(tournament: DemoTournament, stage: TournamentStage, name: string): string | undefined {
@@ -26,12 +26,12 @@ function knockoutPlacement(tournament: DemoTournament, stage: TournamentStage, n
   const bronzeResult = bronze && getMockStoredResult(bronze.id);
   if (bronze && (bronze.sideA === name || bronze.sideB === name) && bronzeResult?.status === 'FINISHED') {
     if (bronzeResult.thirdPlaceSkipped) return 'Platz 3';
-    return winnerFor(bronze.id, bronze.sideA, bronze.sideB) === name ? 'Platz 3' : 'Platz 4';
+    return winnerFor(bronze.id, bronze.sideA, bronze.sideB, tournament.sport) === name ? 'Platz 3' : 'Platz 4';
   }
 
   const final = matches.find((match) => match.round === 'Finale');
   if (final && (final.sideA === name || final.sideB === name)) {
-    const winner = winnerFor(final.id, final.sideA, final.sideB, final.autoWinner);
+    const winner = winnerFor(final.id, final.sideA, final.sideB, tournament.sport, final.autoWinner);
     if (winner) return winner === name ? 'Platz 1' : 'Platz 2';
   }
 
@@ -39,7 +39,7 @@ function knockoutPlacement(tournament: DemoTournament, stage: TournamentStage, n
   for (let index = 0; index < regularRounds.length; index += 1) {
     for (const match of regularRounds[index].matches) {
       if (match.sideA !== name && match.sideB !== name) continue;
-      const winner = winnerFor(match.id, match.sideA, match.sideB, match.autoWinner);
+      const winner = winnerFor(match.id, match.sideA, match.sideB, tournament.sport, match.autoWinner);
       if (!winner || winner === name) continue;
       if (match.sideA === 'Freilos' || match.sideB === 'Freilos') continue;
       if (regularRounds[index].label === 'Halbfinale' && bronze && (bronze.sideA === name || bronze.sideB === name)) {

@@ -2,6 +2,7 @@ import { VenueLayoutEditor } from '@/components/VenueLayout';
 import { createVenueLayout, resizeVenueLayout } from '@/domain/venueLayout';
 import { getVenueTerminology } from '@/domain/venueTerminology';
 import { sportOptions } from '@/domain/sports';
+import { sportScoring } from '@/domain/sportScoring';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -206,7 +207,12 @@ function formatSwissProjection(entrantCount: number, rounds: number): string {
     .join(' · ');
 }
 
-function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCount: number): PhaseDraft {
+function phaseBestOfForSport(sport: string, type: StageType) {
+  const rules = sportScoring(sport);
+  return rules.mode === 'score' ? 1 : rules.shortSetEntry ? defaultBestOfForStage(type) : rules.recommendedBestOf;
+}
+
+function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCount: number, sport = 'table_tennis'): PhaseDraft {
   phaseSequence += 1;
   const entrantCount = Math.max(2, Math.min(participantCount, template.entrantCount ?? participantCount));
   const knockoutRounds = template.type === 'KNOCKOUT' ? knockoutRoundLabels(entrantCount).length : 0;
@@ -214,11 +220,11 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
     id: `phase-${phaseSequence}`,
     type: template.type,
     label: template.label,
-    bestOf: template.defaultBestOf,
+    bestOf: phaseBestOfForSport(sport, template.type),
     groupCount: Math.max(2, template.groupCount ?? Math.min(4, Math.max(2, Math.ceil(participantCount / 4)))),
     swissRounds: Math.max(1, template.swissRounds ?? Math.ceil(Math.log2(Math.max(2, participantCount)))),
     entrantCount,
-    knockoutBestOf: Array.from({ length: knockoutRounds }, () => template.defaultBestOf),
+    knockoutBestOf: Array.from({ length: knockoutRounds }, () => phaseBestOfForSport(sport, template.type)),
     customEntrants: isTerminalStage(template.type) && !knockoutEntrantPresets(participantCount).includes(entrantCount),
   };
 }
@@ -293,7 +299,7 @@ export function CreateTournamentPage() {
   const [name, setName] = useState('');
   const [sport, setSport] = useState('table_tennis');
   const venue = getVenueTerminology(sport);
-  const timedSport = sport !== 'table_tennis';
+  const timedSport = sportScoring(sport).mode === 'score';
   const [timedMatchMinutes, setTimedMatchMinutes] = useState('');
   const [venueTurnoverMinutes, setVenueTurnoverMinutes] = useState('');
   const validMatchDuration = !timedSport || (timedMatchMinutes.trim() !== '' && Number.isInteger(Number(timedMatchMinutes)) && Number(timedMatchMinutes) > 0);
@@ -372,8 +378,8 @@ export function CreateTournamentPage() {
 
   useEffect(() => {
     if (!selectedRecommendation) return;
-    setPhaseDrafts(selectedRecommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount)));
-  }, [selectedRecommendation, participantCount]);
+    setPhaseDrafts(selectedRecommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
+  }, [selectedRecommendation, participantCount, sport]);
 
   const phaseOrderValid = hasValidTerminalStageOrder(phaseDrafts.map((phase) => phase.type));
   const hasTerminalPhase = phaseDrafts.some((phase) => isTerminalStage(phase.type));
@@ -475,7 +481,7 @@ export function CreateTournamentPage() {
       return;
     }
     setSelectedRecommendationId(recommendation.id);
-    setPhaseDrafts(recommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount)));
+    setPhaseDrafts(recommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
   }
 
   function normalizePhaseEntrants(phases: PhaseDraft[]): PhaseDraft[] {
@@ -525,7 +531,7 @@ export function CreateTournamentPage() {
     setSelectedRecommendationId(null);
     setPhaseDrafts((current) => normalizePhaseEntrants([
       ...current,
-      phaseDraftFromTemplate(template, participantCount),
+      phaseDraftFromTemplate(template, participantCount, sport),
     ]));
   }
 
@@ -570,7 +576,7 @@ export function CreateTournamentPage() {
 
       const next = current.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
       const phase = next[index];
-      const bestOf = defaultBestOfForStage(type);
+      const bestOf = phaseBestOfForSport(sport, type);
       phase.type = type;
       phase.label = stageLabel(type);
       phase.bestOf = bestOf;
@@ -616,7 +622,7 @@ export function CreateTournamentPage() {
     if (!canContinue || step === 5) return;
     if (step === 4) {
       if (phaseDrafts.length === 0 && selectedRecommendation) {
-        setPhaseDrafts(selectedRecommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount)));
+        setPhaseDrafts(selectedRecommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
       }
       setHasVisitedPhaseStep(true);
       setStep(5);
@@ -644,11 +650,11 @@ export function CreateTournamentPage() {
       phases: phaseDrafts.map((phase) => ({
         type: phase.type,
         label: phase.label,
-        bestOf: phase.bestOf,
+        bestOf: timedSport ? 1 : phase.bestOf,
         entrantCount: phase.entrantCount,
         groupCount: phase.groupCount,
         swissRounds: phase.swissRounds,
-        knockoutBestOf: phase.knockoutBestOf,
+        knockoutBestOf: timedSport ? phase.knockoutBestOf.map(() => 1) : phase.knockoutBestOf,
       })),
       estimatedDurationMinutes: estimatedTournamentDurationMinutes,
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
@@ -722,7 +728,14 @@ export function CreateTournamentPage() {
               </div>
               <div className="field">
                 <label htmlFor="sport">Sportart</label>
-                <select id="sport" value={sport} onChange={(event) => setSport(event.target.value)}>
+                <select id="sport" value={sport} onChange={(event) => {
+                  const selectedSport = event.target.value;
+                  setSport(selectedSport);
+                  setPhaseDrafts((current) => current.map((phase) => ({ ...phase,
+                    bestOf: phaseBestOfForSport(selectedSport, phase.type),
+                    knockoutBestOf: phase.knockoutBestOf.map(() => phaseBestOfForSport(selectedSport, phase.type)),
+                  })));
+                }}>
                   {sportOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
               </div>
@@ -902,7 +915,7 @@ export function CreateTournamentPage() {
               <div className="field match-timing-fields">
                 <label htmlFor="match-duration">{timedSport ? 'Spieldauer (Minuten) *' : 'Satzdauer (Minuten)'}</label>
                 <input id="match-duration" type="number" min="1" step="1" required={timedSport} value={timedSport ? timedMatchMinutes : '15'} disabled={!timedSport} placeholder={timedSport ? 'Pflichtfeld – z. B. 12' : undefined} onChange={(event) => setTimedMatchMinutes(event.target.value)} />
-                {!timedSport && <span className="field-hint">Tischtennis: fest 15 Minuten je Satz.</span>}
+                {!timedSport && <span className="field-hint">Planungswert: derzeit 15 Minuten je Satz.</span>}
                 {timedSport && <>
                   <label htmlFor="venue-turnover">Pause zwischen Spielen auf derselben Spielfläche (Minuten)</label>
                   <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => setVenueTurnoverMinutes(event.target.value)} />
@@ -1196,7 +1209,7 @@ export function CreateTournamentPage() {
                               </div>
                             )}
 
-                            {phase.type !== 'KNOCKOUT' && (
+                            {phase.type !== 'KNOCKOUT' && !timedSport && (
                               <div className="field phase-bestof">
                                 <label htmlFor={`best-of-${phase.id}`}>Best-of</label>
                                 <select
@@ -1210,7 +1223,7 @@ export function CreateTournamentPage() {
                             )}
                           </div>
 
-                          {phase.type === 'KNOCKOUT' && (
+                          {phase.type === 'KNOCKOUT' && !timedSport && (
                             <div className="knockout-round-settings">
                               <div className="knockout-round-head">
                                 <strong>Best-of je K.-o.-Runde</strong>
@@ -1265,11 +1278,11 @@ export function CreateTournamentPage() {
                                 <span className="badge">Phase {index + 1}</span>
                                 <strong>{phase.label}</strong>
                                 <span className="muted phase-flow-detail">
-                                  {phase.type === 'GROUPS' && `${phase.groupCount} Gruppen · Best-of-${phase.bestOf}`}
-                                  {phase.type === 'SWISS' && `${phase.swissRounds} Runden · Best-of-${phase.bestOf}`}
-                                  {phase.type === 'KNOCKOUT' && `${phase.entrantCount} Teilnehmer · Best-of je Runde`}
+                                  {phase.type === 'GROUPS' && `${phase.groupCount} Gruppen${timedSport ? '' : ` · Best-of-${phase.bestOf}`}`}
+                                  {phase.type === 'SWISS' && `${phase.swissRounds} Runden${timedSport ? '' : ` · Best-of-${phase.bestOf}`}`}
+                                  {phase.type === 'KNOCKOUT' && `${phase.entrantCount} Teilnehmer${timedSport ? '' : ' · Best-of je Runde'}`}
                                    
-                                  {phase.type === 'ROUND_ROBIN' && `Best-of-${phase.bestOf}`}
+                                  {phase.type === 'ROUND_ROBIN' && (timedSport ? 'Direkter Spielstand' : `Best-of-${phase.bestOf}`)}
                                    
                                 </span>
                               </div>

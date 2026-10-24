@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { MatchSet } from '@/domain/types';
 import { getMatchFinalization, requiresFinalApproval } from '@/domain/matchFinalization';
-import { applySetCorrections, parseShortSet } from '@/domain/shortSetNotation';
+import { applySetCorrections } from '@/domain/shortSetNotation';
+import { parseSportSet, sportScoring, setTarget } from '@/domain/sportScoring';
 import { completeMockMatch, saveMockMatchSets, type MockRuntimeMatch } from '@/services/mockRuntime';
 
 function winsFromSets(sets: MatchSet[]) {
@@ -38,7 +39,9 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
   const [error, setError] = useState<string | null>(null);
   const wins = useMemo(() => winsFromSets(playedSets), [playedSets]);
   const currentSetNumber = playedSets.length + 1;
-  const parsedCurrent = parseShortSet(currentValue, currentSetNumber);
+  const rules = sportScoring(match.sport);
+  const target = setTarget(match.sport, playedSets.length, match.bestOf);
+  const parsedCurrent = parseSportSet(match.sport, match.bestOf, playedSets.length, currentValue);
   const alreadyFinished = !editingFinished && match.status === 'FINISHED';
   const needsFinalApproval = requiresFinalApproval(match.bestOf, playedSets, swissAdminEntry) && !alreadyFinished;
 
@@ -54,7 +57,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
   function confirmSet() {
     if (alreadyFinished) return;
     if (!parsedCurrent) {
-      setError('Bitte ein gültiges Satzergebnis eingeben, z. B. 7 oder -7.');
+      setError(rules.shortSetEntry ? 'Bitte ein gültiges Satzergebnis eingeben, z. B. 7 oder -7.' : `Bitte ein gültiges Satzergebnis eingeben, z. B. ${target}:18.`);
       return;
     }
 
@@ -97,9 +100,12 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
   }
 
   function saveCorrection() {
-    const validSets = applySetCorrections(playedSets, correctionValues);
-    if (!validSets) {
-      setCorrectionError('Bitte gültige Satzergebnisse eingeben (z. B. 11:7 oder -7).');
+    const validSets = rules.shortSetEntry
+      ? applySetCorrections(playedSets, correctionValues)
+      : correctionValues.map((value, index) => value.trim() ? parseSportSet(match.sport, match.bestOf, index, value) : playedSets[index]).filter((value): value is MatchSet => Boolean(value));
+    const correctionsValid = correctionValues.every((value, index) => !value.trim() || Boolean(parseSportSet(match.sport, match.bestOf, index, value)));
+    if (!validSets || !correctionsValid) {
+      setCorrectionError(rules.shortSetEntry ? 'Bitte gültige Satzergebnisse eingeben (z. B. 11:7 oder -7).' : `Bitte gültige Satzergebnisse im Format ${target}:18 eingeben.`);
       return;
     }
     if (validSets.length === 0) {
@@ -163,18 +169,18 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
               <input
                 aria-label={`Satz ${currentSetNumber}`}
                 inputMode="numeric"
-                placeholder="7 / -7"
+                placeholder={rules.shortSetEntry ? '7 / -7' : `${target}:18`}
                 value={currentValue}
                 onChange={(event) => setCurrentValue(event.target.value)}
                 onKeyDown={handleKeyDown}
-                title="7 = 11:7, -7 = 7:11"
+                title={rules.shortSetEntry ? '7 = 11:7, -7 = 7:11' : 'Satzpunkte links:rechts eingeben'}
               />
             </label>
             <button className="btn small primary" type="button" disabled={!parsedCurrent} onClick={confirmSet}>
               Satz {currentSetNumber} bestätigen
             </button>
           </div>
-          {compact && <span className="field-hint set-entry-quick-hint">Kurzform (linker Spieler): 7 = 11:7 · −7 = 7:11 · 10 = 12:10. Enter bestätigt den Satz.</span>}
+          {compact && <span className="field-hint set-entry-quick-hint">{rules.shortSetEntry ? 'Kurzform (linker Spieler): 7 = 11:7 · −7 = 7:11 · 10 = 12:10.' : `${match.sport}: Satzergebnis als ${target}:18 eingeben.`} Enter bestätigt den Satz.</span>}
         </div>
       )}
 
@@ -201,7 +207,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
               </div>
               <button type="button" className="btn small" onClick={() => setCorrectionOpen(false)}>Schließen</button>
             </div>
-            <p className="field-hint">Nur die zu ändernden Sätze ausfüllen. Leere Felder übernehmen das bisherige Ergebnis. Eingabe: 7 = 11:7, -7 = 7:11.</p>
+            <p className="field-hint">Nur die zu ändernden Sätze ausfüllen. Leere Felder übernehmen das bisherige Ergebnis. {rules.shortSetEntry ? 'Eingabe: 7 = 11:7, -7 = 7:11.' : 'Eingabe: Satzpunkte links:rechts, z. B. 25:19.'}</p>
             <div className="result-correction-table" role="table" aria-label="Satzergebnisse korrigieren">
               <div className="result-correction-row result-correction-header" role="row">
                 <span role="columnheader">Satz</span>

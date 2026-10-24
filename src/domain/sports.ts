@@ -16,7 +16,8 @@ export const sportOptions = [
 ] as const;
 
 export function findSportOption(value: string) {
-  const normalized = value.trim().toLocaleLowerCase('de-DE');
+  // Alte lokale Turniere konnten den Regelhinweis noch als Klammerzusatz speichern.
+  const normalized = value.trim().replace(/\s+\([^)]*\)$/, '').toLocaleLowerCase('de-DE');
   return sportOptions.find((option) => option.id === normalized || option.label.toLocaleLowerCase('de-DE') === normalized);
 }
 

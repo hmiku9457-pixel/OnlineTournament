@@ -111,7 +111,7 @@ describe('Hallenraster und zeitbasierte Sportarten', () => {
     const running = updateMockTournamentStatus(tournament.id, 'RUNNING');
     const first = getMockRuntimeMatches(running)[0];
     expect(assignMockMatchToTable(running, first.id, 'Tisch 1')).toBe(true);
-    completeMockMatch(first.id, scores);
+    completeMockMatch(first.id, [{ number: 1, sideAScore: 2, sideBScore: 1 }]);
     const next = getMockRuntimeMatches(running).find((match) => match.status === 'WAITING');
     expect(next).toBeDefined();
     // Turnover is a scheduling estimate, not an assignment restriction.

@@ -1,19 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MatchSet } from '@/domain/types';
+import { sportScoring } from '@/domain/sportScoring';
 
 interface Props {
   score: string;
   sets?: MatchSet[];
   onEdit?: () => void;
   className?: string;
+  sport?: string;
 }
 
-function tooltip(sets?: MatchSet[]) {
+function tooltip(sets?: MatchSet[], sport = 'Tischtennis') {
   if (!sets?.length) return undefined;
+  if (sportScoring(sport).mode === 'score') return `Spielstand: ${sets[0].sideAScore}:${sets[0].sideBScore}`;
   return sets.map((set, index) => `Satz ${index + 1}: ${set.sideAScore}:${set.sideBScore}`).join(' · ');
 }
 
-export function MatchResultDetails({ score, sets, onEdit, className = '' }: Props) {
+export function MatchResultDetails({ score, sets, onEdit, className = '', sport = 'Tischtennis' }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
 
@@ -31,7 +34,7 @@ export function MatchResultDetails({ score, sets, onEdit, className = '' }: Prop
       <button
         className="match-result-trigger"
         type="button"
-        title={score === 'W.O.' ? 'Kampflos gewertete Partie (Walkover)' : tooltip(sets)}
+        title={score === 'W.O.' ? 'Kampflos gewertete Partie (Walkover)' : tooltip(sets, sport)}
         onClick={(event) => {
           event.stopPropagation();
           if (sets?.length) setOpen((value) => !value);
@@ -41,9 +44,9 @@ export function MatchResultDetails({ score, sets, onEdit, className = '' }: Prop
       </button>
       {open && sets?.length ? (
         <span className="match-result-popover" role="dialog" onMouseDown={(event) => event.stopPropagation()}>
-          <strong>Sätze</strong>
+          <strong>{sportScoring(sport).mode === 'score' ? 'Spielstand' : 'Sätze'}</strong>
           <span className="match-result-set-list">
-            {sets.map((set, index) => <span className="match-result-set-row" key={set.number}><span>Satz {index + 1}</span><strong>{set.sideAScore}:{set.sideBScore}</strong></span>)}
+            {sets.map((set, index) => <span className="match-result-set-row" key={set.number}><span>{sportScoring(sport).mode === 'score' ? 'Ergebnis' : `Satz ${index + 1}`}</span><strong>{set.sideAScore}:{set.sideBScore}</strong></span>)}
           </span>
           {onEdit && <button className="btn small" type="button" onClick={() => { setOpen(false); onEdit(); }}>Ergebnis bearbeiten</button>}
         </span>

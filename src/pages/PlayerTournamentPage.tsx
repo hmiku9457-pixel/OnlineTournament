@@ -4,12 +4,14 @@ import { getMockPlayerSnapshot, getMockRuntimeMatches } from '@/services/mockRun
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import { getMockTournament } from '@/services/mockTournamentStore';
 import { displayVenueMessage, getVenueTerminology } from '@/domain/venueTerminology';
+import { sportScoring } from '@/domain/sportScoring';
 
 export function PlayerTournamentPage() {
   const { tournamentId } = useParams();
   const navigate = useNavigate();
   const tournament = useMemo(() => getMockTournament(tournamentId), [tournamentId]);
   const venue = getVenueTerminology(tournament.sport);
+  const resultMode = sportScoring(tournament.sport);
   const venueName = (name: string) => displayVenueMessage(tournament.sport, name);
   const snapshot = useMemo(() => getMockPlayerSnapshot(tournament), [tournament]);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament]);
@@ -42,7 +44,7 @@ export function PlayerTournamentPage() {
                 <div className="player-score">{snapshot.currentMatch.score}</div>
                 <h2>{snapshot.currentMatch.sideB}{swissRecordFor(snapshot.currentMatch, snapshot.currentMatch.sideB) && <span className="swiss-record">{swissRecordFor(snapshot.currentMatch, snapshot.currentMatch.sideB)}</span>}</h2>
                 <p className="muted">{snapshot.currentMatch.phase} · {snapshot.currentMatch.round}</p>
-                <Link className="btn primary player-primary-action" to={`/score/${snapshot.currentMatch.id}`}>Ergebnis / Sätze eintragen</Link>
+                <Link className="btn primary player-primary-action" to={`/score/${snapshot.currentMatch.id}`}>{resultMode.mode === 'score' ? 'Ergebnis eintragen' : 'Ergebnis / Sätze eintragen'}</Link>
               </>
             ) : snapshot.nextMatch ? (
               <>
@@ -58,8 +60,8 @@ export function PlayerTournamentPage() {
           <article className="card">
             <div className="control-section-head"><h2>Deine nächsten Schritte</h2><span className="badge">Prototyp</span></div>
             <div className="player-step-list">
-              <div><span>1</span><div><strong>Spielcode am Spielort</strong><p className="muted">Mit dem gemeinsamen Match-Code wird die Satzeingabe freigeschaltet.</p></div></div>
-              <div><span>2</span><div><strong>Sätze erfassen</strong><p className="muted">Die Sätze werden möglichst kurz eingegeben, z. B. 7 für 11:7 oder -7 für 7:11.</p></div></div>
+              <div><span>1</span><div><strong>Spielcode am Spielort</strong><p className="muted">Mit dem gemeinsamen Match-Code wird die Ergebniseingabe freigeschaltet.</p></div></div>
+              <div><span>2</span><div><strong>{resultMode.mode === 'score' ? `${resultMode.plural} erfassen` : 'Sätze erfassen'}</strong><p className="muted">{resultMode.mode === 'score' ? `Den Spielstand beider Seiten eintragen. Bei Gleichstand in einer Entscheidungsrunde zusätzlich den Sieger wählen.` : resultMode.shortSetEntry ? 'Kurzform: 7 für 11:7 oder -7 für 7:11.' : 'Satzergebnisse als Punkte links:rechts eingeben.'}</p></div></div>
               <div><span>3</span><div><strong>Ergebnis bestätigen</strong><p className="muted">Am Ende bestätigt jede Seite mit einem eigenen Spielercode.</p></div></div>
             </div>
           </article>

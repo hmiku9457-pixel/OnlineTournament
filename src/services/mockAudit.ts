@@ -20,6 +20,8 @@ export interface MockAuditEntry {
   /** Previous and new scored sets (only recorded for a correction). */
   beforeSets?: MatchSet[];
   afterSets?: MatchSet[];
+  beforeDecisionSide?: 'A' | 'B';
+  afterDecisionSide?: 'A' | 'B';
 }
 
 const KEY = 'online-tournament:mock-audit:v1';

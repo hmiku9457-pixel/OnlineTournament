@@ -9,6 +9,7 @@ import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
+import { compareRankingRows, resultScore, resultWinnerSide, sportScoring, setTarget, validateCompleteResult, type WinnerSide } from '@/domain/sportScoring';
 
 export { getRuntimeParticipantNames } from '@/services/mockParticipants';
 
@@ -26,6 +27,9 @@ export interface MockRuntimeMatch {
   round: string;
   matchDay?: number;
   bestOf: number;
+  sport: string;
+  decisionSide?: WinnerSide;
+  requiresWinner: boolean;
   pauseA: number | null;
   pauseB: number | null;
   /** True pause before this match started, not the current elapsed time. */
@@ -41,6 +45,7 @@ interface StoredMatchResult {
   confirmedA?: boolean;
   confirmedB?: boolean;
   forcedWinner?: string;
+  decisionSide?: WinnerSide;
   /** Beide Halbfinalverlierer erhalten Platz 3, ohne eine Partie auszutragen. */
   thirdPlaceSkipped?: boolean;
   /** Tatsächlicher Abschlusszeitpunkt; bei kampflosen Partien wird keine Pause ausgelöst. */
@@ -141,27 +146,11 @@ function updateRuntime(matchId: string, update: Omit<StoredMatchRuntime, 'matchI
   return next;
 }
 
-function scoreFromSets(sets: MatchSet[]) {
-  let winsA = 0;
-  let winsB = 0;
-  for (const set of sets) {
-    if (set.sideAScore > set.sideBScore) winsA += 1;
-    else if (set.sideBScore > set.sideAScore) winsB += 1;
-  }
-  return `${winsA} : ${winsB}`;
-}
-
-function resultWinner(result: StoredMatchResult | undefined, sideA: string, sideB: string) {
+function resultWinner(result: StoredMatchResult | undefined, sideA: string, sideB: string, sport: string) {
   if (!result || result.status !== 'FINISHED') return undefined;
   if (result.forcedWinner) return result.forcedWinner;
-  let winsA = 0;
-  let winsB = 0;
-  result.sets.forEach((set) => {
-    if (set.sideAScore > set.sideBScore) winsA += 1;
-    else if (set.sideBScore > set.sideAScore) winsB += 1;
-  });
-  if (winsA === winsB) return undefined;
-  return winsA > winsB ? sideA : sideB;
+  const side = resultWinnerSide(sport, result.sets, result.decisionSide);
+  return side === 'A' ? sideA : side === 'B' ? sideB : undefined;
 }
 
 function groupMembers(tournament: DemoTournament, stage: TournamentStage) {
@@ -265,7 +254,7 @@ function knockoutMatches(tournament: DemoTournament, stage: TournamentStage, res
       let autoWinner: string | undefined;
       if (sideA === 'Freilos' && sideB !== 'Freilos' && sideB !== 'TBD') autoWinner = sideB;
       if (sideB === 'Freilos' && sideA !== 'Freilos' && sideA !== 'TBD') autoWinner = sideA;
-      const winner = autoWinner ?? resultWinner(results.find((item) => item.matchId === id), sideA, sideB);
+      const winner = autoWinner ?? resultWinner(results.find((item) => item.matchId === id), sideA, sideB, tournament.sport);
       rounds.push({ id, sideA, sideB, round: label, autoWinner, bestOf: knockoutRoundBestOf(stage, roundIndex) });
       nextSides.push(winner ?? 'TBD');
     }
@@ -279,7 +268,7 @@ function knockoutMatches(tournament: DemoTournament, stage: TournamentStage, res
     const semiFinals = rounds.filter((match) => match.round === 'Halbfinale');
     if (semiFinals.length === 2) {
       const losers = semiFinals.map((match) => {
-        const winner = match.autoWinner ?? resultWinner(results.find((item) => item.matchId === match.id), match.sideA, match.sideB);
+        const winner = match.autoWinner ?? resultWinner(results.find((item) => item.matchId === match.id), match.sideA, match.sideB, tournament.sport);
         if (!winner) return 'TBD';
         const loser = winner === match.sideA ? match.sideB : match.sideA;
         return loser === 'Freilos' ? 'TBD' : loser;
@@ -302,7 +291,7 @@ export function isMockThirdPlaceMatch(matchId: string) {
   return matchId.endsWith('-third-place');
 }
 
-function swissScoreState(participants: string[], matches: BaseStageMatch[], results: StoredMatchResult[]) {
+function swissScoreState(participants: string[], matches: BaseStageMatch[], results: StoredMatchResult[], sport: string) {
   const state = new Map(participants.map((name, index) => [name, {
     name,
     wins: 0,
@@ -326,7 +315,7 @@ function swissScoreState(participants: string[], matches: BaseStageMatch[], resu
     if (!result) return;
     a.opponents.add(match.sideB);
     b.opponents.add(match.sideA);
-    const winner = resultWinner(result, match.sideA, match.sideB);
+    const winner = resultWinner(result, match.sideA, match.sideB, sport);
     if (winner === match.sideA) {
       a.wins += 1;
       b.losses += 1;
@@ -344,8 +333,9 @@ function swissRoundPairings(
   participants: string[],
   previousMatches: BaseStageMatch[],
   results: StoredMatchResult[],
+  sport: string,
 ) {
-  const state = swissScoreState(participants, previousMatches, results);
+  const state = swissScoreState(participants, previousMatches, results, sport);
   const players: SwissScorePlayer[] = participants.map((name) => {
     const row = state.get(name)!;
     return {
@@ -375,8 +365,8 @@ function swissMatches(tournament: DemoTournament, stage: TournamentStage, result
     const savedRound = readSwissFixtures().find((item) => item.tournamentId === tournament.id && item.stageId === stage.id && item.round === round);
     const eligible = participants.filter((name) => !isMockParticipantWithdrawn(tournament, name));
     const pairings = savedRound?.pairs ?? (round === 1
-      ? swissRoundPairings(eligible, [], results)
-      : swissRoundPairings(eligible, matches, results));
+      ? swissRoundPairings(eligible, [], results, tournament.sport)
+      : swissRoundPairings(eligible, matches, results, tournament.sport));
     if (!savedRound && isStageStarted(tournament, stage) && typeof window !== 'undefined') {
       window.localStorage.setItem(SWISS_FIXTURE_KEY, JSON.stringify([
         ...readSwissFixtures().filter((item) => !(item.tournamentId === tournament.id && item.stageId === stage.id && item.round === round)),
@@ -453,8 +443,9 @@ function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchRes
     startedAt: savedRuntime?.startedAt,
     pauseA: savedRuntime?.startedAt ? (savedRuntime.pauseAtStartA ?? null) : status === 'FINISHED' ? null : match.pauseA,
     pauseB: savedRuntime?.startedAt ? (savedRuntime.pauseAtStartB ?? null) : status === 'FINISHED' ? null : match.pauseB,
-    score: savedResult?.thirdPlaceSkipped ? 'Beide Platz 3' : savedResult?.forcedWinner && !savedResult.sets.length ? 'W.O.' : savedResult ? scoreFromSets(savedResult.sets) : match.score,
+    score: savedResult?.thirdPlaceSkipped ? 'Beide Platz 3' : savedResult?.forcedWinner && !savedResult.sets.length ? 'W.O.' : savedResult ? resultScore(match.sport, savedResult.sets) : match.score,
     sets: savedResult?.sets ?? match.sets,
+    decisionSide: savedResult?.decisionSide,
     note: status === 'WAITING' ? 'Wartet auf Tischzuweisung' : undefined,
   };
 }
@@ -479,6 +470,8 @@ export function getMockStageMatches(tournament: DemoTournament, stage: Tournamen
       round: match.round,
       matchDay: match.matchDay,
       bestOf: match.bestOf ?? stage.bestOf,
+      sport: tournament.sport,
+      requiresWinner: ['SWISS', 'KNOCKOUT', 'DOUBLE_ELIMINATION', 'PLACEMENT'].includes(stage.type),
       pauseA: getElapsedRestMinutes(lastFinishByParticipant.get(match.sideA), now),
       pauseB: getElapsedRestMinutes(lastFinishByParticipant.get(match.sideB), now),
       note: 'Wartet auf Tischzuweisung',
@@ -611,9 +604,9 @@ export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: Moc
   const previous = current.find((item) => item.matchId === matchId);
   const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
   if (tournament && !canEditMockMatch(tournament, matchId)) return previous;
-  const next: StoredMatchResult = { ...previous, matchId, sets, status, forcedWinner: undefined, thirdPlaceSkipped: undefined, confirmedA: previous?.confirmedA, confirmedB: previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
+  const next: StoredMatchResult = { ...previous, matchId, sets, status, decisionSide: undefined, forcedWinner: undefined, thirdPlaceSkipped: undefined, confirmedA: previous?.confirmedA, confirmedB: previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
-  if (tournament && sets.length > (previous?.sets.length ?? 0)) recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Ergebniseingabe (lokal)', action: 'SET_SAVED', description: `Satz ${sets.length} bestätigt`, before: previous?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · '), after: sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') });
+  if (tournament && sets.length > (previous?.sets.length ?? 0)) recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Ergebniseingabe (lokal)', action: 'SET_SAVED', description: sportScoring(tournament.sport).mode === 'score' ? 'Zwischenstand erfasst' : `Satz ${sets.length} bestätigt`, before: previous?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · '), after: sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') });
   return next;
 }
 
@@ -634,13 +627,13 @@ function settleWithdrawnMatches(tournament: DemoTournament) {
       const bWithdrawn = isMockParticipantWithdrawn(tournament, match.sideB);
       if (!aWithdrawn && !bWithdrawn) continue;
       const existing = saved.find((result) => result.matchId === match.id);
-      const wonSets = Math.ceil((match.bestOf ?? active.bestOf) / 2);
+      const wonSets = sportScoring(tournament.sport).mode === 'score' ? 1 : Math.ceil((match.bestOf ?? active.bestOf) / 2);
       const sets: MatchSet[] = aWithdrawn && bWithdrawn
         ? [] // Zwei Rückzüge im selben Spiel: Doppelniederlage, kein Sieger.
         : Array.from({ length: wonSets }, (_, index) => ({
           number: index + 1,
-          sideAScore: aWithdrawn ? 0 : 11,
-          sideBScore: bWithdrawn ? 0 : 11,
+          sideAScore: aWithdrawn ? 0 : sportScoring(tournament.sport).mode === 'score' ? 3 : setTarget(tournament.sport, index, match.bestOf ?? active.bestOf),
+          sideBScore: bWithdrawn ? 0 : sportScoring(tournament.sport).mode === 'score' ? 3 : setTarget(tournament.sport, index, match.bestOf ?? active.bestOf),
         }));
       const forcedWinner = aWithdrawn && bWithdrawn ? 'Freilos' : aWithdrawn ? match.sideB : match.sideA;
       // Nicht bei jeder Ansicht erneut identische Resultate überschreiben.
@@ -698,7 +691,7 @@ export function canWithdrawMockParticipant(tournament: DemoTournament, name: str
       if (match.sideA !== name && match.sideB !== name) continue;
       const result = getMockStoredResult(match.id);
       if (result?.status !== 'FINISHED') continue;
-      const winner = match.autoWinner ?? result.forcedWinner ?? resultWinner(result, match.sideA, match.sideB);
+      const winner = match.autoWinner ?? result.forcedWinner ?? resultWinner(result, match.sideA, match.sideB, tournament.sport);
       if (winner && winner !== name) {
         // Nach Halbfinal-Niederlage ist der Spieler noch für Bronze aktiv.
         if (match.round === 'Halbfinale' && bronzePending) continue;
@@ -784,6 +777,7 @@ interface RankingRow {
   played: number;
   wins: number;
   losses: number;
+  draws: number;
   setsWon: number;
   setsLost: number;
   ballsWon: number;
@@ -791,12 +785,13 @@ interface RankingRow {
   buchholz: number;
 }
 
-function rankParticipants(participants: string[], matches: BaseStageMatch[], results: StoredMatchResult[]) {
+function rankParticipants(participants: string[], matches: BaseStageMatch[], results: StoredMatchResult[], sport: string) {
   const rows = new Map(participants.map((name) => [name, {
     name,
     played: 0,
     wins: 0,
     losses: 0,
+    draws: 0,
     setsWon: 0,
     setsLost: 0,
     ballsWon: 0,
@@ -820,21 +815,27 @@ function rankParticipants(participants: string[], matches: BaseStageMatch[], res
       rowA.ballsLost += set.sideBScore;
       rowB.ballsWon += set.sideBScore;
       rowB.ballsLost += set.sideAScore;
-      if (set.sideAScore > set.sideBScore) {
+      if (sportScoring(sport).mode === 'sets' && set.sideAScore > set.sideBScore) {
         rowA.setsWon += 1;
         rowB.setsLost += 1;
-      } else if (set.sideBScore > set.sideAScore) {
+      } else if (sportScoring(sport).mode === 'sets' && set.sideBScore > set.sideAScore) {
         rowB.setsWon += 1;
         rowA.setsLost += 1;
       }
     });
-    const winner = resultWinner(result, match.sideA, match.sideB);
+    const winner = resultWinner(result, match.sideA, match.sideB, sport);
     if (winner === match.sideA) {
       rowA.wins += 1;
       rowB.losses += 1;
     } else if (winner === match.sideB) {
       rowB.wins += 1;
       rowA.losses += 1;
+    } else if (result.forcedWinner === 'Freilos') {
+      rowA.losses += 1;
+      rowB.losses += 1;
+    } else {
+      rowA.draws += 1;
+      rowB.draws += 1;
     }
   });
 
@@ -842,15 +843,7 @@ function rankParticipants(participants: string[], matches: BaseStageMatch[], res
     row.buchholz = (opponents.get(row.name) ?? []).reduce((sum, opponent) => sum + (rows.get(opponent)?.wins ?? 0), 0);
   });
 
-  return [...rows.values()].sort((a, b) => (
-    b.wins - a.wins
-    || ((b.setsWon - b.setsLost) - (a.setsWon - a.setsLost))
-    || b.setsWon - a.setsWon
-    || ((b.ballsWon - b.ballsLost) - (a.ballsWon - a.ballsLost))
-    || b.ballsWon - a.ballsWon
-    || b.buchholz - a.buchholz
-    || a.name.localeCompare(b.name, 'de')
-  ));
+  return [...rows.values()].sort((a, b) => compareRankingRows(sport, a, b));
 }
 
 function stageQualifierCount(tournament: DemoTournament, stage: TournamentStage) {
@@ -869,27 +862,20 @@ function computeStageQualifiers(tournament: DemoTournament, stage: TournamentSta
   if (stage.type === 'GROUPS') {
     const rankings = groupMembers(tournament, stage).map((members, groupIndex) => {
       const groupLabel = `Gruppe ${String.fromCharCode(65 + groupIndex)}`;
-      return rankParticipants(members, matches.filter((match) => match.round === groupLabel), results);
+      return rankParticipants(members, matches.filter((match) => match.round === groupLabel), results, tournament.sport);
     });
     const qualified: string[] = [];
     for (let rankIndex = 0; qualified.length < targetCount; rankIndex += 1) {
       const tier = rankings.map((ranking) => ranking[rankIndex]).filter((row): row is RankingRow => Boolean(row));
       if (!tier.length) break;
-      tier.sort((a, b) => (
-        b.wins - a.wins
-        || ((b.setsWon - b.setsLost) - (a.setsWon - a.setsLost))
-        || b.setsWon - a.setsWon
-        || ((b.ballsWon - b.ballsLost) - (a.ballsWon - a.ballsLost))
-        || b.ballsWon - a.ballsWon
-        || a.name.localeCompare(b.name, 'de')
-      ));
+      tier.sort((a, b) => compareRankingRows(tournament.sport, a, b));
       qualified.push(...tier.filter((row) => !isMockParticipantWithdrawn(tournament, row.name)).slice(0, targetCount - qualified.length).map((row) => row.name));
     }
     return qualified;
   }
 
   if (stage.type === 'ROUND_ROBIN' || stage.type === 'SWISS') {
-    return rankParticipants(getStageEntrants(tournament, stage), matches, results).filter((row) => !isMockParticipantWithdrawn(tournament, row.name)).slice(0, targetCount).map((row) => row.name);
+    return rankParticipants(getStageEntrants(tournament, stage), matches, results, tournament.sport).filter((row) => !isMockParticipantWithdrawn(tournament, row.name)).slice(0, targetCount).map((row) => row.name);
   }
 
   return getStageEntrants(tournament, stage).filter((name) => !isMockParticipantWithdrawn(tournament, name)).slice(0, targetCount);
@@ -930,7 +916,7 @@ function reconcileCompletedPhase(matchId: string) {
   }
 }
 
-export function completeMockMatch(matchId: string, sets: MatchSet[], status: MockMatchState = 'FINISHED', confirmedByAdmin = false) {
+export function completeMockMatch(matchId: string, sets: MatchSet[], status: MockMatchState = 'FINISHED', confirmedByAdmin = false, decisionSide?: WinnerSide) {
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
   const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
@@ -942,17 +928,26 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
     if (tournament && stage && !canEditFinishedResults(tournament, stage)) return previous;
   }
   const stage = tournament?.stages.find((item) => matchId.startsWith(`${item.id}-`));
+  if (tournament && stage && status === 'FINISHED') {
+    const bestOf = getMockStageMatches(tournament, stage).find((match) => match.id === matchId)?.bestOf ?? stage.bestOf;
+    const isKnockout = ['KNOCKOUT', 'DOUBLE_ELIMINATION', 'PLACEMENT', 'SWISS'].includes(stage.type);
+    const validationError = validateCompleteResult(tournament.sport, bestOf, sets, isKnockout, decisionSide);
+    if (validationError) throw new Error(validationError);
+  }
   const adminPhaseConfirmation = status === 'FINISHED' && confirmedByAdmin && (stage?.type === 'SWISS' || stage?.type === 'KNOCKOUT');
   const next: StoredMatchResult = {
-    ...previous, matchId, sets, status, forcedWinner: undefined, thirdPlaceSkipped: undefined,
+    ...previous, matchId, sets, status, decisionSide, forcedWinner: undefined, thirdPlaceSkipped: undefined,
     confirmedA: adminPhaseConfirmation ? true : previousFinal ? false : previous?.confirmedA,
     confirmedB: adminPhaseConfirmation ? true : previousFinal ? false : previous?.confirmedB,
     finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt,
   };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   if (tournament && status === 'FINISHED') {
-    const resultText = (value: StoredMatchResult | undefined) => value?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') || '–';
-    recordMockAudit({ tournamentId: tournament.id, matchId, actor: previousFinal ? 'Turnierleitung (lokal)' : 'Ergebniseingabe (lokal)', action: previousFinal ? 'RESULT_CORRECTED' : 'RESULT_RECORDED', description: previousFinal ? 'Endergebnis nachträglich korrigiert' : 'Endergebnis eingetragen', before: resultText(previous), after: resultText(next), beforeSets: previousFinal ? previous?.sets : undefined, afterSets: previousFinal ? sets : undefined });
+    const resultText = (value: StoredMatchResult | undefined) => {
+      const scores = value?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') || '–';
+      return value?.decisionSide ? `${scores} · Siegerentscheidung ${value.decisionSide}` : scores;
+    };
+    recordMockAudit({ tournamentId: tournament.id, matchId, actor: previousFinal ? 'Turnierleitung (lokal)' : 'Ergebniseingabe (lokal)', action: previousFinal ? 'RESULT_CORRECTED' : 'RESULT_RECORDED', description: previousFinal ? 'Endergebnis nachträglich korrigiert' : 'Endergebnis eingetragen', before: resultText(previous), after: resultText(next), beforeSets: previousFinal ? previous?.sets : undefined, afterSets: previousFinal ? sets : undefined, beforeDecisionSide: previousFinal ? previous?.decisionSide : undefined, afterDecisionSide: previousFinal ? decisionSide : undefined });
   }
   if (tournament && adminPhaseConfirmation) {
     recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Turnierleitung (lokal)', action: 'RESULT_CONFIRMED', description: 'Phasen-Endergebnis ausdrücklich durch die Turnierleitung bestätigt' });
@@ -976,7 +971,7 @@ export function restoreMockCorrectedResult(tournament: DemoTournament, auditId: 
   const current = readResults();
   const previous = current.find((item) => item.matchId === event.matchId);
   if (!previous || previous.status !== 'FINISHED' || JSON.stringify(previous.sets) !== JSON.stringify(event.afterSets)) return false;
-  const restored: StoredMatchResult = { ...previous, sets: event.beforeSets, confirmedA: false, confirmedB: false };
+  const restored: StoredMatchResult = { ...previous, sets: event.beforeSets, decisionSide: event.beforeDecisionSide, confirmedA: false, confirmedB: false };
   writeResults([restored, ...current.filter((item) => item.matchId !== event.matchId)]);
   const stage = tournament.stages.find((item) => event.matchId!.startsWith(`${item.id}-`));
   if (stage) refreshCompletedStageQualifiers(tournament, stage);
@@ -1066,7 +1061,7 @@ export function getSwissRecordBeforeRound(tournament: DemoTournament, stage: Tou
     if ((Number(match.round.match(/\d+/)?.[0]) || 0) >= roundNumber) continue;
     if (match.sideA !== name && match.sideB !== name) continue;
     const finished = results.find((result) => result.matchId === match.id);
-    const winner = match.autoWinner ?? resultWinner(finished, match.sideA, match.sideB);
+    const winner = match.autoWinner ?? resultWinner(finished, match.sideA, match.sideB, tournament.sport);
     if (!winner) continue;
     if (winner === name) wins += 1;
     else losses += 1;

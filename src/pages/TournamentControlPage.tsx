@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { StageCard } from '@/components/StageCard';
-import { SetBySetEntry } from '@/components/SetBySetEntry';
+import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
+import { sportScoring } from '@/domain/sportScoring';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
@@ -102,6 +103,8 @@ function StageCompetitionView({
   const [selectedGroupPlayer, setSelectedGroupPlayer] = useState<{ groupLabel: string; player: string } | null>(null);
   const [selectedSwissPlayer, setSelectedSwissPlayer] = useState<string | null>(null);
   const previousFinishLabels = getPreviousStageFinishLabels(tournament, stage);
+  const scoreSport = sportScoring(tournament.sport).mode === 'score';
+  const scoreUnit = sportScoring(tournament.sport).plural;
 
   if (stage.type === 'GROUPS') {
     const groups = buildMockGroups(tournament, stage);
@@ -129,15 +132,15 @@ function StageCompetitionView({
           {groups.map((group) => (
             <article className="card group-overview-card" key={group.id}>
               <h4>{group.label}</h4>
-              <div className="mini-standing-table detailed">
-                <div className="mini-standing-head"><span>#</span><span>Spieler</span><span>Sp.</span><span>S</span><span>N</span><span>Sätze</span><span>±</span><span>Bälle</span><span>±</span></div>
+              <div className={scoreSport ? 'mini-standing-table detailed score-standing-table' : 'mini-standing-table detailed'}>
+                <div className="mini-standing-head"><span>#</span><span>Spieler</span><span>Sp.</span><span>S</span><span>{scoreSport ? 'U' : 'N'}</span><span>{scoreSport ? 'N' : 'Sätze'}</span><span>{scoreSport ? scoreUnit : '±'}</span><span>{scoreSport ? '±' : 'Bälle'}</span><span>{scoreSport ? 'Pkt.' : '±'}</span></div>
                 {group.standings.map((row) => {
                   const isQualified = actualQualified ? actualQualified.has(row.name) : qualificationHints.projected.has(row.name);
                   const isPossible = !actualQualified && qualificationHints.possible.has(row.name);
                   return (
                     <div className={`mini-standing-row${isQualified ? ' qualification-zone' : isPossible ? ' qualification-possible' : ''}`} key={row.name}
                       title={isQualified ? stageFinished ? 'Für die nächste Phase qualifiziert' : 'Aktuell auf einem vorläufigen Qualifikationsplatz' : isPossible ? 'Weitere Qualifikationsplätze werden gruppenübergreifend vergeben' : undefined}>
-                      <span>{row.rank}</span><button className="standing-player-button" type="button" onClick={() => setSelectedGroupPlayer({ groupLabel: group.label, player: row.name })}><strong>{row.name}</strong>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}{previousFinishLabels[row.name] && <small>{previousFinishLabels[row.name]}</small>}</button><span>{row.played}</span><span>{row.wins}</span><span>{row.losses}</span><StandingRatio value={row.sets} /><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><StandingRatio value={row.balls} /><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span>
+                      <span>{row.rank}</span><button className="standing-player-button" type="button" onClick={() => setSelectedGroupPlayer({ groupLabel: group.label, player: row.name })}><strong>{row.name}</strong>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}{previousFinishLabels[row.name] && <small>{previousFinishLabels[row.name]}</small>}</button><span>{row.played}</span><span>{row.wins}</span><span>{scoreSport ? row.draws : row.losses}</span>{scoreSport ? <><span>{row.losses}</span><StandingRatio value={row.balls} /><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span><strong>{row.points}</strong></> : <><StandingRatio value={row.sets} /><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><StandingRatio value={row.balls} /><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span></>}
                     </div>
                   );
                 })}
@@ -149,7 +152,7 @@ function StageCompetitionView({
                     {group.matches.filter((match) => (match.matchDay ?? 0) === matchDay).map((match) => (
                       <div className={match.status === 'live' ? 'group-match-row live' : 'group-match-row'} key={match.id}>
                         {match.status === 'live' && <span className="group-match-live-dot" role="img" aria-label="Laufendes Spiel" title="Läuft gerade" />}
-                        <span className="group-match-side" title={match.sideA}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Rückzug (${match.sideA})` : match.sideA}</span><MatchResultDetails score={match.score} sets={match.sets} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} /><span className="group-match-side" title={match.sideB}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Rückzug (${match.sideB})` : match.sideB}</span>
+                        <span className="group-match-side" title={match.sideA}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Rückzug (${match.sideA})` : match.sideA}</span><MatchResultDetails score={match.score} sets={match.sets} sport={tournament.sport} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} /><span className="group-match-side" title={match.sideB}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Rückzug (${match.sideB})` : match.sideB}</span>
                       </div>
                     ))}
                   </div>
@@ -171,14 +174,14 @@ function StageCompetitionView({
                 <div className="player-games-list">
                   {playerMatches.map((match) => {
                     const opponent = match.sideA === selectedGroupPlayer.player ? match.sideB : match.sideA;
-                    const displayedResult = resultForMatchParticipant(match, selectedGroupPlayer.player);
+                    const displayedResult = resultForMatchParticipant({ ...match, sport: tournament.sport }, selectedGroupPlayer.player);
                     return (
                       <div className="player-game-row" key={match.id}>
                         <span className="muted">Spieltag {match.matchDay}</span>
                         <strong>vs. {opponent}</strong>
                         <span className="player-game-result-cell">
                           <PlayerGameOutcome score={displayedResult.score} finished={match.status === 'played'} />
-                          <MatchResultDetails score={displayedResult.score} sets={displayedResult.sets} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
+                          <MatchResultDetails score={displayedResult.score} sets={displayedResult.sets} sport={tournament.sport} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
                         </span>
                       </div>
                     );
@@ -203,8 +206,8 @@ function StageCompetitionView({
                 }}>Seeded Zuteilung</button>}</div></div>
         <div className="card table-wrap">
           <table className="compact-table">
-            <thead><tr><th>#</th><th>Teilnehmer</th><th>Spiele</th><th>Siege</th><th>Niederlagen</th><th className="standing-ratio-cell">Sätze</th><th className="standing-difference-cell">Satz ±</th><th className="standing-ratio-cell">Bälle</th><th className="standing-difference-cell">Ball ±</th></tr></thead>
-            <tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>} {previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td className="standing-ratio-cell"><StandingRatio value={row.sets} /></td><td className="standing-difference-cell">{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></tr>)}</tbody>
+            <thead><tr><th>#</th><th>Teilnehmer</th><th>Spiele</th><th>Siege</th><th>{scoreSport ? 'Unent.' : 'Niederlagen'}</th><th className="standing-ratio-cell">{scoreSport ? 'Niederlagen' : 'Sätze'}</th><th className="standing-difference-cell">{scoreSport ? scoreUnit : 'Satz ±'}</th><th className="standing-ratio-cell">{scoreSport ? 'Differenz' : 'Bälle'}</th><th className="standing-difference-cell">{scoreSport ? 'Punkte' : 'Ball ±'}</th></tr></thead>
+            <tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>} {previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{scoreSport ? row.draws : row.losses}</td>{scoreSport ? <><td>{row.losses}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td><td className="standing-difference-cell">{row.points}</td></> : <><td className="standing-ratio-cell"><StandingRatio value={row.sets} /></td><td className="standing-difference-cell">{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></>}</tr>)}</tbody>
           </table>
         </div>
         {selectedSwissPlayer && (
@@ -222,8 +225,8 @@ function StageCompetitionView({
                   return <div className="player-game-row swiss-player-game-row" key={match.id}>
                     <span className="muted swiss-history-round">{match.round}</span>
                     <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor der Runde">{opponentRecord}</span><span className="swiss-record swiss-record-current" title="Aktuelle Bilanz des Gegners">{opponentCurrentRecord}</span></span>
-                    <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} />
-                    <MatchResultDetails score={result.score} sets={result.sets} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
+                    <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} wonByDecision={match.decisionSide ? match.decisionSide === (match.sideA === selectedSwissPlayer ? 'A' : 'B') : undefined} />
+                    <MatchResultDetails score={result.score} sets={result.sets} sport={tournament.sport} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
                   </div>;
                 })}
               </div>
@@ -316,7 +319,7 @@ function StageCompetitionView({
                               {previousFinishLabels[side] && <small className="participant-origin">{previousFinishLabels[side]}</small>}
                             </span>
                             <span className="bracket-score-cells">
-                              {(match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
+                              {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
                               <strong>{match.score === 'W.O.' ? (winner ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : match.score === 'Freilos' && side === 'Freilos' ? 'BYE' : ''}</strong>
                             </span>
                           </div>
@@ -334,7 +337,7 @@ function StageCompetitionView({
                           <div className={match.winner === side ? 'winner' : ''} key={`${match.id}-${sideIndex}`}>
                             <span>{side}</span>
                             <span className="bracket-score-cells">
-                              {(match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
+                              {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
                               <strong>{match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : ''}</strong>
                             </span>
                           </div>
@@ -662,7 +665,7 @@ export function TournamentControlPage() {
 
   function unassignFromTable(matchId: string) {
     if (!unassignMockMatch(tournament, matchId)) return;
-    setAssignmentMessage('Zuweisung aufgehoben. Bereits eingegebene Sätze bleiben erhalten.');
+    setAssignmentMessage('Zuweisung aufgehoben. Bereits eingegebene Ergebnisse bleiben erhalten.');
     setMovingMatchId(null);
     refreshRuntime();
   }
@@ -723,7 +726,7 @@ export function TournamentControlPage() {
                 const isBlocked = blockedTables.has(tableName);
                 return (
                   <article
-                    className={`card overview-table-card ${match ? 'busy' : isBlocked ? 'blocked' : 'table-drop-target'}${match && requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED' ? ' awaiting-approval' : ''}`}
+                    className={`card overview-table-card ${match ? 'busy' : isBlocked ? 'blocked' : 'table-drop-target'}${match && sportScoring(match.sport).mode === 'sets' && requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED' ? ' awaiting-approval' : ''}`}
                     key={tableName}
                     onDragOver={(event) => { if (tournament.status === 'RUNNING' && !match && !isBlocked) event.preventDefault(); }}
                     onDrop={(event) => {
@@ -749,15 +752,15 @@ export function TournamentControlPage() {
                     </div>
                     {match ? (
                       <>
-                        <span className="muted">{match.phase} · {match.round} · BO{match.bestOf}</span>
-                        <SetBySetEntry match={match} swissAdminEntry={(activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')} onSaved={refreshRuntime} compact sideARecord={swissRecordFor(match, match.sideA)} sideBRecord={swissRecordFor(match, match.sideB)} />
-                        {!(requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED') && (
+                        <span className="muted">{match.phase} · {match.round}{sportScoring(match.sport).mode === 'sets' ? ` · BO${match.bestOf}` : ''}</span>
+                        <SportResultEntry match={match} swissAdminEntry={(activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')} onSaved={refreshRuntime} compact sideARecord={swissRecordFor(match, match.sideA)} sideBRecord={swissRecordFor(match, match.sideB)} />
+                        {!(sportScoring(match.sport).mode === 'sets' && requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED') && (
                           <div className="table-operational-actions">
                             <button className="btn small" type="button" onClick={() => setMovingMatchId((old) => old === match.id ? null : match.id)}>{venue.singular} wechseln</button>
                             <button className="btn small" type="button" onClick={() => unassignFromTable(match.id)}>Zuweisung aufheben</button>
                           </div>
                         )}
-                        {movingMatchId === match.id && !(requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED') && (
+                        {movingMatchId === match.id && !(sportScoring(match.sport).mode === 'sets' && requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED') && (
                           <div className="table-assignment-picker" role="group" aria-label="Neuen Spielort auswählen">
                             {freeTables.length ? freeTables.map((table) => (
                               <button key={table} className="btn small" type="button" onClick={() => moveToTable(match.id, table)}>{venueName(table)}</button>
@@ -925,7 +928,7 @@ export function TournamentControlPage() {
                     </div>
                     <details className="control-inline-help">
                       <summary>Wie bediene ich diese Spielfläche?</summary>
-                      <p>Freie Spielflächen: Partie auswählen und „Zuweisen“ drücken – das Spiel beginnt sofort. Laufende Partien: Sätze aus Sicht des linken Spielers eingeben (7 = 11:7, −7 = 7:11), danach das Endergebnis bestätigen. Spielortwechsel und aufgehobene Zuweisungen behalten bereits erfasste Sätze.</p>
+                      <p>Freie Spielflächen: Partie auswählen und „Zuweisen“ drücken – das Spiel beginnt sofort. Laufende Partien: {sportScoring(tournament.sport).mode === 'score' ? 'Tore bzw. Punkte beider Seiten erfassen und das Spiel abschließen.' : sportScoring(tournament.sport).shortSetEntry ? 'Sätze aus Sicht des linken Spielers eingeben (7 = 11:7, −7 = 7:11), danach das Endergebnis bestätigen.' : 'Sätze als Punkte links:rechts eingeben und das Endergebnis abschließen.'} Spielortwechsel und aufgehobene Zuweisungen behalten erfasste Ergebnisse.</p>
                     </details>
                     <div className="hall-table-modal-content">{tableCards}</div>
                   </section>
@@ -1254,7 +1257,7 @@ export function TournamentControlPage() {
                                 return <tr key={match.id}>
                                   <td>{match.phase}</td><td>{match.round}</td>
                                   <td>{match.sideA === participant ? match.sideB : match.sideA}</td>
-                                  <td>{matchStatusLabel(match.status)}</td><td><MatchResultDetails {...resultForMatchParticipant(match, participant)} /></td>
+                                  <td>{matchStatusLabel(match.status)}</td><td><MatchResultDetails {...resultForMatchParticipant(match, participant)} sport={tournament.sport} /></td>
                                   <td>{match.status === 'FINISHED' && stage && canEditMockMatch(tournament, match.id)
                                     ? <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Spiel bearbeiten</button>
                                     : stage && isStageStarted(tournament, stage) && match.status !== 'FINISHED'
@@ -1300,8 +1303,8 @@ export function TournamentControlPage() {
                 <div><span className="badge">TURNIERLEITUNG</span><h2>{found.match.status === 'FINISHED' && !canEditMockMatch(tournament, found.match.id) ? 'Ergebnis anzeigen' : 'Spiel bearbeiten / Ergebnis anzeigen'}</h2></div>
                 <button className="btn small" type="button" onClick={() => setAdminEditMatchId(null)}>Schließen</button>
               </div>
-              <p className="muted">{found.match.sideA} gegen {found.match.sideB} · {found.match.round} · Best-of-{found.match.bestOf}</p>
-              <SetBySetEntry
+              <p className="muted">{found.match.sideA} gegen {found.match.sideB} · {found.match.round}{sportScoring(found.match.sport).mode === 'sets' ? ` · Best-of-${found.match.bestOf}` : ''}</p>
+              <SportResultEntry
                 match={found.match}
                 swissAdminEntry={stage?.type === 'SWISS' || stage?.type === 'KNOCKOUT'}
                 allowEditFinished={canEditMockMatch(tournament, found.match.id)}

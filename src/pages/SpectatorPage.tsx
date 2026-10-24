@@ -8,6 +8,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import { getMockTournament } from '@/services/mockTournamentStore';
 import { displayVenueMessage, getVenueTerminology } from '@/domain/venueTerminology';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
+import { sportScoring } from '@/domain/sportScoring';
 
 
 export function SpectatorPage() {
@@ -16,6 +17,8 @@ export function SpectatorPage() {
   const [selectedSwiss, setSelectedSwiss] = useState<{ name: string; stageId: string } | null>(null);
   const tournament = useMemo(() => getMockTournament(tournamentId), [tournamentId]);
   const venue = getVenueTerminology(tournament.sport);
+  const scoreSport = sportScoring(tournament.sport).mode === 'score';
+  const scoreUnit = sportScoring(tournament.sport).plural;
   const venueName = (name: string) => displayVenueMessage(tournament.sport, name);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament]);
   const live = matches.filter((match) => match.status === 'LIVE' || match.status === 'CONFIRMATION');
@@ -67,9 +70,9 @@ export function SpectatorPage() {
                   {groups.map((group) => (
                     <article className="card spectator-standing-card" key={group.id}>
                       <h4>{group.label}</h4>
-                      <div className="mini-standing-table detailed">
-                        <div className="mini-standing-head"><span>#</span><span>Spieler</span><span>Sp.</span><span>S</span><span>N</span><span>Sätze</span><span>±</span><span>Bälle</span><span>±</span></div>
-                        {group.standings.map((row) => <div className="mini-standing-row" key={row.name}><span>{row.rank}</span><strong>{row.name}{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}{previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</strong><span>{row.played}</span><span>{row.wins}</span><span>{row.losses}</span><span>{row.sets}</span><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><span>{row.balls}</span><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span></div>)}
+                      <div className={scoreSport ? 'mini-standing-table detailed score-standing-table' : 'mini-standing-table detailed'}>
+                        <div className="mini-standing-head"><span>#</span><span>Spieler</span><span>Sp.</span><span>S</span><span>{scoreSport ? 'U' : 'N'}</span><span>{scoreSport ? 'N' : 'Sätze'}</span><span>{scoreSport ? scoreUnit : '±'}</span><span>{scoreSport ? '±' : 'Bälle'}</span><span>{scoreSport ? 'Pkt.' : '±'}</span></div>
+                        {group.standings.map((row) => <div className="mini-standing-row" key={row.name}><span>{row.rank}</span><strong>{row.name}{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}{previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</strong><span>{row.played}</span><span>{row.wins}</span><span>{scoreSport ? row.draws : row.losses}</span>{scoreSport ? <><span>{row.losses}</span><span>{row.balls}</span><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span><strong>{row.points}</strong></> : <><span>{row.sets}</span><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><span>{row.balls}</span><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span></>}</div>)}
                       </div>
                     </article>
                   ))}
@@ -83,7 +86,7 @@ export function SpectatorPage() {
             return (
               <section className="spectator-stage-block" key={stage.id}>
                 <div className="competition-stage-head"><div><span className="badge">SCHWEIZER SYSTEM</span><h3>{stage.name}</h3></div></div>
-                <div className="card table-wrap"><table className="compact-table"><thead><tr><th>#</th><th>Teilnehmer</th><th>Sp.</th><th>Siege</th><th>N.</th><th>Sätze</th><th>Satz ±</th><th>Bälle</th><th>Ball ±</th></tr></thead><tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><button type="button" className="standing-player-button" onClick={() => setSelectedSwiss({ name: row.name, stageId: stage.id })}><strong>{row.name}</strong></button>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>} {previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.sets}</td><td>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td>{row.balls}</td><td>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></tr>)}</tbody></table></div>
+                <div className="card table-wrap"><table className="compact-table"><thead><tr><th>#</th><th>Teilnehmer</th><th>Sp.</th><th>Siege</th><th>{scoreSport ? 'Unent.' : 'N.'}</th><th>{scoreSport ? 'Niederlagen' : 'Sätze'}</th><th>{scoreSport ? scoreUnit : 'Satz ±'}</th><th>{scoreSport ? 'Differenz' : 'Bälle'}</th><th>{scoreSport ? 'Punkte' : 'Ball ±'}</th></tr></thead><tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><button type="button" className="standing-player-button" onClick={() => setSelectedSwiss({ name: row.name, stageId: stage.id })}><strong>{row.name}</strong></button>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>} {previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{scoreSport ? row.draws : row.losses}</td>{scoreSport ? <><td>{row.losses}</td><td>{row.balls}</td><td>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td><td>{row.points}</td></> : <><td>{row.sets}</td><td>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td>{row.balls}</td><td>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></>}</tr>)}</tbody></table></div>
               </section>
             );
           }
@@ -104,7 +107,7 @@ export function SpectatorPage() {
                       {previousFinishLabels[side] && <small className="participant-origin">{previousFinishLabels[side]}</small>}
                     </span>
                     <span className="bracket-score-cells">
-                      {(match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
+                      {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
                       <strong>{match.score === 'W.O.' ? (match.winner === side ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : sideIndex === 1 && match.score === 'Freilos' ? 'BYE' : ''}</strong>
                     </span>
                   </div>
@@ -154,7 +157,7 @@ export function SpectatorPage() {
               return <div className="player-game-row swiss-player-game-row" key={match.id}>
                 <span className="muted">{match.round}</span>
                 <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor dieser Runde">{opponentRecord}</span><span className="swiss-record swiss-record-current" title="Aktuelle Bilanz des Gegners">{opponentCurrentRecord}</span></span>
-                <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} /><MatchResultDetails {...result} />
+                <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} wonByDecision={match.decisionSide ? match.decisionSide === (match.sideA === selectedSwiss.name ? 'A' : 'B') : undefined} /><MatchResultDetails {...result} sport={tournament.sport} />
               </div>;
             })}</div>
           </section>

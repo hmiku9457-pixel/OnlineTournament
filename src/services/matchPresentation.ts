@@ -1,4 +1,5 @@
 import type { MatchSet } from '@/domain/types';
+import { resultScore } from '@/domain/sportScoring';
 
 /**
  * A finished match's sets are the source of truth for its set score.
@@ -9,6 +10,7 @@ export function resultForParticipant(
   score: string,
   sets: MatchSet[] | undefined,
   participantIsSideB: boolean,
+  sport = 'Tischtennis',
 ): { score: string; sets: MatchSet[] | undefined } {
   const numericScore = /^(\d+)\s*:\s*(\d+)$/.exec(score.trim());
   const orientedSets = participantIsSideB
@@ -24,9 +26,7 @@ export function resultForParticipant(
   if (!numericScore) return { score, sets: orientedSets };
 
   if (orientedSets?.length) {
-    const ownWins = orientedSets.filter((set) => set.sideAScore > set.sideBScore).length;
-    const opponentWins = orientedSets.filter((set) => set.sideBScore > set.sideAScore).length;
-    return { score: `${ownWins}:${opponentWins}`, sets: orientedSets };
+    return { score: resultScore(sport, orientedSets), sets: orientedSets };
   }
 
   return {
@@ -39,11 +39,11 @@ export function resultForParticipant(
 
 /** Match identity is explicit here: callers cannot accidentally reverse A/B twice. */
 export function resultForMatchParticipant(
-  match: { sideA: string; sideB: string; score: string; sets?: MatchSet[] },
+  match: { sideA: string; sideB: string; score: string; sets?: MatchSet[]; sport?: string },
   participantName: string,
 ): { score: string; sets: MatchSet[] | undefined } {
   if (participantName !== match.sideA && participantName !== match.sideB) {
     throw new Error(`Participant ${participantName} is not in match ${match.sideA} – ${match.sideB}`);
   }
-  return resultForParticipant(match.score, match.sets, participantName === match.sideB);
+  return resultForParticipant(match.score, match.sets, participantName === match.sideB, match.sport);
 }

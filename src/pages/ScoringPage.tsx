@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { MatchSet } from '@/domain/types';
-import { SetBySetEntry } from '@/components/SetBySetEntry';
+import { SportResultEntry } from '@/components/SportResultEntry';
+import { resultScore, sportScoring } from '@/domain/sportScoring';
 import { displayVenueName } from '@/domain/venueTerminology';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import {
@@ -12,17 +13,6 @@ import {
   getMockMatchCode,
   verifyMockMatchCode,
 } from '@/services/mockRuntime';
-
-function winsFromSets(sets: MatchSet[]) {
-  return sets.reduce(
-    (wins, set) => {
-      if (set.sideAScore > set.sideBScore) wins.a += 1;
-      else if (set.sideBScore > set.sideAScore) wins.b += 1;
-      return wins;
-    },
-    { a: 0, b: 0 },
-  );
-}
 
 export function ScoringPage() {
   const { matchId } = useParams();
@@ -41,8 +31,8 @@ export function ScoringPage() {
   const sideA = runtime?.match.sideA ?? 'Müller';
   const sideB = runtime?.match.sideB ?? 'Schmidt';
   const bestOf = runtime?.match.bestOf ?? 3;
+  const rules = sportScoring(runtime?.tournament.sport ?? 'Tischtennis');
   const resultSets = completedSets.length ? completedSets : (existing?.sets ?? runtime?.match.sets ?? []);
-  const wins = winsFromSets(resultSets);
   const swissRecordFor: ReturnType<typeof getActiveSwissRecordLookup> = runtime
     ? getActiveSwissRecordLookup(runtime.tournament)
     : () => undefined;
@@ -95,7 +85,7 @@ export function ScoringPage() {
           </div>
           <div className="control-kicker">Tablet am Spielort</div>
           <h1>Ergebniseingabe</h1>
-          <p className="muted">{sideA} – {sideB} · {displayVenueName(runtime.tournament.sport, runtime.match.table)} · Best-of-{bestOf}</p>
+          <p className="muted">{sideA} – {sideB} · {displayVenueName(runtime.tournament.sport, runtime.match.table)}{rules.mode === 'sets' ? ` · Best-of-${bestOf}` : ''}</p>
           <div className="field">
             <label htmlFor="matchCode">Gemeinsamer Spielcode</label>
             <input
@@ -130,10 +120,11 @@ export function ScoringPage() {
           </div>
           <span className="badge ready">SPIEL ABGESCHLOSSEN</span>
           <h1>{sideA}{swissRecords.get(sideA) && <span className="swiss-record">{swissRecords.get(sideA)}</span>} – {sideB}{swissRecords.get(sideB) && <span className="swiss-record">{swissRecords.get(sideB)}</span>}</h1>
-          <div className="finished-score">{wins.a} : {wins.b}</div>
+          <div className="finished-score">{resultScore(runtime.tournament.sport, resultSets)}</div>
+          {existing?.decisionSide && <p className="field-hint">Sieger nach Entscheidung: {existing.decisionSide === 'A' ? sideA : sideB}</p>}
           <p className="score-waiting-message">Wartet auf nächste Partie.</p>
           <div className="completed-set-list">
-            {resultSets.map((set) => (
+            {rules.mode === 'sets' && resultSets.map((set) => (
               <span key={set.number}>Satz {set.number}: {set.sideAScore}:{set.sideBScore}</span>
             ))}
           </div>
@@ -169,12 +160,12 @@ export function ScoringPage() {
         </div>
         <div><span className="badge live">LIVE</span><span className="score-table-label">{displayVenueName(runtime.tournament.sport, runtime.match.table)}</span></div>
         <h1>{sideA}{swissRecords.get(sideA) && <span className="swiss-record">{swissRecords.get(sideA)}</span>} – {sideB}{swissRecords.get(sideB) && <span className="swiss-record">{swissRecords.get(sideB)}</span>}</h1>
-        <p className="muted">Best-of-{bestOf} · Satzweise Eingabe: <strong>7</strong> = 11:7, <strong>-7</strong> = 7:11. Jeden Satz mit Enter oder dem Satz-Button bestätigen.</p>
+        <p className="muted">{rules.mode === 'score' ? `Trage die ${rules.plural.toLowerCase()} beider Mannschaften ein und schließe die Partie ab.` : rules.shortSetEntry ? <>Best-of-{bestOf} · Satzweise Eingabe: <strong>7</strong> = 11:7, <strong>-7</strong> = 7:11. Jeden Satz bestätigen.</> : `Best-of-${bestOf} · Satzergebnisse links:rechts eingeben und jeden Satz bestätigen.`}</p>
       </div>
 
       <div className="card compact-set-entry">
-        <div className="control-section-head"><h2>Satzweise Ergebniseingabe</h2><span className="badge">BO{bestOf}</span></div>
-        <SetBySetEntry
+        <div className="control-section-head"><h2>{rules.mode === 'score' ? 'Spielstand eingeben' : 'Satzweise Ergebniseingabe'}</h2>{rules.mode === 'sets' && <span className="badge">BO{bestOf}</span>}</div>
+        <SportResultEntry
           match={runtime.match}
           sideARecord={swissRecords.get(sideA)}
           sideBRecord={swissRecords.get(sideB)}
