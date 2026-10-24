@@ -9,6 +9,7 @@ import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
+import { rankStandings, type RankedParticipant } from '@/domain/standingRankings';
 import { compareRankingRows, resultScore, resultWinnerSide, scoreWithDecision, sportScoring, setTarget, validateCompleteResult, validateScoreDecision, type ExtraTimeProgress, type ScoreDecision, type WinnerSide } from '@/domain/sportScoring';
 
 export { getRuntimeParticipantNames } from '@/services/mockParticipants';
@@ -778,78 +779,22 @@ export function restoreMockParticipant(tournament: DemoTournament, name: string)
   return true;
 }
 
-interface RankingRow {
-  name: string;
-  played: number;
-  wins: number;
-  losses: number;
-  draws: number;
-  setsWon: number;
-  setsLost: number;
-  ballsWon: number;
-  ballsLost: number;
-  buchholz: number;
-}
+type RankingRow = RankedParticipant;
 
-function rankParticipants(participants: string[], matches: BaseStageMatch[], results: StoredMatchResult[], sport: string) {
-  const rows = new Map(participants.map((name) => [name, {
-    name,
-    played: 0,
-    wins: 0,
-    losses: 0,
-    draws: 0,
-    setsWon: 0,
-    setsLost: 0,
-    ballsWon: 0,
-    ballsLost: 0,
-    buchholz: 0,
-  } satisfies RankingRow]));
-  const opponents = new Map(participants.map((name) => [name, [] as string[]]));
-
-  matches.forEach((match) => {
-    const result = results.find((item) => item.matchId === match.id && item.status === 'FINISHED');
-    if (!result) return;
-    const rowA = rows.get(match.sideA);
-    const rowB = rows.get(match.sideB);
-    if (!rowA || !rowB) return;
-    rowA.played += 1;
-    rowB.played += 1;
-    opponents.get(match.sideA)?.push(match.sideB);
-    opponents.get(match.sideB)?.push(match.sideA);
-    result.sets.forEach((set) => {
-      rowA.ballsWon += set.sideAScore;
-      rowA.ballsLost += set.sideBScore;
-      rowB.ballsWon += set.sideBScore;
-      rowB.ballsLost += set.sideAScore;
-      if (sportScoring(sport).mode === 'sets' && set.sideAScore > set.sideBScore) {
-        rowA.setsWon += 1;
-        rowB.setsLost += 1;
-      } else if (sportScoring(sport).mode === 'sets' && set.sideBScore > set.sideAScore) {
-        rowB.setsWon += 1;
-        rowA.setsLost += 1;
-      }
-    });
-    const winner = resultWinner(result, match.sideA, match.sideB, sport);
-    if (winner === match.sideA) {
-      rowA.wins += 1;
-      rowB.losses += 1;
-    } else if (winner === match.sideB) {
-      rowB.wins += 1;
-      rowA.losses += 1;
-    } else if (result.forcedWinner === 'Freilos') {
-      rowA.losses += 1;
-      rowB.losses += 1;
-    } else {
-      rowA.draws += 1;
-      rowB.draws += 1;
-    }
+function rankParticipants(participants: string[], matches: BaseStageMatch[], results: StoredMatchResult[], sport: string): RankingRow[] {
+  const resultById = new Map(results.map((result) => [result.matchId, result]));
+  const automaticWins = matches
+    .filter((match) => match.sideB === 'Freilos' && match.autoWinner)
+    .map((match) => match.autoWinner!);
+  const rankingMatches = matches.map((match) => {
+    const result = resultById.get(match.id);
+    return {
+      sideA: match.sideA, sideB: match.sideB,
+      status: result?.status, sets: result?.sets,
+      forcedWinner: result?.forcedWinner, decisionSide: result?.decisionSide,
+    };
   });
-
-  rows.forEach((row) => {
-    row.buchholz = (opponents.get(row.name) ?? []).reduce((sum, opponent) => sum + (rows.get(opponent)?.wins ?? 0), 0);
-  });
-
-  return [...rows.values()].sort((a, b) => compareRankingRows(sport, a, b));
+  return rankStandings(participants, rankingMatches, sport, automaticWins);
 }
 
 function stageQualifierCount(tournament: DemoTournament, stage: TournamentStage) {

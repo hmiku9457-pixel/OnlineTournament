@@ -1,6 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
-import { compareRankingRows, resultMetrics, resultScore, resultWinnerSide, type ExtraTimeProgress, type ScoreDecision } from '@/domain/sportScoring';
+import { resultScore, resultWinnerSide, type ExtraTimeProgress, type ScoreDecision } from '@/domain/sportScoring';
+import { rankStandings } from '@/domain/standingRankings';
 import { getStageEntrants } from '@/services/mockPhaseLifecycle';
 import { getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import {
@@ -58,70 +59,15 @@ export interface MockBracketRound {
   matches: MockBracketMatch[];
 }
 
-function computeStandings(members: string[], matches: ReturnType<typeof getMockStageMatches>, sport: string, tieOrder?: string[], automaticWins: string[] = []): MockStanding[] {
-  const rows = new Map(members.map((name) => [name, {
-    rank: 0,
-    name,
-    played: 0,
-    wins: 0,
-    losses: 0,
-    draws: 0,
-    setsWon: 0,
-    setsLost: 0,
-    ballsWon: 0,
-    ballsLost: 0,
-  }]));
-
-  matches.forEach((match) => {
-    if (match.status !== 'FINISHED') return;
-    const forceWinner = getMockStoredResult(match.id)?.forcedWinner;
-    const sets = match.sets ?? [];
-    if (!sets.length && !forceWinner) return;
-    const a = rows.get(match.sideA);
-    const b = rows.get(match.sideB);
-    if (!a || !b) return;
-    const { winsA, winsB } = resultMetrics(sport, sets);
-    a.played += 1;
-    b.played += 1;
-    a.setsWon += winsA;
-    a.setsLost += winsB;
-    b.setsWon += winsB;
-    b.setsLost += winsA;
-    sets.forEach((set) => {
-      a.ballsWon += set.sideAScore;
-      a.ballsLost += set.sideBScore;
-      b.ballsWon += set.sideBScore;
-      b.ballsLost += set.sideAScore;
-    });
-    const winnerSide = resultWinnerSide(sport, sets, getMockStoredResult(match.id)?.decisionSide);
-    if (forceWinner === 'Freilos') {
-      // Beide Teilnehmer zurückgezogen: niemand bekommt einen Sieg.
-      a.losses += 1;
-      b.losses += 1;
-    } else if (forceWinner === match.sideA || (!forceWinner && winnerSide === 'A')) {
-      a.wins += 1;
-      b.losses += 1;
-    } else if (forceWinner === match.sideB || (!forceWinner && winnerSide === 'B')) {
-      b.wins += 1;
-      a.losses += 1;
-    } else {
-      a.draws += 1;
-      b.draws += 1;
-    }
+function computeStandings(members: string[], matches: ReturnType<typeof getMockStageMatches>, sport: string, automaticWins: string[] = []): MockStanding[] {
+  const rankingMatches = matches.map((match) => {
+    const result = getMockStoredResult(match.id);
+    return {
+      sideA: match.sideA, sideB: match.sideB, status: match.status,
+      sets: match.sets, forcedWinner: result?.forcedWinner, decisionSide: result?.decisionSide,
+    };
   });
-
-  automaticWins.forEach((name) => {
-    const row = rows.get(name);
-    if (!row) return;
-    row.played += 1;
-    row.wins += 1;
-  });
-
-  const orderIndex = new Map((tieOrder ?? members).map((name, index) => [name, index]));
-
-  return [...rows.values()]
-    .sort((a, b) => compareRankingRows(sport, a, b)
-      || (orderIndex.get(a.name) ?? Number.MAX_SAFE_INTEGER) - (orderIndex.get(b.name) ?? Number.MAX_SAFE_INTEGER))
+  return rankStandings(members, rankingMatches, sport, automaticWins)
     .map((row, index) => ({
       rank: index + 1,
       name: row.name,
@@ -201,7 +147,7 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
 export function buildSwissStandings(tournament: DemoTournament, stage: TournamentStage): MockStanding[] {
   const order = getSwissOrder(tournament, stage);
   const automaticWins = getMockStageBaseMatches(tournament, stage).filter((match) => match.autoWinner && match.sideB === 'Freilos').map((match) => match.autoWinner!);
-  return computeStandings(order, getMockStageMatches(tournament, stage), tournament.sport, order, automaticWins);
+  return computeStandings(order, getMockStageMatches(tournament, stage), tournament.sport, automaticWins);
 }
 
 
