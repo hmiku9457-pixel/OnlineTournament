@@ -643,7 +643,6 @@ export function TournamentControlPage() {
               {Array.from({ length: tournament.tables }, (_, index) => {
                 const tableName = `Tisch ${index + 1}`;
                 if (tableView === 'hall' && tournament.venueLayout && tableName !== selectedHallTable) return null;
-                const tableName = `Tisch ${index + 1}`;
                 const match = matchesByTable.get(tableName);
                 const isLive = match?.status === 'LIVE' || match?.status === 'CONFIRMATION' || match?.status === 'READY';
                 const isBlocked = blockedTables.has(tableName);
