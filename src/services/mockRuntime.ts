@@ -10,7 +10,8 @@ import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/
 import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
 import { rankStandings, type RankedParticipant } from '@/domain/standingRankings';
-import { compareRankingRows, resultScore, resultWinnerSide, scoreWithDecision, sportScoring, setTarget, validateCompleteResult, validateScoreDecision, type ExtraTimeProgress, type ScoreDecision, type WinnerSide } from '@/domain/sportScoring';
+import { compareRankingRows, resultScore, resultWinnerSide, scoreWithDecision, sportScoring, validateCompleteResult, validateScoreDecision, type ExtraTimeProgress, type ScoreDecision, type WinnerSide } from '@/domain/sportScoring';
+import { getWithdrawalAwardSets } from '@/domain/withdrawalScoring';
 
 export { getRuntimeParticipantNames } from '@/services/mockParticipants';
 
@@ -617,10 +618,9 @@ export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: Moc
   return next;
 }
 
-// Gruppen-/Jeder-gegen-jeden-Rückzug: alle Partien der laufenden Phase,
-// auch bereits gespielte, werden rückwirkend als 0:11-Satzniederlagen
-// gewertet. Außerhalb solcher Phasen gelten weiterhin Walkover-Regeln für
-// offene Spiele; abgeschlossene Partien bleiben dann unverändert.
+// Gruppen-/Jeder-gegen-jeden-Rückzug: alle Partien der laufenden Phase
+// (auch bereits gespielte) werden sportabhängig kampflos gewertet.
+// Außerhalb dieser Phasen bleiben abgeschlossene Partien unverändert.
 function settleWithdrawnMatches(tournament: DemoTournament) {
   const active = getActiveStage(tournament);
   if (!active) return;
@@ -634,14 +634,11 @@ function settleWithdrawnMatches(tournament: DemoTournament) {
       const bWithdrawn = isMockParticipantWithdrawn(tournament, match.sideB);
       if (!aWithdrawn && !bWithdrawn) continue;
       const existing = saved.find((result) => result.matchId === match.id);
-      const wonSets = sportScoring(tournament.sport).mode === 'score' ? 1 : Math.ceil((match.bestOf ?? active.bestOf) / 2);
-      const sets: MatchSet[] = aWithdrawn && bWithdrawn
-        ? [] // Zwei Rückzüge im selben Spiel: Doppelniederlage, kein Sieger.
-        : Array.from({ length: wonSets }, (_, index) => ({
-          number: index + 1,
-          sideAScore: aWithdrawn ? 0 : sportScoring(tournament.sport).mode === 'score' ? 3 : setTarget(tournament.sport, index, match.bestOf ?? active.bestOf),
-          sideBScore: bWithdrawn ? 0 : sportScoring(tournament.sport).mode === 'score' ? 3 : setTarget(tournament.sport, index, match.bestOf ?? active.bestOf),
-        }));
+      const sets = getWithdrawalAwardSets(
+        tournament.sport,
+        match.bestOf ?? active.bestOf,
+        aWithdrawn && bWithdrawn ? 'BOTH' : aWithdrawn ? 'A' : 'B',
+      );
       const forcedWinner = aWithdrawn && bWithdrawn ? 'Freilos' : aWithdrawn ? match.sideB : match.sideA;
       // Nicht bei jeder Ansicht erneut identische Resultate überschreiben.
       if (existing?.status === 'FINISHED' && existing.forcedWinner === forcedWinner
