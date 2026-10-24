@@ -146,7 +146,7 @@ export function ScoreMatchEntry({ match, onSaved, onCompleted, allowEditFinished
         {decisionStep === 'CHOICE' && <>
           <div className="sport-score-choice-actions">
             {!regulationScore && <button className="btn small" type="button" onClick={chooseExtraTime}>Verlängerung</button>}
-            <button className="btn small" type="button" onClick={() => { setDecisionStep('PENALTIES'); setError(''); }}>Elfmeterschießen</button>
+            <button className="btn small sport-score-penalties-button" type="button" onClick={() => { setDecisionStep('PENALTIES'); setError(''); }}>Elfmeterschießen</button>
             <button className="btn small" type="button" onClick={() => { setDecisionStep('LOT'); setError(''); }}>{regulationScore ? 'Losglück' : 'Losen'}</button>
           </div>
         </>}
