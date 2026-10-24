@@ -1885,3 +1885,100 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   .control-utility-links .btn { flex: 1 1 auto; text-align: center; }
   .control-primary-actions .btn { white-space: normal; }
 }
+
+/* Leitungs-Dashboard: kompakte, sofort ausführbare Hinweise statt zusätzlicher großer Karten. */
+.control-attention-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: -3px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #fedf89;
+  border-radius: 10px;
+  background: #fffaeb;
+}
+.control-attention-title { display: inline-flex; align-items: center; gap: 7px; color: #92400e; font-size: .82rem; white-space: nowrap; }
+.control-attention-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #f79009; }
+.control-attention-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.control-attention-action {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 9px;
+  border: 1px solid #fedf89;
+  border-radius: 8px;
+  background: white;
+  color: #7a2e0e;
+  font-size: .76rem;
+  font-weight: 650;
+  text-align: left;
+}
+.control-attention-action:hover { border-color: #fdb022; background: #fff3d1; }
+.control-attention-action:focus-visible, .control-metric-link:focus-visible, .control-match-status-filters button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.control-metric-link { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; width: 100%; min-width: 0; gap: 4px 12px; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; }
+.control-metric-link:not(:disabled):hover { color: #175cd3; }
+.control-metric-link:disabled { cursor: default; }
+.control-metric-link .muted { flex: 1 1 115px; }
+.control-metric-link strong { flex: 0 1 auto; text-align: right; }
+#control-next-matches { scroll-margin-top: 18px; }
+
+/* Der Balken ist bewusst eine Phasen-Näherung; die Gesamtzahl der Spiele steht noch nicht fest. */
+.control-progress-card { display: grid; gap: 10px; }
+.control-progress-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.control-progress-heading h3 { margin: 0; font-size: .98rem; }
+.control-progress-heading strong { color: #067647; font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+.control-progress-track { width: 100%; height: 10px; overflow: hidden; border-radius: 999px; background: #e4e7ec; }
+.control-progress-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #12b76a, #079455); transition: width .25s ease; }
+.control-progress-details { display: grid; gap: 3px; font-size: .78rem; }
+.control-progress-details > strong { color: #344054; font-size: .84rem; }
+.control-progress-details > span, .control-progress-card > small { color: #667085; }
+.control-progress-card > small { font-size: .7rem; line-height: 1.4; }
+
+/* Spielübersicht: Filter sind jederzeit sichtbar, die Ergebnistabelle bleibt kompakt. */
+.control-match-filters { display: grid; gap: 11px; margin: 14px 0; padding: 12px; border: 1px solid #e4e7ec; border-radius: 11px; background: #f9fafb; }
+.control-match-status-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.control-match-status-filters button { padding: 6px 10px; border: 1px solid #d0d5dd; border-radius: 8px; background: white; color: #475467; font-size: .77rem; font-weight: 700; }
+.control-match-status-filters button:hover { border-color: #98a2b3; }
+.control-match-status-filters button.active { border-color: #1d4ed8; background: #eff6ff; color: #1d4ed8; }
+.control-match-filter-fields { display: grid; grid-template-columns: minmax(180px, 1.5fr) repeat(2, minmax(140px, 1fr)); gap: 10px; }
+.control-match-filter-fields label { display: grid; min-width: 0; gap: 4px; color: #475467; font-size: .74rem; font-weight: 750; }
+.control-match-filter-fields input, .control-match-filter-fields select { width: 100%; min-width: 0; min-height: 34px; padding: 7px 9px; border: 1px solid #d0d5dd; border-radius: 8px; background: white; color: #101828; font-size: .83rem; }
+.control-match-filter-summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: .78rem; font-weight: 650; color: #667085; }
+.control-matches-empty { margin: 10px 0 2px; }
+
+/* Kurzes Feedback nach einer Korrektur, inklusive derselben Undo-Aktion wie im Protokoll. */
+.control-correction-toast {
+  position: fixed;
+  z-index: 1100;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(450px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid #75e0a7;
+  border-radius: 12px;
+  background: #f0fdf4;
+  box-shadow: 0 12px 32px rgb(16 24 40 / 16%);
+  color: #054f31;
+  font-size: .82rem;
+}
+.control-correction-toast.error { border-color: #fda29b; background: #fff1f0; color: #b42318; }
+.control-correction-toast > strong { flex: 1; min-width: 0; }
+.control-correction-toast-icon { display: grid; place-items: center; flex: none; width: 23px; height: 23px; border-radius: 50%; background: #d1fadf; font-weight: 900; }
+.control-correction-toast.error .control-correction-toast-icon { background: #fee4e2; }
+.control-correction-toast .btn { flex: none; }
+.control-toast-close { align-self: flex-start; flex: none; padding: 0 3px; border: 0; background: transparent; color: inherit; font-size: 1.2rem; line-height: 1; }
+
+@media (max-width: 760px) { .control-match-filter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .control-match-filter-fields label:first-child { grid-column: 1 / -1; } }
+@media (max-width: 500px) {
+  .control-attention-strip { align-items: flex-start; flex-direction: column; }
+  .control-match-filter-fields { grid-template-columns: 1fr; }
+  .control-match-filter-fields label:first-child { grid-column: auto; }
+  .control-correction-toast { left: 16px; right: 16px; bottom: 16px; width: auto; flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) { .control-progress-fill { transition: none; } }
+@media print { .control-attention-strip, .control-match-filters, .control-correction-toast { display: none !important; } }

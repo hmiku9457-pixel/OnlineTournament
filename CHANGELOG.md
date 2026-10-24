@@ -1,3 +1,10 @@
+## 2026-10-24 – Leitungsübersicht mit direkten Aktionen und Fortschritt
+- „Jetzt wichtig“ hebt offene Ergebnisbestätigungen, zuweisbare Wartespiele und die Vorbereitung der nächsten Phase hervor; die Aktionen führen direkt zum betreffenden Bereich.
+- „Alle Spiele“ bietet kombinierbare Status-, Phasen-, Tisch- und Teilnehmerfilter mit Trefferzahl und Zurücksetzen. Abgeschlossene, noch unbestätigte Partien lassen sich gezielt finden.
+- Nach einer administrativen Ergebniskorrektur erscheint eine zeitlich begrenzte Meldung mit sofortigem „Rückgängig“; die bestehende Sicherheitsprüfung und das Änderungsprotokoll bleiben maßgeblich.
+- Der Turnierstatus erhält eine kompakte Fortschrittsanzeige auf Phasenbasis mit dem Zwischenstand der derzeit angesetzten Spiele. Die Prozentangabe ist bewusst als Näherung gekennzeichnet.
+- Regressionstests für kombinierte Spielfilter und Phasenfortschritt ergänzt.
+
 ## 2026-10-24 – Weitere UI-Feinheiten in der Turnierleitung
 - Der Kopfbereich nutzt die gesamte verfügbare Breite; der Turnierstatus fällt als eigenständiger, farbcodierter Statusindikator stärker auf.
 - Laufende Gruppenspiele erscheinen als kompakte, deutlich markierte Live-Partien mit eigenem Status und abgesetztem Spielstand.
