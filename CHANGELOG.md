@@ -1,3 +1,7 @@
+## 2026-10-24 – Qualifikationsmarkierungen rechts sauber abrunden
+- Rechte Tabellenwerte erhalten denselben optischen Abstand zur Markierung wie die Platzierungsziffern links.
+- Grüne und blaue Qualifikationszeilen schließen mit sanft gerundeter Kante und feinem Rand ab, ohne die Spaltenausrichtung zu verändern.
+
 ## 2026-10-24 – Einheitsgröße für Gruppenpartien und saubere Tabellenmarkierungen
 - Wartende, abgeschlossene und laufende Spiele besitzen nun gleich hohe, dezente Zeilenkarten. Live-Spiele behalten ihre grüne Hervorhebung.
 - Die Rangspalte einschließlich Kopf erhält Abstand zum linken Qualifikationsstreifen, damit keine Ziffer überdeckt wird.
