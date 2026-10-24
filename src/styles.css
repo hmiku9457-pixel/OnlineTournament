@@ -1793,15 +1793,21 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .control-tournament-status.status-registration { border-color: #b2ddff; background: #eff8ff; color: #175cd3; }
 .control-tournament-status.status-finished { border-color: #d6bbfb; background: #f4f3ff; color: #6941c6; }
 
-/* Laufende Gruppenspiele und numerische Paarwerte sind auch in dichten Listen erkennbar. */
-.group-overview-card .group-match-row.live {
+/* Sämtliche Gruppenspiele gleich groß und einzeilig; live bleibt grün hervorgehoben. */
+.group-overview-card .group-match-row {
   position: relative;
   gap: 3px;
   margin: 2px 0;
   padding: 5px 6px 5px 12px;
+  min-height: 32px;
+  border: 1px solid #e4e7ec;
+  border-left: 2px solid #d0d5dd;
+  border-radius: 6px;
+  background: #f9fafb;
+}
+.group-overview-card .group-match-row.live {
   border: 1px solid #abefc6;
   border-left: 2px solid #12b76a;
-  border-radius: 6px;
   background: #ecfdf3;
 }
 .group-match-row .group-match-side { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -1824,9 +1830,11 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .group-qualification-legend > small { color: #667085; font-size: .71rem; }
 .group-qualification-key { width: 10px; height: 10px; display: inline-block; flex: none; border-radius: 3px; }
 .group-qualification-key.qualified { background: #b7ebcd; border: 1px solid #12b76a; }
-.group-qualification-key.possible { background: #fef0c7; border: 1px solid #fdb022; }
+.group-qualification-key.possible { background: #dbeafe; border: 1px solid #3b82f6; }
+.group-overview-card .mini-standing-table.detailed .mini-standing-head,
+.group-overview-card .mini-standing-table.detailed .mini-standing-row { padding-left: 8px; }
 .group-overview-card .mini-standing-row.qualification-zone { background: #ecfdf3; box-shadow: inset 3px 0 #12b76a; border-radius: 4px; }
-.group-overview-card .mini-standing-row.qualification-possible { background: #fffaeb; box-shadow: inset 3px 0 #fdb022; border-radius: 4px; }
+.group-overview-card .mini-standing-row.qualification-possible { background: #eff6ff; box-shadow: inset 3px 0 #3b82f6; border-radius: 4px; }
 .standing-ratio { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 1px; width: 100%; font-variant-numeric: tabular-nums; }
 .standing-ratio > :first-child { text-align: right; }
 .standing-ratio > :last-child { text-align: left; }

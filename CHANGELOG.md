@@ -1,3 +1,8 @@
+## 2026-10-24 – Einheitsgröße für Gruppenpartien und saubere Tabellenmarkierungen
+- Wartende, abgeschlossene und laufende Spiele besitzen nun gleich hohe, dezente Zeilenkarten. Live-Spiele behalten ihre grüne Hervorhebung.
+- Die Rangspalte einschließlich Kopf erhält Abstand zum linken Qualifikationsstreifen, damit keine Ziffer überdeckt wird.
+- Gruppenübergreifend mögliche Zusatzqualifikationen sind nun blau statt gelb gekennzeichnet.
+
 ## 2026-10-24 – Kompakte Live-Spiele und Qualifikationszonen in Gruppenkarten
 - Laufende Begegnungen erscheinen einzeilig mit dezenter grüner Markierung und aktuellem Satzstand (anfangs 0:0 statt „–“); gespeicherte Sätze bleiben anklickbar.
 - Gruppentabellen markieren die vorläufigen Qualifikationsplätze in Grün. Gruppenübergreifend umkämpfte Zusatzplätze werden in Gelb hervorgehoben und ausdrücklich als noch offen erklärt.
