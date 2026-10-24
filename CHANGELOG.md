@@ -1,3 +1,9 @@
+## 2026-10-24 – Weitere UI-Feinheiten in der Turnierleitung
+- Der Kopfbereich nutzt die gesamte verfügbare Breite; der Turnierstatus fällt als eigenständiger, farbcodierter Statusindikator stärker auf.
+- Laufende Gruppenspiele erscheinen als kompakte, deutlich markierte Live-Partien mit eigenem Status und abgesetztem Spielstand.
+- Satz- und Ballverhältnisse sind in Gruppen- und Schweizer Tabellen am Doppelpunkt ausgerichtet, Differenzen rechtsbündig.
+- In der Teilnehmerverwaltung unterscheiden sich „Aktiv“ (blau) und „Spielt gerade“ (grün mit Statuspunkt) auf einen Blick.
+
 ## 2026-10-24 – Layout-Feinschliff für die Turnierleitung
 - Hilfe-Buttons sind klar umrandet und zeigen das Fragezeichen hinter „Hilfe“; der Hauptbutton heißt neutral „Anleitung & Hilfe“.
 - Die Legende für laufende, freie und gesperrte Tische ist jetzt in Tischkarten- und Hallenansicht sichtbar.

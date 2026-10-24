@@ -1737,13 +1737,14 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 }
 
 /* Turnierleitung: klar getrennte Navigation, Turnierkopf und Hauptaktionen. */
-.control-head { display: grid; gap: 10px; margin-bottom: 12px; }
+.control-head { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; width: 100%; gap: 10px; margin-bottom: 12px; }
 .control-utility-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
 .control-utility-bar .control-back-button { margin: 0; }
 .control-utility-links { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
 .control-utility-links .btn { white-space: nowrap; }
 .control-hero-bar {
   display: flex;
+  width: 100%;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
@@ -1754,11 +1755,76 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   background: linear-gradient(120deg, #fff 58%, #f8fafc);
   box-shadow: 0 1px 3px rgb(16 24 40 / 4%);
 }
-.control-identity { flex: 1 1 280px; min-width: 0; }
+.control-identity { flex: 1 1 460px; min-width: 0; }
 .control-hero-bar .tournament-page-status-row { flex-wrap: wrap; }
 .control-hero-bar h1 { overflow-wrap: anywhere; }
 .control-primary-actions { justify-content: flex-end; align-items: center; gap: 8px; }
 .control-primary-actions .btn { white-space: nowrap; }
+.control-tournament-status {
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #d0d5dd;
+  background: #f2f4f7;
+  color: #344054;
+  font-size: .87rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 5%);
+}
+.control-tournament-status::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+}
+.control-tournament-status.status-running { border-color: #75e0a7; background: #dcfae6; color: #067647; }
+.control-tournament-status.status-paused { border-color: #fedf89; background: #fffaeb; color: #b54708; }
+.control-tournament-status.status-ready,
+.control-tournament-status.status-registration { border-color: #b2ddff; background: #eff8ff; color: #175cd3; }
+.control-tournament-status.status-finished { border-color: #d6bbfb; background: #f4f3ff; color: #6941c6; }
+
+/* Laufende Gruppenspiele und numerische Paarwerte sind auch in dichten Listen erkennbar. */
+.group-overview-card .group-match-row.live {
+  gap: 5px;
+  margin: 4px 0;
+  padding: 7px 8px;
+  border: 1px solid #abefc6;
+  border-left: 3px solid #12b76a;
+  border-radius: 9px;
+  background: #ecfdf3;
+}
+.group-match-row .group-match-side { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.group-match-row.live .group-match-side { font-weight: 700; color: #054f31; }
+.group-match-live-label {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  justify-self: start;
+  color: #067647;
+  font-size: .69rem;
+  font-weight: 800;
+}
+.group-match-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #12b76a; }
+.group-match-row.live .match-result-trigger { border-radius: 5px; padding: 3px 5px; background: #d1fadf; color: #05603a; font-variant-numeric: tabular-nums; }
+.standing-ratio { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 1px; width: 100%; font-variant-numeric: tabular-nums; }
+.standing-ratio > :first-child { text-align: right; }
+.standing-ratio > :last-child { text-align: left; }
+.group-overview-card .mini-standing-table.detailed .mini-standing-head > :nth-child(n + 3),
+.group-overview-card .mini-standing-table.detailed .mini-standing-row > :nth-child(n + 3) { text-align: center; font-variant-numeric: tabular-nums; }
+.group-overview-card .mini-standing-table.detailed .mini-standing-head > :nth-child(7),
+.group-overview-card .mini-standing-table.detailed .mini-standing-head > :nth-child(9),
+.group-overview-card .mini-standing-table.detailed .mini-standing-row > :nth-child(7),
+.group-overview-card .mini-standing-table.detailed .mini-standing-row > :nth-child(9) { text-align: right; }
+.compact-table .standing-ratio-cell { text-align: center; font-variant-numeric: tabular-nums; }
+.compact-table .standing-difference-cell { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Status-Tags der Teilnehmer haben eigene, klar unterscheidbare Farben. */
+.participant-inline-status.active { color: #175cd3; background: #eff8ff; border: 1px solid #b2ddff; }
+.participant-inline-status.playing { color: #067647; background: #dcfae6; border: 1px solid #75e0a7; }
+.participant-inline-status.playing::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 3px; }
 
 /* Die Hilfeschaltflächen wirken wie echte Buttons und tragen das ? am Ende. */
 .control-help-button {

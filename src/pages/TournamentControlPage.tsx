@@ -57,6 +57,11 @@ function matchStatusLabel(status: string) {
   }
 }
 
+function StandingRatio({ value }: { value: string }) {
+  const [left = '0', right = '0'] = value.split(':');
+  return <span className="standing-ratio"><span>{left}</span><span>:</span><span>{right}</span></span>;
+}
+
 const BRACKET_DRAG_TYPE = 'text/online-tournament-bracket-slot';
 
 
@@ -90,7 +95,7 @@ function StageCompetitionView({
                 <div className="mini-standing-head"><span>#</span><span>Spieler</span><span>Sp.</span><span>S</span><span>N</span><span>Sätze</span><span>±</span><span>Bälle</span><span>±</span></div>
                 {group.standings.map((row) => (
                   <div className="mini-standing-row" key={row.name}>
-                    <span>{row.rank}</span><button className="standing-player-button" type="button" onClick={() => setSelectedGroupPlayer({ groupLabel: group.label, player: row.name })}><strong>{row.name}</strong>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}{previousFinishLabels[row.name] && <small>{previousFinishLabels[row.name]}</small>}</button><span>{row.played}</span><span>{row.wins}</span><span>{row.losses}</span><span>{row.sets}</span><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><span>{row.balls}</span><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span>
+                    <span>{row.rank}</span><button className="standing-player-button" type="button" onClick={() => setSelectedGroupPlayer({ groupLabel: group.label, player: row.name })}><strong>{row.name}</strong>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}{previousFinishLabels[row.name] && <small>{previousFinishLabels[row.name]}</small>}</button><span>{row.played}</span><span>{row.wins}</span><span>{row.losses}</span><StandingRatio value={row.sets} /><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><StandingRatio value={row.balls} /><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span>
                   </div>
                 ))}
               </div>
@@ -100,7 +105,8 @@ function StageCompetitionView({
                     <strong className="group-match-day-label">Spieltag {matchDay}</strong>
                     {group.matches.filter((match) => (match.matchDay ?? 0) === matchDay).map((match) => (
                       <div className={match.status === 'live' ? 'group-match-row live' : 'group-match-row'} key={match.id}>
-                        <span title={match.sideA}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Rückzug (${match.sideA})` : match.sideA}</span><MatchResultDetails score={match.score} sets={match.sets} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} /><span title={match.sideB}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Rückzug (${match.sideB})` : match.sideB}</span>
+                        {match.status === 'live' && <span className="group-match-live-label"><span className="group-match-live-dot" aria-hidden="true" />Läuft gerade</span>}
+                        <span className="group-match-side" title={match.sideA}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Rückzug (${match.sideA})` : match.sideA}</span><MatchResultDetails score={match.score} sets={match.sets} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} /><span className="group-match-side" title={match.sideB}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Rückzug (${match.sideB})` : match.sideB}</span>
                       </div>
                     ))}
                   </div>
@@ -154,8 +160,8 @@ function StageCompetitionView({
                 }}>Seeded Zuteilung</button>}</div></div>
         <div className="card table-wrap">
           <table className="compact-table">
-            <thead><tr><th>#</th><th>Teilnehmer</th><th>Spiele</th><th>Siege</th><th>Niederlagen</th><th>Sätze</th><th>Satz ±</th><th>Bälle</th><th>Ball ±</th></tr></thead>
-            <tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>} {previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td>{row.sets}</td><td>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td>{row.balls}</td><td>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></tr>)}</tbody>
+            <thead><tr><th>#</th><th>Teilnehmer</th><th>Spiele</th><th>Siege</th><th>Niederlagen</th><th className="standing-ratio-cell">Sätze</th><th className="standing-difference-cell">Satz ±</th><th className="standing-ratio-cell">Bälle</th><th className="standing-difference-cell">Ball ±</th></tr></thead>
+            <tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>} {previousFinishLabels[row.name] && <small className="participant-origin">{previousFinishLabels[row.name]}</small>}</td><td>{row.played}</td><td>{row.wins}</td><td>{row.losses}</td><td className="standing-ratio-cell"><StandingRatio value={row.sets} /></td><td className="standing-difference-cell">{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></tr>)}</tbody>
           </table>
         </div>
         {selectedSwissPlayer && (
@@ -679,7 +685,7 @@ export function TournamentControlPage() {
             <div className="control-kicker">Turnierleitung</div>
             <div className="tournament-page-status-row">
               <h1>{tournament.name}</h1>
-              <span className={tournament.status === 'RUNNING' ? 'badge live' : 'badge'}>{statusLabel(tournament.status)}</span>
+              <span className={`badge control-tournament-status status-${tournament.status.toLowerCase()}`}>Status: {statusLabel(tournament.status)}</span>
             </div>
             <p className="muted">{tournament.phasesLabel} · {tournament.participants} Teilnehmer · {tournament.tables} Tische</p>
           </div>
@@ -1013,7 +1019,7 @@ export function TournamentControlPage() {
               return (
                 <article className={isWithdrawn ? 'participant-control-row withdrawn' : 'participant-control-row'} key={`${participant}-${index}`}>
                   <span className="participant-list-number">{index + 1}</span>
-                  <div className="participant-control-identity"><strong>{participant}</strong><span className={isWithdrawn ? "participant-inline-status withdrawn" : progress.status === 'Ausgeschieden' ? 'participant-inline-status eliminated' : 'participant-inline-status'}>{statusText}</span>{progress.placement && <span className="participant-placement">{progress.placement}</span>}</div>
+                  <div className="participant-control-identity"><strong>{participant}</strong><span className={`participant-inline-status${statusText === 'Spielt gerade' ? ' playing' : statusText === 'Aktiv' ? 'active' : isWithdrawn ? ' withdrawn' : progress.status === 'Ausgeschieden' ? ' eliminated' : ''}`}>{statusText}</span>{progress.placement && <span className="participant-placement">{progress.placement}</span>}</div>
                   <code>{tournament.participantCodes?.[participant] ?? String(4100 + index).slice(-4)}</code>
                   <div className="participant-row-actions">
                     <button className="btn small" type="button" onClick={() => setParticipantPanel({ name: participant, mode: 'edit' })}>Daten bearbeiten</button>
