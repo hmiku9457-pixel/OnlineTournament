@@ -10,6 +10,7 @@ import {
   countMockOpenConfirmations,
   getMockAssignmentBlockReason,
   getMockParticipantTableConflicts,
+  getMockQueueAssignableTables,
   getMockMatchCode,
   getMockParticipantCode,
   getMockRuntimeMatches,
@@ -55,6 +56,55 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('Turnierleitung: Zuweisung, Pause, Codes, Audit', () => {
+  it('meldet keine zuweisbaren Partien, solange alle Spieler belegt sind – trotz freiem Tisch', () => {
+    const tournament = setup();
+    const matches = getMockRuntimeMatches(tournament);
+    const first = matches[0];
+    const disjoint = matches.find((match) => match.id !== first.id && ![match.sideA, match.sideB].some((name) => name === first.sideA || name === first.sideB));
+    expect(disjoint).toBeDefined();
+    expect(assignMockMatchToTable(tournament, first.id, 'Tisch 1')).toBe(true);
+    expect(assignMockMatchToTable(tournament, disjoint!.id, 'Tisch 2')).toBe(true);
+    const waiting = getMockRuntimeMatches(tournament).filter((match) => match.status === 'WAITING');
+    expect(waiting.length).toBeGreaterThan(0);
+    const options = getMockQueueAssignableTables(tournament);
+    expect(waiting.every((match) => options.get(match.id)?.length === 0)).toBe(true);
+    // Tisch 3 ist frei, aber kein weiterer Spieler.
+    expect(getMockAssignmentBlockReason(tournament, waiting[0].id, 'Tisch 3')).toContain('bereits Tisch');
+
+    completeMockMatch(first.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }, { number: 2, sideAScore: 11, sideBScore: 9 }]);
+    // Solange Tisch 2 noch läuft, können die Begegnungen weiterhin blockiert sein.
+    completeMockMatch(disjoint!.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }, { number: 2, sideAScore: 11, sideBScore: 9 }]);
+    const after = getMockQueueAssignableTables(tournament);
+    expect(waiting.some((match) => (after.get(match.id)?.length ?? 0) > 0)).toBe(true);
+  });
+
+  it('lässt ein späteres Wartespiel mit freien Spielern direkt an einen freien Tisch zuweisen', () => {
+    const tournament = createMockTournament({
+      name: 'Neunzehner-Test', sport: 'table_tennis', discipline: 'SINGLES', tables: 8, minimumMatches: 1,
+      participantNames: Array.from({ length: 19 }, (_, index) => `Spieler ${index + 1}`),
+      phases: [{ type: 'GROUPS', label: 'Gruppenphase', entrantCount: 19, groupCount: 4, bestOf: 3, swissRounds: 1, knockoutBestOf: [] }],
+      estimatedDurationMinutes: 240,
+    });
+    expect(startFirstStage(tournament)).toBe(true);
+    const running = updateMockTournamentStatus(tournament.id, 'RUNNING');
+    const matches = getMockRuntimeMatches(running);
+    const later = matches[9];
+    expect(later).toBeDefined();
+
+    // Andere Spiele laufen bereits, die beiden Spieler aus Platz 10 bleiben frei.
+    let assigned = 0;
+    for (const match of matches) {
+      if (match.id === later.id || [match.sideA, match.sideB].some((name) => name === later.sideA || name === later.sideB)) continue;
+      const table = getMockQueueAssignableTables(running).get(match.id)?.find((entry) => entry !== 'Tisch 8');
+      if (table && assignMockMatchToTable(running, match.id, table)) assigned += 1;
+      if (assigned === 5) break;
+    }
+    expect(assigned).toBeGreaterThan(0);
+    expect(getMockQueueAssignableTables(running).get(later.id)).toContain('Tisch 8');
+    expect(getMockAssignmentBlockReason(running, later.id, 'Tisch 8')).toBeNull();
+    expect(assignMockMatchToTable(running, later.id, 'Tisch 8')).toBe(true);
+  });
+
   it('zeigt belegte Teilnehmer an und gibt die wartende Partie erst nach Spielende frei', () => {
     const tournament = setup();
     const matches = getMockRuntimeMatches(tournament);

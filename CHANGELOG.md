@@ -1,3 +1,9 @@
+## 2026-10-24 – Zuweisbarkeit der Warteliste zuverlässig abgleichen
+- Der Schnellbutton „X Spiele anzeigen“ erscheint nur, wenn mindestens eine Wartelisten-Partie tatsächlich einem freien, ungesperrten Tisch zugewiesen werden kann; die Anzahl zählt nur zuweisbare Spiele.
+- Warteliste, Tisch-Auswahl und automatische Zuweisung verwenden dieselbe Prüfung wie der eigentliche Spielstart. Bei Abweichungen wird der konkrete Sperrgrund eingeblendet.
+- Änderungen aus einem zweiten Browser-Tab aktualisieren die Turnierleitung. Abgelehnte Zuweisungen laden den aktuellen Zustand erneut.
+- Tests für eine freie Tischposition bei durchgehend belegten Spielern sowie ein späteres, konfliktfreies Spiel in einer 19er-Gruppenphase ergänzt.
+
 ## 2026-10-24 – Belegte Teilnehmer in der Warteschlange erkennen
 - „Nächste Spiele“ markiert Teilnehmer, die bereits einem anderen Tisch zugewiesen sind, mit der konkreten Tischnummer und einem kurzen Hinweis.
 - Automatische und manuelle Zuweisung sowie Drag & Drop sind für solche wartenden Partien deaktiviert. Der globale Auto-Zuweisen-Button bleibt gesperrt, wenn keine konfliktfreie Partie bereitsteht.

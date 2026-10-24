@@ -7,7 +7,7 @@ import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mo
 import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, isStageCompleted, isStageStarted, setStageEntrants } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
-import { isMockTableBlocked } from '@/services/mockTableLocks';
+import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
 
 export { getRuntimeParticipantNames } from '@/services/mockParticipants';
@@ -514,16 +514,20 @@ export function getMockParticipantTableConflicts(
   });
 }
 
-export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId: string, table: string) {
-  // Always read current stored status: callers can hold an older React snapshot.
-  const currentTournament = getAllMockTournaments().find((item) => item.id === tournament.id) ?? tournament;
-  if (currentTournament.status !== 'RUNNING') return 'Pause aktiv oder Turnier nicht gestartet: Neue Tischzuweisungen sind gesperrt.';
+function getAssignmentBlockReasonForSnapshot(
+  tournament: DemoTournament,
+  matchId: string,
+  table: string,
+  matches: MockRuntimeMatch[],
+  blockedTables: ReadonlySet<string>,
+  tournamentStatus: string,
+) {
+  if (tournamentStatus !== 'RUNNING') return 'Pause aktiv oder Turnier nicht gestartet: Neue Tischzuweisungen sind gesperrt.';
   if (!/^Tisch [1-9]\d*$/.test(table) || Number(table.slice(6)) > tournament.tables) return 'Ungültiger Tisch.';
-  if (isMockTableBlocked(tournament, table)) return `${table} ist für dieses Turnier gesperrt.`;
+  if (blockedTables.has(table)) return `${table} ist für dieses Turnier gesperrt.`;
   // Die Wechselzeit ist eine unverbindliche Planungsgröße (Dauerprognose),
   // kein Sperrgrund. Nur gesperrte oder belegte Tische und Spielerkonflikte
   // verhindern eine neue Zuweisung.
-  const matches = getMockRuntimeMatches(tournament);
   const target = matches.find((match) => match.id === matchId);
   if (!target) return 'Spiel wurde nicht gefunden.';
   if (target.status !== 'WAITING') return 'Dieses Spiel ist nicht mehr in der Warteschlange.';
@@ -537,6 +541,27 @@ export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId
   }
 
   return null;
+}
+
+export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId: string, table: string) {
+  // Immer den aktuellen gespeicherten Zustand verwenden, auch bei alten React-Snapshots.
+  const currentTournament = getAllMockTournaments().find((item) => item.id === tournament.id) ?? tournament;
+  const matches = getMockRuntimeMatches(currentTournament);
+  return getAssignmentBlockReasonForSnapshot(currentTournament, matchId, table, matches, new Set(getBlockedMockTables(currentTournament)), currentTournament.status);
+}
+
+/** Dieselbe Prüfung wie beim tatsächlichen Zuweisen, aber für die gesamte Warteschlange in einem Snapshot. */
+export function getMockQueueAssignableTables(tournament: DemoTournament): Map<string, string[]> {
+  const currentTournament = getAllMockTournaments().find((item) => item.id === tournament.id) ?? tournament;
+  const matches = getMockRuntimeMatches(currentTournament);
+  const blockedTables = new Set(getBlockedMockTables(currentTournament));
+  const freeTables = Array.from({ length: currentTournament.tables }, (_, index) => `Tisch ${index + 1}`)
+    .filter((table) => !blockedTables.has(table) && !matches.some((match) => match.table === table && isActiveTableMatch(match)));
+
+  return new Map(matches.filter((match) => match.status === 'WAITING').map((match) => [
+    match.id,
+    freeTables.filter((table) => getAssignmentBlockReasonForSnapshot(currentTournament, match.id, table, matches, blockedTables, currentTournament.status) === null),
+  ]));
 }
 
 /** Zuweisung = Spielstart. Restzeit ist der Wert genau zum Startzeitpunkt. */

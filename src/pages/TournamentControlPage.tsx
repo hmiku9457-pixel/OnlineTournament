@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { StageCard } from '@/components/StageCard';
@@ -12,7 +12,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
 import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { VenueLayoutMini } from '@/components/VenueLayout';
@@ -396,6 +396,7 @@ export function TournamentControlPage() {
   const standingsSource = useMemo(() => ({ ...phaseRuntimeSource, participantVersion }), [phaseRuntimeSource, participantVersion]);
 
   const matches = useMemo(() => getMockRuntimeMatches(clockSource.tournament), [clockSource]);
+  const queueAssignableTables = useMemo(() => getMockQueueAssignableTables(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   const blockedTables = useMemo(() => new Set(getBlockedMockTables(runtimeSource.tournament)), [runtimeSource]);
   const restTimeLabel = useMemo(
     () => formatRemainingTournamentDuration(estimateRemainingTournamentMinutes(phaseRuntimeSource.tournament)),
@@ -416,6 +417,7 @@ export function TournamentControlPage() {
   ), [participantProgress]);
   const finalStandings = useMemo(() => standingsSource.tournament.status === 'FINISHED' ? getMockFinalStandings(standingsSource.tournament) : [], [standingsSource]);
   const nextMatches = matches.filter((match) => match.status === 'WAITING');
+  const assignableWaitingMatches = nextMatches.filter((match) => (queueAssignableTables.get(match.id)?.length ?? 0) > 0);
   const tableMatches = matches.filter((match) => ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch '));
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table) && !blockedTables.has(table));
@@ -440,10 +442,16 @@ export function TournamentControlPage() {
     hasStarted: Boolean(tournament.hasStarted),
     hasActiveStage: Boolean(activeStage),
     hasNextStage: Boolean(nextStartableStage),
-    waitingMatches: nextMatches.length,
+    waitingMatches: assignableWaitingMatches.length,
     freeTables: freeTables.length,
     activeMatches: tableMatches.length,
   });
+
+  const refreshRuntime = useCallback(() => {
+    setTournament(getMockTournament(tournament.id));
+    setRuntimeVersion((value) => value + 1);
+    setPhaseVersion((value) => value + 1);
+  }, [tournament.id]);
 
   useEffect(() => {
     function handlePhaseCompleted(event: Event) {
@@ -459,6 +467,16 @@ export function TournamentControlPage() {
     window.addEventListener('mock-phase-completed', handlePhaseCompleted);
     return () => window.removeEventListener('mock-phase-completed', handlePhaseCompleted);
   }, [tournament]);
+
+  useEffect(() => {
+    function handleStorage(event: StorageEvent) {
+      if (event.storageArea !== window.localStorage || (event.key && !event.key.startsWith('online-tournament:'))) return;
+      // Änderungen aus einem anderen Tab dürfen keine veralteten Wartelisten anzeigen.
+      refreshRuntime();
+    }
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [refreshRuntime]);
 
   useEffect(() => {
     const onAuditChange = (event: Event) => {
@@ -482,12 +500,6 @@ export function TournamentControlPage() {
 
   function setStatus(status: TournamentStatus) {
     setTournament(updateMockTournamentStatus(tournament.id, status));
-  }
-
-  function refreshRuntime() {
-    setTournament(getMockTournament(tournament.id));
-    setRuntimeVersion((value) => value + 1);
-    setPhaseVersion((value) => value + 1);
   }
 
   function openWaitingQueue() {
@@ -587,6 +599,7 @@ export function TournamentControlPage() {
     const blockReason = getMockAssignmentBlockReason(tournament, matchId, table);
     if (blockReason) {
       setAssignmentMessage(blockReason);
+      refreshRuntime();
       return false;
     }
     if (!assignMockMatchToTable(tournament, matchId, table)) return false;
@@ -614,7 +627,7 @@ export function TournamentControlPage() {
   }
 
   function autoAssignMatch(matchId: string) {
-    for (const table of freeTables) {
+    for (const table of queueAssignableTables.get(matchId) ?? []) {
       if (assignToTable(matchId, table)) return;
     }
 
@@ -622,6 +635,7 @@ export function TournamentControlPage() {
       .map((table) => getMockAssignmentBlockReason(tournament, matchId, table))
       .find((reason) => reason);
     setAssignmentMessage(firstReason ?? 'Aktuell ist kein geeigneter Tisch frei.');
+    refreshRuntime();
   }
 
   function autoAssignWaitingMatches() {
@@ -787,7 +801,7 @@ export function TournamentControlPage() {
       <div className="control-guide-strip no-print">
         <div className="control-guide-copy"><strong>{guide.title}</strong><span>{guide.text}</span></div>
         <div className="control-guide-actions">
-          {nextMatches.length > 0 && freeTables.length > 0 && tournament.status === 'RUNNING' && <button type="button" className="btn small control-guide-action" onClick={openWaitingQueue}>{nextMatches.length} {nextMatches.length === 1 ? 'Spiel' : 'Spiele'} anzeigen →</button>}
+          {assignableWaitingMatches.length > 0 && <button type="button" className="btn small control-guide-action" onClick={openWaitingQueue}>{assignableWaitingMatches.length} {assignableWaitingMatches.length === 1 ? 'Spiel' : 'Spiele'} anzeigen →</button>}
           {nextStartableStage && !activeStage && <button type="button" className="btn small control-guide-action" onClick={openNextStagePreparation}>Phase vorbereiten →</button>}
           <ControlHelpButton topic={guide.topic} onOpen={setHelpTopic} label="So geht's →" />
         </div>
@@ -812,7 +826,7 @@ export function TournamentControlPage() {
                 <button
                   className="btn small primary"
                   type="button"
-                  disabled={tournament.status !== 'RUNNING' || freeTables.length === 0 || !nextMatches.some((match) => getMockParticipantTableConflicts(match, matches).length === 0)}
+                  disabled={assignableWaitingMatches.length === 0}
                   onClick={autoAssignWaitingMatches}
                 >
                   Automatisch zuweisen
@@ -879,11 +893,15 @@ export function TournamentControlPage() {
                   const busyA = busyPlayers.find((entry) => entry.participant === match.sideA);
                   const busyB = busyPlayers.find((entry) => entry.participant === match.sideB);
                   const isBusy = busyPlayers.length > 0;
+                  const eligibleTables = queueAssignableTables.get(match.id) ?? [];
+                  const canAssign = eligibleTables.length > 0;
+                  const otherBlockReason = !isBusy && !canAssign && freeTables.length > 0 && tournament.status === 'RUNNING'
+                    ? getMockAssignmentBlockReason(tournament, match.id, freeTables[0]) : null;
                   return (
                   <article
                     className={`match-queue-row expanded draggable-match${isBusy ? ' participant-busy' : ''}`}
                     key={match.id}
-                    draggable={tournament.status === 'RUNNING' && !isBusy && !isMockThirdPlaceMatch(match.id)}
+                    draggable={canAssign && !isMockThirdPlaceMatch(match.id)}
                     onDragStart={(event) => {
                       event.dataTransfer.setData('text/mock-match-id', match.id);
                       event.dataTransfer.effectAllowed = 'move';
@@ -895,11 +913,10 @@ export function TournamentControlPage() {
                       <strong>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseB)}</em>{busyB && <span className="queue-player-table-flag">Bereits an {busyB.table}</span>}</strong>
                       <span className="muted">{match.phase} · {match.round}{match.matchDay ? ` · Spieltag ${match.matchDay}` : ''}{match.note ? ` · ${match.note}` : ''}</span>
                       {isBusy && <span className="queue-conflict-hint">Zuweisung möglich, sobald {busyPlayers.length === 1 ? 'dieser Teilnehmer wieder frei ist.' : 'beide Teilnehmer wieder frei sind.'}</span>}
-                      {assigningMatchId === match.id && !isBusy && (
+                      {otherBlockReason && <span className="queue-conflict-hint">Derzeit nicht zuweisbar: {otherBlockReason}</span>}
+                      {assigningMatchId === match.id && canAssign && (
                         <div className="table-assignment-picker">
-                          {freeTables.length === 0 ? (
-                            <span className="muted">Aktuell ist kein Tisch frei.</span>
-                          ) : freeTables.map((table) => (
+                          {eligibleTables.map((table) => (
                             <button className="btn small" type="button" key={table} onClick={() => assignToTable(match.id, table)}>{table}</button>
                           ))}
                         </div>
@@ -913,8 +930,8 @@ export function TournamentControlPage() {
                             Nicht austragen · beide Platz 3
                           </button>
                         )}
-                        <button className="btn small primary" type="button" disabled={tournament.status !== 'RUNNING' || freeTables.length === 0 || isBusy} onClick={() => autoAssignMatch(match.id)}>Automatisch zuweisen</button>
-                        <button className="btn small" type="button" disabled={tournament.status !== 'RUNNING' || isBusy} onClick={() => setAssigningMatchId((current) => current === match.id ? null : match.id)}>Zuweisen</button>
+                        <button className="btn small primary" type="button" disabled={!canAssign} onClick={() => autoAssignMatch(match.id)}>Automatisch zuweisen</button>
+                        <button className="btn small" type="button" disabled={!canAssign} onClick={() => setAssigningMatchId((current) => current === match.id ? null : match.id)}>Zuweisen</button>
                       </>
                     </div>
                   </article>
