@@ -1649,3 +1649,89 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   background: white;
 }
 .hall-table-modal-assign-controls .btn { flex-shrink: 0; }
+
+/* Go-live copy pass: compact guidance with contextual help, never obscuring the table overview. */
+.control-guide-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  margin: -3px 0 13px;
+  padding: 8px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+.control-guide-strip > div { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; min-width: 0; font-size: .79rem; }
+.control-guide-strip strong { white-space: nowrap; }
+.control-guide-strip span { color: #344054; }
+.control-help-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.control-help-title h2, .control-help-title h3 { margin: 0; }
+.control-help-button {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #1d4ed8;
+  font-size: .75rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.control-help-button:hover { background: #dbeafe; }
+.control-help-button:focus-visible,
+.control-help-main-button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.control-help-main-button { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.control-empty-message { padding: 16px 12px; color: #667085; font-size: .85rem; }
+.set-entry-quick-hint { display: block; margin-top: 5px; font-size: .68rem; }
+.control-inline-help { border: 1px solid #dbeafe; border-radius: 9px; background: #f8fbff; padding: 8px 10px; font-size: .78rem; }
+.control-inline-help summary { cursor: pointer; color: #1d4ed8; font-weight: 750; }
+.control-inline-help p { margin: 8px 0 0; line-height: 1.45; }
+.control-help-dialog {
+  width: min(760px, 100%);
+  max-height: min(90dvh, 850px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+.control-help-heading { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-shrink: 0; }
+.control-help-heading h2 { margin: 7px 0 3px; font-size: 1.35rem; }
+.control-help-heading p { margin: 0; font-size: .83rem; }
+.control-help-heading > .btn { flex-shrink: 0; }
+.control-help-topics { display: flex; gap: 5px; overflow-x: auto; padding: 0 0 5px; flex-shrink: 0; scrollbar-width: thin; }
+.control-help-topics button {
+  flex: 0 0 auto;
+  border: 1px solid #e4e7ec;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: white;
+  color: #475467;
+  font-size: .78rem;
+  font-weight: 750;
+}
+.control-help-topics button.active { background: #1d4ed8; border-color: #1d4ed8; color: white; }
+.control-help-topics button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.control-help-body { overflow-y: auto; min-height: 0; padding-right: 4px; }
+.control-help-body h3 { margin: 0 0 3px; font-size: 1.1rem; }
+.control-help-body > p { margin: 0 0 12px; font-size: .85rem; }
+.control-help-steps { list-style: none; counter-reset: help-step; display: grid; gap: 8px; padding: 0; margin: 0; }
+.control-help-steps li { counter-increment: help-step; display: grid; grid-template-columns: 26px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; font-size: .85rem; }
+.control-help-steps li::before { content: counter(help-step); grid-row: span 2; display: grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; background: #eff6ff; color: #1e40af; font-weight: 800; }
+.control-help-steps li strong { padding-top: 1px; }
+.control-help-steps li span { color: #475467; line-height: 1.45; }
+.control-help-body .control-help-notice { margin: 14px 0 0; padding: 10px 12px; border: 1px solid #fedf89; border-radius: 9px; background: #fffaeb; color: #7a2e0e; line-height: 1.45; }
+@media (max-width: 640px) {
+  .control-guide-strip { align-items: flex-start; }
+  .control-guide-strip > div { display: grid; gap: 2px; }
+  .control-help-backdrop { padding: 9px; }
+  .control-help-dialog { max-height: 95dvh; padding: 14px; gap: 10px; }
+  .control-help-heading { gap: 7px; }
+  .control-help-heading h2 { font-size: 1.1rem; }
+  .control-help-heading p { display: none; }
+}
+@media print {
+  .control-guide-strip, .control-help-button, .control-help-main-button, .control-help-backdrop { display: none !important; }
+}

@@ -16,6 +16,8 @@ import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockPar
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { VenueLayoutMini } from '@/components/VenueLayout';
 import { TournamentHallView } from '@/components/TournamentHallView';
+import { ControlHelpButton, TournamentControlHelp } from '@/components/TournamentControlHelp';
+import { getControlGuide, type ControlHelpTopic } from '@/domain/controlGuide';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getStageEntrants, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
@@ -40,6 +42,17 @@ function statusLabel(status: TournamentStatus) {
     case 'PAUSED': return 'Pausiert';
     case 'REGISTRATION': return 'Anmeldung';
     case 'FINISHED': return 'Beendet';
+    default: return status;
+  }
+}
+
+function matchStatusLabel(status: string) {
+  switch (status) {
+    case 'WAITING': return 'Wartet';
+    case 'READY': return 'Bereit';
+    case 'LIVE': return 'Läuft';
+    case 'CONFIRMATION': return 'Bestätigung offen';
+    case 'FINISHED': return 'Abgeschlossen';
     default: return status;
   }
 }
@@ -324,6 +337,7 @@ export function TournamentControlPage() {
   const [tab, setTab] = useState<ControlTab>('overview');
   const [tableView, setTableView] = useState<'cards' | 'hall'>('cards');
   const [selectedHallTable, setSelectedHallTable] = useState<string | null>(null);
+  const [helpTopic, setHelpTopic] = useState<ControlHelpTopic | null>(null);
   const [hallAssignMatchId, setHallAssignMatchId] = useState('');
   const [runtimeVersion, setRuntimeVersion] = useState(0);
   const [restClockTick, setRestClockTick] = useState(0);
@@ -390,6 +404,15 @@ export function TournamentControlPage() {
   const nextStartableStage = useMemo(() => getNextStartableStage(phaseSource.tournament), [phaseSource]);
   const editableStage = useMemo(() => phaseSource.tournament.stages.find((stage) => isStageEditable(phaseSource.tournament, stage)), [phaseSource]);
   const selectedStage = useMemo(() => tournament.stages.find((stage) => stage.id === selectedStageId) ?? tournament.stages[0], [tournament, selectedStageId]);
+  const guide = getControlGuide({
+    status: tournament.status,
+    hasStarted: Boolean(tournament.hasStarted),
+    hasActiveStage: Boolean(activeStage),
+    hasNextStage: Boolean(nextStartableStage),
+    waitingMatches: nextMatches.length,
+    freeTables: freeTables.length,
+    activeMatches: tableMatches.length,
+  });
 
   useEffect(() => {
     function handlePhaseCompleted(event: Event) {
@@ -653,6 +676,7 @@ export function TournamentControlPage() {
           <p className="muted">{tournament.phasesLabel} · {tournament.participants} Teilnehmer · {tournament.tables} Tische</p>
         </div>
         <div className="actions no-print">
+          <button className="btn control-help-main-button" type="button" onClick={() => setHelpTopic('start')}>? Anleitung & Hilfe</button>
           <Link className="btn" to={`/player/${tournament.id}`}>Spieleransicht</Link>
           <Link className="btn" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
           {editableStage && ['GROUPS', 'SWISS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(editableStage.type) && (
@@ -684,12 +708,17 @@ export function TournamentControlPage() {
         ))}
       </nav>
 
+      <div className="control-guide-strip no-print">
+        <div><strong>{guide.title}</strong><span>{guide.text}</span></div>
+        <ControlHelpButton topic={guide.topic} onOpen={setHelpTopic} label="So geht's →" />
+      </div>
+
       {tab === 'overview' && (
         <section className="control-overview-stack">
           <div>
             <div className="control-section-head control-table-section-head">
               <div>
-                <h2>Tische</h2>
+                <div className="control-help-title"><h2>Tische</h2><ControlHelpButton topic="tables" onOpen={setHelpTopic} /></div>
                 <p className="muted">{tableView === 'hall' && tournament.venueLayout ? 'Spielübersicht nach den tatsächlichen Tischpositionen.' : 'Alle Spielorte auf einen Blick – auch freie Tische bleiben sichtbar.'}</p>
               </div>
               <div className="control-table-head-actions">
@@ -747,6 +776,10 @@ export function TournamentControlPage() {
                       </div>
                       <button className="btn small" type="button" autoFocus onClick={() => { setSelectedHallTable(null); setMovingMatchId(null); }}>Schließen</button>
                     </div>
+                    <details className="control-inline-help">
+                      <summary>Wie bediene ich diesen Tisch?</summary>
+                      <p>Freie Tische: Partie auswählen und „Zuweisen“ drücken – das Spiel beginnt sofort. Laufende Partien: Sätze aus Sicht des linken Spielers eingeben (7 = 11:7, −7 = 7:11), danach das Endergebnis bestätigen. Tischwechsel und aufgehobene Zuweisungen behalten bereits erfasste Sätze.</p>
+                    </details>
                     <div className="hall-table-modal-content">{tableCards}</div>
                   </section>
                 </div>
@@ -757,8 +790,9 @@ export function TournamentControlPage() {
 
           <div className="control-overview-columns">
             <main>
-              <div className="control-section-head control-section-spaced"><div><h2>Nächste Spiele</h2><p className="muted">Pausenzeit seit dem letzten tatsächlich gespielten Match; aktualisiert sich automatisch.</p></div></div>
+              <div className="control-section-head control-section-spaced"><div><div className="control-help-title"><h2>Nächste Spiele</h2><ControlHelpButton topic="queue" onOpen={setHelpTopic} /></div><p className="muted">Pausenzeit seit dem letzten tatsächlich gespielten Match; aktualisiert sich automatisch.</p></div></div>
               <div className="match-queue">
+                {nextMatches.length === 0 && <div className="control-empty-message">{!tournament.hasStarted ? 'Noch keine wartenden Spiele. Starte zuerst das Turnier.' : activeStage ? 'Zurzeit wartet keine Partie auf einen Tisch.' : 'Aktuell keine wartenden Spiele. Prüfe den Turnierverlauf für die nächste Phase.'}</div>}
                 {nextMatches.map((match, index) => (
                   <article
                     className="match-queue-row expanded draggable-match"
@@ -802,7 +836,7 @@ export function TournamentControlPage() {
             </main>
             <aside className="control-side">
               <div className="card control-status-card">
-                <h3>Turnierstatus</h3>
+                <div className="control-help-title"><h3>Turnierstatus</h3><ControlHelpButton topic="queue" onOpen={setHelpTopic} /></div>
                 <div className="control-metrics-grid">
                   <div><span className="muted">Tischbelegung</span><strong>{tableMatches.length}/{tournament.tables} · {blockedTables.size} gesperrt</strong></div>
                   <div><span className="muted">Wartende Spiele</span><strong>{nextMatches.length}</strong></div>
@@ -823,7 +857,7 @@ export function TournamentControlPage() {
 
       {tab === 'audit' && (
         <section className="card control-tab-panel">
-          <div className="control-section-head"><div><h2>Änderungsprotokoll</h2><p className="muted">Nachvollziehbare lokale Änderungen an Tischen, Ergebnissen, Bestätigungen und Turnierpause. „Turnierleitung (lokal)“ ist im Prototyp keine verifizierte Benutzeridentität.</p></div></div>
+          <div className="control-section-head"><div><div className="control-help-title"><h2>Änderungsprotokoll</h2><ControlHelpButton topic="audit" onOpen={setHelpTopic} /></div><p className="muted">Nachvollziehbare lokale Änderungen an Tischen, Ergebnissen, Bestätigungen und Turnierpause. „Turnierleitung (lokal)“ ist im Prototyp keine verifizierte Benutzeridentität.</p></div></div>
           <div className="audit-list">
             {auditEntries.length === 0 && <p className="muted">Noch keine Aktionen protokolliert.</p>}
             {auditEntries.map((entry) => (
@@ -843,7 +877,7 @@ export function TournamentControlPage() {
         <section className="control-tab-panel competition-flow-page" data-draw-version={drawVersion} data-phase-version={phaseVersion}>
           <div className="control-section-head">
             <div>
-              <h2>Turnierverlauf</h2>
+              <div className="control-help-title"><h2>Turnierverlauf</h2><ControlHelpButton topic="phases" onOpen={setHelpTopic} /></div>
               <p className="muted">Eine Phase endet automatisch mit dem letzten abgeschlossenen Spiel. Danach wird die nächste Phase bearbeitbar; mit ihrem Start wird die Auslosung eingefroren.</p>
             </div>
             {nextStartableStage && !activeStage && tournament.hasStarted && (
@@ -892,14 +926,14 @@ export function TournamentControlPage() {
 
       {tab === 'matches' && (
         <section className="card control-tab-panel">
-          <div className="control-section-head"><div><h2>Alle Spiele</h2><p className="muted">Zentrale Liste für laufende und kommende Partien.</p></div></div>
+          <div className="control-section-head"><div><div className="control-help-title"><h2>Alle Spiele</h2><ControlHelpButton topic="matches" onOpen={setHelpTopic} /></div><p className="muted">Zentrale Liste für laufende und kommende Partien.</p></div></div>
           {allTournamentMatches.length === 0 && <p className="muted">Noch keine Spiele verfügbar. Die Paarungen erscheinen hier, sobald du die erste Phase gestartet hast. Die Auslosung kannst du vorher im Turnierverlauf bearbeiten.</p>}
           {allTournamentMatches.length > 0 && <div className="table-wrap">
             <table>
               <thead><tr><th>Status</th><th>Phase</th><th>Spiel</th><th>Pausenzeit</th><th>Tisch</th><th>Stand</th><th></th></tr></thead>
               <tbody>{allTournamentMatches.map((match) => (
                 <tr key={match.id}>
-                  <td><span className={match.status === 'LIVE' ? 'badge live' : match.status === 'READY' ? 'badge ready' : 'badge'}>{match.status}</span></td>
+                  <td><span className={match.status === 'LIVE' ? 'badge live' : match.status === 'READY' ? 'badge ready' : 'badge'}>{matchStatusLabel(match.status)}</span></td>
                   <td>{match.phase}<div className="muted">{match.round}</div></td>
                   <td><strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>}</strong><div>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>}</div></td>
                   <td>{formatMockMatchRest(match, 'A')} / {formatMockMatchRest(match, 'B')}</td>
@@ -934,7 +968,7 @@ export function TournamentControlPage() {
       {tab === 'participants' && (
         <section className="card control-tab-panel">
           <div className="control-section-head">
-            <div><h2>Teilnehmer</h2><p className="muted">Spielercodes, Daten, Spiele und Rückzug an einer Stelle.</p></div>
+            <div><div className="control-help-title"><h2>Teilnehmer</h2><ControlHelpButton topic="participants" onOpen={setHelpTopic} /></div><p className="muted">Spielercodes, Daten, Spiele und Rückzug an einer Stelle.</p></div>
             {!tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status) && (
               <button className="btn primary" type="button" onClick={() => { setShowParticipantAdd((current) => !current); setParticipantAddError(''); }}>
                 {showParticipantAdd ? 'Nachmeldung schließen' : '+ Teilnehmer nachtragen'}
@@ -1008,7 +1042,7 @@ export function TournamentControlPage() {
                                 return <tr key={match.id}>
                                   <td>{match.phase}</td><td>{match.round}</td>
                                   <td>{match.sideA === participant ? match.sideB : match.sideA}</td>
-                                  <td>{match.status}</td><td><MatchResultDetails {...resultForMatchParticipant(match, participant)} /></td>
+                                  <td>{matchStatusLabel(match.status)}</td><td><MatchResultDetails {...resultForMatchParticipant(match, participant)} /></td>
                                   <td>{match.status === 'FINISHED' && stage && canEditMockMatch(tournament, match.id)
                                     ? <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Spiel bearbeiten</button>
                                     : stage && isStageStarted(tournament, stage) && match.status !== 'FINISHED'
@@ -1109,6 +1143,7 @@ export function TournamentControlPage() {
           </section>
         </div>
       )}
+      {helpTopic && <TournamentControlHelp initialTopic={helpTopic} onClose={() => setHelpTopic(null)} />}
     </>
   );
 }

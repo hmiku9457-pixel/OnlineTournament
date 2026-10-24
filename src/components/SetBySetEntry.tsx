@@ -156,22 +156,25 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
       )}
 
       {!alreadyFinished && !needsFinalApproval && currentSetNumber <= match.bestOf && (
-        <div className="current-set-entry-row">
-          <label className="current-set-field">
-            <span>Satz {currentSetNumber}</span>
-            <input
-              aria-label={`Satz ${currentSetNumber}`}
-              inputMode="numeric"
-              placeholder="7 / -7"
-              value={currentValue}
-              onChange={(event) => setCurrentValue(event.target.value)}
-              onKeyDown={handleKeyDown}
-              title="7 = 11:7, -7 = 7:11"
-            />
-          </label>
-          <button className="btn small primary" type="button" disabled={!parsedCurrent} onClick={confirmSet}>
-            Satz {currentSetNumber} bestätigen
-          </button>
+        <div className="current-set-entry-group">
+          <div className="current-set-entry-row">
+            <label className="current-set-field">
+              <span>Satz {currentSetNumber}</span>
+              <input
+                aria-label={`Satz ${currentSetNumber}`}
+                inputMode="numeric"
+                placeholder="7 / -7"
+                value={currentValue}
+                onChange={(event) => setCurrentValue(event.target.value)}
+                onKeyDown={handleKeyDown}
+                title="7 = 11:7, -7 = 7:11"
+              />
+            </label>
+            <button className="btn small primary" type="button" disabled={!parsedCurrent} onClick={confirmSet}>
+              Satz {currentSetNumber} bestätigen
+            </button>
+          </div>
+          {compact && <span className="field-hint set-entry-quick-hint">Kurzform (linker Spieler): 7 = 11:7 · −7 = 7:11 · 10 = 12:10. Enter bestätigt den Satz.</span>}
         </div>
       )}
 

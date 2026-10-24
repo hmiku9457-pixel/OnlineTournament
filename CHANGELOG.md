@@ -1,3 +1,10 @@
+## 2026-10-24 – Bedienhilfen für neue Turnierleitungen
+- Kompakte „Anleitung & Hilfe“ mit acht direkt anwählbaren Themen: Schnellstart, Tische, nächste Spiele, Ergebnisse, Turnierverlauf, Teilnehmer, Spiele und Protokoll.
+- Kontextbezogene „? Hilfe“-Schaltflächen an den jeweiligen Bereichen und ein einzeiliger Hinweis auf den aktuellen nächsten Schritt (Vorstart, laufendes Turnier, Pause, Phasenwechsel oder Abschluss).
+- Im Hallentisch-Modal bleibt die Bedienhilfe einklappbar. Die satzweise Eingabe zeigt die Kurznotation direkt neben dem Eingabefeld; leere Warteschlangen erklären ihren Zustand.
+- Spielstatus-Bezeichnungen in der Turnierleitung sind auch in Tabellen auf Deutsch lesbar.
+- Tests für die kontextabhängigen Leitungs-Hinweise. Der lokale Prototyp wird ausdrücklich nicht als produktionsreife Mehrgeräte-Lösung dargestellt.
+
 ## 2026-10-24 – Abschluss der Turnierleitungs-Übersicht
 - Die nicht mehr benötigte „Schnellzugriff“-Mock-Karte wurde aus der Übersicht entfernt.
 - Der aktive Turnierleitungs-Tab ist mit kontrastreichem Blau und Tastaturfokus klar gekennzeichnet.
