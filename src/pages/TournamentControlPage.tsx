@@ -323,7 +323,8 @@ export function TournamentControlPage() {
   const [tournament, setTournament] = useState(initialTournament);
   const [tab, setTab] = useState<ControlTab>('overview');
   const [tableView, setTableView] = useState<'cards' | 'hall'>('cards');
-  const [selectedHallTable, setSelectedHallTable] = useState<string | null>('Tisch 1');
+  const [selectedHallTable, setSelectedHallTable] = useState<string | null>(null);
+  const [hallAssignMatchId, setHallAssignMatchId] = useState('');
   const [runtimeVersion, setRuntimeVersion] = useState(0);
   const [restClockTick, setRestClockTick] = useState(0);
   useEffect(() => {
@@ -553,92 +554,8 @@ export function TournamentControlPage() {
     refreshRuntime();
   }
 
-  return (
-    <>
-      <header className="control-head">
-        <div>
-          <button className="btn small control-back-button" type="button" onClick={() => navigate(-1)}>← Zurück</button>
-          <div className="control-kicker">Turnierleitung</div>
-          <div className="tournament-page-status-row">
-            <h1>{tournament.name}</h1>
-            <span className={tournament.status === 'RUNNING' ? 'badge live' : 'badge'}>{statusLabel(tournament.status)}</span>
-          </div>
-          <p className="muted">{tournament.phasesLabel} · {tournament.participants} Teilnehmer · {tournament.tables} Tische</p>
-        </div>
-        <div className="actions no-print">
-          <Link className="btn" to={`/player/${tournament.id}`}>Spieleransicht</Link>
-          <Link className="btn" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
-          {editableStage && ['GROUPS', 'SWISS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(editableStage.type) && (
-            <button className="btn" type="button" onClick={() => setTab('flow')}>Aktuelle Phase bearbeiten</button>
-          )}
-          {!tournament.hasStarted && tournament.status !== 'FINISHED' && (
-            <button className="btn primary" type="button" onClick={requestStartTournament}
-              disabled={!tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
-              title={tournament.stages[0] && getStageEntrants(tournament, tournament.stages[0]).length < 2 ? 'Mindestens zwei aktive Teilnehmer erforderlich' : undefined}>Turnier starten</button>
-          )}
-          {tournament.hasStarted && activeStage && tournament.status !== 'FINISHED' && (
-            <>
-              {tournament.status === 'RUNNING' ? (
-                <button className="btn" type="button" onClick={() => setStatus('PAUSED')}>Turnier pausieren</button>
-              ) : (
-                <button className="btn" type="button" onClick={() => setStatus('RUNNING')}>Turnier fortsetzen</button>
-              )}
-            </>
-          )}
-          {tournament.hasStarted && !activeStage && nextStartableStage && tournament.status !== 'FINISHED' && (
-            <button className="btn primary" type="button" onClick={requestStartNextPhase}>Nächste Phase starten</button>
-          )}
-        </div>
-      </header>
-
-      <nav className="control-tabs" aria-label="Turnierleitungsbereiche">
-        {(tournament.status === 'FINISHED' ? [...tabs, { id: 'final' as const, label: 'Endplatzierungen' }] : tabs).map((item) => (
-          <button className={tab === item.id ? 'control-tab active' : 'control-tab'} key={item.id} type="button" aria-current={tab === item.id ? 'page' : undefined} onClick={() => setTab(item.id)}>{item.label}</button>
-        ))}
-      </nav>
-
-      {tab === 'overview' && (
-        <section className="control-overview-stack">
-          <div>
-            <div className="control-section-head control-table-section-head">
-              <div>
-                <h2>Tische</h2>
-                <p className="muted">{tableView === 'hall' && tournament.venueLayout ? 'Spielübersicht nach den tatsächlichen Tischpositionen.' : 'Alle Spielorte auf einen Blick – auch freie Tische bleiben sichtbar.'}</p>
-              </div>
-              <div className="control-table-head-actions">
-                {tournament.venueLayout && (
-                  <div className="table-view-switch" role="group" aria-label="Darstellung der Tische">
-                    <button type="button" className={tableView === 'cards' ? 'active' : ''} aria-pressed={tableView === 'cards'} onClick={() => setTableView('cards')}>Tischkarten</button>
-                    <button type="button" className={tableView === 'hall' ? 'active' : ''} aria-pressed={tableView === 'hall'} onClick={() => setTableView('hall')}>Hallenansicht</button>
-                  </div>
-                )}
-                <span className="badge live">{tableMatches.length} laufend</span>
-                <button
-                  className="btn small primary"
-                  type="button"
-                  disabled={tournament.status !== 'RUNNING' || freeTables.length === 0 || !nextMatches.some((match) => match.status === 'WAITING')}
-                  onClick={autoAssignWaitingMatches}
-                >
-                  Automatisch zuweisen
-                </button>
-              </div>
-            </div>
-            {tournament.status === 'PAUSED' && <div className="assignment-message" role="status">Turnier pausiert: Neue Tischzuweisungen sind gesperrt. Laufende Spiele dürfen beendet werden.</div>}
-            {assignmentMessage && <div className="assignment-message" role="status">{assignmentMessage}</div>}
-            {tableView === 'hall' && tournament.venueLayout && (
-              <TournamentHallView
-                layout={tournament.venueLayout}
-                matchesByTable={matchesByTable}
-                blockedTables={blockedTables}
-                selectedTable={selectedHallTable}
-                canAssign={tournament.status === 'RUNNING'}
-                onSelectTable={setSelectedHallTable}
-                onAssignToTable={assignToTable}
-              />
-            )}
-            {tableView === 'hall' && tournament.venueLayout && selectedHallTable && (
-              <h3 className="hall-table-detail-heading">{selectedHallTable} · Bedienung</h3>
-            )}
+  // Gemeinsame Tischbedienung für Karte und Hallen-Modal.
+  const tableCards = (
             <div className={tableView === 'hall' && tournament.venueLayout ? 'overview-table-grid hall-table-detail' : 'overview-table-grid'}>
               {Array.from({ length: tournament.tables }, (_, index) => {
                 const tableName = `Tisch ${index + 1}`;
@@ -698,13 +615,143 @@ export function TournamentControlPage() {
                     ) : (
                       <div className="free-table-message">
                         <strong>{isBlocked ? 'Für dieses Turnier gesperrt' : 'Frei für die nächste Partie'}</strong>
-                        <span>{isBlocked ? 'Keine automatische oder manuelle Zuweisung möglich.' : 'Spiel hierher ziehen oder über „Zuweisen“ auswählen.'}</span>
+                        <span>{isBlocked ? 'Keine automatische oder manuelle Zuweisung möglich.' : tableView === 'hall' ? 'Wartende Partie direkt zuweisen oder auf den Tisch im Hallenplan ziehen.' : 'Spiel hierher ziehen oder über „Zuweisen“ auswählen.'}</span>
+                        {tableView === 'hall' && tournament.venueLayout && !isBlocked && tournament.status === 'RUNNING' && (
+                          <div className="hall-table-modal-assign">
+                            <label htmlFor={`hall-assign-${index}`}>Wartendes Spiel</label>
+                            <div className="hall-table-modal-assign-controls">
+                              <select id={`hall-assign-${index}`} value={hallAssignMatchId} onChange={(event) => setHallAssignMatchId(event.target.value)}>
+                                <option value="">Partie auswählen</option>
+                                {nextMatches.filter((waiting) => !getMockAssignmentBlockReason(tournament, waiting.id, tableName)).map((waiting) => (
+                                  <option key={waiting.id} value={waiting.id}>{waiting.sideA} – {waiting.sideB} · {waiting.round}</option>
+                                ))}
+                              </select>
+                              <button className="btn small primary" type="button" disabled={!hallAssignMatchId} onClick={() => {
+                                if (hallAssignMatchId && assignToTable(hallAssignMatchId, tableName)) setHallAssignMatchId('');
+                              }}>Zuweisen</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </article>
                 );
               })}
             </div>
+  );
+
+  return (
+    <>
+      <header className="control-head">
+        <div>
+          <button className="btn small control-back-button" type="button" onClick={() => navigate(-1)}>← Zurück</button>
+          <div className="control-kicker">Turnierleitung</div>
+          <div className="tournament-page-status-row">
+            <h1>{tournament.name}</h1>
+            <span className={tournament.status === 'RUNNING' ? 'badge live' : 'badge'}>{statusLabel(tournament.status)}</span>
+          </div>
+          <p className="muted">{tournament.phasesLabel} · {tournament.participants} Teilnehmer · {tournament.tables} Tische</p>
+        </div>
+        <div className="actions no-print">
+          <Link className="btn" to={`/player/${tournament.id}`}>Spieleransicht</Link>
+          <Link className="btn" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
+          {editableStage && ['GROUPS', 'SWISS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(editableStage.type) && (
+            <button className="btn" type="button" onClick={() => setTab('flow')}>Aktuelle Phase bearbeiten</button>
+          )}
+          {!tournament.hasStarted && tournament.status !== 'FINISHED' && (
+            <button className="btn primary" type="button" onClick={requestStartTournament}
+              disabled={!tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
+              title={tournament.stages[0] && getStageEntrants(tournament, tournament.stages[0]).length < 2 ? 'Mindestens zwei aktive Teilnehmer erforderlich' : undefined}>Turnier starten</button>
+          )}
+          {tournament.hasStarted && activeStage && tournament.status !== 'FINISHED' && (
+            <>
+              {tournament.status === 'RUNNING' ? (
+                <button className="btn" type="button" onClick={() => setStatus('PAUSED')}>Turnier pausieren</button>
+              ) : (
+                <button className="btn" type="button" onClick={() => setStatus('RUNNING')}>Turnier fortsetzen</button>
+              )}
+            </>
+          )}
+          {tournament.hasStarted && !activeStage && nextStartableStage && tournament.status !== 'FINISHED' && (
+            <button className="btn primary" type="button" onClick={requestStartNextPhase}>Nächste Phase starten</button>
+          )}
+        </div>
+      </header>
+
+      <nav className="control-tabs" aria-label="Turnierleitungsbereiche">
+        {(tournament.status === 'FINISHED' ? [...tabs, { id: 'final' as const, label: 'Endplatzierungen' }] : tabs).map((item) => (
+          <button className={tab === item.id ? 'control-tab active' : 'control-tab'} key={item.id} type="button" aria-current={tab === item.id ? 'page' : undefined} onClick={() => setTab(item.id)}>{item.label}</button>
+        ))}
+      </nav>
+
+      {tab === 'overview' && (
+        <section className="control-overview-stack">
+          <div>
+            <div className="control-section-head control-table-section-head">
+              <div>
+                <h2>Tische</h2>
+                <p className="muted">{tableView === 'hall' && tournament.venueLayout ? 'Spielübersicht nach den tatsächlichen Tischpositionen.' : 'Alle Spielorte auf einen Blick – auch freie Tische bleiben sichtbar.'}</p>
+              </div>
+              <div className="control-table-head-actions">
+                {tournament.venueLayout && (
+                  <div className="table-view-switch" role="group" aria-label="Darstellung der Tische">
+                    <button type="button" className={tableView === 'cards' ? 'active' : ''} aria-pressed={tableView === 'cards'} onClick={() => { setTableView('cards'); setSelectedHallTable(null); setMovingMatchId(null); }}>Tischkarten</button>
+                    <button type="button" className={tableView === 'hall' ? 'active' : ''} aria-pressed={tableView === 'hall'} onClick={() => { setTableView('hall'); setSelectedHallTable(null); setMovingMatchId(null); }}>Hallenansicht</button>
+                  </div>
+                )}
+                <span className="badge live">{tableMatches.length} laufend</span>
+                <button
+                  className="btn small primary"
+                  type="button"
+                  disabled={tournament.status !== 'RUNNING' || freeTables.length === 0 || !nextMatches.some((match) => match.status === 'WAITING')}
+                  onClick={autoAssignWaitingMatches}
+                >
+                  Automatisch zuweisen
+                </button>
+              </div>
+            </div>
+            {tournament.status === 'PAUSED' && <div className="assignment-message" role="status">Turnier pausiert: Neue Tischzuweisungen sind gesperrt. Laufende Spiele dürfen beendet werden.</div>}
+            {assignmentMessage && <div className="assignment-message" role="status">{assignmentMessage}</div>}
+            {tableView === 'hall' && tournament.venueLayout && (
+              <TournamentHallView
+                layout={tournament.venueLayout}
+                matchesByTable={matchesByTable}
+                blockedTables={blockedTables}
+                selectedTable={selectedHallTable}
+                canAssign={tournament.status === 'RUNNING'}
+                onSelectTable={(table) => { setSelectedHallTable(table); setHallAssignMatchId(''); setMovingMatchId(null); }}
+                onAssignToTable={assignToTable}
+              />
+            )}
+            {tableView === 'hall' && tournament.venueLayout ? (
+              selectedHallTable && (
+                <div className="prototype-modal-backdrop hall-table-modal-backdrop" role="presentation" onMouseDown={() => { setSelectedHallTable(null); setMovingMatchId(null); }}>
+                  <section
+                    className="prototype-modal hall-table-modal"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="hall-table-modal-title"
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape' && !(event.target as HTMLElement).closest('.result-correction-modal')) {
+                        event.stopPropagation();
+                        setSelectedHallTable(null);
+                        setMovingMatchId(null);
+                      }
+                    }}
+                  >
+                    <div className="hall-table-modal-head">
+                      <div>
+                        <span className="badge">HALLENANSICHT</span>
+                        <h2 id="hall-table-modal-title">{selectedHallTable} · Bedienung</h2>
+                      </div>
+                      <button className="btn small" type="button" autoFocus onClick={() => { setSelectedHallTable(null); setMovingMatchId(null); }}>Schließen</button>
+                    </div>
+                    <div className="hall-table-modal-content">{tableCards}</div>
+                  </section>
+                </div>
+              )
+            ) : tableCards}
 
           </div>
 

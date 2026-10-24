@@ -1603,6 +1603,49 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .tournament-hall-desk { min-height: 30px; padding: 6px; border-radius: 7px; }
 .tournament-hall-desk.outside { margin: 5px 0; }
 .tournament-hall-desk.side { min-width: 33px; }
-.hall-table-detail-heading { margin: 17px 0 8px; font-size: 1rem; }
 .overview-table-grid.hall-table-detail { display: block; max-width: 440px; margin-top: 0; }
 .overview-table-grid.hall-table-detail .overview-table-card { width: 100%; }
+
+/* Turnierleitung: Hallentische werden im Modal statt unter dem Hallenplan bedient. */
+.hall-table-modal {
+  width: min(600px, 100%);
+  max-height: min(90dvh, 850px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+.hall-table-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-shrink: 0;
+}
+.hall-table-modal-head h2 { margin: 7px 0 0; }
+.hall-table-modal-head .btn { flex-shrink: 0; }
+.hall-table-modal-content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+}
+.hall-table-modal-content .overview-table-grid.hall-table-detail { max-width: none; margin: 0; }
+.hall-table-modal-content .overview-table-card { box-shadow: none; }
+@media (max-width: 600px) {
+  .hall-table-modal-backdrop { padding: 10px; }
+  .hall-table-modal { padding: 14px; max-height: 94dvh; }
+  .hall-table-modal-head h2 { font-size: 1.1rem; }
+}
+
+.hall-table-modal-assign { width: 100%; margin-top: 10px; display: grid; gap: 6px; text-align: left; }
+.hall-table-modal-assign label { font-size: .8rem; font-weight: 700; color: #344054; }
+.hall-table-modal-assign-controls { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
+.hall-table-modal-assign-controls select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: white;
+}
+.hall-table-modal-assign-controls .btn { flex-shrink: 0; }
