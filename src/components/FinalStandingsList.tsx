@@ -61,7 +61,7 @@ export function FinalStandingsList({ standings, phaseNames }: FinalStandingsList
   const groups = groupPlacements(standings);
   const podium = groups.filter((group) => ['Platz 1', 'Platz 2', 'Platz 3'].includes(group.placement));
   const podiumGroups = new Set(podium);
-  const remainingPhases = groupByPhase(groups.filter((group) => !podiumGroups.has(group));
+  const remainingPhases = groupByPhase(groups.filter((group) => !podiumGroups.has(group)));
 
   return (
     <div className="final-standings-list" aria-label="Endplatzierungen">
