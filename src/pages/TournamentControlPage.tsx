@@ -346,32 +346,45 @@ export function TournamentControlPage() {
   const [startModal, setStartModal] = useState<{ kind: 'tournament' | 'phase'; stageName: string } | null>(null);
   const [skipThirdMatchId, setSkipThirdMatchId] = useState<string | null>(null);
   const [adminEditMatchId, setAdminEditMatchId] = useState<string | null>(null);
-  const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament, runtimeVersion, restClockTick]);
-  const blockedTables = useMemo(() => new Set(getBlockedMockTables(tournament)), [tournament, runtimeVersion]);
+  // Die Mock-Services lesen mutable localStorage-Daten. Diese Snapshots
+  // halten die bisherigen Cache-Invalidierungen durch Versionsänderungen bei,
+  // selbst wenn die Tournament-Referenz gleich bleibt.
+  const phaseSource = useMemo(() => ({ tournament, phaseVersion }), [tournament, phaseVersion]);
+  const runtimeSource = useMemo(() => ({ tournament, runtimeVersion }), [tournament, runtimeVersion]);
+  const clockSource = useMemo(() => ({ ...runtimeSource, restClockTick }), [runtimeSource, restClockTick]);
+  const phaseRuntimeSource = useMemo(() => ({ ...runtimeSource, phaseVersion }), [runtimeSource, phaseVersion]);
+  const phaseClockSource = useMemo(() => ({ ...phaseRuntimeSource, restClockTick }), [phaseRuntimeSource, restClockTick]);
+  const participantSource = useMemo(() => ({ tournament, participantVersion }), [tournament, participantVersion]);
+  const progressSource = useMemo(() => ({ ...phaseRuntimeSource, drawVersion }), [phaseRuntimeSource, drawVersion]);
+  const standingsSource = useMemo(() => ({ ...phaseRuntimeSource, participantVersion }), [phaseRuntimeSource, participantVersion]);
+
+  const matches = useMemo(() => getMockRuntimeMatches(clockSource.tournament), [clockSource]);
+  const blockedTables = useMemo(() => new Set(getBlockedMockTables(runtimeSource.tournament)), [runtimeSource]);
   const restTimeLabel = useMemo(
-    () => formatRemainingTournamentDuration(estimateRemainingTournamentMinutes(tournament)),
-    [tournament, runtimeVersion, phaseVersion],
+    () => formatRemainingTournamentDuration(estimateRemainingTournamentMinutes(phaseRuntimeSource.tournament)),
+    [phaseRuntimeSource],
   );
-  const openConfirmations = useMemo(() => countMockOpenConfirmations(tournament), [tournament, runtimeVersion, phaseVersion]);
-  const auditEntries = useMemo(() => getMockAudit(tournament.id), [tournament.id, runtimeVersion]);
-  const allTournamentMatches = useMemo(() => tournament.stages.filter((stage) => isStageStarted(tournament, stage)).flatMap((stage) => getMockStageMatches(tournament, stage)), [tournament, runtimeVersion, phaseVersion, restClockTick]);
-  const participants = useMemo(() => getRuntimeParticipantNames(tournament), [tournament, participantVersion]);
+  const openConfirmations = useMemo(() => countMockOpenConfirmations(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
+  const auditEntries = useMemo(() => getMockAudit(runtimeSource.tournament.id), [runtimeSource]);
+  const allTournamentMatches = useMemo(() => phaseClockSource.tournament.stages.filter((stage) => isStageStarted(phaseClockSource.tournament, stage)).flatMap((stage) => getMockStageMatches(phaseClockSource.tournament, stage)), [phaseClockSource]);
+  const participants = useMemo(() => getRuntimeParticipantNames(participantSource.tournament), [participantSource]);
   const participantProgress = useMemo(() => participants.map((name) => ({
     name,
-    progress: getMockParticipantProgress(tournament, name),
-  })), [participants, tournament, runtimeVersion, phaseVersion, drawVersion]);
+    progress: getMockParticipantProgress(progressSource.tournament, name),
+  })), [participants, progressSource]);
   const participantStatistics = useMemo(() => summarizeParticipantStatuses(
     participantProgress.map(({ progress }) => progress.status),
   ), [participantProgress]);
-  const finalStandings = useMemo(() => tournament.status === 'FINISHED' ? getMockFinalStandings(tournament) : [], [tournament, participantVersion, phaseVersion, runtimeVersion]);
+  const finalStandings = useMemo(() => standingsSource.tournament.status === 'FINISHED' ? getMockFinalStandings(standingsSource.tournament) : [], [standingsSource]);
   const nextMatches = matches.filter((match) => match.status === 'WAITING');
   const tableMatches = matches.filter((match) => ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch '));
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table) && !blockedTables.has(table));
-  const activeStage = useMemo(() => getActiveStage(tournament), [tournament, phaseVersion]);
-  const swissRecordFor = useMemo(() => getActiveSwissRecordLookup(tournament), [tournament, activeStage, runtimeVersion]);
-  const nextStartableStage = useMemo(() => getNextStartableStage(tournament), [tournament, phaseVersion]);
-  const editableStage = useMemo(() => tournament.stages.find((stage) => isStageEditable(tournament, stage)), [tournament, phaseVersion]);
+  const activeStage = useMemo(() => getActiveStage(phaseSource.tournament), [phaseSource]);
+  const swissSource = useMemo(() => ({ ...runtimeSource, activeStage }), [runtimeSource, activeStage]);
+  const swissRecordFor = useMemo(() => getActiveSwissRecordLookup(swissSource.tournament), [swissSource]);
+  const nextStartableStage = useMemo(() => getNextStartableStage(phaseSource.tournament), [phaseSource]);
+  const editableStage = useMemo(() => phaseSource.tournament.stages.find((stage) => isStageEditable(phaseSource.tournament, stage)), [phaseSource]);
   const selectedStage = useMemo(() => tournament.stages.find((stage) => stage.id === selectedStageId) ?? tournament.stages[0], [tournament, selectedStageId]);
 
   useEffect(() => {

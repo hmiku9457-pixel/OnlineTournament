@@ -1,4 +1,4 @@
-import { useMemo, useState, type DragEvent } from 'react';
+import type { DragEvent } from 'react';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import {
@@ -33,9 +33,8 @@ function getDragValue(event: DragEvent) {
 }
 
 export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
-  const [revision, setRevision] = useState(0);
   const editable = canEditDraw(tournament, stage);
-  const participants = useMemo(() => getStageEntrants(tournament, stage), [tournament, stage, revision]);
+  const participants = getStageEntrants(tournament, stage);
   const started = isStageStarted(tournament, stage);
   const stageIndex = tournament.stages.findIndex((item) => item.id === stage.id);
   const precededBySwiss = tournament.stages[stageIndex - 1]?.type === 'SWISS';
@@ -44,7 +43,6 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
   const waitingForPrevious = isStageLockedWaiting(tournament, stage);
 
   function changed() {
-    setRevision((value) => value + 1);
     onChanged();
   }
 

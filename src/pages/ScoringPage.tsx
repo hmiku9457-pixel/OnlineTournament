@@ -42,7 +42,9 @@ export function ScoringPage() {
   const bestOf = runtime?.match.bestOf ?? 3;
   const resultSets = completedSets.length ? completedSets : (existing?.sets ?? runtime?.match.sets ?? []);
   const wins = winsFromSets(resultSets);
-  const swissRecordFor = runtime ? getActiveSwissRecordLookup(runtime.tournament) : (_match: { stageId: string }, _name: string): string | undefined => undefined;
+  const swissRecordFor: ReturnType<typeof getActiveSwissRecordLookup> = runtime
+    ? getActiveSwissRecordLookup(runtime.tournament)
+    : () => undefined;
   const swissRecords = new Map<string, string>();
   if (runtime) {
     for (const name of [sideA, sideB]) {

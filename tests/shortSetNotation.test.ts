@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applySetCorrections, parseShortSet } from '@/components/SetBySetEntry';
+import { applySetCorrections, parseShortSet } from '@/domain/shortSetNotation';
 
 describe('Kurznotation der Sätze', () => {
   it('interpretiert -0 als 0:11 und +0 bzw. 0 als 11:0', () => {
