@@ -6,6 +6,7 @@ import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
+import { BracketDecisionTimeline } from '@/components/BracketDecisionTimeline';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
 import { getGroupQualificationHints } from '@/domain/groupQualification';
@@ -325,7 +326,7 @@ function StageCompetitionView({
                           </div>
                         );
                       })}
-                      {match.decision && <span className={match.decision.type === 'LOT' ? 'bracket-decision-label lottery' : 'bracket-decision-label'}>Endstand: {match.score} {scoreDecisionSuffix(match.decision)}{match.decision.type === 'LOT' && match.winner ? ` · Sieger: ${match.winner}` : ''}</span>}
+                      <BracketDecisionTimeline sets={match.sets} decision={match.decision} extraTimeProgress={match.extraTimeProgress} winner={match.winner} />
                     </article>
                   ))}
                 {roundIndex === rounds.length - 1 && thirdPlaceRound && (
@@ -343,7 +344,7 @@ function StageCompetitionView({
                             </span>
                           </div>
                         ))}
-                        {match.decision && <span className={match.decision.type === 'LOT' ? 'bracket-decision-label lottery' : 'bracket-decision-label'}>Endstand: {match.score} {scoreDecisionSuffix(match.decision)}{match.decision.type === 'LOT' && match.winner ? ` · Sieger: ${match.winner}` : ''}</span>}
+                        <BracketDecisionTimeline sets={match.sets} decision={match.decision} extraTimeProgress={match.extraTimeProgress} winner={match.winner} />
                       </article>
                     ))}
                   </div>
@@ -1153,7 +1154,7 @@ export function TournamentControlPage() {
                   <td>{match.phase}<div className="muted">{match.round}</div></td>
                   <td><strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>}</strong><div>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>}</div></td>
                   <td>{formatMockMatchRest(match, 'A')} / {formatMockMatchRest(match, 'B')}</td>
-                  <td>{venueMessage(match.table)}</td><td>{match.score} {scoreDecisionSuffix(match.decision)}</td>
+                  <td>{venueMessage(match.table)}</td><td>{match.score} {match.extraTimeProgress ? 'n.V. · LIVE' : scoreDecisionSuffix(match.decision)}</td>
                   <td><div className="actions compact-actions"><button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Ergebnis anzeigen</button>{match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) && <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Bearbeiten</button>}</div></td>
                 </tr>
               ))}</tbody>

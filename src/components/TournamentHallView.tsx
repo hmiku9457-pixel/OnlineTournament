@@ -66,6 +66,7 @@ export function TournamentHallView({
                         <span className="tournament-hall-match">
                           <span title={match.sideA}>{match.sideA}</span>
                           <strong className="tournament-hall-score">{match.score && match.score !== '–' ? match.score : '– : –'}</strong>
+                          {match.extraTimeProgress && <small className="tournament-hall-extra-time">n.V. · LIVE</small>}
                           <span title={match.sideB}>{match.sideB}</span>
                         </span>
                       ) : <span className="tournament-hall-empty">{blocked ? 'Keine Zuweisung' : 'Spiel zuweisen'}</span>}

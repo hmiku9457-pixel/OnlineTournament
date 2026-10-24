@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { getMockRuntimeMatches, getMockStageMatches, isMockParticipantWithdrawn, getSwissRecordBeforeRound, getSwissCurrentRecord } from '@/services/mockRuntime';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
+import { BracketDecisionTimeline } from '@/components/BracketDecisionTimeline';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
@@ -50,7 +51,7 @@ export function SpectatorPage() {
               <div className="spectator-match-head"><span className="badge live">LIVE</span><strong>{venueName(match.table)}</strong></div>
               <span className="muted">{match.round}</span>
               <div className="spectator-team">{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>}</div>
-              <div className="spectator-score">{match.score} {scoreDecisionSuffix(match.decision)}</div>
+              <div className="spectator-score">{match.score} {match.extraTimeProgress ? 'n.V. · LIVE' : scoreDecisionSuffix(match.decision)}</div>
               <div className="spectator-team">{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>}</div>
             </article>
           ))}
@@ -112,7 +113,7 @@ export function SpectatorPage() {
                     </span>
                   </div>
                 ))}
-                {match.decision && <span className={match.decision.type === 'LOT' ? 'bracket-decision-label lottery' : 'bracket-decision-label'}>Endstand: {match.score} {scoreDecisionSuffix(match.decision)}{match.decision.type === 'LOT' && match.winner ? ` · Sieger: ${match.winner}` : ''}</span>}
+                <BracketDecisionTimeline sets={match.sets} decision={match.decision} extraTimeProgress={match.extraTimeProgress} winner={match.winner} />
               </article>
             );
             return (

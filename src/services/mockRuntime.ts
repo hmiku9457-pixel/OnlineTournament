@@ -9,7 +9,7 @@ import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
-import { compareRankingRows, resultScore, resultWinnerSide, scoreWithDecision, sportScoring, setTarget, validateCompleteResult, validateScoreDecision, type ScoreDecision, type WinnerSide } from '@/domain/sportScoring';
+import { compareRankingRows, resultScore, resultWinnerSide, scoreWithDecision, sportScoring, setTarget, validateCompleteResult, validateScoreDecision, type ExtraTimeProgress, type ScoreDecision, type WinnerSide } from '@/domain/sportScoring';
 
 export { getRuntimeParticipantNames } from '@/services/mockParticipants';
 
@@ -30,6 +30,7 @@ export interface MockRuntimeMatch {
   sport: string;
   decisionSide?: WinnerSide;
   decision?: ScoreDecision;
+  extraTimeProgress?: ExtraTimeProgress;
   requiresWinner: boolean;
   pauseA: number | null;
   pauseB: number | null;
@@ -48,6 +49,7 @@ interface StoredMatchResult {
   forcedWinner?: string;
   decisionSide?: WinnerSide;
   decision?: ScoreDecision;
+  extraTimeProgress?: ExtraTimeProgress;
   /** Beide Halbfinalverlierer erhalten Platz 3, ohne eine Partie auszutragen. */
   thirdPlaceSkipped?: boolean;
   /** Tatsächlicher Abschlusszeitpunkt; bei kampflosen Partien wird keine Pause ausgelöst. */
@@ -449,6 +451,7 @@ function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchRes
     sets: savedResult?.sets ?? match.sets,
     decisionSide: savedResult?.decisionSide,
     decision: savedResult?.decision,
+    extraTimeProgress: status === 'FINISHED' ? undefined : savedResult?.extraTimeProgress,
     note: status === 'WAITING' ? 'Wartet auf Tischzuweisung' : undefined,
   };
 }
@@ -602,12 +605,12 @@ export function startMockMatch(matchId: string) {
   updateRuntime(matchId, { status: 'LIVE' });
 }
 
-export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: MockMatchState = 'LIVE') {
+export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: MockMatchState = 'LIVE', extraTimeProgress?: ExtraTimeProgress) {
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
   const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
   if (tournament && !canEditMockMatch(tournament, matchId)) return previous;
-  const next: StoredMatchResult = { ...previous, matchId, sets, status, decisionSide: undefined, decision: undefined, forcedWinner: undefined, thirdPlaceSkipped: undefined, confirmedA: previous?.confirmedA, confirmedB: previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
+  const next: StoredMatchResult = { ...previous, matchId, sets, status, decisionSide: undefined, decision: undefined, extraTimeProgress, forcedWinner: undefined, thirdPlaceSkipped: undefined, confirmedA: previous?.confirmedA, confirmedB: previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   if (tournament && sets.length > (previous?.sets.length ?? 0)) recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Ergebniseingabe (lokal)', action: 'SET_SAVED', description: sportScoring(tournament.sport).mode === 'score' ? 'Zwischenstand erfasst' : `Satz ${sets.length} bestätigt`, before: previous?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · '), after: sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') });
   return next;
@@ -941,7 +944,7 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
   }
   const adminPhaseConfirmation = status === 'FINISHED' && confirmedByAdmin && (stage?.type === 'SWISS' || stage?.type === 'KNOCKOUT');
   const next: StoredMatchResult = {
-    ...previous, matchId, sets, status, decisionSide, decision, forcedWinner: undefined, thirdPlaceSkipped: undefined,
+    ...previous, matchId, sets, status, decisionSide, decision, extraTimeProgress: undefined, forcedWinner: undefined, thirdPlaceSkipped: undefined,
     confirmedA: adminPhaseConfirmation ? true : previousFinal ? false : previous?.confirmedA,
     confirmedB: adminPhaseConfirmation ? true : previousFinal ? false : previous?.confirmedB,
     finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt,

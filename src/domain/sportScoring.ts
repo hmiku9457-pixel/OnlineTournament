@@ -8,8 +8,25 @@ export type WinnerSide = 'A' | 'B';
 /** Zusatzinformation zur Entscheidung eines nach regulärer Spielzeit unentschiedenen Spiels. */
 export type ScoreDecision =
   | { type: 'EXTRA_TIME'; regulationScore: MatchSet }
-  | { type: 'PENALTIES'; penaltyScore: MatchSet }
-  | { type: 'LOT' };
+  | { type: 'PENALTIES'; penaltyScore: MatchSet; regulationScore?: MatchSet }
+  | { type: 'LOT'; regulationScore?: MatchSet };
+
+/** Ein fortlaufender Stand der Verlängerung gehört zum Live-Spiel, noch nicht zum Endergebnis. */
+export interface ExtraTimeProgress {
+  regulationScore: MatchSet;
+}
+
+export function scoreDecisionTimeline(sets: MatchSet[], decision: ScoreDecision): { label: string; score: string }[] {
+  const score = (value: MatchSet) => `${value.sideAScore}:${value.sideBScore}`;
+  const current = sets[0];
+  if (!current) return [];
+  const regulation = decision.regulationScore;
+  const timeline = [{ label: 'FT', score: score(regulation ?? current) }];
+  if (regulation) timeline.push({ label: 'n.V.', score: score(current) });
+  if (decision.type === 'PENALTIES') timeline.push({ label: 'i.E.', score: score(decision.penaltyScore) });
+  if (decision.type === 'LOT') timeline.push({ label: 'Los', score: 'Entscheid' });
+  return timeline;
+}
 
 export function scoreDecisionSuffix(decision?: ScoreDecision, reversed = false): string {
   if (!decision) return '';
@@ -38,6 +55,14 @@ export function validateScoreDecision(sport: string, sets: MatchSet[], decisionS
     return null;
   }
   if (result.sideAScore !== result.sideBScore) return 'Eine Entscheidung ist nur bei Gleichstand erforderlich.';
+  if (decision.regulationScore) {
+    const regulation = decision.regulationScore;
+    if (!valid(regulation.sideAScore) || !valid(regulation.sideBScore)
+      || regulation.sideAScore !== regulation.sideBScore
+      || result.sideAScore < regulation.sideAScore || result.sideBScore < regulation.sideBScore) {
+      return 'Der Spielstand der Verlängerung darf nicht unter dem regulären Ergebnis liegen.';
+    }
+  }
   if (decision.type === 'PENALTIES') {
     const penalties = decision.penaltyScore;
     if (!valid(penalties.sideAScore) || !valid(penalties.sideBScore) || penalties.sideAScore === penalties.sideBScore) {

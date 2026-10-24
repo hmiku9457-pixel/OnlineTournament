@@ -41,7 +41,7 @@ export function PlayerTournamentPage() {
               <>
                 <div className="player-match-table">{venueName(snapshot.currentMatch.table)}</div>
                 <h2>{snapshot.currentMatch.sideA}{swissRecordFor(snapshot.currentMatch, snapshot.currentMatch.sideA) && <span className="swiss-record">{swissRecordFor(snapshot.currentMatch, snapshot.currentMatch.sideA)}</span>}</h2>
-                <div className="player-score">{snapshot.currentMatch.score}</div>
+                <div className="player-score">{snapshot.currentMatch.score}{snapshot.currentMatch.extraTimeProgress && <small className="sport-score-suffix"> n.V.</small>}</div>
                 <h2>{snapshot.currentMatch.sideB}{swissRecordFor(snapshot.currentMatch, snapshot.currentMatch.sideB) && <span className="swiss-record">{swissRecordFor(snapshot.currentMatch, snapshot.currentMatch.sideB)}</span>}</h2>
                 <p className="muted">{snapshot.currentMatch.phase} · {snapshot.currentMatch.round}</p>
                 <Link className="btn primary player-primary-action" to={`/score/${snapshot.currentMatch.id}`}>{resultMode.mode === 'score' ? 'Ergebnis eintragen' : 'Ergebnis / Sätze eintragen'}</Link>

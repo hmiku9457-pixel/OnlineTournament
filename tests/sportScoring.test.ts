@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { sportScoring, parseSportSet, isValidSportSet, resultScore, resultWinnerSide, scoreWithDecision, validateScoreDecision, validateCompleteResult, compareRankingRows } from '@/domain/sportScoring';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { BracketDecisionTimeline } from '@/components/BracketDecisionTimeline';
+import { ScoreMatchEntry } from '@/components/ScoreMatchEntry';
+import { sportScoring, parseSportSet, isValidSportSet, resultScore, resultWinnerSide, scoreWithDecision, scoreDecisionTimeline, validateScoreDecision, validateCompleteResult, compareRankingRows } from '@/domain/sportScoring';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { startFirstStage } from '@/services/mockPhaseLifecycle';
-import { completeMockMatch, getMockRuntimeMatches, getMockStoredResult, restoreMockCorrectedResult } from '@/services/mockRuntime';
+import { completeMockMatch, getMockRuntimeMatches, getMockStoredResult, restoreMockCorrectedResult, saveMockMatchSets } from '@/services/mockRuntime';
 import { buildMockBracket, buildMockGroups } from '@/services/mockCompetitionViews';
 import { getMockAudit } from '@/services/mockAudit';
 import type { MatchSet } from '@/domain/types';
@@ -64,6 +68,21 @@ describe('Sportartspezifische Ergebniserfassung', () => {
     expect(scoreWithDecision('football', tie, { type: 'LOT' })).toBe('1:1 (Losentscheid)');
     expect(validateScoreDecision('football', tie, undefined, { type: 'LOT' })).not.toBeNull();
     expect(validateScoreDecision('football', tie, 'A', { type: 'LOT' })).toBeNull();
+    const overtimePenalties = { type: 'PENALTIES' as const, penaltyScore: set(5, 4), regulationScore: set(1, 1) };
+    expect(scoreDecisionTimeline([set(2, 2)], overtimePenalties)).toEqual([
+      { label: 'FT', score: '1:1' }, { label: 'n.V.', score: '2:2' }, { label: 'i.E.', score: '5:4' },
+    ]);
+    expect(validateScoreDecision('football', [set(2, 2)], 'A', overtimePenalties)).toBeNull();
+    expect(validateScoreDecision('football', [set(0, 0)], 'A', overtimePenalties)).not.toBeNull();
+    expect(scoreDecisionTimeline([set(1, 1)], penalties)).toEqual([
+      { label: 'FT', score: '1:1' }, { label: 'i.E.', score: '4:5' },
+    ]);
+    expect(scoreDecisionTimeline([set(2, 1)], overtime)).toEqual([
+      { label: 'FT', score: '1:1' }, { label: 'n.V.', score: '2:1' },
+    ]);
+    const timeline = renderToStaticMarkup(createElement(BracketDecisionTimeline, { sets: [set(2, 2)], decision: overtimePenalties }));
+    expect(timeline.indexOf('FT')).toBeLessThan(timeline.indexOf('n.V.'));
+    expect(timeline.indexOf('n.V.')).toBeLessThan(timeline.indexOf('i.E.'));
   });
 
   it('sortiert direkte Ergebnisse nach Tabellenpunkten, Tor-/Punktedifferenz und erzielten Toren', () => {
@@ -97,6 +116,34 @@ function sampleTournament(sport: string, type: 'GROUPS' | 'KNOCKOUT') {
 }
 
 describe('Sportwertung in gespeicherten Turnieren', () => {
+  it('speichert einen unentschiedenen Live-Stand in der Verlängerung und bewahrt den FT-Stand auf', () => {
+    const tournament = sampleTournament('football', 'KNOCKOUT');
+    const game = getMockRuntimeMatches(tournament).find((entry) => entry.round === 'Halbfinale')!;
+    saveMockMatchSets(game.id, [set(1, 1)], 'LIVE', { regulationScore: set(1, 1) });
+    saveMockMatchSets(game.id, [set(2, 2)], 'LIVE', { regulationScore: set(1, 1) });
+    const live = getMockRuntimeMatches(tournament).find((entry) => entry.id === game.id)!;
+    expect(live.score).toBe('2:2');
+    expect(live.status).toBe('LIVE');
+    expect(live.extraTimeProgress?.regulationScore).toEqual(set(1, 1));
+    const liveBracket = buildMockBracket(tournament, tournament.stages[0]).flatMap((round) => round.matches).find((entry) => entry.id === game.id)!;
+    expect(liveBracket.extraTimeProgress?.regulationScore).toEqual(set(1, 1));
+    const bracketPreview = renderToStaticMarkup(createElement(BracketDecisionTimeline, { sets: liveBracket.sets, extraTimeProgress: liveBracket.extraTimeProgress }));
+    expect(bracketPreview).toContain('FT');
+    expect(bracketPreview).toContain('n.V.');
+    expect(bracketPreview).toContain('LIVE');
+    const form = renderToStaticMarkup(createElement(ScoreMatchEntry, { match: live }));
+    expect(form).toContain('Verlängerung');
+    expect(form).toContain('Reguläre Spielzeit 1:1');
+    expect(form).toContain('Zwischenstand speichern');
+    expect(form).not.toContain('sport-score-saved');
+    completeMockMatch(game.id, [set(2, 2)], 'FINISHED', false, 'B', { type: 'PENALTIES', penaltyScore: set(3, 4), regulationScore: set(1, 1) });
+    const final = getMockRuntimeMatches(tournament).find((entry) => entry.id === game.id)!;
+    expect(final.extraTimeProgress).toBeUndefined();
+    expect(final.decision?.regulationScore).toEqual(set(1, 1));
+    const bracket = buildMockBracket(tournament, tournament.stages[0]).flatMap((round) => round.matches).find((entry) => entry.id === game.id)!;
+    expect(bracket.winner).toBe(game.sideB);
+    expect(scoreWithDecision('football', bracket.sets!, bracket.decision)).toBe('2:2 (3:4 i.E.)');
+  });
   it('übernimmt Remis als 1 Tabellenpunkt und zeigt Tore in der Gruppenwertung', () => {
     const tournament = sampleTournament('football', 'GROUPS');
     const game = getMockRuntimeMatches(tournament)[0];

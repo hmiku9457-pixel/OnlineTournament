@@ -1,6 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
-import { compareRankingRows, resultMetrics, resultScore, resultWinnerSide, type ScoreDecision } from '@/domain/sportScoring';
+import { compareRankingRows, resultMetrics, resultScore, resultWinnerSide, type ExtraTimeProgress, type ScoreDecision } from '@/domain/sportScoring';
 import { getStageEntrants } from '@/services/mockPhaseLifecycle';
 import { getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import {
@@ -49,6 +49,7 @@ export interface MockBracketMatch {
   autoWinner?: string;
   sets?: MatchSet[];
   decision?: ScoreDecision;
+  extraTimeProgress?: ExtraTimeProgress;
 }
 
 export interface MockBracketRound {
@@ -189,7 +190,7 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
       score = 'Freilos';
     }
     const list = byRound.get(match.round) ?? [];
-    list.push({ id: match.id, sideA: match.sideA, sideB: match.sideB, score, winner, autoWinner: match.autoWinner, sets: stored?.sets, decision: stored?.decision });
+    list.push({ id: match.id, sideA: match.sideA, sideB: match.sideB, score, winner, autoWinner: match.autoWinner, sets: stored?.sets, decision: stored?.decision, extraTimeProgress: stored?.status === 'FINISHED' ? undefined : stored?.extraTimeProgress });
     byRound.set(match.round, list);
   });
 
