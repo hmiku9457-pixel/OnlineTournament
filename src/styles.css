@@ -1204,7 +1204,41 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .hall-plan-wrap.compact .hall-desk-outside.side { min-width: 25px; }
 .hall-plan-wrap.compact .hall-desk-outside.top,.hall-plan-wrap.compact .hall-desk-outside.bottom { min-height: 23px; }
 .control-hall-layout .hall-plan-scroller { padding: 2px 0; }
-.final-standings-table th,.final-standings-table td { padding-block: 9px; }
+/* Endplatzierungen: Platz und Teilnehmer bleiben optisch zusammen, Status rechts. */
+.final-standings-list { display: grid; gap: 6px; margin-top: 14px; }
+.final-standing-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center;
+  min-height: 51px; padding: 7px 12px; border: 1px solid #e4e7ec; border-radius: 10px; background: #fff;
+}
+.final-standing-row.is-first { border-color: #f5dc90; background: #fffcf2; }
+.final-standing-row.is-second { border-color: #d5dbe5; background: #fafbfc; }
+.final-standing-row.is-third { border-color: #ebd3bf; background: #fffaf5; }
+.final-standing-identity { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; align-items: center; min-width: 0; }
+.final-standing-rank {
+  display: inline-flex; justify-content: center; align-items: center; min-height: 28px;
+  border-radius: 7px; padding: 4px 7px; background: #f2f4f7; color: #344054;
+  font-weight: 800; font-size: .78rem; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.final-standing-rank.is-first { background: #fef0c7; color: #93370d; }
+.final-standing-rank.is-second { background: #e9edf3; color: #344054; }
+.final-standing-rank.is-third { background: #f9e8d7; color: #93471e; }
+.final-standing-person { display: grid; gap: 3px; min-width: 0; }
+.final-standing-person strong { font-size: .88rem; overflow-wrap: anywhere; line-height: 1.2; }
+.final-standing-person small { font-size: .73rem; color: #667085; line-height: 1.2; }
+.final-standing-status {
+  display: inline-flex; align-items: center; justify-content: center; justify-self: end;
+  border-radius: 999px; padding: 5px 10px; white-space: nowrap;
+  font-size: .72rem; font-weight: 800; background: #f2f4f7; color: #475467;
+}
+.final-standing-status.is-winner { background: #fef0c7; color: #93370d; }
+.final-standing-status.is-eliminated { background: #eff4ff; color: #3538cd; }
+.final-standing-status.is-withdrawn { background: #fff1e6; color: #b54708; }
+.final-standing-status.is-active { background: #dcfae6; color: #067647; }
+@media (max-width: 600px) {
+  .final-standing-row { grid-template-columns: minmax(0, 1fr); gap: 7px; }
+  .final-standing-identity { grid-template-columns: 96px minmax(0, 1fr); gap: 9px; }
+  .final-standing-status { justify-self: start; margin-left: 105px; }
+}
 @media (max-width: 700px) { .hall-editor-controls { align-items: start; flex-direction: column; } }
 
 .control-tables-with-plan { display: grid; grid-template-columns: minmax(0, 1fr) 230px; align-items: start; gap: 12px; }

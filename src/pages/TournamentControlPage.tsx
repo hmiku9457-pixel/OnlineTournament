@@ -20,6 +20,7 @@ import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
 import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
+import { FinalStandingsList } from '@/components/FinalStandingsList';
 import { VenueLayoutMini } from '@/components/VenueLayout';
 import { displayVenueMessage, displayVenueName, getVenueTerminology } from '@/domain/venueTerminology';
 import { TableStateLegend, TournamentHallView } from '@/components/TournamentHallView';
@@ -1175,17 +1176,7 @@ export function TournamentControlPage() {
           <div className="control-section-head"><div><h2>Endplatzierungen</h2>
             <p className="muted">Turnierweite Gesamtplatzierungen über alle Phasen. Gleiche Gruppenränge teilen sich einen Platzierungsbereich; Rückzüge werden gemäß ihrer letzten erreichten Phase eingeordnet.</p>
           </div></div>
-          <div className="table-wrap final-standings-table"><table>
-            <thead><tr><th>Endplatzierung</th><th>Teilnehmer</th><th>Letzte Phase</th><th>Status</th></tr></thead>
-            <tbody>{finalStandings.map((row) => (
-              <tr key={row.name}>
-                <td><strong>{row.placement ?? (row.status === 'Zurückgezogen' ? 'Zurückgezogen' : 'Keine Platzierung')}</strong></td>
-                <td>{row.name}</td>
-                <td>{tournament.stages[row.stageIndex]?.name ?? '–'}</td>
-                <td><span className="badge">{row.status}</span></td>
-              </tr>
-            ))}</tbody>
-          </table></div>
+          <FinalStandingsList standings={finalStandings} phaseNames={tournament.stages.map((stage) => stage.name)} />
         </section>
       )}
 
