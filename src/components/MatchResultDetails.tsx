@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MatchSet } from '@/domain/types';
-import { sportScoring } from '@/domain/sportScoring';
+import { scoreDecisionSuffix, sportScoring, type ScoreDecision } from '@/domain/sportScoring';
 
 interface Props {
   score: string;
@@ -8,6 +8,8 @@ interface Props {
   onEdit?: () => void;
   className?: string;
   sport?: string;
+  decision?: ScoreDecision;
+  decisionReversed?: boolean;
 }
 
 function tooltip(sets?: MatchSet[], sport = 'Tischtennis') {
@@ -16,7 +18,7 @@ function tooltip(sets?: MatchSet[], sport = 'Tischtennis') {
   return sets.map((set, index) => `Satz ${index + 1}: ${set.sideAScore}:${set.sideBScore}`).join(' · ');
 }
 
-export function MatchResultDetails({ score, sets, onEdit, className = '', sport = 'Tischtennis' }: Props) {
+export function MatchResultDetails({ score, sets, onEdit, className = '', sport = 'Tischtennis', decision, decisionReversed = false }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
 
@@ -34,13 +36,13 @@ export function MatchResultDetails({ score, sets, onEdit, className = '', sport 
       <button
         className="match-result-trigger"
         type="button"
-        title={score === 'W.O.' ? 'Kampflos gewertete Partie (Walkover)' : tooltip(sets, sport)}
+        title={score === 'W.O.' ? 'Kampflos gewertete Partie (Walkover)' : [tooltip(sets, sport), scoreDecisionSuffix(decision, decisionReversed)].filter(Boolean).join(' · ')}
         onClick={(event) => {
           event.stopPropagation();
           if (sets?.length) setOpen((value) => !value);
         }}
       >
-        {score === 'W.O.' ? 'Kampflos' : score}
+        {score === 'W.O.' ? 'Kampflos' : [score, scoreDecisionSuffix(decision, decisionReversed)].filter(Boolean).join(' ')}
       </button>
       {open && sets?.length ? (
         <span className="match-result-popover" role="dialog" onMouseDown={(event) => event.stopPropagation()}>
@@ -48,6 +50,7 @@ export function MatchResultDetails({ score, sets, onEdit, className = '', sport 
           <span className="match-result-set-list">
             {sets.map((set, index) => <span className="match-result-set-row" key={set.number}><span>{sportScoring(sport).mode === 'score' ? 'Ergebnis' : `Satz ${index + 1}`}</span><strong>{set.sideAScore}:{set.sideBScore}</strong></span>)}
           </span>
+          {decision && <span className="field-hint">{decision.type === 'EXTRA_TIME' ? 'Nach Verlängerung' : decision.type === 'PENALTIES' ? `Elfmeterschießen: ${scoreDecisionSuffix(decision, decisionReversed)}` : 'Sieger nach Losentscheid'}</span>}
           {onEdit && <button className="btn small" type="button" onClick={() => { setOpen(false); onEdit(); }}>Ergebnis bearbeiten</button>}
         </span>
       ) : null}

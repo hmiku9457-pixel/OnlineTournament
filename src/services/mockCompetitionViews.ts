@@ -1,6 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
-import { compareRankingRows, resultMetrics, resultScore, resultWinnerSide } from '@/domain/sportScoring';
+import { compareRankingRows, resultMetrics, resultScore, resultWinnerSide, type ScoreDecision } from '@/domain/sportScoring';
 import { getStageEntrants } from '@/services/mockPhaseLifecycle';
 import { getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import {
@@ -48,6 +48,7 @@ export interface MockBracketMatch {
   winner?: string;
   autoWinner?: string;
   sets?: MatchSet[];
+  decision?: ScoreDecision;
 }
 
 export interface MockBracketRound {
@@ -188,7 +189,7 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
       score = 'Freilos';
     }
     const list = byRound.get(match.round) ?? [];
-    list.push({ id: match.id, sideA: match.sideA, sideB: match.sideB, score, winner, autoWinner: match.autoWinner, sets: stored?.sets });
+    list.push({ id: match.id, sideA: match.sideA, sideB: match.sideB, score, winner, autoWinner: match.autoWinner, sets: stored?.sets, decision: stored?.decision });
     byRound.set(match.round, list);
   });
 

@@ -1,5 +1,6 @@
 /** Local prototype audit trail. Not a substitute for server-side identity or tamper-proof logging. */
 import type { MatchSet } from '@/domain/types';
+import type { ScoreDecision } from '@/domain/sportScoring';
 
 export type MockAuditAction =
   | 'MATCH_ASSIGNED' | 'MATCH_MOVED' | 'MATCH_UNASSIGNED'
@@ -22,6 +23,8 @@ export interface MockAuditEntry {
   afterSets?: MatchSet[];
   beforeDecisionSide?: 'A' | 'B';
   afterDecisionSide?: 'A' | 'B';
+  beforeDecision?: ScoreDecision;
+  afterDecision?: ScoreDecision;
 }
 
 const KEY = 'online-tournament:mock-audit:v1';

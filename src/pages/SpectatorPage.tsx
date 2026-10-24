@@ -3,12 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { getMockRuntimeMatches, getMockStageMatches, isMockParticipantWithdrawn, getSwissRecordBeforeRound, getSwissCurrentRecord } from '@/services/mockRuntime';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
+import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
 import { getMockTournament } from '@/services/mockTournamentStore';
 import { displayVenueMessage, getVenueTerminology } from '@/domain/venueTerminology';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { sportScoring } from '@/domain/sportScoring';
 
 
 export function SpectatorPage() {
@@ -50,7 +50,7 @@ export function SpectatorPage() {
               <div className="spectator-match-head"><span className="badge live">LIVE</span><strong>{venueName(match.table)}</strong></div>
               <span className="muted">{match.round}</span>
               <div className="spectator-team">{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>}</div>
-              <div className="spectator-score">{match.score}</div>
+              <div className="spectator-score">{match.score} {scoreDecisionSuffix(match.decision)}</div>
               <div className="spectator-team">{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>}</div>
             </article>
           ))}
@@ -112,6 +112,7 @@ export function SpectatorPage() {
                     </span>
                   </div>
                 ))}
+                {match.decision && <span className={match.decision.type === 'LOT' ? 'bracket-decision-label lottery' : 'bracket-decision-label'}>Endstand: {match.score} {scoreDecisionSuffix(match.decision)}{match.decision.type === 'LOT' && match.winner ? ` · Sieger: ${match.winner}` : ''}</span>}
               </article>
             );
             return (
@@ -157,7 +158,7 @@ export function SpectatorPage() {
               return <div className="player-game-row swiss-player-game-row" key={match.id}>
                 <span className="muted">{match.round}</span>
                 <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor dieser Runde">{opponentRecord}</span><span className="swiss-record swiss-record-current" title="Aktuelle Bilanz des Gegners">{opponentCurrentRecord}</span></span>
-                <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} wonByDecision={match.decisionSide ? match.decisionSide === (match.sideA === selectedSwiss.name ? 'A' : 'B') : undefined} /><MatchResultDetails {...result} sport={tournament.sport} />
+                <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} wonByDecision={match.decisionSide ? match.decisionSide === (match.sideA === selectedSwiss.name ? 'A' : 'B') : undefined} /><MatchResultDetails {...result} sport={tournament.sport} decision={match.decision} decisionReversed={match.sideB === selectedSwiss.name} />
               </div>;
             })}</div>
           </section>

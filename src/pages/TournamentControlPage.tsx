@@ -4,7 +4,7 @@ import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { StageCard } from '@/components/StageCard';
 import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
-import { sportScoring } from '@/domain/sportScoring';
+import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
@@ -226,7 +226,7 @@ function StageCompetitionView({
                     <span className="muted swiss-history-round">{match.round}</span>
                     <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor der Runde">{opponentRecord}</span><span className="swiss-record swiss-record-current" title="Aktuelle Bilanz des Gegners">{opponentCurrentRecord}</span></span>
                     <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} wonByDecision={match.decisionSide ? match.decisionSide === (match.sideA === selectedSwissPlayer ? 'A' : 'B') : undefined} />
-                    <MatchResultDetails score={result.score} sets={result.sets} sport={tournament.sport} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
+                    <MatchResultDetails score={result.score} sets={result.sets} sport={tournament.sport} decision={match.decision} decisionReversed={match.sideB === selectedSwissPlayer} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
                   </div>;
                 })}
               </div>
@@ -325,6 +325,7 @@ function StageCompetitionView({
                           </div>
                         );
                       })}
+                      {match.decision && <span className={match.decision.type === 'LOT' ? 'bracket-decision-label lottery' : 'bracket-decision-label'}>Endstand: {match.score} {scoreDecisionSuffix(match.decision)}{match.decision.type === 'LOT' && match.winner ? ` · Sieger: ${match.winner}` : ''}</span>}
                     </article>
                   ))}
                 {roundIndex === rounds.length - 1 && thirdPlaceRound && (
@@ -342,6 +343,7 @@ function StageCompetitionView({
                             </span>
                           </div>
                         ))}
+                        {match.decision && <span className={match.decision.type === 'LOT' ? 'bracket-decision-label lottery' : 'bracket-decision-label'}>Endstand: {match.score} {scoreDecisionSuffix(match.decision)}{match.decision.type === 'LOT' && match.winner ? ` · Sieger: ${match.winner}` : ''}</span>}
                       </article>
                     ))}
                   </div>
@@ -1151,7 +1153,7 @@ export function TournamentControlPage() {
                   <td>{match.phase}<div className="muted">{match.round}</div></td>
                   <td><strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>}</strong><div>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>}</div></td>
                   <td>{formatMockMatchRest(match, 'A')} / {formatMockMatchRest(match, 'B')}</td>
-                  <td>{venueMessage(match.table)}</td><td>{match.score}</td>
+                  <td>{venueMessage(match.table)}</td><td>{match.score} {scoreDecisionSuffix(match.decision)}</td>
                   <td><div className="actions compact-actions"><button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Ergebnis anzeigen</button>{match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) && <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Bearbeiten</button>}</div></td>
                 </tr>
               ))}</tbody>
@@ -1257,7 +1259,7 @@ export function TournamentControlPage() {
                                 return <tr key={match.id}>
                                   <td>{match.phase}</td><td>{match.round}</td>
                                   <td>{match.sideA === participant ? match.sideB : match.sideA}</td>
-                                  <td>{matchStatusLabel(match.status)}</td><td><MatchResultDetails {...resultForMatchParticipant(match, participant)} sport={tournament.sport} /></td>
+                                  <td>{matchStatusLabel(match.status)}</td><td><MatchResultDetails {...resultForMatchParticipant(match, participant)} sport={tournament.sport} decision={match.decision} decisionReversed={match.sideB === participant} /></td>
                                   <td>{match.status === 'FINISHED' && stage && canEditMockMatch(tournament, match.id)
                                     ? <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Spiel bearbeiten</button>
                                     : stage && isStageStarted(tournament, stage) && match.status !== 'FINISHED'

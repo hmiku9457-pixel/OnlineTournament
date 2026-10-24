@@ -42,7 +42,7 @@ function getTopics(sport: string): Array<{ id: ControlHelpTopic; label: string; 
     id: 'results', label: 'Ergebnisse', intro: scoreSport ? `${rules.plural} der beiden Seiten erfassen und die Partie abschließen.` : 'Sätze aus Sicht des links angezeigten Spielers eintragen.',
     steps: scoreSport ? [
       { title: 'Spielstand erfassen', description: `Die ${rules.plural.toLowerCase()} beider Seiten als ganze Zahlen eingeben. „Zwischenstand speichern“ aktualisiert die Live-Anzeige, ohne die Partie zu beenden.` },
-      { title: 'Unentschieden und Entscheidung', description: rules.allowsDraw ? 'In Gruppen sind Remis möglich. Im K.-o.-Modus und Schweizer System bei Gleichstand zusätzlich den Sieger nach Entscheidung auswählen.' : 'Bei Basketball bitte den Spielstand nach Verlängerung eingeben; ein Unentschieden ist nicht zulässig.' },
+      { title: 'Unentschieden und Entscheidung', description: rules.allowsDraw ? 'In Gruppen sind Remis möglich. Bei Gleichstand in Entscheidungsspielen öffnet „Spiel abschließen“ die Fragen nach Verlängerung, Elfmeterschießen oder Losentscheid.' : 'Bei Basketball bitte den Spielstand nach Verlängerung eingeben; ein Unentschieden ist nicht zulässig.' },
       { title: 'Spiel abschließen', description: 'Mit „Spiel abschließen“ den Endstand speichern. Die Spielfläche wird wieder frei und die Tabelle wird aktualisiert.' },
       { title: 'Korrekturen', description: 'Unter „Spiele“ kann die Turnierleitung ein abgeschlossenes Ergebnis bearbeiten, solange noch keine Folgephase die Korrektur sperrt.' },
     ] : [

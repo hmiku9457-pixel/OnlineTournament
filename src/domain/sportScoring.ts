@@ -5,6 +5,50 @@ import { parseShortSet } from '@/domain/shortSetNotation';
 export type ResultMode = 'score' | 'sets';
 export type WinnerSide = 'A' | 'B';
 
+/** Zusatzinformation zur Entscheidung eines nach regulärer Spielzeit unentschiedenen Spiels. */
+export type ScoreDecision =
+  | { type: 'EXTRA_TIME'; regulationScore: MatchSet }
+  | { type: 'PENALTIES'; penaltyScore: MatchSet }
+  | { type: 'LOT' };
+
+export function scoreDecisionSuffix(decision?: ScoreDecision, reversed = false): string {
+  if (!decision) return '';
+  if (decision.type === 'EXTRA_TIME') return 'n.V.';
+  if (decision.type === 'LOT') return '(Losentscheid)';
+  const { sideAScore, sideBScore } = decision.penaltyScore;
+  return `(${reversed ? sideBScore : sideAScore}:${reversed ? sideAScore : sideBScore} i.E.)`;
+}
+
+export function scoreWithDecision(sport: string, sets: MatchSet[], decision?: ScoreDecision, reversed = false): string {
+  return [resultScore(sport, sets), scoreDecisionSuffix(decision, reversed)].filter(Boolean).join(' ');
+}
+
+export function validateScoreDecision(sport: string, sets: MatchSet[], decisionSide?: WinnerSide, decision?: ScoreDecision): string | null {
+  if (!decision) return null; // Ältere Ergebnisse ohne Entscheidungsart bleiben lesbar.
+  if (sportScoring(sport).mode !== 'score' || sets.length !== 1) return 'Diese Entscheidungsart ist für die Partie nicht verfügbar.';
+  const result = sets[0];
+  const valid = (value: number) => Number.isSafeInteger(value) && value >= 0;
+  if (decision.type === 'EXTRA_TIME') {
+    const regulation = decision.regulationScore;
+    if (!valid(regulation.sideAScore) || !valid(regulation.sideBScore) || regulation.sideAScore !== regulation.sideBScore
+      || !valid(result.sideAScore) || !valid(result.sideBScore)
+      || result.sideAScore < regulation.sideAScore || result.sideBScore < regulation.sideBScore
+      || result.sideAScore === result.sideBScore) return 'Bitte einen gültigen, entschiedenen Endstand nach Verlängerung eintragen.';
+    if (decisionSide && decisionSide !== resultWinnerSide(sport, sets)) return 'Der Sieger passt nicht zum Endstand nach Verlängerung.';
+    return null;
+  }
+  if (result.sideAScore !== result.sideBScore) return 'Eine Entscheidung ist nur bei Gleichstand erforderlich.';
+  if (decision.type === 'PENALTIES') {
+    const penalties = decision.penaltyScore;
+    if (!valid(penalties.sideAScore) || !valid(penalties.sideBScore) || penalties.sideAScore === penalties.sideBScore) {
+      return 'Bitte ein eindeutiges Ergebnis des Elfmeterschießens eintragen.';
+    }
+    const penaltyWinner = penalties.sideAScore > penalties.sideBScore ? 'A' : 'B';
+    return decisionSide === penaltyWinner ? null : 'Der Sieger passt nicht zum Elfmeterschießen.';
+  }
+  return decisionSide ? null : 'Bitte den Sieger nach Losentscheid auswählen.';
+}
+
 export interface SportScoringRules {
   mode: ResultMode;
   unit: string;

@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { MatchSet } from '@/domain/types';
 import { SportResultEntry } from '@/components/SportResultEntry';
-import { resultScore, sportScoring } from '@/domain/sportScoring';
+import { scoreWithDecision, sportScoring } from '@/domain/sportScoring';
 import { displayVenueName } from '@/domain/venueTerminology';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import {
@@ -120,8 +120,9 @@ export function ScoringPage() {
           </div>
           <span className="badge ready">SPIEL ABGESCHLOSSEN</span>
           <h1>{sideA}{swissRecords.get(sideA) && <span className="swiss-record">{swissRecords.get(sideA)}</span>} – {sideB}{swissRecords.get(sideB) && <span className="swiss-record">{swissRecords.get(sideB)}</span>}</h1>
-          <div className="finished-score">{resultScore(runtime.tournament.sport, resultSets)}</div>
-          {existing?.decisionSide && <p className="field-hint">Sieger nach Entscheidung: {existing.decisionSide === 'A' ? sideA : sideB}</p>}
+          <div className="finished-score">{scoreWithDecision(runtime.tournament.sport, resultSets, existing?.decision)}</div>
+          {existing?.decision && <p className="field-hint">{existing.decision.type === 'LOT' ? 'Sieger nach Losentscheid' : existing.decision.type === 'PENALTIES' ? 'Sieger im Elfmeterschießen' : 'Sieger nach Verlängerung'}: {existing.decisionSide === 'A' || (!existing.decisionSide && resultSets[0]?.sideAScore > resultSets[0]?.sideBScore) ? sideA : sideB}</p>}
+          {!existing?.decision && existing?.decisionSide && <p className="field-hint">Sieger nach Entscheidung: {existing.decisionSide === 'A' ? sideA : sideB}</p>}
           <p className="score-waiting-message">Wartet auf nächste Partie.</p>
           <div className="completed-set-list">
             {rules.mode === 'sets' && resultSets.map((set) => (

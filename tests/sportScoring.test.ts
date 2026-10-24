@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { sportScoring, parseSportSet, isValidSportSet, resultScore, resultWinnerSide, validateCompleteResult, compareRankingRows } from '@/domain/sportScoring';
+import { sportScoring, parseSportSet, isValidSportSet, resultScore, resultWinnerSide, scoreWithDecision, validateScoreDecision, validateCompleteResult, compareRankingRows } from '@/domain/sportScoring';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { startFirstStage } from '@/services/mockPhaseLifecycle';
 import { completeMockMatch, getMockRuntimeMatches, getMockStoredResult, restoreMockCorrectedResult } from '@/services/mockRuntime';
@@ -47,6 +47,23 @@ describe('Sportartspezifische Ergebniserfassung', () => {
     expect(validateCompleteResult('Basketball', 1, [set(64, 64)], false)).toContain('Verlängerung');
     expect(validateCompleteResult('Basketball', 1, [set(64, 64)], true, 'A')).toContain('Verlängerung');
     expect(validateCompleteResult('Volleyball', 5, [set(25, 18)] , false)).toContain('3 gewonnene');
+  });
+
+  it('zeigt Verlängerung, Elfmeterschießen und Losentscheid eindeutig an und validiert die Entscheidung', () => {
+    const tie = [set(1, 1)];
+    const overtime = { type: 'EXTRA_TIME' as const, regulationScore: set(1, 1) };
+    const penalties = { type: 'PENALTIES' as const, penaltyScore: set(4, 5) };
+    expect(scoreWithDecision('football', [set(2, 1)], overtime)).toBe('2:1 n.V.');
+    expect(validateScoreDecision('football', [set(2, 1)], undefined, overtime)).toBeNull();
+    expect(validateScoreDecision('football', [set(1, 1)], undefined, overtime)).not.toBeNull();
+    expect(scoreWithDecision('football', tie, penalties)).toBe('1:1 (4:5 i.E.)');
+    expect(scoreWithDecision('football', tie, penalties, true)).toBe('1:1 (5:4 i.E.)');
+    expect(validateScoreDecision('football', tie, 'B', penalties)).toBeNull();
+    expect(validateScoreDecision('football', tie, 'A', penalties)).not.toBeNull();
+    expect(validateScoreDecision('football', tie, 'A', { type: 'PENALTIES', penaltyScore: set(4, 4) })).not.toBeNull();
+    expect(scoreWithDecision('football', tie, { type: 'LOT' })).toBe('1:1 (Losentscheid)');
+    expect(validateScoreDecision('football', tie, undefined, { type: 'LOT' })).not.toBeNull();
+    expect(validateScoreDecision('football', tie, 'A', { type: 'LOT' })).toBeNull();
   });
 
   it('sortiert direkte Ergebnisse nach Tabellenpunkten, Tor-/Punktedifferenz und erzielten Toren', () => {
@@ -98,6 +115,27 @@ describe('Sportwertung in gespeicherten Turnieren', () => {
     const result = getMockRuntimeMatches(tournament).find((entry) => entry.id === match.id)!;
     expect(result.score).toBe('3:3');
     expect(result.decisionSide).toBe('B');
+  });
+
+  it('speichert jede KO-Entscheidungsart samt Sieger, Anzeige und Korrektur-Rollback', () => {
+    const tournament = sampleTournament('football', 'KNOCKOUT');
+    const game = getMockRuntimeMatches(tournament).find((entry) => entry.round === 'Halbfinale')!;
+    completeMockMatch(game.id, [set(2, 1)], 'FINISHED', false, undefined, { type: 'EXTRA_TIME', regulationScore: set(1, 1) });
+    expect(getMockStoredResult(game.id)?.decision?.type).toBe('EXTRA_TIME');
+    expect(buildMockBracket(tournament, tournament.stages[0]).find((round) => round.label === 'Halbfinale')?.matches.find((entry) => entry.id === game.id)?.decision?.type).toBe('EXTRA_TIME');
+    expect(getMockRuntimeMatches(tournament).find((entry) => entry.id === game.id)?.score).toBe('2:1');
+    expect(getMockRuntimeMatches(tournament).find((entry) => entry.id === game.id)?.sideA).toBe(game.sideA);
+    completeMockMatch(game.id, [set(1, 1)], 'FINISHED', false, 'B', { type: 'PENALTIES', penaltyScore: set(4, 5) });
+    const penaltyResult = getMockStoredResult(game.id);
+    expect(scoreWithDecision('football', penaltyResult!.sets, penaltyResult!.decision)).toBe('1:1 (4:5 i.E.)');
+    expect(buildMockBracket(tournament, tournament.stages[0]).find((round) => round.label === 'Halbfinale')?.matches.find((entry) => entry.id === game.id)?.winner).toBe(game.sideB);
+    const correction = getMockAudit(tournament.id).find((entry) => entry.matchId === game.id && entry.action === 'RESULT_CORRECTED')!;
+    expect(restoreMockCorrectedResult(tournament, correction.id)).toBe(true);
+    expect(getMockStoredResult(game.id)?.decision?.type).toBe('EXTRA_TIME');
+    completeMockMatch(game.id, [set(1, 1)], 'FINISHED', false, 'A', { type: 'LOT' });
+    expect(buildMockBracket(tournament, tournament.stages[0]).find((round) => round.label === 'Halbfinale')?.matches.find((entry) => entry.id === game.id)?.winner).toBe(game.sideA);
+    expect(getMockRuntimeMatches(tournament).find((entry) => entry.id === game.id)?.decision).toEqual({ type: 'LOT' });
+    expect(() => completeMockMatch(game.id, [set(1, 1)], 'FINISHED', false, 'A', { type: 'PENALTIES', penaltyScore: set(2, 3) })).toThrow(/Sieger/);
   });
 
   it('stellt bei einer Ergebniskorrektur auch die frühere Siegerentscheidung wieder her', () => {

@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { createVenueLayout, layoutTableNumbers, resizeVenueLayout } from '@/domain/venueLayout';
 import { createMockTournament, getMockTournament, addMockParticipant, updateMockTournamentStatus, type MockPhaseInput } from '@/services/mockTournamentStore';
 import { getStageEntrants, startFirstStage } from '@/services/mockPhaseLifecycle';
@@ -68,6 +71,10 @@ describe('Hallenlayout und Vorstartteilnehmer', () => {
     expect(updated.participants).toBe(6);
     expect(updated.participantCodes?.['Nora Neu']).toMatch(/^\d{6}$/);
     expect(getStageEntrants(updated, updated.stages[0])).toContain('Nora Neu');
+    const assignment = getGroupAssignments(updated, updated.stages[0]);
+    expect(Object.keys(assignment)).toHaveLength(6);
+    expect(assignment).toHaveProperty('Nora Neu');
+    expect(updated.stages[0].settings.entrants).toBe(5); // Planwert bleibt alt; die Auslosung nutzt alle 6.
     expect(getMockStageBaseMatches(updated, updated.stages[0]).some((match) =>
       match.sideA === 'Nora Neu' || match.sideB === 'Nora Neu')).toBe(true);
     expect(addMockParticipant(cup.id, 'nora', 'neu').ok).toBe(false);
@@ -76,6 +83,24 @@ describe('Hallenlayout und Vorstartteilnehmer', () => {
     const live = getMockTournament(cup.id);
     expect(getStageEntrants(live, live.stages[0])).toContain('Nora Neu');
     expect(addMockParticipant(cup.id, 'Jens', 'Spät').ok).toBe(false);
+  });
+
+  it('zeigt auch den 20. nachgemeldeten Spieler in der Gruppenauslosung an', () => {
+    const names = Array.from({ length: 19 }, (_, i) => `Spieler ${String(i + 1).padStart(2, '0')}`);
+    const cup = createMockTournament({
+      name: 'Nachmeldetest', sport: 'football', discipline: 'SINGLES', tables: 4,
+      minimumMatches: 1, estimatedDurationMinutes: 100, participantNames: names,
+      phases: [{ ...group, entrantCount: 19, groupCount: 4 }],
+    });
+    expect(addMockParticipant(cup.id, 'Spieler', '20').ok).toBe(true);
+    const updated = getMockTournament(cup.id);
+    expect(updated.stages[0].settings.entrants).toBe(19);
+    expect(getStageEntrants(updated, updated.stages[0])).toHaveLength(20);
+    const markup = renderToStaticMarkup(createElement(PrestartDrawEditor, {
+      tournament: updated, stage: updated.stages[0], onChanged: () => {},
+    }));
+    expect(markup).toContain('Spieler 20');
+    expect((markup.match(/class="draw-player-chip"/g) ?? [])).toHaveLength(20);
   });
 
   it('unterstützt Nachmeldungen für Doppel, ohne Personen mehrfach einzutragen', () => {

@@ -67,8 +67,8 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
 
   if (stage.type === 'GROUPS') {
     const groupCount = Math.max(1, Number(stage.settings.groups) || 1);
-    const entrantCount = Math.max(1, Math.min(participants.length, Number(stage.settings.entrants) || participants.length));
-    const entrants = participants.slice(0, entrantCount);
+    // Nachmeldungen erhöhen den aktuellen Kader, ohne die ursprüngliche Phasenplanung zu ändern.
+    const entrants = participants;
     const assignments = getGroupAssignments(tournament, stage);
     const groups = Array.from({ length: groupCount }, (_, groupIndex) => ({
       groupIndex,

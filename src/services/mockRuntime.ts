@@ -9,7 +9,7 @@ import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
-import { compareRankingRows, resultScore, resultWinnerSide, sportScoring, setTarget, validateCompleteResult, type WinnerSide } from '@/domain/sportScoring';
+import { compareRankingRows, resultScore, resultWinnerSide, scoreWithDecision, sportScoring, setTarget, validateCompleteResult, validateScoreDecision, type ScoreDecision, type WinnerSide } from '@/domain/sportScoring';
 
 export { getRuntimeParticipantNames } from '@/services/mockParticipants';
 
@@ -29,6 +29,7 @@ export interface MockRuntimeMatch {
   bestOf: number;
   sport: string;
   decisionSide?: WinnerSide;
+  decision?: ScoreDecision;
   requiresWinner: boolean;
   pauseA: number | null;
   pauseB: number | null;
@@ -46,6 +47,7 @@ interface StoredMatchResult {
   confirmedB?: boolean;
   forcedWinner?: string;
   decisionSide?: WinnerSide;
+  decision?: ScoreDecision;
   /** Beide Halbfinalverlierer erhalten Platz 3, ohne eine Partie auszutragen. */
   thirdPlaceSkipped?: boolean;
   /** Tatsächlicher Abschlusszeitpunkt; bei kampflosen Partien wird keine Pause ausgelöst. */
@@ -446,6 +448,7 @@ function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchRes
     score: savedResult?.thirdPlaceSkipped ? 'Beide Platz 3' : savedResult?.forcedWinner && !savedResult.sets.length ? 'W.O.' : savedResult ? resultScore(match.sport, savedResult.sets) : match.score,
     sets: savedResult?.sets ?? match.sets,
     decisionSide: savedResult?.decisionSide,
+    decision: savedResult?.decision,
     note: status === 'WAITING' ? 'Wartet auf Tischzuweisung' : undefined,
   };
 }
@@ -604,7 +607,7 @@ export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: Moc
   const previous = current.find((item) => item.matchId === matchId);
   const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
   if (tournament && !canEditMockMatch(tournament, matchId)) return previous;
-  const next: StoredMatchResult = { ...previous, matchId, sets, status, decisionSide: undefined, forcedWinner: undefined, thirdPlaceSkipped: undefined, confirmedA: previous?.confirmedA, confirmedB: previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
+  const next: StoredMatchResult = { ...previous, matchId, sets, status, decisionSide: undefined, decision: undefined, forcedWinner: undefined, thirdPlaceSkipped: undefined, confirmedA: previous?.confirmedA, confirmedB: previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   if (tournament && sets.length > (previous?.sets.length ?? 0)) recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Ergebniseingabe (lokal)', action: 'SET_SAVED', description: sportScoring(tournament.sport).mode === 'score' ? 'Zwischenstand erfasst' : `Satz ${sets.length} bestätigt`, before: previous?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · '), after: sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') });
   return next;
@@ -916,7 +919,7 @@ function reconcileCompletedPhase(matchId: string) {
   }
 }
 
-export function completeMockMatch(matchId: string, sets: MatchSet[], status: MockMatchState = 'FINISHED', confirmedByAdmin = false, decisionSide?: WinnerSide) {
+export function completeMockMatch(matchId: string, sets: MatchSet[], status: MockMatchState = 'FINISHED', confirmedByAdmin = false, decisionSide?: WinnerSide, decision?: ScoreDecision) {
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
   const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
@@ -933,10 +936,12 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
     const isKnockout = ['KNOCKOUT', 'DOUBLE_ELIMINATION', 'PLACEMENT', 'SWISS'].includes(stage.type);
     const validationError = validateCompleteResult(tournament.sport, bestOf, sets, isKnockout, decisionSide);
     if (validationError) throw new Error(validationError);
+    const decisionError = validateScoreDecision(tournament.sport, sets, decisionSide, decision);
+    if (decisionError) throw new Error(decisionError);
   }
   const adminPhaseConfirmation = status === 'FINISHED' && confirmedByAdmin && (stage?.type === 'SWISS' || stage?.type === 'KNOCKOUT');
   const next: StoredMatchResult = {
-    ...previous, matchId, sets, status, decisionSide, forcedWinner: undefined, thirdPlaceSkipped: undefined,
+    ...previous, matchId, sets, status, decisionSide, decision, forcedWinner: undefined, thirdPlaceSkipped: undefined,
     confirmedA: adminPhaseConfirmation ? true : previousFinal ? false : previous?.confirmedA,
     confirmedB: adminPhaseConfirmation ? true : previousFinal ? false : previous?.confirmedB,
     finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt,
@@ -944,10 +949,14 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   if (tournament && status === 'FINISHED') {
     const resultText = (value: StoredMatchResult | undefined) => {
-      const scores = value?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') || '–';
-      return value?.decisionSide ? `${scores} · Siegerentscheidung ${value.decisionSide}` : scores;
+      const scores = value?.sets.length
+        ? sportScoring(tournament.sport).mode === 'score'
+          ? scoreWithDecision(tournament.sport, value.sets, value.decision)
+          : value.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ')
+        : '–';
+      return value?.decisionSide ? `${scores} · Sieger ${value.decisionSide}` : scores;
     };
-    recordMockAudit({ tournamentId: tournament.id, matchId, actor: previousFinal ? 'Turnierleitung (lokal)' : 'Ergebniseingabe (lokal)', action: previousFinal ? 'RESULT_CORRECTED' : 'RESULT_RECORDED', description: previousFinal ? 'Endergebnis nachträglich korrigiert' : 'Endergebnis eingetragen', before: resultText(previous), after: resultText(next), beforeSets: previousFinal ? previous?.sets : undefined, afterSets: previousFinal ? sets : undefined, beforeDecisionSide: previousFinal ? previous?.decisionSide : undefined, afterDecisionSide: previousFinal ? decisionSide : undefined });
+    recordMockAudit({ tournamentId: tournament.id, matchId, actor: previousFinal ? 'Turnierleitung (lokal)' : 'Ergebniseingabe (lokal)', action: previousFinal ? 'RESULT_CORRECTED' : 'RESULT_RECORDED', description: previousFinal ? 'Endergebnis nachträglich korrigiert' : 'Endergebnis eingetragen', before: resultText(previous), after: resultText(next), beforeSets: previousFinal ? previous?.sets : undefined, afterSets: previousFinal ? sets : undefined, beforeDecisionSide: previousFinal ? previous?.decisionSide : undefined, afterDecisionSide: previousFinal ? decisionSide : undefined, beforeDecision: previousFinal ? previous?.decision : undefined, afterDecision: previousFinal ? decision : undefined });
   }
   if (tournament && adminPhaseConfirmation) {
     recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Turnierleitung (lokal)', action: 'RESULT_CONFIRMED', description: 'Phasen-Endergebnis ausdrücklich durch die Turnierleitung bestätigt' });
@@ -971,7 +980,7 @@ export function restoreMockCorrectedResult(tournament: DemoTournament, auditId: 
   const current = readResults();
   const previous = current.find((item) => item.matchId === event.matchId);
   if (!previous || previous.status !== 'FINISHED' || JSON.stringify(previous.sets) !== JSON.stringify(event.afterSets)) return false;
-  const restored: StoredMatchResult = { ...previous, sets: event.beforeSets, decisionSide: event.beforeDecisionSide, confirmedA: false, confirmedB: false };
+  const restored: StoredMatchResult = { ...previous, sets: event.beforeSets, decisionSide: event.beforeDecisionSide, decision: event.beforeDecision, confirmedA: false, confirmedB: false };
   writeResults([restored, ...current.filter((item) => item.matchId !== event.matchId)]);
   const stage = tournament.stages.find((item) => event.matchId!.startsWith(`${item.id}-`));
   if (stage) refreshCompletedStageQualifiers(tournament, stage);
