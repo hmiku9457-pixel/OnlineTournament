@@ -1,3 +1,9 @@
+## 2026-10-24 – Layout-Feinschliff für die Turnierleitung
+- Hilfe-Buttons sind klar umrandet und zeigen das Fragezeichen hinter „Hilfe“; der Hauptbutton heißt neutral „Anleitung & Hilfe“.
+- Die Legende für laufende, freie und gesperrte Tische ist jetzt in Tischkarten- und Hallenansicht sichtbar.
+- Der Turnierkopf trennt Navigation und Ansichtslinks von Turnierstatus und operativen Aktionen; das Layout bricht auf kleinen Bildschirmen sauber um.
+- Die Kennzahlen der Turnierstatus-Karte stehen in vier eigenen Zeilen statt im 2×2-Raster.
+
 ## 2026-10-24 – Bedienhilfen für neue Turnierleitungen
 - Kompakte „Anleitung & Hilfe“ mit acht direkt anwählbaren Themen: Schnellstart, Tische, nächste Spiele, Ergebnisse, Turnierverlauf, Teilnehmer, Spiele und Protokoll.
 - Kontextbezogene „? Hilfe“-Schaltflächen an den jeweiligen Bereichen und ein einzeiliger Hinweis auf den aktuellen nächsten Schritt (Vorstart, laufendes Turnier, Pause, Phasenwechsel oder Abschluss).

@@ -15,7 +15,7 @@ import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, countM
 import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { VenueLayoutMini } from '@/components/VenueLayout';
-import { TournamentHallView } from '@/components/TournamentHallView';
+import { TableStateLegend, TournamentHallView } from '@/components/TournamentHallView';
 import { ControlHelpButton, TournamentControlHelp } from '@/components/TournamentControlHelp';
 import { getControlGuide, type ControlHelpTopic } from '@/domain/controlGuide';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
@@ -666,39 +666,45 @@ export function TournamentControlPage() {
   return (
     <>
       <header className="control-head">
-        <div>
+        <div className="control-utility-bar no-print">
           <button className="btn small control-back-button" type="button" onClick={() => navigate(-1)}>← Zurück</button>
-          <div className="control-kicker">Turnierleitung</div>
-          <div className="tournament-page-status-row">
-            <h1>{tournament.name}</h1>
-            <span className={tournament.status === 'RUNNING' ? 'badge live' : 'badge'}>{statusLabel(tournament.status)}</span>
+          <div className="control-utility-links">
+            <Link className="btn small" to={`/player/${tournament.id}`}>Spieleransicht</Link>
+            <Link className="btn small" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
+            <button className="btn small control-help-main-button" type="button" onClick={() => setHelpTopic('start')}>Anleitung & Hilfe</button>
           </div>
-          <p className="muted">{tournament.phasesLabel} · {tournament.participants} Teilnehmer · {tournament.tables} Tische</p>
         </div>
-        <div className="actions no-print">
-          <button className="btn control-help-main-button" type="button" onClick={() => setHelpTopic('start')}>? Anleitung & Hilfe</button>
-          <Link className="btn" to={`/player/${tournament.id}`}>Spieleransicht</Link>
-          <Link className="btn" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
-          {editableStage && ['GROUPS', 'SWISS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(editableStage.type) && (
-            <button className="btn" type="button" onClick={() => setTab('flow')}>Aktuelle Phase bearbeiten</button>
-          )}
-          {!tournament.hasStarted && tournament.status !== 'FINISHED' && (
-            <button className="btn primary" type="button" onClick={requestStartTournament}
-              disabled={!tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
-              title={tournament.stages[0] && getStageEntrants(tournament, tournament.stages[0]).length < 2 ? 'Mindestens zwei aktive Teilnehmer erforderlich' : undefined}>Turnier starten</button>
-          )}
-          {tournament.hasStarted && activeStage && tournament.status !== 'FINISHED' && (
-            <>
-              {tournament.status === 'RUNNING' ? (
-                <button className="btn" type="button" onClick={() => setStatus('PAUSED')}>Turnier pausieren</button>
-              ) : (
-                <button className="btn" type="button" onClick={() => setStatus('RUNNING')}>Turnier fortsetzen</button>
-              )}
-            </>
-          )}
-          {tournament.hasStarted && !activeStage && nextStartableStage && tournament.status !== 'FINISHED' && (
-            <button className="btn primary" type="button" onClick={requestStartNextPhase}>Nächste Phase starten</button>
-          )}
+        <div className="control-hero-bar">
+          <div className="control-identity">
+            <div className="control-kicker">Turnierleitung</div>
+            <div className="tournament-page-status-row">
+              <h1>{tournament.name}</h1>
+              <span className={tournament.status === 'RUNNING' ? 'badge live' : 'badge'}>{statusLabel(tournament.status)}</span>
+            </div>
+            <p className="muted">{tournament.phasesLabel} · {tournament.participants} Teilnehmer · {tournament.tables} Tische</p>
+          </div>
+          <div className="actions control-primary-actions no-print">
+            {editableStage && ['GROUPS', 'SWISS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(editableStage.type) && (
+              <button className="btn" type="button" onClick={() => setTab('flow')}>Aktuelle Phase bearbeiten</button>
+            )}
+            {!tournament.hasStarted && tournament.status !== 'FINISHED' && (
+              <button className="btn primary" type="button" onClick={requestStartTournament}
+                disabled={!tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
+                title={tournament.stages[0] && getStageEntrants(tournament, tournament.stages[0]).length < 2 ? 'Mindestens zwei aktive Teilnehmer erforderlich' : undefined}>Turnier starten</button>
+            )}
+            {tournament.hasStarted && activeStage && tournament.status !== 'FINISHED' && (
+              <>
+                {tournament.status === 'RUNNING' ? (
+                  <button className="btn" type="button" onClick={() => setStatus('PAUSED')}>Turnier pausieren</button>
+                ) : (
+                  <button className="btn" type="button" onClick={() => setStatus('RUNNING')}>Turnier fortsetzen</button>
+                )}
+              </>
+            )}
+            {tournament.hasStarted && !activeStage && nextStartableStage && tournament.status !== 'FINISHED' && (
+              <button className="btn primary" type="button" onClick={requestStartNextPhase}>Nächste Phase starten</button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -741,6 +747,7 @@ export function TournamentControlPage() {
             </div>
             {tournament.status === 'PAUSED' && <div className="assignment-message" role="status">Turnier pausiert: Neue Tischzuweisungen sind gesperrt. Laufende Spiele dürfen beendet werden.</div>}
             {assignmentMessage && <div className="assignment-message" role="status">{assignmentMessage}</div>}
+            <div className="control-table-legend"><TableStateLegend /></div>
             {tableView === 'hall' && tournament.venueLayout && (
               <TournamentHallView
                 layout={tournament.venueLayout}

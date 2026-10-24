@@ -1735,3 +1735,87 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 @media print {
   .control-guide-strip, .control-help-button, .control-help-main-button, .control-help-backdrop { display: none !important; }
 }
+
+/* Turnierleitung: klar getrennte Navigation, Turnierkopf und Hauptaktionen. */
+.control-head { display: grid; gap: 10px; margin-bottom: 12px; }
+.control-utility-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
+.control-utility-bar .control-back-button { margin: 0; }
+.control-utility-links { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px; }
+.control-utility-links .btn { white-space: nowrap; }
+.control-hero-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  padding: 17px 20px;
+  border: 1px solid #e4e7ec;
+  border-radius: 14px;
+  background: linear-gradient(120deg, #fff 58%, #f8fafc);
+  box-shadow: 0 1px 3px rgb(16 24 40 / 4%);
+}
+.control-identity { flex: 1 1 280px; min-width: 0; }
+.control-hero-bar .tournament-page-status-row { flex-wrap: wrap; }
+.control-hero-bar h1 { overflow-wrap: anywhere; }
+.control-primary-actions { justify-content: flex-end; align-items: center; gap: 8px; }
+.control-primary-actions .btn { white-space: nowrap; }
+
+/* Die Hilfeschaltflächen wirken wie echte Buttons und tragen das ? am Ende. */
+.control-help-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: white;
+  color: #344054;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 5%);
+}
+.control-help-button:hover { background: #f2f4f7; border-color: #98a2b3; }
+.control-help-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #e4e7ec;
+  color: #344054;
+  font-size: .68rem;
+  font-weight: 900;
+}
+.btn.control-help-main-button { background: white; border-color: #d0d5dd; color: #344054; box-shadow: none; }
+.btn.control-help-main-button:hover { background: #f2f4f7; border-color: #98a2b3; }
+
+/* Dieselbe Farb-Legende für Tischkarten und Hallenplan. */
+.control-table-legend { margin: 9px 0 5px; }
+.control-table-legend .tournament-hall-legend { gap: 10px 16px; }
+.control-table-legend + .tournament-hall { margin-top: 5px; }
+
+/* Statuskennzahlen: vier separate Zeilen statt eines zu engen 2x2-Rasters. */
+.control-status-card .control-metrics-grid { grid-template-columns: minmax(0, 1fr); gap: 0; margin-top: 8px; }
+.control-status-card .control-metrics-grid > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  min-width: 0;
+  padding: 9px 0;
+  border-bottom: 1px solid #eaecf0;
+}
+.control-status-card .control-metrics-grid > div:last-child { border-bottom: 0; padding-bottom: 2px; }
+.control-status-card .control-metrics-grid .muted { flex: 1 1 115px; font-size: .75rem; }
+.control-status-card .control-metrics-grid strong { flex: 0 1 auto; min-width: 0; text-align: right; font-size: .91rem; overflow-wrap: anywhere; }
+
+@media (max-width: 720px) {
+  .control-hero-bar { align-items: flex-start; padding: 14px; }
+  .control-identity { flex-basis: 100%; }
+  .control-primary-actions { justify-content: flex-start; }
+}
+@media (max-width: 560px) {
+  .control-utility-links { justify-content: flex-start; width: 100%; }
+  .control-utility-links .btn { flex: 1 1 auto; text-align: center; }
+  .control-primary-actions .btn { white-space: normal; }
+}

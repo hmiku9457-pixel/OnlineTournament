@@ -76,8 +76,8 @@ const topics: Array<{ id: ControlHelpTopic; label: string; intro: string; steps:
   },
 ];
 
-export function ControlHelpButton({ topic, onOpen, label = '? Hilfe' }: { topic: ControlHelpTopic; onOpen: (topic: ControlHelpTopic) => void; label?: string }) {
-  return <button type="button" className="control-help-button" aria-label={`Hilfe: ${topics.find((item) => item.id === topic)?.label}`} onClick={() => onOpen(topic)}>{label}</button>;
+export function ControlHelpButton({ topic, onOpen, label }: { topic: ControlHelpTopic; onOpen: (topic: ControlHelpTopic) => void; label?: string }) {
+  return <button type="button" className="control-help-button" aria-label={`Hilfe: ${topics.find((item) => item.id === topic)?.label}`} onClick={() => onOpen(topic)}>{label ?? <>Hilfe <span className="control-help-mark" aria-hidden="true">?</span></>}</button>;
 }
 
 export function TournamentControlHelp({ initialTopic, onClose }: { initialTopic: ControlHelpTopic; onClose: () => void }) {

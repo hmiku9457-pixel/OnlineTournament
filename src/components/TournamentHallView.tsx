@@ -11,17 +11,22 @@ interface TournamentHallViewProps {
   onAssignToTable: (matchId: string, table: string) => boolean;
 }
 
+export function TableStateLegend() {
+  return (
+    <div className="tournament-hall-legend" aria-label="Legende der Tischzustände">
+      <span className="hall-legend-item running">Laufendes Spiel</span>
+      <span className="hall-legend-item free">Freier Tisch</span>
+      <span className="hall-legend-item locked">Gesperrter Tisch</span>
+    </div>
+  );
+}
+
 /** The plan uses fixed-width, readable tiles; large halls scroll rather than shrink. */
 export function TournamentHallView({
   layout, matchesByTable, blockedTables, selectedTable, canAssign, onSelectTable, onAssignToTable,
 }: TournamentHallViewProps) {
   return (
     <div className="tournament-hall">
-      <div className="tournament-hall-legend" aria-label="Legende der Tischzustände">
-        <span className="hall-legend-item running">Laufendes Spiel</span>
-        <span className="hall-legend-item free">Freier Tisch</span>
-        <span className="hall-legend-item locked">Gesperrter Tisch</span>
-      </div>
       <p className="muted tournament-hall-hint">Tisch auswählen, um Ergebnis und Zuweisung zu bearbeiten. Wartende Spiele können auf freie Tische gezogen werden. Bei breiten Hallenplänen horizontal scrollen.</p>
       <div className="tournament-hall-scroller" role="region" aria-label="Hallenplan der Turniertische" tabIndex={0}>
         <div className="tournament-hall-plan">
