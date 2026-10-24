@@ -115,13 +115,80 @@ export function getMockParticipantProgress(tournament: DemoTournament, name: str
   return { status: 'Aktiv' };
 }
 
-/** Completed-tournament summary: placements from older elimination phases retain their group/phase context. */
+/**
+ * Endplatzierungen müssen turnierweit eindeutig bzw. bewusst geteilt sein.
+ * Jede spätere gestartete Phase steht vor den Teilnehmern, die in einer
+ * früheren Phase ausschieden oder zurückgezogen wurden. Innerhalb einer
+ * Ausscheidungsstufe entscheidet die Platzierung in genau dieser Phase.
+ * Rückzug bleibt ein Status und ändert die sportlich erreichte Reihenfolge nicht.
+ */
 export function getMockFinalStandings(tournament: DemoTournament) {
-  return getRuntimeParticipantNames(tournament).map((name) => {
+  const rows = getRuntimeParticipantNames(tournament).map((name) => {
     const progress = getMockParticipantProgress(tournament, name);
     const stageIndex = tournament.stages.reduce((latest, stage, index) =>
       isStageStarted(tournament, stage) && getStageEntrants(tournament, stage).includes(name) ? index : latest, -1);
-    const placementNumber = Number(progress.placement?.match(/Platz\s+(\d+)/)?.[1] ?? Number.MAX_SAFE_INTEGER);
-    return { name, ...progress, stageIndex, placementNumber };
-  }).sort((a, b) => b.stageIndex - a.stageIndex || a.placementNumber - b.placementNumber || a.name.localeCompare(b.name, 'de'));
+    return { name, ...progress, stageIndex, placementNumber: Number.MAX_SAFE_INTEGER };
+  });
+  let nextPlace = 1;
+  const asRange = (from: number, count: number) => `Platz ${from}${count > 1 ? `–${from + count - 1}` : ''}`;
+
+  for (let stageIndex = tournament.stages.length - 1; stageIndex >= -1; stageIndex -= 1) {
+    const participants = rows.filter((row) => row.stageIndex === stageIndex);
+    if (!participants.length) continue;
+    const stage = tournament.stages[stageIndex];
+    // Die letzte Phase ist für ihre Teilnehmer eine eigene Ergebnisklasse.
+    // Gruppenplatzierungen verschiedener Gruppen sind gleichrangig.
+    if (stage?.type === 'GROUPS') {
+      const positions = new Map<string, { rank: number; group: string }>();
+      for (const group of buildMockGroups(tournament, stage)) {
+        for (const standing of group.standings) positions.set(standing.name, { rank: standing.rank, group: group.label });
+      }
+      const ranks = [...new Set(participants.map((row) => positions.get(row.name)?.rank ?? Number.MAX_SAFE_INTEGER))].sort((a, b) => a - b);
+      for (const rank of ranks) {
+        const tied = participants.filter((row) => (positions.get(row.name)?.rank ?? Number.MAX_SAFE_INTEGER) === rank);
+        const label = asRange(nextPlace, tied.length);
+        for (const row of tied) {
+          const group = positions.get(row.name)?.group;
+          row.placement = group && Number.isFinite(rank) ? `${label} · ${rank}. Platz ${group}` : label;
+          row.placementNumber = nextPlace;
+        }
+        nextPlace += tied.length;
+      }
+    } else if (stage?.type === 'SWISS') {
+      const ranks = new Map(buildSwissStandings(tournament, stage).map((standing) => [standing.name, standing.rank]));
+      participants.sort((a, b) => (ranks.get(a.name) ?? Infinity) - (ranks.get(b.name) ?? Infinity) || a.name.localeCompare(b.name, 'de'));
+      for (const row of participants) {
+        row.placement = asRange(nextPlace, 1);
+        row.placementNumber = nextPlace++;
+      }
+    } else if (stage?.type === 'KNOCKOUT' || stage?.type === 'DOUBLE_ELIMINATION' || stage?.type === 'PLACEMENT') {
+      const ranks = (name: string) => {
+        const placement = knockoutPlacement(tournament, stage, name);
+        return Number(placement?.match(/Platz\s+(\d+)/)?.[1] ?? Number.MAX_SAFE_INTEGER);
+      };
+      const rankValues = [...new Set(participants.map((row) => ranks(row.name)))].sort((a, b) => a - b);
+      for (const rank of rankValues) {
+        const tied = participants.filter((row) => ranks(row.name) === rank);
+        // Bei abgewähltem Bronze-Spiel sind zwei dritte Plätze ausdrücklich
+        // gleichrangig. Kein künstliches Platz-3–4 daraus machen.
+        const jointThirdPlace = rank === 3 && tied.length > 1 && tied.every((row) => knockoutPlacement(tournament, stage, row.name) === 'Platz 3');
+        const label = jointThirdPlace ? `Platz ${nextPlace}` : asRange(nextPlace, tied.length);
+        for (const row of tied) {
+          row.placement = label;
+          row.placementNumber = nextPlace;
+        }
+        nextPlace += tied.length;
+      }
+    } else {
+      // Ohne absolvierte Phase gibt es keinen sportlichen Vergleich.
+      // Diese Teilnehmer teilen sich die letzten noch freien Plätze.
+      const label = asRange(nextPlace, participants.length);
+      for (const row of participants) {
+        row.placement = label;
+        row.placementNumber = nextPlace;
+      }
+      nextPlace += participants.length;
+    }
+  }
+  return rows.sort((a, b) => a.placementNumber - b.placementNumber || a.name.localeCompare(b.name, 'de'));
 }

@@ -10,6 +10,7 @@ import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
+import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, countMockOpenConfirmations, adminConfirmMockMatch, getMockMatchConfirmation, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
 import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
@@ -368,9 +369,7 @@ export function TournamentControlPage() {
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table) && !blockedTables.has(table));
   const activeStage = useMemo(() => getActiveStage(tournament), [tournament, phaseVersion]);
-  const activeSwissRecords = useMemo(() => (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')
-    ? new Map(buildSwissStandings(tournament, activeStage).map((row) => [row.name, `${row.wins}:${row.losses}`]))
-    : new Map<string, string>(), [tournament, activeStage, runtimeVersion]);
+  const swissRecordFor = useMemo(() => getActiveSwissRecordLookup(tournament), [tournament, activeStage, runtimeVersion]);
   const nextStartableStage = useMemo(() => getNextStartableStage(tournament), [tournament, phaseVersion]);
   const editableStage = useMemo(() => tournament.stages.find((stage) => isStageEditable(tournament, stage)), [tournament, phaseVersion]);
   const selectedStage = useMemo(() => tournament.stages.find((stage) => stage.id === selectedStageId) ?? tournament.stages[0], [tournament, selectedStageId]);
@@ -639,7 +638,7 @@ export function TournamentControlPage() {
                     {match ? (
                       <>
                         <span className="muted">{match.phase} · {match.round} · BO{match.bestOf}</span>
-                        <SetBySetEntry match={match} swissAdminEntry={(activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')} onSaved={refreshRuntime} compact sideARecord={activeSwissRecords.get(match.sideA)} sideBRecord={activeSwissRecords.get(match.sideB)} />
+                        <SetBySetEntry match={match} swissAdminEntry={(activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')} onSaved={refreshRuntime} compact sideARecord={swissRecordFor(match, match.sideA)} sideBRecord={swissRecordFor(match, match.sideB)} />
                         {!(requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED') && (
                           <div className="table-operational-actions">
                             <button className="btn small" type="button" onClick={() => setMovingMatchId((old) => old === match.id ? null : match.id)}>Tisch wechseln</button>
@@ -688,8 +687,8 @@ export function TournamentControlPage() {
                   >
                     <span className="queue-position">{index + 1}</span>
                     <div className="match-queue-main">
-                      <strong>{match.sideA}{activeSwissRecords.get(match.sideA) && <span className="swiss-record">{activeSwissRecords.get(match.sideA)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseA)}</em></strong>
-                      <strong>{match.sideB}{activeSwissRecords.get(match.sideB) && <span className="swiss-record">{activeSwissRecords.get(match.sideB)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseB)}</em></strong>
+                      <strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseA)}</em></strong>
+                      <strong>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseB)}</em></strong>
                       <span className="muted">{match.phase} · {match.round}{match.matchDay ? ` · Spieltag ${match.matchDay}` : ''}{match.note ? ` · ${match.note}` : ''}</span>
                       {assigningMatchId === match.id && (
                         <div className="table-assignment-picker">
@@ -824,7 +823,7 @@ export function TournamentControlPage() {
                 <tr key={match.id}>
                   <td><span className={match.status === 'LIVE' ? 'badge live' : match.status === 'READY' ? 'badge ready' : 'badge'}>{match.status}</span></td>
                   <td>{match.phase}<div className="muted">{match.round}</div></td>
-                  <td><strong>{match.sideA}{activeSwissRecords.get(match.sideA) && <span className="swiss-record">{activeSwissRecords.get(match.sideA)}</span>}</strong><div>{match.sideB}{activeSwissRecords.get(match.sideB) && <span className="swiss-record">{activeSwissRecords.get(match.sideB)}</span>}</div></td>
+                  <td><strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>}</strong><div>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>}</div></td>
                   <td>{formatMockMatchRest(match, 'A')} / {formatMockMatchRest(match, 'B')}</td>
                   <td>{match.table}</td><td>{match.score}</td>
                   <td><div className="actions compact-actions"><button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Ergebnis anzeigen</button>{match.status === 'FINISHED' && (match.sets?.length ?? 0) > 0 && !((getMockMatchConfirmation(match.id)?.confirmedA) && (getMockMatchConfirmation(match.id)?.confirmedB)) && <button className="btn small" type="button" onClick={() => { if (adminConfirmMockMatch(tournament, match.id)) refreshRuntime(); }}>Als Turnierleitung bestätigen</button>}{match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) && <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Bearbeiten</button>}</div></td>
@@ -838,7 +837,7 @@ export function TournamentControlPage() {
       {tab === 'final' && tournament.status === 'FINISHED' && (
         <section className="card control-tab-panel">
           <div className="control-section-head"><div><h2>Endplatzierungen</h2>
-            <p className="muted">Abschlussübersicht aller Teilnehmer. Bei Ausscheiden in früheren Gruppenphasen wird der Gruppenplatz und kein erfundener Gesamtrang angezeigt.</p>
+            <p className="muted">Turnierweite Gesamtplatzierungen über alle Phasen. Gleiche Gruppenränge teilen sich einen Platzierungsbereich; Rückzüge werden gemäß ihrer letzten erreichten Phase eingeordnet.</p>
           </div></div>
           <div className="table-wrap final-standings-table"><table>
             <thead><tr><th>Endplatzierung</th><th>Teilnehmer</th><th>Letzte Phase</th><th>Status</th></tr></thead>

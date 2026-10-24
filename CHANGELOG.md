@@ -1,3 +1,9 @@
+## 2026-10-24 – Schweizer Bilanzanzeige und turnierweite Endplatzierungen
+- Schweizer Standing-Tags bei Spielen nur, wenn genau die zugehörige Schweizer Phase aktuell läuft. Bei aufeinanderfolgenden Schweizer Phasen werden ältere Partien nicht mit der neuen Bilanz etikettiert (Turnierleitung, Zuschauer, Spieler und Satzeingabe).
+- Abschlussrangfolge durchgehend über alle begonnenen Phasen: Teilnehmer der späteren Phase stehen vor ausgeschiedenen/zurückgezogenen Teilnehmern früherer Phasen. Rückzüge behalten ihren Status und ihren sportlich erreichten Rang innerhalb ihrer Ausscheidungsstufe.
+- Gemeinsame Gruppenplätze mit führendem Gesamtbereich und anschließendem Gruppenbezug, z. B. `Platz 11–15 · 3. Platz Gruppe A`.
+- Regressionstests mit Schweizer → Gruppen → K.-o. (20 Teilnehmer) sowie Schweizer → Schweizer und alleiniger Gruppenphase.
+
 ## 2026-10-24 – Phasen-Setzung, Spielerhistorie und Endplatzierungen
 - Spielerhistorie: Gegnerbilanzen ohne Labels in Tags; Spaltenheader erläutert beide Werte.
 - Schweizer → Gruppen: Seeded-Verteilung und vorangegangene Platzierung direkt in der Gruppenauslosung.

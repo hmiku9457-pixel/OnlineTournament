@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { MatchSet } from '@/domain/types';
 import { SetBySetEntry } from '@/components/SetBySetEntry';
-import { buildSwissStandings } from '@/services/mockCompetitionViews';
+import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import {
   confirmMockMatchSide,
   findMockRuntimeMatch,
@@ -42,10 +42,14 @@ export function ScoringPage() {
   const bestOf = runtime?.match.bestOf ?? 3;
   const resultSets = completedSets.length ? completedSets : (existing?.sets ?? runtime?.match.sets ?? []);
   const wins = winsFromSets(resultSets);
-  const stage = runtime?.tournament.stages.find((item) => item.id === runtime.match.stageId);
-  const swissRecords = stage?.type === 'SWISS' && runtime
-    ? new Map(buildSwissStandings(runtime.tournament, stage).map((row) => [row.name, `${row.wins}:${row.losses}`]))
-    : new Map<string, string>();
+  const swissRecordFor = runtime ? getActiveSwissRecordLookup(runtime.tournament) : (_match: { stageId: string }, _name: string): string | undefined => undefined;
+  const swissRecords = new Map<string, string>();
+  if (runtime) {
+    for (const name of [sideA, sideB]) {
+      const record = swissRecordFor(runtime.match, name);
+      if (record) swissRecords.set(name, record);
+    }
+  }
 
   function confirm(side: 'A' | 'B') {
     if (!matchId) return;

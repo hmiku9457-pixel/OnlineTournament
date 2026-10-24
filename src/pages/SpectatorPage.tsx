@@ -6,7 +6,7 @@ import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
 import { getMockTournament } from '@/services/mockTournamentStore';
-import { getActiveStage } from '@/services/mockPhaseLifecycle';
+import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 
 
 export function SpectatorPage() {
@@ -17,10 +17,7 @@ export function SpectatorPage() {
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament]);
   const live = matches.filter((match) => match.status === 'LIVE' || match.status === 'CONFIRMATION');
   const next = matches.filter((match) => match.status === 'READY' || match.status === 'WAITING');
-  const activeStage = getActiveStage(tournament);
-  const swissRecords = activeStage?.type === 'SWISS'
-    ? new Map(buildSwissStandings(tournament, activeStage).map((row) => [row.name, `${row.wins}:${row.losses}`]))
-    : new Map<string, string>();
+  const swissRecordFor = getActiveSwissRecordLookup(tournament);
 
   return (
     <div className="spectator-shell">
@@ -46,9 +43,9 @@ export function SpectatorPage() {
             <article className="card spectator-match-card" key={match.id}>
               <div className="spectator-match-head"><span className="badge live">LIVE</span><strong>{match.table}</strong></div>
               <span className="muted">{match.round}</span>
-              <div className="spectator-team">{match.sideA}{swissRecords.get(match.sideA) && <span className="swiss-record">{swissRecords.get(match.sideA)}</span>}</div>
+              <div className="spectator-team">{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>}</div>
               <div className="spectator-score">{match.score}</div>
-              <div className="spectator-team">{match.sideB}{swissRecords.get(match.sideB) && <span className="swiss-record">{swissRecords.get(match.sideB)}</span>}</div>
+              <div className="spectator-team">{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>}</div>
             </article>
           ))}
         </div>
@@ -167,7 +164,7 @@ export function SpectatorPage() {
           {next.map((match) => (
             <div className="spectator-next-row" key={match.id}>
               <span className={match.status === 'READY' ? 'badge ready' : 'badge'}>{match.table}</span>
-              <div><strong>{match.sideA}{swissRecords.get(match.sideA) && <span className="swiss-record">{swissRecords.get(match.sideA)}</span>} – {match.sideB}{swissRecords.get(match.sideB) && <span className="swiss-record">{swissRecords.get(match.sideB)}</span>}</strong><span className="muted">{match.phase} · {match.round}</span></div>
+              <div><strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>} – {match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>}</strong><span className="muted">{match.phase} · {match.round}</span></div>
               <span className="muted">{match.status === 'READY' ? 'bereit' : 'wartet'}</span>
             </div>
           ))}
