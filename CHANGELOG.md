@@ -1,3 +1,8 @@
+## 2026-10-24 – Belegte Teilnehmer in der Warteschlange erkennen
+- „Nächste Spiele“ markiert Teilnehmer, die bereits einem anderen Tisch zugewiesen sind, mit der konkreten Tischnummer und einem kurzen Hinweis.
+- Automatische und manuelle Zuweisung sowie Drag & Drop sind für solche wartenden Partien deaktiviert. Der globale Auto-Zuweisen-Button bleibt gesperrt, wenn keine konfliktfreie Partie bereitsteht.
+- Sichtbare Warnung und eigentliche Zuweisungssperre nutzen dieselbe Konfliktregel; ein Regressionstest prüft die Freigabe nach dem Spielende.
+
 ## 2026-10-24 – Schlankere Leitungs-Hinweise und Ergebnisliste
 - Die Schnellaktionen für wartende Spiele und den nächsten Phasenwechsel stehen direkt in der vorhandenen blauen Hinweisleiste. Das zusätzliche „Jetzt wichtig“-Banner entfällt.
 - Hinweise, Kennzahlen, Filter und der Button für eine erneute Bestätigung bereits abgeschlossener Spiele entfallen aus der Turnierleitung. Die ausdrückliche Freigabe des Endergebnisses während der Satzeingabe bleibt unverändert.

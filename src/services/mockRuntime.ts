@@ -503,6 +503,17 @@ function isActiveTableMatch(match: MockRuntimeMatch) {
   return ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch ');
 }
 
+/** Sichtbarer Zuweisungskonflikt und serverunabhängige Schutzprüfung nutzen dieselbe Regel. */
+export function getMockParticipantTableConflicts(
+  target: Pick<MockRuntimeMatch, 'id' | 'sideA' | 'sideB'>,
+  matches: readonly MockRuntimeMatch[],
+): Array<{ participant: string; table: string }> {
+  return [target.sideA, target.sideB].flatMap((participant) => {
+    const other = matches.find((match) => match.id !== target.id && isActiveTableMatch(match) && (match.sideA === participant || match.sideB === participant));
+    return other ? [{ participant, table: other.table }] : [];
+  });
+}
+
 export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId: string, table: string) {
   // Always read current stored status: callers can hold an older React snapshot.
   const currentTournament = getAllMockTournaments().find((item) => item.id === tournament.id) ?? tournament;
@@ -520,15 +531,9 @@ export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId
   const tableOccupied = matches.some((match) => match.id !== matchId && match.table === table && isActiveTableMatch(match));
   if (tableOccupied) return `${table} ist bereits belegt.`;
 
-  const playerConflict = matches.find((match) => (
-    match.id !== matchId
-    && isActiveTableMatch(match)
-    && (match.sideA === target.sideA || match.sideB === target.sideA || match.sideA === target.sideB || match.sideB === target.sideB)
-  ));
-
+  const [playerConflict] = getMockParticipantTableConflicts(target, matches);
   if (playerConflict) {
-    const blockedPlayer = [target.sideA, target.sideB].find((player) => player === playerConflict.sideA || player === playerConflict.sideB);
-    return `${blockedPlayer ?? 'Ein Teilnehmer'} ist bereits ${playerConflict.table} zugewiesen.`;
+    return `${playerConflict.participant} ist bereits ${playerConflict.table} zugewiesen.`;
   }
 
   return null;

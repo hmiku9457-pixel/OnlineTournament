@@ -601,6 +601,10 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .free-table-message { display: grid; gap: 4px; color: #667085; align-content: center; min-height: 86px; }
 .free-table-message strong { color: #344054; }
 .assigned-match-actions, .queue-row-actions, .table-assignment-picker { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.match-queue-row.participant-busy { background: #fffbeb; box-shadow: inset 3px 0 #f79009; cursor: default; }
+.match-queue-row.participant-busy:active { cursor: default; }
+.queue-player-table-flag { display: inline-flex; align-items: center; width: fit-content; padding: 2px 7px; border: 1px solid #fedf89; border-radius: 999px; background: #fff3d1; color: #92400e; font-size: .69rem; font-weight: 800; white-space: nowrap; }
+.queue-conflict-hint { color: #92400e; font-size: .72rem; font-weight: 650; line-height: 1.35; }
 .draggable-match { cursor: grab; }
 .draggable-match:active { cursor: grabbing; }
 .draggable-match.assigned { background: #f5f8ff; }

@@ -28,7 +28,7 @@ const topics: Array<{ id: ControlHelpTopic; label: string; intro: string; steps:
       { title: 'Automatisch zuweisen', description: 'Der große Button verteilt mehrere mögliche Partien auf freie Tische; der Button je Partie weist nur dieses eine Spiel zu.' },
       { title: 'Manuell zuweisen', description: '„Zuweisen“ öffnet die Auswahl freier Tische. Alternativ eine Partie auf eine freie Tischkarte oder einen Hallentisch ziehen.' },
       { title: 'Pausenzeiten lesen', description: 'Die Zeit neben einem Namen zeigt die Pause seit der letzten tatsächlich gespielten Partie. Sie ist eine Planungshilfe, keine feste Sperrfrist.' },
-      { title: 'Konflikte vermeiden', description: 'Bereits beschäftigte, gesperrte oder anderweitig nicht geeignete Tische können nicht belegt werden. Während einer Turnierpause sind neue Zuweisungen gesperrt.' },
+      { title: 'Konflikte vermeiden', description: 'Ist ein Teilnehmer bereits einem Tisch zugewiesen, zeigt die Warteliste dessen Tisch orange an und sperrt die Zuweisung dieser Partie. Auch belegte oder gesperrte Tische sowie eine Turnierpause verhindern neue Zuweisungen.' },
     ],
   },
   {

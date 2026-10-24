@@ -9,6 +9,7 @@ import {
   confirmMockMatchSide,
   countMockOpenConfirmations,
   getMockAssignmentBlockReason,
+  getMockParticipantTableConflicts,
   getMockMatchCode,
   getMockParticipantCode,
   getMockRuntimeMatches,
@@ -54,6 +55,29 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('Turnierleitung: Zuweisung, Pause, Codes, Audit', () => {
+  it('zeigt belegte Teilnehmer an und gibt die wartende Partie erst nach Spielende frei', () => {
+    const tournament = setup();
+    const matches = getMockRuntimeMatches(tournament);
+    const first = matches[0];
+    const waiting = matches.find((match) => match.id !== first.id && [match.sideA, match.sideB].some((name) => name === first.sideA || name === first.sideB));
+    expect(waiting).toBeDefined();
+    expect(assignMockMatchToTable(tournament, first.id, 'Tisch 1')).toBe(true);
+
+    const current = getMockRuntimeMatches(tournament);
+    const conflicts = getMockParticipantTableConflicts(waiting!, current);
+    expect(conflicts).toContainEqual({ participant: [first.sideA, first.sideB].find((name) => name === waiting!.sideA || name === waiting!.sideB), table: 'Tisch 1' });
+    expect(getMockAssignmentBlockReason(tournament, waiting!.id, 'Tisch 2')).toContain('bereits Tisch 1 zugewiesen');
+    expect(assignMockMatchToTable(tournament, waiting!.id, 'Tisch 2')).toBe(false);
+
+    // Auch ein nur zugewiesenes, noch nicht begonnenes Spiel blockiert die Person.
+    const active = current.find((match) => match.id === first.id)!;
+    expect(getMockParticipantTableConflicts(waiting!, [{ ...active, status: 'READY' }])).toHaveLength(1);
+
+    completeMockMatch(first.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }, { number: 2, sideAScore: 11, sideBScore: 8 }]);
+    expect(getMockParticipantTableConflicts(waiting!, getMockRuntimeMatches(tournament))).toEqual([]);
+    expect(getMockAssignmentBlockReason(tournament, waiting!.id, 'Tisch 2')).toBeNull();
+  });
+
   it('sperrt neue Zuordnungen während einer Pause, lässt laufende Partie zu Ende spielen', () => {
     const tournament = setup();
     const [first, next] = getMockRuntimeMatches(tournament);

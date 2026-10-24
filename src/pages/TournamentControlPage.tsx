@@ -12,7 +12,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, formatPlayerRest, getMockRuntimeMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
 import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { VenueLayoutMini } from '@/components/VenueLayout';
@@ -812,7 +812,7 @@ export function TournamentControlPage() {
                 <button
                   className="btn small primary"
                   type="button"
-                  disabled={tournament.status !== 'RUNNING' || freeTables.length === 0 || !nextMatches.some((match) => match.status === 'WAITING')}
+                  disabled={tournament.status !== 'RUNNING' || freeTables.length === 0 || !nextMatches.some((match) => getMockParticipantTableConflicts(match, matches).length === 0)}
                   onClick={autoAssignWaitingMatches}
                 >
                   Automatisch zuweisen
@@ -874,11 +874,16 @@ export function TournamentControlPage() {
               <div className="control-section-head control-section-spaced" id="control-next-matches"><div><div className="control-help-title"><h2>Nächste Spiele</h2><ControlHelpButton topic="queue" onOpen={setHelpTopic} /></div><p className="muted">Pausenzeit seit dem letzten tatsächlich gespielten Match; aktualisiert sich automatisch.</p></div></div>
               <div className="match-queue">
                 {nextMatches.length === 0 && <div className="control-empty-message">{!tournament.hasStarted ? 'Noch keine wartenden Spiele. Starte zuerst das Turnier.' : activeStage ? 'Zurzeit wartet keine Partie auf einen Tisch.' : 'Aktuell keine wartenden Spiele. Prüfe den Turnierverlauf für die nächste Phase.'}</div>}
-                {nextMatches.map((match, index) => (
+                {nextMatches.map((match, index) => {
+                  const busyPlayers = getMockParticipantTableConflicts(match, matches);
+                  const busyA = busyPlayers.find((entry) => entry.participant === match.sideA);
+                  const busyB = busyPlayers.find((entry) => entry.participant === match.sideB);
+                  const isBusy = busyPlayers.length > 0;
+                  return (
                   <article
-                    className="match-queue-row expanded draggable-match"
+                    className={`match-queue-row expanded draggable-match${isBusy ? ' participant-busy' : ''}`}
                     key={match.id}
-                    draggable={tournament.status === 'RUNNING' && !isMockThirdPlaceMatch(match.id)}
+                    draggable={tournament.status === 'RUNNING' && !isBusy && !isMockThirdPlaceMatch(match.id)}
                     onDragStart={(event) => {
                       event.dataTransfer.setData('text/mock-match-id', match.id);
                       event.dataTransfer.effectAllowed = 'move';
@@ -886,10 +891,11 @@ export function TournamentControlPage() {
                   >
                     <span className="queue-position">{index + 1}</span>
                     <div className="match-queue-main">
-                      <strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseA)}</em></strong>
-                      <strong>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseB)}</em></strong>
+                      <strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseA)}</em>{busyA && <span className="queue-player-table-flag">Bereits an {busyA.table}</span>}</strong>
+                      <strong>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseB)}</em>{busyB && <span className="queue-player-table-flag">Bereits an {busyB.table}</span>}</strong>
                       <span className="muted">{match.phase} · {match.round}{match.matchDay ? ` · Spieltag ${match.matchDay}` : ''}{match.note ? ` · ${match.note}` : ''}</span>
-                      {assigningMatchId === match.id && (
+                      {isBusy && <span className="queue-conflict-hint">Zuweisung möglich, sobald {busyPlayers.length === 1 ? 'dieser Teilnehmer wieder frei ist.' : 'beide Teilnehmer wieder frei sind.'}</span>}
+                      {assigningMatchId === match.id && !isBusy && (
                         <div className="table-assignment-picker">
                           {freeTables.length === 0 ? (
                             <span className="muted">Aktuell ist kein Tisch frei.</span>
@@ -907,12 +913,13 @@ export function TournamentControlPage() {
                             Nicht austragen · beide Platz 3
                           </button>
                         )}
-                        <button className="btn small primary" type="button" disabled={tournament.status !== 'RUNNING' || freeTables.length === 0} onClick={() => autoAssignMatch(match.id)}>Automatisch zuweisen</button>
-                        <button className="btn small" type="button" disabled={tournament.status !== 'RUNNING'} onClick={() => setAssigningMatchId((current) => current === match.id ? null : match.id)}>Zuweisen</button>
+                        <button className="btn small primary" type="button" disabled={tournament.status !== 'RUNNING' || freeTables.length === 0 || isBusy} onClick={() => autoAssignMatch(match.id)}>Automatisch zuweisen</button>
+                        <button className="btn small" type="button" disabled={tournament.status !== 'RUNNING' || isBusy} onClick={() => setAssigningMatchId((current) => current === match.id ? null : match.id)}>Zuweisen</button>
                       </>
                     </div>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             </main>
             <aside className="control-side">
