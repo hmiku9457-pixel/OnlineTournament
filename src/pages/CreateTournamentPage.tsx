@@ -1,6 +1,7 @@
 import { VenueLayoutEditor } from '@/components/VenueLayout';
 import { createVenueLayout, resizeVenueLayout } from '@/domain/venueLayout';
 import { getVenueTerminology } from '@/domain/venueTerminology';
+import { sportOptions } from '@/domain/sports';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -722,10 +723,7 @@ export function CreateTournamentPage() {
               <div className="field">
                 <label htmlFor="sport">Sportart</label>
                 <select id="sport" value={sport} onChange={(event) => setSport(event.target.value)}>
-                  <option value="table_tennis">Tischtennis</option>
-                  <option value="football">Fußball (auf Zeit)</option>
-                  <option value="handball">Handball (auf Zeit)</option>
-                  <option value="basketball">Basketball (auf Zeit)</option>
+                  {sportOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
               </div>
               <div className="field">

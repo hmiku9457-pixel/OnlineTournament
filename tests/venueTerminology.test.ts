@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { displayVenueMessage, displayVenueName, getVenueTerminology } from '../src/domain/venueTerminology';
 import { getControlGuide } from '../src/domain/controlGuide';
+import { getSportLabel, sportOptions } from '../src/domain/sports';
 
 describe('Sportabhängige Bezeichnungen von Spielorten', () => {
   it('behält Tischtennis-Tische in neuen und bestehenden Turnieren bei', () => {
@@ -14,7 +15,18 @@ describe('Sportabhängige Bezeichnungen von Spielorten', () => {
     expect(displayVenueName('Fußball', 'Tisch 3')).toBe('Platz 3');
     expect(displayVenueName('Handball', 'Tisch 3')).toBe('Spielfeld 3');
     expect(displayVenueName('Basketball', 'Tisch 3')).toBe('Spielfeld 3');
-    expect(displayVenueName('Volleyball', 'Tisch 3')).toBe('Platz 3');
+    expect(displayVenueName('Lacrosse', 'Tisch 3')).toBe('Platz 3');
+  });
+
+  it('bietet weitere gängige Sportarten mit neutralen Namen und den passenden Spielflächen an', () => {
+    expect(sportOptions.map(({ id }) => id).length).toBe(new Set(sportOptions.map(({ id }) => id)).size);
+    expect(sportOptions.every(({ label }) => !label.includes('('))).toBe(true);
+    expect(getSportLabel('beach_volleyball')).toBe('Beachvolleyball');
+    expect(getSportLabel('ice_hockey')).toBe('Eishockey');
+    expect(displayVenueName('Volleyball', 'Tisch 1')).toBe('Spielfeld 1');
+    expect(displayVenueName('Badminton', 'Tisch 2')).toBe('Spielfeld 2');
+    expect(displayVenueName('Tennis', 'Tisch 3')).toBe('Platz 3');
+    expect(displayVenueName('Padel', 'Tisch 4')).toBe('Platz 4');
   });
 
   it('übersetzt gespeicherte Hinweise, ohne die internen Tischkennungen zu verändern', () => {

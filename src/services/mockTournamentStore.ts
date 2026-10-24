@@ -3,6 +3,7 @@ import { generatePlayerCodes, generateUniquePlayerCode } from '@/services/mockPl
 import { recordMockAudit } from '@/services/mockAudit';
 import { reconcilePrestartDraws } from '@/services/mockDrawStore';
 import type { VenueLayout } from '@/domain/venueLayout';
+import { getSportLabel } from '@/domain/sports';
 import { type DemoTournament } from '@/data/demoTournaments';
 import type { Discipline, StageType, TournamentStage, TournamentStatus } from '@/domain/types';
 
@@ -101,7 +102,7 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
     subtitle: `${input.discipline === 'DOUBLES' ? 'Doppel' : 'Einzel'} · ${phaseLabel(input.phases)}`,
     status: 'READY',
     visibility: 'PRIVATE',
-    sport: ({ table_tennis: 'Tischtennis', football: 'Fußball', handball: 'Handball', basketball: 'Basketball' } as Record<string, string>)[input.sport] ?? input.sport,
+    sport: getSportLabel(input.sport),
     discipline: input.discipline,
     participants: input.participantNames.length,
     tables: input.tables,

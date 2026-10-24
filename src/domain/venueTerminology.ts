@@ -1,10 +1,12 @@
+import { findSportOption } from '@/domain/sports';
+
 /** Sportartabhängige Anzeige. Gespeicherte IDs wie "Tisch 1" bleiben unverändert. */
 export function getVenueTerminology(sport: string) {
-  const normalized = sport.trim().toLocaleLowerCase('de-DE');
-  if (normalized === 'tischtennis' || normalized === 'table_tennis') {
+  const kind = findSportOption(sport)?.venueKind;
+  if (kind === 'table') {
     return { singular: 'Tisch', plural: 'Tische', dativePlural: 'Tischen', free: 'Freier Tisch', locked: 'Gesperrter Tisch' };
   }
-  if (normalized === 'handball' || normalized === 'basketball') {
+  if (kind === 'field') {
     return { singular: 'Spielfeld', plural: 'Spielfelder', dativePlural: 'Spielfeldern', free: 'Freies Spielfeld', locked: 'Gesperrtes Spielfeld' };
   }
   // Auch für weitere Sportarten ist ein Platz der verständliche Standard.

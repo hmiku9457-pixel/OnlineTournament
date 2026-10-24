@@ -1,3 +1,9 @@
+## 2026-10-24 – Gängige Sportarten direkt auswählbar
+- Die Sportartenliste in der Turniererstellung umfasst jetzt zusätzlich Volleyball, Beachvolleyball, Tennis, Badminton, Padel, Squash, Futsal, Hockey und Eishockey.
+- Alle Einträge heißen ausschließlich wie die Sportart, ohne „(auf Zeit)“ oder andere Zusätze.
+- Sportartnamen und Spielortbezeichnungen stammen aus einer gemeinsamen Liste, damit neue Turniere ihre Sportart und passende Plätze bzw. Spielfelder konsistent anzeigen.
+- Die sportartspezifischen Wertungsregeln außerhalb von Tischtennis sind damit noch nicht umgesetzt; die bestehende Eingabelogik bleibt unverändert.
+
 ## 2026-10-24 – Sportartgerechte Spielorte und neutraler Spielflächenplan
 - Die Oberfläche bezeichnet Spielorte passend zur Sportart: Tischtennis-Tische, Fußballplätze sowie Spielfelder für Handball und Basketball; für weitere Sportarten werden Plätze verwendet.
 - Die bisherige „Hallenansicht“ heißt jetzt „Planansicht“ und der Hallenplan „Spielflächenplan“ – für Hallen und Außengelände gleichermaßen.
