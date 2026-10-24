@@ -708,16 +708,20 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .sport-score-actions .btn.save-success { background: #dcfae6; border-color: #75e0a7; color: #067647; font-weight: 800; }
 .sport-score-actions .btn.save-success:hover { background: #abefc6; }
 .sport-score-suffix { font-size: .68rem; font-weight: 700; color: #475467; white-space: nowrap; }
-.bracket-match > .bracket-decision-timeline { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px; padding: 7px 9px; background: #f9fafb; border-top: 1px solid #eaecf0; }
-.bracket-decision-timeline-item { display: flex; align-items: center; gap: 4px; }
-.bracket-decision-timeline-arrow { color: #98a2b3; font-weight: 800; }
-.bracket-decision-timeline-step { display: flex; align-items: baseline; gap: 4px; color: #475467; }
-.bracket-decision-timeline-step small { font-size: .68rem; font-weight: 650; }
-.bracket-decision-timeline-step strong { font-size: .76rem; color: #101828; font-variant-numeric: tabular-nums; text-align: center; }
-.bracket-decision-lot-winner { flex-basis: 100%; text-align: center; color: #475467; font-size: .7rem; }
-.bracket-decision-timeline-live { color: #067647; font-size: .64rem; font-weight: 850; }
+.bracket-match > .bracket-stage-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 5px 9px; border-bottom: 1px solid #eaecf0; background: #f8fafc; }
+.bracket-stage-heading { color: #98a2b3; font-size: .65rem; font-weight: 700; }
+.bracket-stage-grid { display: grid; gap: 3px; align-items: center; }
+.bracket-stage-label { display: grid; gap: 0; justify-items: center; align-content: center; min-height: 20px; font-size: .66rem; font-weight: 750; color: #667085; }
+.bracket-stage-label.decisive { color: #344054; }
+.bracket-stage-label small { font-size: .52rem; letter-spacing: .02em; font-weight: 850; color: #067647; }
+.bracket-stage-values { font-variant-numeric: tabular-nums; }
+.bracket-stage-value { display: grid; align-items: center; justify-items: center; min-height: 24px; border-radius: 5px; color: #667085; font-size: .79rem; font-weight: 700; }
+.bracket-stage-value.decisive { background: #f2f4f7; color: #101828; font-weight: 850; }
+.bracket-match > .winner .bracket-stage-value.decisive { background: #d1fadf; color: #067647; }
+.bracket-match > .bracket-stage-row { padding-top: 9px; padding-bottom: 9px; }
 .sport-score-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 8px; }
 .sport-score-actions .btn { width: 100%; min-height: 36px; white-space: normal; text-wrap: balance; display: flex; align-items: center; justify-content: center; }
+.sport-score-actions .btn:not(.primary) { font-size: .74rem; }
 .sport-score-entry .set-entry-scoreline > strong { font-variant-numeric: tabular-nums; }
 .sport-score-entry.compact .sport-score-fields .current-set-field input { width: 100%; }
 .current-set-entry-row { display: grid; grid-template-columns: 92px max-content; gap: 8px; align-items: end; }

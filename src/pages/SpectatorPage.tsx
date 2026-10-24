@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { getMockRuntimeMatches, getMockStageMatches, isMockParticipantWithdrawn, getSwissRecordBeforeRound, getSwissCurrentRecord } from '@/services/mockRuntime';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
-import { BracketDecisionTimeline } from '@/components/BracketDecisionTimeline';
+import { BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
+import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
@@ -97,25 +98,28 @@ export function SpectatorPage() {
             const rounds = allRounds.filter((round) => round.label !== 'Spiel um Platz 3');
             const thirdPlaceRound = allRounds.find((round) => round.label === 'Spiel um Platz 3');
             type BracketMatch = (typeof allRounds)[number]['matches'][number];
-            const renderMatch = (match: BracketMatch) => (
-              <article className="bracket-match" key={match.id}>
-                {match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover)">Kampflos</span>}
-                {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz</span>}
-                {[match.sideA, match.sideB].map((side, sideIndex) => (
-                  <div className={match.winner === side ? 'winner' : ''} key={`${match.id}-${sideIndex}`}>
-                    <span>
-                      {match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, side) ? `Rückzug (${side})` : side}
-                      {previousFinishLabels[side] && <small className="participant-origin">{previousFinishLabels[side]}</small>}
-                    </span>
-                    <span className="bracket-score-cells">
-                      {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
-                      <strong>{match.score === 'W.O.' ? (match.winner === side ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : sideIndex === 1 && match.score === 'Freilos' ? 'BYE' : ''}</strong>
-                    </span>
-                  </div>
-                ))}
-                <BracketDecisionTimeline sets={match.sets} decision={match.decision} extraTimeProgress={match.extraTimeProgress} winner={match.winner} />
-              </article>
-            );
+            const renderMatch = (match: BracketMatch) => {
+              const scoreStages = scoreSport ? getBracketScoreStages(match.sets, match.decision, match.extraTimeProgress, match.winner, match.sideA, match.sideB, match.live) : [];
+              return (
+                <article className="bracket-match" key={match.id}>
+                  {match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover)">Kampflos</span>}
+                  {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz</span>}
+                  <BracketStageHeader stages={scoreStages} />
+                  {[match.sideA, match.sideB].map((side, sideIndex) => (
+                    <div className={`${match.winner === side ? 'winner ' : ''}${scoreStages.length ? 'bracket-stage-row' : ''}`.trim()} key={`${match.id}-${sideIndex}`}>
+                      <span>
+                        {match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, side) ? `Rückzug (${side})` : side}
+                        {previousFinishLabels[side] && <small className="participant-origin">{previousFinishLabels[side]}</small>}
+                      </span>
+                      {scoreStages.length ? <BracketStageValues stages={scoreStages} sideIndex={sideIndex as 0 | 1} /> : <span className="bracket-score-cells">
+                        {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
+                        <strong>{match.score === 'W.O.' ? (match.winner === side ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : sideIndex === 1 && match.score === 'Freilos' ? 'BYE' : ''}</strong>
+                      </span>}
+                    </div>
+                  ))}
+                </article>
+              );
+            };
             return (
               <section className="spectator-stage-block" key={stage.id}>
                 <div className="competition-stage-head"><div><span className="badge">K.-O.</span><h3>{stage.name}</h3></div></div>

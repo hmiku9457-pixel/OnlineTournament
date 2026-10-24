@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BracketDecisionTimeline } from '@/components/BracketDecisionTimeline';
+import { BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
+import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { ScoreMatchEntry } from '@/components/ScoreMatchEntry';
 import { sportScoring, parseSportSet, isValidSportSet, resultScore, resultWinnerSide, scoreWithDecision, scoreDecisionTimeline, validateScoreDecision, validateCompleteResult, compareRankingRows } from '@/domain/sportScoring';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
@@ -80,9 +81,29 @@ describe('Sportartspezifische Ergebniserfassung', () => {
     expect(scoreDecisionTimeline([set(2, 1)], overtime)).toEqual([
       { label: 'FT', score: '1:1' }, { label: 'n.V.', score: '2:1' },
     ]);
-    const timeline = renderToStaticMarkup(createElement(BracketDecisionTimeline, { sets: [set(2, 2)], decision: overtimePenalties }));
-    expect(timeline.indexOf('FT')).toBeLessThan(timeline.indexOf('n.V.'));
-    expect(timeline.indexOf('n.V.')).toBeLessThan(timeline.indexOf('i.E.'));
+    const stages = getBracketScoreStages([set(2, 2)], overtimePenalties, undefined, 'Anna', 'Anna', 'Ben');
+    expect(stages.map((stage) => [stage.label, stage.sideA, stage.sideB])).toEqual([
+      ['FT', '1', '1'], ['n.V.', '2', '2'], ['i.E.', '5', '4'],
+    ]);
+    const header = renderToStaticMarkup(createElement(BracketStageHeader, { stages }));
+    expect(header.indexOf('FT')).toBeLessThan(header.indexOf('n.V.'));
+    expect(header.indexOf('n.V.')).toBeLessThan(header.indexOf('i.E.'));
+    const winnerScores = renderToStaticMarkup(createElement(BracketStageValues, { stages, sideIndex: 0 }));
+    const loserScores = renderToStaticMarkup(createElement(BracketStageValues, { stages, sideIndex: 1 }));
+    expect(winnerScores).toMatch(/>1<.*>2<.*>5</);
+    expect(loserScores).toMatch(/>1<.*>2<.*>4</);
+    expect(header).not.toContain('1:1');
+    const lotStages = getBracketScoreStages([set(0, 0)], { type: 'LOT' }, undefined, 'Ben', 'Anna', 'Ben');
+    expect(lotStages.map((stage) => [stage.label, stage.sideA, stage.sideB])).toEqual([
+      ['FT', '0', '0'], ['Los', '–', '✓'],
+    ]);
+    expect(getBracketScoreStages([set(2, 1)], undefined, undefined, 'Anna', 'Anna', 'Ben')).toEqual([
+      { label: 'FT', sideA: '2', sideB: '1', live: false, deciding: true },
+    ]);
+    expect(getBracketScoreStages([set(2, 1)], undefined, undefined, undefined, 'Anna', 'Ben', true)).toEqual([
+      { label: 'FT', sideA: '2', sideB: '1', live: true, deciding: false },
+    ]);
+    expect(getBracketScoreStages(undefined, undefined, undefined, undefined, 'Anna', 'Ben')).toEqual([]);
   });
 
   it('sortiert direkte Ergebnisse nach Tabellenpunkten, Tor-/Punktedifferenz und erzielten Toren', () => {
@@ -127,10 +148,12 @@ describe('Sportwertung in gespeicherten Turnieren', () => {
     expect(live.extraTimeProgress?.regulationScore).toEqual(set(1, 1));
     const liveBracket = buildMockBracket(tournament, tournament.stages[0]).flatMap((round) => round.matches).find((entry) => entry.id === game.id)!;
     expect(liveBracket.extraTimeProgress?.regulationScore).toEqual(set(1, 1));
-    const bracketPreview = renderToStaticMarkup(createElement(BracketDecisionTimeline, { sets: liveBracket.sets, extraTimeProgress: liveBracket.extraTimeProgress }));
+    const liveStages = getBracketScoreStages(liveBracket.sets, undefined, liveBracket.extraTimeProgress, undefined, game.sideA, game.sideB);
+    const bracketPreview = renderToStaticMarkup(createElement(BracketStageHeader, { stages: liveStages }));
     expect(bracketPreview).toContain('FT');
     expect(bracketPreview).toContain('n.V.');
     expect(bracketPreview).toContain('LIVE');
+    expect(liveStages.map((stage) => `${stage.sideA}:${stage.sideB}`)).toEqual(['1:1', '2:2']);
     const form = renderToStaticMarkup(createElement(ScoreMatchEntry, { match: live }));
     expect(form).toContain('Verlängerung');
     expect(form).toContain('Reguläre Spielzeit 1:1');

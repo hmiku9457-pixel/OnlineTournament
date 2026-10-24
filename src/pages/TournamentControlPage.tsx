@@ -6,7 +6,8 @@ import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
-import { BracketDecisionTimeline } from '@/components/BracketDecisionTimeline';
+import { BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
+import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
 import { getGroupQualificationHints } from '@/domain/groupQualification';
@@ -283,70 +284,76 @@ function StageCompetitionView({
               <div className="bracket-round" key={round.label}>
                 <h4>{round.label}</h4>
                 <div className={roundIndex === rounds.length - 1 ? 'bracket-round-matches bracket-final-round-matches' : 'bracket-round-matches'}>
-                  {round.matches.map((match, matchIndex) => (
-                    <article className="bracket-match" key={match.id}>
-                      {match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover, z. B. bei Rückzug)">Kampflos</span>}
-                      {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz · nicht ausgetragen</span>}
-                      {[match.sideA, match.sideB].map((side, sideIndex) => {
-                        const slotIndex = matchIndex * 2 + sideIndex;
-                        const isEditableSlot = editable && roundIndex === 0 && slotIndex < slots.length;
-                        const winner = match.winner === side;
-                        return (
-                          <div
-                            className={`${winner ? 'winner ' : ''}${isEditableSlot ? 'editable-bracket-slot' : ''}${isEditableSlot && pinnedSlots.has(slotIndex) ? ' pinned-slot' : ''}${side === 'Freilos' ? ' bye' : ''}`.trim()}
-                            key={`${match.id}-${sideIndex}`}
-                            draggable={isEditableSlot && !pinnedSlots.has(slotIndex)}
-                            onDragStart={(event) => {
-                              if (!isEditableSlot || pinnedSlots.has(slotIndex)) return;
-                              event.dataTransfer.setData(BRACKET_DRAG_TYPE, JSON.stringify({ value: side, sourceSlotIndex: slotIndex }));
-                              event.dataTransfer.effectAllowed = 'move';
-                            }}
-                            onDragOver={(event) => {
-                              if (!isEditableSlot) return;
-                              event.preventDefault();
-                              event.dataTransfer.dropEffect = 'move';
-                            }}
-                            onDrop={(event) => handleBracketDrop(event, slotIndex)}
-                          >
-                            <span>
-                              <span className="bracket-name-inline">{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, side) ? `Rückzug (${side})` : side}{isEditableSlot && side !== 'Freilos' && (
-                                <button className={pinnedSlots.has(slotIndex) ? 'bracket-pin pinned' : 'bracket-pin'} type="button"
-                                  aria-label={`${side} ${pinnedSlots.has(slotIndex) ? 'lösen' : 'fixieren'}`}
-                                  title={pinnedSlots.has(slotIndex) ? 'Fixierung lösen' : 'Platz fixieren'}
-                                  onClick={() => { if (toggleBracketPin(tournament, stage, slotIndex)) onDrawChanged?.(); }}>
-                                  {pinnedSlots.has(slotIndex) ? '📌' : '📍'}
-                                </button>
-                              )}</span>
-                              {previousFinishLabels[side] && <small className="participant-origin">{previousFinishLabels[side]}</small>}
-                            </span>
-                            <span className="bracket-score-cells">
-                              {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
-                              <strong>{match.score === 'W.O.' ? (winner ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : match.score === 'Freilos' && side === 'Freilos' ? 'BYE' : ''}</strong>
-                            </span>
-                          </div>
-                        );
-                      })}
-                      <BracketDecisionTimeline sets={match.sets} decision={match.decision} extraTimeProgress={match.extraTimeProgress} winner={match.winner} />
-                    </article>
-                  ))}
+                  {round.matches.map((match, matchIndex) => {
+                    const scoreStages = scoreSport ? getBracketScoreStages(match.sets, match.decision, match.extraTimeProgress, match.winner, match.sideA, match.sideB, match.live) : [];
+                    return (
+                      <article className="bracket-match" key={match.id}>
+                        {match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover, z. B. bei Rückzug)">Kampflos</span>}
+                        {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz · nicht ausgetragen</span>}
+                        <BracketStageHeader stages={scoreStages} />
+                        {[match.sideA, match.sideB].map((side, sideIndex) => {
+                          const slotIndex = matchIndex * 2 + sideIndex;
+                          const isEditableSlot = editable && roundIndex === 0 && slotIndex < slots.length;
+                          const winner = match.winner === side;
+                          return (
+                            <div
+                              className={`${winner ? 'winner ' : ''}${scoreStages.length ? 'bracket-stage-row ' : ''}${isEditableSlot ? 'editable-bracket-slot' : ''}${isEditableSlot && pinnedSlots.has(slotIndex) ? ' pinned-slot' : ''}${side === 'Freilos' ? ' bye' : ''}`.trim()}
+                              key={`${match.id}-${sideIndex}`}
+                              draggable={isEditableSlot && !pinnedSlots.has(slotIndex)}
+                              onDragStart={(event) => {
+                                if (!isEditableSlot || pinnedSlots.has(slotIndex)) return;
+                                event.dataTransfer.setData(BRACKET_DRAG_TYPE, JSON.stringify({ value: side, sourceSlotIndex: slotIndex }));
+                                event.dataTransfer.effectAllowed = 'move';
+                              }}
+                              onDragOver={(event) => {
+                                if (!isEditableSlot) return;
+                                event.preventDefault();
+                                event.dataTransfer.dropEffect = 'move';
+                              }}
+                              onDrop={(event) => handleBracketDrop(event, slotIndex)}
+                            >
+                              <span>
+                                <span className="bracket-name-inline">{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, side) ? `Rückzug (${side})` : side}{isEditableSlot && side !== 'Freilos' && (
+                                  <button className={pinnedSlots.has(slotIndex) ? 'bracket-pin pinned' : 'bracket-pin'} type="button"
+                                    aria-label={`${side} ${pinnedSlots.has(slotIndex) ? 'lösen' : 'fixieren'}`}
+                                    title={pinnedSlots.has(slotIndex) ? 'Fixierung lösen' : 'Platz fixieren'}
+                                    onClick={() => { if (toggleBracketPin(tournament, stage, slotIndex)) onDrawChanged?.(); }}>
+                                    {pinnedSlots.has(slotIndex) ? '📌' : '📍'}
+                                  </button>
+                                )}</span>
+                                {previousFinishLabels[side] && <small className="participant-origin">{previousFinishLabels[side]}</small>}
+                              </span>
+                              {scoreStages.length ? <BracketStageValues stages={scoreStages} sideIndex={sideIndex as 0 | 1} /> : <span className="bracket-score-cells">
+                                {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
+                                <strong>{match.score === 'W.O.' ? (winner ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : match.score === 'Freilos' && side === 'Freilos' ? 'BYE' : ''}</strong>
+                              </span>}
+                            </div>
+                          );
+                        })}
+                      </article>
+                    );
+                  })}
                 {roundIndex === rounds.length - 1 && thirdPlaceRound && (
                   <div className="bracket-third-place-block">
                     <h4>Spiel um Platz 3</h4>
-                    {thirdPlaceRound.matches.map((match) => (
-                      <article className="bracket-match" key={match.id}>
-                        {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz · nicht ausgetragen</span>}
-                        {[match.sideA, match.sideB].map((side, sideIndex) => (
-                          <div className={match.winner === side ? 'winner' : ''} key={`${match.id}-${sideIndex}`}>
-                            <span>{side}</span>
-                            <span className="bracket-score-cells">
-                              {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
-                              <strong>{match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : ''}</strong>
-                            </span>
-                          </div>
-                        ))}
-                        <BracketDecisionTimeline sets={match.sets} decision={match.decision} extraTimeProgress={match.extraTimeProgress} winner={match.winner} />
-                      </article>
-                    ))}
+                    {thirdPlaceRound.matches.map((match) => {
+                      const scoreStages = scoreSport ? getBracketScoreStages(match.sets, match.decision, match.extraTimeProgress, match.winner, match.sideA, match.sideB, match.live) : [];
+                      return (
+                        <article className="bracket-match" key={match.id}>
+                          {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz · nicht ausgetragen</span>}
+                          <BracketStageHeader stages={scoreStages} />
+                          {[match.sideA, match.sideB].map((side, sideIndex) => (
+                            <div className={`${match.winner === side ? 'winner ' : ''}${scoreStages.length ? 'bracket-stage-row' : ''}`.trim()} key={`${match.id}-${sideIndex}`}>
+                              <span>{side}</span>
+                              {scoreStages.length ? <BracketStageValues stages={scoreStages} sideIndex={sideIndex as 0 | 1} /> : <span className="bracket-score-cells">
+                                {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
+                                <strong>{match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : ''}</strong>
+                              </span>}
+                            </div>
+                          ))}
+                        </article>
+                      );
+                    })}
                   </div>
                 )}
                 </div>

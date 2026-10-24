@@ -167,7 +167,9 @@ export function ScoreMatchEntry({ match, onSaved, onCompleted, allowEditFinished
           </div>
           <button className="btn small primary" type="button" disabled={!decisionSide} onClick={() => finishWith(draft, decisionSide || undefined, { type: 'LOT', regulationScore })}>Sieger nach Losentscheid speichern</button>
         </>}
-        <button className="btn small sport-score-back" type="button" onClick={() => { setDecisionStep(decisionStep === 'CHOICE' ? null : 'CHOICE'); setError(''); }}>← Zurück</button>
+        <button className={decisionStep === 'CHOICE' ? 'btn small' : 'btn small sport-score-back'} type="button" onClick={() => { setDecisionStep(decisionStep === 'CHOICE' ? null : 'CHOICE'); setError(''); }}>
+          {decisionStep === 'CHOICE' ? 'Ergebnis korrigieren' : '← Zurück'}
+        </button>
       </div>}
       {error && <p className="field-error" role="alert">{error}</p>}
       {!decisionStep && <div className="sport-score-actions">

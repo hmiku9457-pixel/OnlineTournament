@@ -50,6 +50,7 @@ export interface MockBracketMatch {
   sets?: MatchSet[];
   decision?: ScoreDecision;
   extraTimeProgress?: ExtraTimeProgress;
+  live?: boolean;
 }
 
 export interface MockBracketRound {
@@ -190,7 +191,7 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
       score = 'Freilos';
     }
     const list = byRound.get(match.round) ?? [];
-    list.push({ id: match.id, sideA: match.sideA, sideB: match.sideB, score, winner, autoWinner: match.autoWinner, sets: stored?.sets, decision: stored?.decision, extraTimeProgress: stored?.status === 'FINISHED' ? undefined : stored?.extraTimeProgress });
+    list.push({ id: match.id, sideA: match.sideA, sideB: match.sideB, score, winner, autoWinner: match.autoWinner, sets: stored?.sets, decision: stored?.decision, extraTimeProgress: stored?.status === 'FINISHED' ? undefined : stored?.extraTimeProgress, live: stored?.status === 'LIVE' || stored?.status === 'CONFIRMATION' });
     byRound.set(match.round, list);
   });
 
