@@ -171,7 +171,7 @@ export function buildMockGroups(tournament: DemoTournament, stage: TournamentSta
         id: match.id,
         sideA: match.sideA,
         sideB: match.sideB,
-        score: match.status === 'FINISHED' ? match.score.replace(/\s/g, '') : match.status === 'LIVE' ? match.score : '–',
+        score: match.status === 'FINISHED' ? match.score.replace(/\s/g, '') : match.status === 'LIVE' ? scoreFromSets(match.sets ?? []) : '–',
         status,
         matchDay: match.matchDay,
         sets: match.sets,

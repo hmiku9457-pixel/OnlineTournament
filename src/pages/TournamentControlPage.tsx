@@ -7,6 +7,7 @@ import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
+import { getGroupQualificationHints } from '@/domain/groupQualification';
 import { filterControlMatches, filterControlQueueMatches, summarizeControlProgress, type ControlMatchFilters, type ControlMatchFilter, type ControlQueueFilters, type ControlQueueStatusFilter } from '@/domain/controlOverview';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
@@ -103,20 +104,42 @@ function StageCompetitionView({
 
   if (stage.type === 'GROUPS') {
     const groups = buildMockGroups(tournament, stage);
+    const nextStage = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) + 1];
+    const qualificationCount = nextStage
+      ? stage.advancement.type === 'top_n' && stage.advancement.value > 0
+        ? stage.advancement.value : Math.max(1, Number(nextStage.settings.entrants) || 1)
+      : 0;
+    const stageFinished = isStageCompleted(tournament, stage);
+    const withdrawn = new Set(groups.flatMap((group) => group.standings.map((row) => row.name))
+      .filter((name) => isMockParticipantWithdrawn(tournament, name)));
+    const qualificationHints = getGroupQualificationHints(groups, qualificationCount, withdrawn);
+    const actualQualified = stageFinished && nextStage ? new Set(getStageEntrants(tournament, nextStage)) : null;
     return (
       <section className="competition-stage-section" id={`${tournamentId}-${stage.id}`}>
         <div className="competition-stage-head"><div><span className="badge">GRUPPEN</span><h3>{stage.name}</h3></div><span className="muted">{groups.length} Gruppen</span></div>
+        {nextStage && qualificationCount > 0 && (
+          <div className="group-qualification-legend" aria-label="Kennzeichnung der Qualifikationsplätze">
+            <span><i className="group-qualification-key qualified" aria-hidden="true" />{stageFinished ? 'Qualifiziert' : 'Aktuell auf Qualifikationsplatz'}</span>
+            {!stageFinished && qualificationHints.possible.size > 0 && <span><i className="group-qualification-key possible" aria-hidden="true" />Weitere Plätze im Gruppenvergleich möglich</span>}
+            {!stageFinished && <small>Vorläufig bis zum Abschluss der Gruppenphase</small>}
+          </div>
+        )}
         <div className="group-overview-grid">
           {groups.map((group) => (
             <article className="card group-overview-card" key={group.id}>
               <h4>{group.label}</h4>
               <div className="mini-standing-table detailed">
                 <div className="mini-standing-head"><span>#</span><span>Spieler</span><span>Sp.</span><span>S</span><span>N</span><span>Sätze</span><span>±</span><span>Bälle</span><span>±</span></div>
-                {group.standings.map((row) => (
-                  <div className="mini-standing-row" key={row.name}>
-                    <span>{row.rank}</span><button className="standing-player-button" type="button" onClick={() => setSelectedGroupPlayer({ groupLabel: group.label, player: row.name })}><strong>{row.name}</strong>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}{previousFinishLabels[row.name] && <small>{previousFinishLabels[row.name]}</small>}</button><span>{row.played}</span><span>{row.wins}</span><span>{row.losses}</span><StandingRatio value={row.sets} /><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><StandingRatio value={row.balls} /><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span>
-                  </div>
-                ))}
+                {group.standings.map((row) => {
+                  const isQualified = actualQualified ? actualQualified.has(row.name) : qualificationHints.projected.has(row.name);
+                  const isPossible = !actualQualified && qualificationHints.possible.has(row.name);
+                  return (
+                    <div className={`mini-standing-row${isQualified ? ' qualification-zone' : isPossible ? ' qualification-possible' : ''}`} key={row.name}
+                      title={isQualified ? stageFinished ? 'Für die nächste Phase qualifiziert' : 'Aktuell auf einem vorläufigen Qualifikationsplatz' : isPossible ? 'Weitere Qualifikationsplätze werden gruppenübergreifend vergeben' : undefined}>
+                      <span>{row.rank}</span><button className="standing-player-button" type="button" onClick={() => setSelectedGroupPlayer({ groupLabel: group.label, player: row.name })}><strong>{row.name}</strong>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}{previousFinishLabels[row.name] && <small>{previousFinishLabels[row.name]}</small>}</button><span>{row.played}</span><span>{row.wins}</span><span>{row.losses}</span><StandingRatio value={row.sets} /><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><StandingRatio value={row.balls} /><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span>
+                    </div>
+                  );
+                })}
               </div>
               <div className="group-match-list">
                 {[...new Set(group.matches.map((match) => match.matchDay ?? 0))].map((matchDay) => (
@@ -124,7 +147,7 @@ function StageCompetitionView({
                     <strong className="group-match-day-label">Spieltag {matchDay}</strong>
                     {group.matches.filter((match) => (match.matchDay ?? 0) === matchDay).map((match) => (
                       <div className={match.status === 'live' ? 'group-match-row live' : 'group-match-row'} key={match.id}>
-                        {match.status === 'live' && <span className="group-match-live-label"><span className="group-match-live-dot" aria-hidden="true" />Läuft gerade</span>}
+                        {match.status === 'live' && <span className="group-match-live-dot" role="img" aria-label="Laufendes Spiel" title="Läuft gerade" />}
                         <span className="group-match-side" title={match.sideA}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Rückzug (${match.sideA})` : match.sideA}</span><MatchResultDetails score={match.score} sets={match.sets} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} /><span className="group-match-side" title={match.sideB}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Rückzug (${match.sideB})` : match.sideB}</span>
                       </div>
                     ))}

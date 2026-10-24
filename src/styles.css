@@ -1795,28 +1795,38 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 
 /* Laufende Gruppenspiele und numerische Paarwerte sind auch in dichten Listen erkennbar. */
 .group-overview-card .group-match-row.live {
-  gap: 5px;
-  margin: 4px 0;
-  padding: 7px 8px;
+  position: relative;
+  gap: 3px;
+  margin: 2px 0;
+  padding: 5px 6px 5px 12px;
   border: 1px solid #abefc6;
-  border-left: 3px solid #12b76a;
-  border-radius: 9px;
+  border-left: 2px solid #12b76a;
+  border-radius: 6px;
   background: #ecfdf3;
 }
 .group-match-row .group-match-side { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .group-match-row.live .group-match-side { font-weight: 700; color: #054f31; }
-.group-match-live-label {
-  grid-column: 1 / -1;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  justify-self: start;
-  color: #067647;
-  font-size: .69rem;
-  font-weight: 800;
+.group-match-live-dot {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #12b76a;
 }
-.group-match-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #12b76a; }
-.group-match-row.live .match-result-trigger { border-radius: 5px; padding: 3px 5px; background: #d1fadf; color: #05603a; font-variant-numeric: tabular-nums; }
+.group-match-row.live .match-result-trigger { border-radius: 5px; padding: 2px 4px; background: #d1fadf; color: #05603a; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* Dezente Qualifikationszone; während der Phase stets als vorläufig gekennzeichnet. */
+.group-qualification-legend { display: flex; flex-wrap: wrap; gap: 5px 14px; align-items: center; margin: 3px 0 10px; color: #475467; font-size: .74rem; }
+.group-qualification-legend > span { display: inline-flex; gap: 6px; align-items: center; font-weight: 650; }
+.group-qualification-legend > small { color: #667085; font-size: .71rem; }
+.group-qualification-key { width: 10px; height: 10px; display: inline-block; flex: none; border-radius: 3px; }
+.group-qualification-key.qualified { background: #b7ebcd; border: 1px solid #12b76a; }
+.group-qualification-key.possible { background: #fef0c7; border: 1px solid #fdb022; }
+.group-overview-card .mini-standing-row.qualification-zone { background: #ecfdf3; box-shadow: inset 3px 0 #12b76a; border-radius: 4px; }
+.group-overview-card .mini-standing-row.qualification-possible { background: #fffaeb; box-shadow: inset 3px 0 #fdb022; border-radius: 4px; }
 .standing-ratio { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 1px; width: 100%; font-variant-numeric: tabular-nums; }
 .standing-ratio > :first-child { text-align: right; }
 .standing-ratio > :last-child { text-align: left; }

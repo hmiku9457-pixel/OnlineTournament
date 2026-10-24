@@ -3,7 +3,7 @@ import { createMockTournament, updateMockTournamentStatus } from '@/services/moc
 import type { MockPhaseInput } from '@/services/mockTournamentStore';
 import { getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { buildMockGroups } from '@/services/mockCompetitionViews';
-import { canEditFinishedResults, canEditMockMatch, completeMockMatch, getMockStageBaseMatches, getMockStageMatches, getMockStoredResult, withdrawMockParticipant } from '@/services/mockRuntime';
+import { assignMockMatchToTable, canEditFinishedResults, canEditMockMatch, completeMockMatch, getMockStageBaseMatches, getMockStageMatches, getMockStoredResult, saveMockMatchSets, withdrawMockParticipant } from '@/services/mockRuntime';
 import { getStageEntrants, isStageCompleted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
 
 const group: MockPhaseInput = { type: 'GROUPS', label: 'Gruppen', bestOf: 1, entrantCount: 4, groupCount: 1, swissRounds: 1, knockoutBestOf: [] };
@@ -35,6 +35,26 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Turnierleitung - Regressionen', () => {
+  it('zeigt bei einem laufenden Gruppenspiel den aktuellen Satzstand anstelle eines Strichs', () => {
+    const tournament = makeTournament(4, [{ ...group, bestOf: 3 }]);
+    const stage = tournament.stages[0];
+    expect(startFirstStage(tournament)).toBe(true);
+    const running = updateMockTournamentStatus(tournament.id, 'RUNNING');
+    const match = getMockStageMatches(running, stage)[0];
+    expect(assignMockMatchToTable(running, match.id, 'Tisch 1')).toBe(true);
+
+    const current = () => buildMockGroups(running, stage)[0].matches.find((item) => item.id === match.id);
+    expect(current()?.status).toBe('live');
+    expect(current()?.score).toBe('0:0');
+
+    saveMockMatchSets(match.id, [
+      { number: 1, sideAScore: 11, sideBScore: 7 },
+      { number: 2, sideAScore: 6, sideBScore: 11 },
+    ]);
+    expect(current()?.score).toBe('1:1');
+    expect(current()?.sets).toHaveLength(2);
+  });
+
   it('behält fixierte KO-Spieler bei einer neuen Zufallsverteilung an ihren Plätzen', () => {
     const tournament = makeTournament(12, [ko]);
     const stage = tournament.stages[0];

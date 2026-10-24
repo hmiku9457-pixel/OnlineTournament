@@ -1,3 +1,8 @@
+## 2026-10-24 – Kompakte Live-Spiele und Qualifikationszonen in Gruppenkarten
+- Laufende Begegnungen erscheinen einzeilig mit dezenter grüner Markierung und aktuellem Satzstand (anfangs 0:0 statt „–“); gespeicherte Sätze bleiben anklickbar.
+- Gruppentabellen markieren die vorläufigen Qualifikationsplätze in Grün. Gruppenübergreifend umkämpfte Zusatzplätze werden in Gelb hervorgehoben und ausdrücklich als noch offen erklärt.
+- Nach Abschluss der Gruppenphase markieren die Tabellen die tatsächlichen Qualifizierten für die Folgephase statt einer Prognose. Tests für Satzstände und die Qualifikationsgrenzen ergänzt.
+
 ## 2026-10-24 – Filter für die Warteliste „Nächste Spiele“
 - Kombinierbare Statusfilter („Alle“, „Zuweisbar“, „Aktuell blockiert“), Gruppen- und Spieltag-Auswahl sowie Spielersuche mit Treffermenge und Zurücksetzen.
 - Nach dem Filtern bleibt die ursprüngliche Wartelistenposition erhalten. Nicht vorhandene Gruppen und Spieltage werden nicht angeboten.
