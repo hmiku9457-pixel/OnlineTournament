@@ -26,7 +26,7 @@ import { displayVenueMessage, displayVenueName, getVenueTerminology } from '@/do
 import { TableStateLegend, TournamentHallView } from '@/components/TournamentHallView';
 import { ControlHelpButton, TournamentControlHelp } from '@/components/TournamentControlHelp';
 import { getControlGuide, type ControlHelpTopic } from '@/domain/controlGuide';
-import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
+import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getStageEntrants, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
 import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
@@ -207,8 +207,6 @@ function StageCompetitionView({
     const openingPairings = swissEditable
       ? getMockStageBaseMatches(tournament, stage).filter((match) => match.round === 'Runde 1')
       : [];
-    const previousStage = tournament.stages[tournament.stages.findIndex((entry) => entry.id === stage.id) - 1];
-    const canSeedSwiss = swissEditable && previousStage?.type === 'GROUPS' && isStageCompleted(tournament, previousStage);
     return (
       <section className="competition-stage-section">
         <div className="competition-stage-head"><div><span className="badge">SCHWEIZER SYSTEM</span><h3>{stage.name}</h3></div><div className="actions"><span className="muted">{Number(stage.settings.rounds) || 4} Runden</span>{swissEditable && <button className="btn small" type="button" onClick={() => {
@@ -216,12 +214,7 @@ function StageCompetitionView({
                     setSwissDrawNotice('Neue Zufallsreihenfolge gespeichert.');
                     onDrawChanged?.();
                   }
-                }}>Neue Zufallsreihenfolge</button>}{canSeedSwiss && <button className="btn small" type="button" title="Startreihenfolge nach Gruppenplatzierungen: A–D, D–A, A–D …" onClick={() => {
-                  if (previousStage && applySeededSwissOrder(tournament, stage, buildMockGroups(tournament, previousStage).map((group) => group.standings.map((row) => row.name)))) {
-                    setSwissDrawNotice('Seeded Zuteilung gespeichert.');
-                    onDrawChanged?.();
-                  }
-                }}>Seeded Zuteilung</button>}</div></div>
+                }}>Neue Zufallsreihenfolge</button>}</div></div>
         {swissEditable && (
           <div className="swiss-draw-preview" aria-label="Vorschau der Schweizer Erstrunden-Paarungen">
             <div className="swiss-draw-preview-head">
@@ -239,7 +232,7 @@ function StageCompetitionView({
           </div>
         )}
         {!swissEditable && isStageStarted(tournament, stage) && (
-          <p className="swiss-draw-lock-note">Die Startreihenfolge ist seit Beginn des Schweizer Systems eingefroren. Zufallsreihenfolge und Seeding können nur vor dem Phasenstart verändert werden.</p>
+          <p className="swiss-draw-lock-note">Die Startreihenfolge ist seit Beginn des Schweizer Systems eingefroren. Sie kann nur vor dem Phasenstart verändert werden.</p>
         )}
         <div className="card table-wrap">
           <table className="compact-table">
