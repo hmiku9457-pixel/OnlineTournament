@@ -34,6 +34,39 @@ export function filterControlMatches<T extends FilterableMatch>(
   });
 }
 
+export type ControlQueueStatusFilter = 'all' | 'assignable' | 'blocked';
+
+export interface ControlQueueFilters {
+  status: ControlQueueStatusFilter;
+  group: string;
+  matchDay: string;
+  search: string;
+}
+
+interface FilterableQueueMatch {
+  id: string;
+  sideA: string;
+  sideB: string;
+  round: string;
+  matchDay?: number;
+}
+
+export function filterControlQueueMatches<T extends FilterableQueueMatch>(
+  matches: readonly T[],
+  filters: ControlQueueFilters,
+  assignableIds: ReadonlySet<string>,
+): T[] {
+  const query = filters.search.trim().toLocaleLowerCase('de-DE');
+  return matches.filter((match) => {
+    const assignable = assignableIds.has(match.id);
+    if (filters.status === 'assignable' && !assignable) return false;
+    if (filters.status === 'blocked' && assignable) return false;
+    if (filters.group && match.round !== filters.group) return false;
+    if (filters.matchDay && match.matchDay !== Number(filters.matchDay)) return false;
+    return !query || [match.sideA, match.sideB].some((name) => name.toLocaleLowerCase('de-DE').includes(query));
+  });
+}
+
 interface PhaseProgressStep { id: string; name: string; started: boolean; completed: boolean }
 
 export function summarizeControlProgress(

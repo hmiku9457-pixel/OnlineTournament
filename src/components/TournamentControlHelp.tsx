@@ -25,6 +25,7 @@ const topics: Array<{ id: ControlHelpTopic; label: string; intro: string; steps:
   {
     id: 'queue', label: 'Nächste Spiele', intro: 'Hier stehen die wartenden Begegnungen und ihre Pausenzeiten.',
     steps: [
+      { title: 'Warteliste eingrenzen', description: 'Mit „Zuweisbar“ siehst du Partien, die jetzt an einen Tisch können; „Aktuell blockiert“ zeigt die übrigen. Gruppe, Spieltag und die Namenssuche lassen sich kombinieren. Die Rangnummern bleiben unverändert.' },
       { title: 'Automatisch zuweisen', description: 'Der große Button verteilt mehrere mögliche Partien auf freie Tische; der Button je Partie weist nur dieses eine Spiel zu.' },
       { title: 'Manuell zuweisen', description: '„Zuweisen“ öffnet die Auswahl freier Tische. Alternativ eine Partie auf eine freie Tischkarte oder einen Hallentisch ziehen.' },
       { title: 'Pausenzeiten lesen', description: 'Die Zeit neben einem Namen zeigt die Pause seit der letzten tatsächlich gespielten Partie. Sie ist eine Planungshilfe, keine feste Sperrfrist.' },

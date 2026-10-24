@@ -1,3 +1,8 @@
+## 2026-10-24 – Filter für die Warteliste „Nächste Spiele“
+- Kombinierbare Statusfilter („Alle“, „Zuweisbar“, „Aktuell blockiert“), Gruppen- und Spieltag-Auswahl sowie Spielersuche mit Treffermenge und Zurücksetzen.
+- Nach dem Filtern bleibt die ursprüngliche Wartelistenposition erhalten. Nicht vorhandene Gruppen und Spieltage werden nicht angeboten.
+- Der Schnellbutton aus der Hinweisleiste öffnet gezielt zuweisbare Spiele; die Kennzahl „Wartende Spiele“ zeigt wieder alle Partien. Kurzanleitung ergänzt.
+
 ## 2026-10-24 – Zuweisbarkeit der Warteliste zuverlässig abgleichen
 - Der Schnellbutton „X Spiele anzeigen“ erscheint nur, wenn mindestens eine Wartelisten-Partie tatsächlich einem freien, ungesperrten Tisch zugewiesen werden kann; die Anzahl zählt nur zuweisbare Spiele.
 - Warteliste, Tisch-Auswahl und automatische Zuweisung verwenden dieselbe Prüfung wie der eigentliche Spielstart. Bei Abweichungen wird der konkrete Sperrgrund eingeblendet.

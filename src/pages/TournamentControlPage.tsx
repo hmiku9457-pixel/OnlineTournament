@@ -7,7 +7,7 @@ import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
-import { filterControlMatches, summarizeControlProgress, type ControlMatchFilters, type ControlMatchFilter } from '@/domain/controlOverview';
+import { filterControlMatches, filterControlQueueMatches, summarizeControlProgress, type ControlMatchFilters, type ControlMatchFilter, type ControlQueueFilters, type ControlQueueStatusFilter } from '@/domain/controlOverview';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
@@ -43,6 +43,14 @@ const matchFilterOptions: Array<{ value: ControlMatchFilter; label: string }> = 
   { value: 'waiting', label: 'Wartend' },
   { value: 'finished', label: 'Abgeschlossen' },
 ];
+
+const queueStatusOptions: Array<{ value: ControlQueueStatusFilter; label: string }> = [
+  { value: 'all', label: 'Alle' },
+  { value: 'assignable', label: 'Zuweisbar' },
+  { value: 'blocked', label: 'Aktuell blockiert' },
+];
+
+const emptyQueueFilters: ControlQueueFilters = { status: 'all', group: '', matchDay: '', search: '' };
 
 interface CorrectionNotice { key: string; message: string; undoAuditId?: string; error?: boolean }
 
@@ -382,6 +390,7 @@ export function TournamentControlPage() {
   const [skipThirdMatchId, setSkipThirdMatchId] = useState<string | null>(null);
   const [adminEditMatchId, setAdminEditMatchId] = useState<string | null>(null);
   const [matchFilters, setMatchFilters] = useState<ControlMatchFilters>({ status: 'all', phase: '', table: '', search: '' });
+  const [queueFilters, setQueueFilters] = useState<ControlQueueFilters>(emptyQueueFilters);
   const [correctionNotice, setCorrectionNotice] = useState<CorrectionNotice | null>(null);
   // Die Mock-Services lesen mutable localStorage-Daten. Diese Snapshots
   // halten die bisherigen Cache-Invalidierungen durch Versionsänderungen bei,
@@ -418,6 +427,11 @@ export function TournamentControlPage() {
   const finalStandings = useMemo(() => standingsSource.tournament.status === 'FINISHED' ? getMockFinalStandings(standingsSource.tournament) : [], [standingsSource]);
   const nextMatches = matches.filter((match) => match.status === 'WAITING');
   const assignableWaitingMatches = nextMatches.filter((match) => (queueAssignableTables.get(match.id)?.length ?? 0) > 0);
+  const assignableWaitingIds = new Set(assignableWaitingMatches.map((match) => match.id));
+  const filteredNextMatches = filterControlQueueMatches(nextMatches, queueFilters, assignableWaitingIds);
+  const queuePositions = new Map(nextMatches.map((match, index) => [match.id, index + 1]));
+  const queueGroups = useMemo(() => [...new Set(matches.filter((match) => match.status === 'WAITING' && match.round.startsWith('Gruppe ')).map((match) => match.round))].sort((a, b) => a.localeCompare(b, 'de', { numeric: true })), [matches]);
+  const queueMatchDays = useMemo(() => [...new Set(matches.filter((match) => match.status === 'WAITING').map((match) => match.matchDay).filter((day): day is number => typeof day === 'number'))].sort((a, b) => a - b), [matches]);
   const tableMatches = matches.filter((match) => ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch '));
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table) && !blockedTables.has(table));
@@ -452,6 +466,14 @@ export function TournamentControlPage() {
     setRuntimeVersion((value) => value + 1);
     setPhaseVersion((value) => value + 1);
   }, [tournament.id]);
+
+  useEffect(() => {
+    setQueueFilters((current) => {
+      const group = current.group && !queueGroups.includes(current.group) ? '' : current.group;
+      const matchDay = current.matchDay && !queueMatchDays.includes(Number(current.matchDay)) ? '' : current.matchDay;
+      return group === current.group && matchDay === current.matchDay ? current : { ...current, group, matchDay };
+    });
+  }, [queueGroups, queueMatchDays]);
 
   useEffect(() => {
     function handlePhaseCompleted(event: Event) {
@@ -502,7 +524,8 @@ export function TournamentControlPage() {
     setTournament(updateMockTournamentStatus(tournament.id, status));
   }
 
-  function openWaitingQueue() {
+  function openWaitingQueue(onlyAssignable = false) {
+    setQueueFilters({ ...emptyQueueFilters, status: onlyAssignable ? 'assignable' : 'all' });
     setTab('overview');
     window.requestAnimationFrame(() => document.getElementById('control-next-matches')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
@@ -801,7 +824,7 @@ export function TournamentControlPage() {
       <div className="control-guide-strip no-print">
         <div className="control-guide-copy"><strong>{guide.title}</strong><span>{guide.text}</span></div>
         <div className="control-guide-actions">
-          {assignableWaitingMatches.length > 0 && <button type="button" className="btn small control-guide-action" onClick={openWaitingQueue}>{assignableWaitingMatches.length} {assignableWaitingMatches.length === 1 ? 'Spiel' : 'Spiele'} anzeigen →</button>}
+          {assignableWaitingMatches.length > 0 && <button type="button" className="btn small control-guide-action" onClick={() => openWaitingQueue(true)}>{assignableWaitingMatches.length} {assignableWaitingMatches.length === 1 ? 'Spiel' : 'Spiele'} anzeigen →</button>}
           {nextStartableStage && !activeStage && <button type="button" className="btn small control-guide-action" onClick={openNextStagePreparation}>Phase vorbereiten →</button>}
           <ControlHelpButton topic={guide.topic} onOpen={setHelpTopic} label="So geht's →" />
         </div>
@@ -886,9 +909,32 @@ export function TournamentControlPage() {
           <div className="control-overview-columns">
             <main>
               <div className="control-section-head control-section-spaced" id="control-next-matches"><div><div className="control-help-title"><h2>Nächste Spiele</h2><ControlHelpButton topic="queue" onOpen={setHelpTopic} /></div><p className="muted">Pausenzeit seit dem letzten tatsächlich gespielten Match; aktualisiert sich automatisch.</p></div></div>
+              {nextMatches.length > 0 && (
+                <div className="control-match-filters control-queue-filters" role="search" aria-label="Nächste Spiele filtern">
+                  <div className="control-match-status-filters" role="group" aria-label="Zuweisungsstatus">
+                    {queueStatusOptions.map((option) => (
+                      <button key={option.value} type="button" className={queueFilters.status === option.value ? 'active' : ''}
+                        aria-pressed={queueFilters.status === option.value}
+                        onClick={() => setQueueFilters((current) => ({ ...current, status: option.value }))}>
+                        {option.label} ({option.value === 'all' ? nextMatches.length : option.value === 'assignable' ? assignableWaitingMatches.length : nextMatches.length - assignableWaitingMatches.length})
+                      </button>
+                    ))}
+                  </div>
+                  <div className="control-match-filter-fields">
+                    <label>Spieler suchen<input type="search" value={queueFilters.search} placeholder="Name eingeben …" onChange={(event) => setQueueFilters((current) => ({ ...current, search: event.target.value }))} /></label>
+                    <label>Gruppe<select value={queueFilters.group} disabled={queueGroups.length === 0} onChange={(event) => setQueueFilters((current) => ({ ...current, group: event.target.value }))}><option value="">Alle Gruppen</option>{queueGroups.map((group) => <option key={group} value={group}>{group}</option>)}</select></label>
+                    <label>Spieltag<select value={queueFilters.matchDay} disabled={queueMatchDays.length === 0} onChange={(event) => setQueueFilters((current) => ({ ...current, matchDay: event.target.value }))}><option value="">Alle Spieltage</option>{queueMatchDays.map((day) => <option key={day} value={String(day)}>Spieltag {day}</option>)}</select></label>
+                  </div>
+                  <div className="control-match-filter-summary" aria-live="polite">
+                    <span>{filteredNextMatches.length} von {nextMatches.length} wartenden Spielen</span>
+                    {(queueFilters.status !== 'all' || queueFilters.group || queueFilters.matchDay || queueFilters.search) && <button className="btn small" type="button" onClick={() => setQueueFilters(emptyQueueFilters)}>Filter zurücksetzen</button>}
+                  </div>
+                </div>
+              )}
               <div className="match-queue">
                 {nextMatches.length === 0 && <div className="control-empty-message">{!tournament.hasStarted ? 'Noch keine wartenden Spiele. Starte zuerst das Turnier.' : activeStage ? 'Zurzeit wartet keine Partie auf einen Tisch.' : 'Aktuell keine wartenden Spiele. Prüfe den Turnierverlauf für die nächste Phase.'}</div>}
-                {nextMatches.map((match, index) => {
+                {nextMatches.length > 0 && filteredNextMatches.length === 0 && <div className="control-empty-message">Keine wartenden Spiele passen zu diesen Filtern. Passe die Auswahl an oder setze die Filter zurück.</div>}
+                {filteredNextMatches.map((match) => {
                   const busyPlayers = getMockParticipantTableConflicts(match, matches);
                   const busyA = busyPlayers.find((entry) => entry.participant === match.sideA);
                   const busyB = busyPlayers.find((entry) => entry.participant === match.sideB);
@@ -907,7 +953,7 @@ export function TournamentControlPage() {
                       event.dataTransfer.effectAllowed = 'move';
                     }}
                   >
-                    <span className="queue-position">{index + 1}</span>
+                    <span className="queue-position" title="Ursprüngliche Position in der Warteliste">{queuePositions.get(match.id)}</span>
                     <div className="match-queue-main">
                       <strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseA)}</em>{busyA && <span className="queue-player-table-flag">Bereits an {busyA.table}</span>}</strong>
                       <strong>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseB)}</em>{busyB && <span className="queue-player-table-flag">Bereits an {busyB.table}</span>}</strong>
@@ -944,7 +990,7 @@ export function TournamentControlPage() {
                 <div className="control-help-title"><h3>Turnierstatus</h3><ControlHelpButton topic="queue" onOpen={setHelpTopic} /></div>
                 <div className="control-metrics-grid">
                   <div><span className="muted">Tischbelegung</span><strong>{tableMatches.length}/{tournament.tables} · {blockedTables.size} gesperrt</strong></div>
-                  <div><button className="control-metric-link" type="button" disabled={nextMatches.length === 0} onClick={openWaitingQueue} title={nextMatches.length ? 'Zu den wartenden Spielen springen' : undefined}><span className="muted">Wartende Spiele</span><strong>{nextMatches.length}</strong></button></div>
+                  <div><button className="control-metric-link" type="button" disabled={nextMatches.length === 0} onClick={() => openWaitingQueue()} title={nextMatches.length ? 'Zu den wartenden Spielen springen' : undefined}><span className="muted">Wartende Spiele</span><strong>{nextMatches.length}</strong></button></div>
                   <div><span className="muted">Restzeit grob</span><strong title="Prognose aus offenen Spielen, Best-of und verfügbaren Tischen (15 Minuten je Satz).">{restTimeLabel}</strong></div>
                 </div>
               </div>
