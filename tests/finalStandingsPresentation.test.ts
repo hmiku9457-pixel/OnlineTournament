@@ -18,8 +18,8 @@ const standings = [
   { name: 'Test Spieler 10', placement: 'Platz 11', status: 'Zurückgezogen' as const, stageIndex: 0, placementNumber: 11 },
 ];
 
-describe('Endplatzierungen: Siegerpodest und kompakte Rangliste', () => {
-  it('zeigt die ersten drei Plätze im Podest und bündelt einen geteilten dritten Platz', () => {
+describe('Endplatzierungen: verdichtete Ergebnisübersicht', () => {
+  it('zeigt alle drei Podestplätze in flachen Karten und bündelt den geteilten dritten Platz', () => {
     const html = renderToStaticMarkup(createElement(FinalStandingsList, { standings, phaseNames }));
     const podium = html.split('class="final-ranking"')[0];
     expect(podium).toContain('Siegerpodest');
@@ -32,24 +32,23 @@ describe('Endplatzierungen: Siegerpodest und kompakte Rangliste', () => {
     expect(podium).toContain('Test Spieler 18');
     expect(podium).toContain('· geteilt');
     expect(podium).toContain('final-standing-tag is-winner');
-    expect(podium).toContain('K.-o.-Phase');
   });
 
-  it('zeigt einen geteilten Platzierungsbereich nur einmal und alle vier Spieler', () => {
+  it('fasst gemeinsame Platzierungen zusammen und zeigt Phasen nur in Abschnittsüberschriften', () => {
     const html = renderToStaticMarkup(createElement(FinalStandingsList, { standings, phaseNames }));
     expect((html.match(/Platz 5–8/g) ?? [])).toHaveLength(1);
+    expect(html).toContain('final-ranking-card is-shared is-wide');
     expect(html).toContain('4 Teilnehmer');
-    for (const name of ['Test Spieler 05', 'Test Spieler 07', 'Test Spieler 09', 'Test Spieler 17']) {
-      expect(html).toContain(name);
-    }
-    expect(html).toContain('final-ranking-grid');
-    expect(html).not.toContain('final-standing-tag is-eliminated');
+    expect(html).toContain('<h4>K.-o.-Phase</h4>');
+    expect(html).toContain('<h4>Schweizer System</h4>');
+    expect((html.match(/<h4>/g) ?? [])).toHaveLength(2);
     expect(html).toContain('final-standing-tag is-withdrawn');
-    expect(html).toContain('Schweizer System');
+    expect(html).not.toContain('final-standing-tag is-eliminated');
     expect((html.match(/<strong>/g) ?? [])).toHaveLength(standings.length);
+    for (const row of standings) expect(html).toContain(row.name);
   });
 
-  it('bleibt bei einer einzelnen Schweizer Phase ohne K.-o.-Podest vollständig sichtbar', () => {
+  it('zeigt auch einzelne Phasen ohne Podest und teilt gleiche Ränge nicht auf', () => {
     const html = renderToStaticMarkup(createElement(FinalStandingsList, {
       standings: [
         { name: 'A', placement: 'Platz 1–3', status: 'Beendet', stageIndex: 0, placementNumber: 1 },
@@ -59,7 +58,8 @@ describe('Endplatzierungen: Siegerpodest und kompakte Rangliste', () => {
       phaseNames,
     }));
     expect(html).not.toContain('Siegerpodest');
-    expect(html).toContain('3 Teilnehmer');
+    expect(html).toContain('<h4>Schweizer System</h4>');
+    expect((html.match(/Platz 1–3/g) ?? [])).toHaveLength(1);
     expect((html.match(/<strong>/g) ?? [])).toHaveLength(3);
   });
 });

@@ -14,7 +14,6 @@ interface PlacementGroup {
   participants: FinalStanding[];
 }
 
-/** Gruppenplätze werden nur zusammengefasst, wenn es dieselbe Gesamtplatzierung ist. */
 function groupPlacements(standings: readonly FinalStanding[]): PlacementGroup[] {
   const groups: PlacementGroup[] = [];
   for (const row of standings) {
@@ -29,6 +28,19 @@ function groupPlacements(standings: readonly FinalStanding[]): PlacementGroup[] 
   return groups;
 }
 
+function groupByPhase(groups: PlacementGroup[]) {
+  const phases: Array<{ stageIndex: number; groups: PlacementGroup[] }> = [];
+  for (const group of groups) {
+    const current = phases[phases.length - 1];
+    if (current?.stageIndex === group.stageIndex) {
+      current.groups.push(group);
+    } else {
+      phases.push({ stageIndex: group.stageIndex, groups: [group] });
+    }
+  }
+  return phases;
+}
+
 function participantTag(status: FinalStanding['status']) {
   if (status === 'Zurückgezogen') return <span className="final-standing-tag is-withdrawn">Zurückgezogen</span>;
   if (status === 'Turniersieger') return <span className="final-standing-tag is-winner">Turniersieger</span>;
@@ -36,11 +48,11 @@ function participantTag(status: FinalStanding['status']) {
   return null;
 }
 
-function playerDetails(row: FinalStanding, phaseNames: readonly string[]) {
+function playerName(row: FinalStanding) {
   return (
     <span className="final-standing-person">
-      <span className="final-standing-person-name"><strong>{row.name}</strong>{participantTag(row.status)}</span>
-      <small>{phaseNames[row.stageIndex] ?? '–'}</small>
+      <strong>{row.name}</strong>
+      {participantTag(row.status)}
     </span>
   );
 }
@@ -49,7 +61,7 @@ export function FinalStandingsList({ standings, phaseNames }: FinalStandingsList
   const groups = groupPlacements(standings);
   const podium = groups.filter((group) => ['Platz 1', 'Platz 2', 'Platz 3'].includes(group.placement));
   const podiumGroups = new Set(podium);
-  const remaining = groups.filter((group) => !podiumGroups.has(group));
+  const remainingPhases = groupByPhase(groups.filter((group) => !podiumGroups.has(group));
 
   return (
     <div className="final-standings-list" aria-label="Endplatzierungen">
@@ -61,12 +73,14 @@ export function FinalStandingsList({ standings, phaseNames }: FinalStandingsList
               const level = group.placement === 'Platz 1' ? 'first' : group.placement === 'Platz 2' ? 'second' : 'third';
               const medal = level === 'first' ? '🏆' : level === 'second' ? '🥈' : '🥉';
               return (
-                <article key={group.placement} className={['final-podium-card', 'is-' + level].join(' ')} role="listitem">
+                <article key={group.placement} className={'final-podium-card is-' + level} role="listitem">
                   <span className="final-podium-medal" aria-hidden="true">{medal}</span>
-                  <span className="final-podium-rank">{group.placement}{group.participants.length > 1 ? ' · geteilt' : ''}</span>
-                  <ul className="final-podium-players">
-                    {group.participants.map((row) => <li key={row.name}>{playerDetails(row, phaseNames)}</li>)}
-                  </ul>
+                  <div className="final-podium-content">
+                    <span className="final-podium-rank">{group.placement}{group.participants.length > 1 ? ' · geteilt' : ''}</span>
+                    <ul className="final-podium-players">
+                      {group.participants.map((row) => <li key={row.name}>{playerName(row)}</li>)}
+                    </ul>
+                  </div>
                 </article>
               );
             })}
@@ -74,22 +88,37 @@ export function FinalStandingsList({ standings, phaseNames }: FinalStandingsList
         </section>
       )}
 
-      {remaining.length > 0 && (
+      {remainingPhases.length > 0 && (
         <section className="final-ranking" aria-label="Weitere Platzierungen">
           <h3>{podium.length ? 'Weitere Platzierungen' : 'Endplatzierungen'}</h3>
-          <div className="final-ranking-grid" role="list">
-            {remaining.map((group) => (
-              <article key={[group.placementNumber, group.stageIndex, group.placement].join('-')} className={['final-ranking-card', group.participants.length > 1 ? 'is-shared' : ''].filter(Boolean).join(' ')} role="listitem">
-                <div className="final-ranking-position">
-                  <span className="final-ranking-badge">{group.placement}</span>
-                  {group.participants.length > 1 && <small>{group.participants.length} Teilnehmer</small>}
+          {remainingPhases.map((phase, index) => {
+            const participantCount = phase.groups.reduce((sum, group) => sum + group.participants.length, 0);
+            return (
+              <div className="final-ranking-phase" key={phase.stageIndex + '-' + index}>
+                <div className="final-ranking-phase-heading">
+                  <h4>{phaseNames[phase.stageIndex] ?? 'Ohne Turnierphase'}</h4>
+                  <small>{participantCount} Teilnehmer</small>
                 </div>
-                <ul className="final-ranking-players">
-                  {group.participants.map((row) => <li key={row.name}>{playerDetails(row, phaseNames)}</li>)}
-                </ul>
-              </article>
-            ))}
-          </div>
+                <div className="final-ranking-grid" role="list">
+                  {phase.groups.map((group) => (
+                    <article
+                      key={[group.placementNumber, group.stageIndex, group.placement].join('-')}
+                      className={['final-ranking-card', group.participants.length > 1 ? 'is-shared' : '', group.participants.length >= 3 ? 'is-wide' : ''].filter(Boolean).join(' ')}
+                      role="listitem"
+                    >
+                      <div className="final-ranking-position">
+                        <span className="final-ranking-badge">{group.placement}</span>
+                        {group.participants.length > 1 && <small>{group.participants.length} Teilnehmer</small>}
+                      </div>
+                      <ul className="final-ranking-players">
+                        {group.participants.map((row) => <li key={row.name}>{playerName(row)}</li>)}
+                      </ul>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </section>
       )}
     </div>
