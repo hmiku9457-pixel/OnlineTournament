@@ -1,35 +1,38 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ControlHelpTopic } from '@/domain/controlGuide';
+import { getVenueTerminology } from '@/domain/venueTerminology';
 
 type HelpStep = { title: string; description: string };
 
-const topics: Array<{ id: ControlHelpTopic; label: string; intro: string; steps: HelpStep[] }> = [
+function getTopics(sport: string): Array<{ id: ControlHelpTopic; label: string; intro: string; steps: HelpStep[] }> {
+  const venue = getVenueTerminology(sport);
+  return [
   {
     id: 'start', label: 'Schnellstart', intro: 'Der Ablauf von der Vorbereitung bis zur letzten Partie.',
     steps: [
       { title: 'Teilnehmer prüfen', description: 'Unter „Teilnehmer“ Namen und Spielercodes kontrollieren. Vor dem ersten Start sind Nachmeldungen möglich.' },
       { title: 'Auslosung vorbereiten', description: 'Im „Turnierverlauf“ die erste Phase auswählen und gegebenenfalls Gruppen oder Startplätze verändern.' },
       { title: 'Turnier starten', description: 'Oben „Turnier starten“ wählen. Die Auslosung dieser Phase wird dabei festgeschrieben.' },
-      { title: 'Spiele abwickeln', description: 'Unter „Übersicht“ wartende Partien Tischen zuweisen, Sätze erfassen und Endergebnisse abschließen. Die nächste Phase startet später ausdrücklich durch die Turnierleitung.' },
+      { title: 'Spiele abwickeln', description: `Unter „Übersicht“ wartende Partien ${venue.dativePlural} zuweisen, Sätze erfassen und Endergebnisse abschließen. Die nächste Phase startet später ausdrücklich durch die Turnierleitung.` },
     ],
   },
   {
-    id: 'tables', label: 'Tische', intro: 'Tischkarten und Hallenansicht steuern dieselben Partien.',
+    id: 'tables', label: venue.plural, intro: 'Karten- und Planansicht steuern dieselben Partien.',
     steps: [
-      { title: 'Tisch öffnen', description: 'In der Hallenansicht auf einen Tisch klicken: Die Bedienung öffnet sich im Fenster. In der Kartenansicht stehen die Bedienelemente direkt auf der Tischkarte.' },
-      { title: 'Spiel zuweisen', description: 'Ein wartendes Spiel auswählen oder aus „Nächste Spiele“ auf einen freien Tisch ziehen. Mit der Zuweisung beginnt die Partie.' },
-      { title: 'Tisch wechseln oder freigeben', description: 'Bei laufenden Spielen lassen sich Tisch und Zuweisung ändern. Bereits erfasste Sätze bleiben dabei erhalten.' },
-      { title: 'Tisch sperren', description: 'Gesperrte Tische erhalten keine neuen Spiele. Eine bereits laufende Partie wird dadurch nicht abgebrochen.' },
+      { title: `${venue.singular} öffnen`, description: `In der Planansicht auf die gewünschte Spielfläche klicken: Die Bedienung öffnet sich im Fenster. In der Kartenansicht stehen die Bedienelemente direkt auf der Karte.` },
+      { title: 'Spiel zuweisen', description: 'Ein wartendes Spiel auswählen oder aus „Nächste Spiele“ auf eine freie Spielfläche ziehen. Mit der Zuweisung beginnt die Partie.' },
+      { title: `${venue.singular} wechseln oder freigeben`, description: 'Bei laufenden Spielen lassen sich Spielort und Zuweisung ändern. Bereits erfasste Sätze bleiben dabei erhalten.' },
+      { title: `${venue.singular} sperren`, description: `Gesperrte ${venue.plural} erhalten keine neuen Spiele. Eine bereits laufende Partie wird dadurch nicht abgebrochen.` },
     ],
   },
   {
     id: 'queue', label: 'Nächste Spiele', intro: 'Hier stehen die wartenden Begegnungen und ihre Pausenzeiten.',
     steps: [
-      { title: 'Warteliste eingrenzen', description: 'Mit „Zuweisbar“ siehst du Partien, die jetzt an einen Tisch können; „Aktuell blockiert“ zeigt die übrigen. Gruppe, Spieltag und die Namenssuche lassen sich kombinieren. Die Rangnummern bleiben unverändert.' },
-      { title: 'Automatisch zuweisen', description: 'Der große Button verteilt mehrere mögliche Partien auf freie Tische; der Button je Partie weist nur dieses eine Spiel zu.' },
-      { title: 'Manuell zuweisen', description: '„Zuweisen“ öffnet die Auswahl freier Tische. Alternativ eine Partie auf eine freie Tischkarte oder einen Hallentisch ziehen.' },
+      { title: 'Warteliste eingrenzen', description: 'Mit „Zuweisbar“ siehst du Partien, die jetzt zugewiesen werden können; „Aktuell blockiert“ zeigt die übrigen. Gruppe, Spieltag und die Namenssuche lassen sich kombinieren. Die Rangnummern bleiben unverändert.' },
+      { title: 'Automatisch zuweisen', description: 'Der große Button verteilt mehrere mögliche Partien auf freie Spielflächen; der Button je Partie weist nur dieses eine Spiel zu.' },
+      { title: 'Manuell zuweisen', description: '„Zuweisen“ öffnet die Auswahl freier Spielflächen. Alternativ eine Partie auf eine freie Karte oder auf die Spielfläche im Plan ziehen.' },
       { title: 'Pausenzeiten lesen', description: 'Die Zeit neben einem Namen zeigt die Pause seit der letzten tatsächlich gespielten Partie. Sie ist eine Planungshilfe, keine feste Sperrfrist.' },
-      { title: 'Konflikte vermeiden', description: 'Ist ein Teilnehmer bereits einem Tisch zugewiesen, zeigt die Warteliste dessen Tisch orange an und sperrt die Zuweisung dieser Partie. Auch belegte oder gesperrte Tische sowie eine Turnierpause verhindern neue Zuweisungen.' },
+      { title: 'Konflikte vermeiden', description: 'Ist ein Teilnehmer bereits einer Spielfläche zugewiesen, zeigt die Warteliste den Spielort orange an und sperrt die Zuweisung dieser Partie. Auch belegte oder gesperrte Spielflächen sowie eine Turnierpause verhindern neue Zuweisungen.' },
     ],
   },
   {
@@ -37,8 +40,8 @@ const topics: Array<{ id: ControlHelpTopic; label: string; intro: string; steps:
     steps: [
       { title: 'Kurz eingeben', description: '7 bedeutet 11:7, −7 bedeutet 7:11 und 10 bedeutet 12:10. Auch eine vollständige Eingabe wie 11:9 ist möglich.' },
       { title: 'Jeden Satz bestätigen', description: 'Mit Enter oder „Satz bestätigen“ speichern. Gespeicherte Sätze lassen sich durch Anklicken des Satzstands korrigieren.' },
-      { title: 'Endergebnis abschließen', description: 'Bei längeren Best-of-Partien und im Schweizer System bzw. K.-o.-Modus das vorläufige Endergebnis ausdrücklich bestätigen. Erst dann wird der Tisch wieder frei.' },
-      { title: 'Danach ist das Spiel abgeschlossen', description: 'Nach dem endgültigen Speichern wird der Tisch frei. Im Bereich „Spiele“ bleibt das Ergebnis einsehbar und kann bei Bedarf korrigiert werden, solange die Phase es zulässt.' },
+      { title: 'Endergebnis abschließen', description: 'Bei längeren Best-of-Partien und im Schweizer System bzw. K.-o.-Modus das vorläufige Endergebnis ausdrücklich bestätigen. Erst dann wird die Spielfläche wieder frei.' },
+      { title: 'Danach ist das Spiel abgeschlossen', description: 'Nach dem endgültigen Speichern wird die Spielfläche frei. Im Bereich „Spiele“ bleibt das Ergebnis einsehbar und kann bei Bedarf korrigiert werden, solange die Phase es zulässt.' },
     ],
   },
   {
@@ -62,29 +65,31 @@ const topics: Array<{ id: ControlHelpTopic; label: string; intro: string; steps:
   {
     id: 'matches', label: 'Spiele', intro: 'Die vollständige Liste hilft bei der Kontrolle und Korrektur.',
     steps: [
-      { title: 'Status erkennen', description: '„Wartet“: noch nicht zugewiesen. „Läuft“: am Tisch. „Abgeschlossen“: Ergebnis gespeichert.' },
+      { title: 'Status erkennen', description: '„Wartet“: noch nicht zugewiesen. „Läuft“: am Spielort. „Abgeschlossen“: Ergebnis gespeichert.' },
       { title: 'Details ansehen', description: '„Ergebnis anzeigen“ öffnet die Satzergebnisse. Abgeschlossene, noch bearbeitbare Partien können dort korrigiert werden.' },
-      { title: 'Gezielt finden', description: 'Mit Status, Phase, Tisch und der Namenssuche lassen sich Partien auch bei größeren Turnieren schnell finden.' },
+      { title: 'Gezielt finden', description: 'Mit Status, Phase, Spielort und der Namenssuche lassen sich Partien auch bei größeren Turnieren schnell finden.' },
     ],
   },
   {
     id: 'audit', label: 'Protokoll', intro: 'Wichtige Verwaltungsaktionen werden chronologisch aufgelistet.',
     steps: [
-      { title: 'Änderungen nachverfolgen', description: 'Tischzuweisungen, Ergebnisänderungen, Bestätigungen und Turnierpausen sind mit Zeitpunkt und Vorher/Nachher-Werten sichtbar.' },
+      { title: 'Änderungen nachverfolgen', description: 'Spielortzuweisungen, Ergebnisänderungen, Bestätigungen und Turnierpausen sind mit Zeitpunkt und Vorher/Nachher-Werten sichtbar.' },
       { title: 'Korrektur zurücknehmen', description: 'Die jüngste Ergebniskorrektur lässt sich gegebenenfalls rückgängig machen, solange keine Folgephase die Änderung sperrt.' },
       { title: 'Lokaler Testbetrieb', description: 'Die Einträge stammen aktuell aus dem Browser und sind keine manipulationssichere, verifizierte Benutzerhistorie.' },
     ],
   },
-];
-
-export function ControlHelpButton({ topic, onOpen, label }: { topic: ControlHelpTopic; onOpen: (topic: ControlHelpTopic) => void; label?: string }) {
-  return <button type="button" className="control-help-button" aria-label={`Hilfe: ${topics.find((item) => item.id === topic)?.label}`} onClick={() => onOpen(topic)}>{label ?? <>Hilfe <span className="control-help-mark" aria-hidden="true">?</span></>}</button>;
+  ];
 }
 
-export function TournamentControlHelp({ initialTopic, onClose }: { initialTopic: ControlHelpTopic; onClose: () => void }) {
+export function ControlHelpButton({ topic, onOpen, label }: { topic: ControlHelpTopic; onOpen: (topic: ControlHelpTopic) => void; label?: string }) {
+  return <button type="button" className="control-help-button" aria-label="Hilfe zu diesem Bereich" onClick={() => onOpen(topic)}>{label ?? <>Hilfe <span className="control-help-mark" aria-hidden="true">?</span></>}</button>;
+}
+
+export function TournamentControlHelp({ initialTopic, onClose, sport }: { initialTopic: ControlHelpTopic; onClose: () => void; sport: string }) {
   const [selectedTopic, setSelectedTopic] = useState<ControlHelpTopic>(initialTopic);
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
+  const topics = getTopics(sport);
   const topic = topics.find((item) => item.id === selectedTopic) ?? topics[0];
 
   useEffect(() => {

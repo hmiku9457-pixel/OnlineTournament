@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { MatchSet } from '@/domain/types';
 import { SetBySetEntry } from '@/components/SetBySetEntry';
+import { displayVenueName } from '@/domain/venueTerminology';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import {
   confirmMockMatchSide,
@@ -92,9 +93,9 @@ export function ScoringPage() {
           <div className="standalone-back-row">
             <button className="btn small" type="button" onClick={() => navigate(-1)}>← Zurück</button>
           </div>
-          <div className="control-kicker">Tablet am Tisch</div>
+          <div className="control-kicker">Tablet am Spielort</div>
           <h1>Ergebniseingabe</h1>
-          <p className="muted">{sideA} – {sideB} · {runtime.match.table} · Best-of-{bestOf}</p>
+          <p className="muted">{sideA} – {sideB} · {displayVenueName(runtime.tournament.sport, runtime.match.table)} · Best-of-{bestOf}</p>
           <div className="field">
             <label htmlFor="matchCode">Gemeinsamer Spielcode</label>
             <input
@@ -166,7 +167,7 @@ export function ScoringPage() {
         <div className="standalone-back-row">
           <button className="btn small" type="button" onClick={() => navigate(-1)}>← Zurück</button>
         </div>
-        <div><span className="badge live">LIVE</span><span className="score-table-label">{runtime.match.table}</span></div>
+        <div><span className="badge live">LIVE</span><span className="score-table-label">{displayVenueName(runtime.tournament.sport, runtime.match.table)}</span></div>
         <h1>{sideA}{swissRecords.get(sideA) && <span className="swiss-record">{swissRecords.get(sideA)}</span>} – {sideB}{swissRecords.get(sideB) && <span className="swiss-record">{swissRecords.get(sideB)}</span>}</h1>
         <p className="muted">Best-of-{bestOf} · Satzweise Eingabe: <strong>7</strong> = 11:7, <strong>-7</strong> = 7:11. Jeden Satz mit Enter oder dem Satz-Button bestätigen.</p>
       </div>

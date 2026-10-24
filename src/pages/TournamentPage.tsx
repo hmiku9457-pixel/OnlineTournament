@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { StageCard } from '@/components/StageCard';
 import { getMockTournament } from '@/services/mockTournamentStore';
+import { getVenueTerminology } from '@/domain/venueTerminology';
 
 function getStatusLabel(status: string) {
   switch (status) {
@@ -22,6 +23,7 @@ export function TournamentPage() {
   const { tournamentId } = useParams();
   const navigate = useNavigate();
   const tournament = useMemo(() => getMockTournament(tournamentId), [tournamentId]);
+  const venue = getVenueTerminology(tournament.sport);
 
   return (
     <>
@@ -49,11 +51,11 @@ export function TournamentPage() {
           <div className="metric">{tournament.participants}</div>
         </div>
         <div className="card span-3">
-          <div className="muted">Tische</div>
+          <div className="muted">{venue.plural}</div>
           <div className="metric">{tournament.tables}</div>
         </div>
         <div className="card span-3">
-          <div className="muted">Aktive Tische</div>
+          <div className="muted">Aktive {venue.plural}</div>
           <div className="metric">{tournament.activeTables}</div>
         </div>
         <div className="card span-3">
@@ -90,11 +92,11 @@ export function TournamentPage() {
         ))}
 
         <div className="card span-12">
-          <h2>Tischbereiche</h2>
+          <h2>Spielbereiche</h2>
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Bereich</th><th>Tische</th><th>Bevorzugte Turniersegmente</th><th>Modus</th></tr>
+                <tr><th>Bereich</th><th>{venue.plural}</th><th>Bevorzugte Turniersegmente</th><th>Modus</th></tr>
               </thead>
               <tbody>
                 {tournament.areas.map((area) => (

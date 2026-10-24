@@ -115,8 +115,8 @@ export function estimateRemainingTournamentMinutes(tournament: DemoTournament): 
   return [...duration.values()].reduce((total, round) => total + estimateRoundRemainingMinutes(round, availableTables), 0);
 }
 
-export function formatRemainingTournamentDuration(minutes: number | null) {
-  if (minutes === null) return 'Keine Tische verfügbar';
+export function formatRemainingTournamentDuration(minutes: number | null, venuePlural = 'Tische') {
+  if (minutes === null) return `Keine ${venuePlural} verfügbar`;
   if (minutes <= 0) return '0 min';
   const rounded = Math.max(1, Math.ceil(minutes));
   const hours = Math.floor(rounded / 60);

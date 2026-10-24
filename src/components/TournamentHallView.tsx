@@ -1,4 +1,5 @@
 import type { VenueLayout } from '@/domain/venueLayout';
+import { displayVenueName, getVenueTerminology } from '@/domain/venueTerminology';
 import type { MockRuntimeMatch } from '@/services/mockRuntime';
 
 interface TournamentHallViewProps {
@@ -7,28 +8,31 @@ interface TournamentHallViewProps {
   blockedTables: Set<string>;
   selectedTable: string | null;
   canAssign: boolean;
+  sport: string;
   onSelectTable: (table: string) => void;
   onAssignToTable: (matchId: string, table: string) => boolean;
 }
 
-export function TableStateLegend() {
+export function TableStateLegend({ sport }: { sport: string }) {
+  const venue = getVenueTerminology(sport);
   return (
-    <div className="tournament-hall-legend" aria-label="Legende der Tischzustände">
+    <div className="tournament-hall-legend" aria-label="Legende der Spielflächenzustände">
       <span className="hall-legend-item running">Laufendes Spiel</span>
-      <span className="hall-legend-item free">Freier Tisch</span>
-      <span className="hall-legend-item locked">Gesperrter Tisch</span>
+      <span className="hall-legend-item free">{venue.free}</span>
+      <span className="hall-legend-item locked">{venue.locked}</span>
     </div>
   );
 }
 
 /** The plan uses fixed-width, readable tiles; large halls scroll rather than shrink. */
 export function TournamentHallView({
-  layout, matchesByTable, blockedTables, selectedTable, canAssign, onSelectTable, onAssignToTable,
+  layout, matchesByTable, blockedTables, selectedTable, canAssign, sport, onSelectTable, onAssignToTable,
 }: TournamentHallViewProps) {
+  const venue = getVenueTerminology(sport);
   return (
     <div className="tournament-hall">
-      <p className="muted tournament-hall-hint">Tisch auswählen, um Ergebnis und Zuweisung zu bearbeiten. Wartende Spiele können auf freie Tische gezogen werden. Bei breiten Hallenplänen horizontal scrollen.</p>
-      <div className="tournament-hall-scroller" role="region" aria-label="Hallenplan der Turniertische" tabIndex={0}>
+      <p className="muted tournament-hall-hint">{venue.singular} auswählen, um Ergebnis und Zuweisung zu bearbeiten. Wartende Spiele können per Drag & Drop auf freie Spielflächen gezogen werden. Bei breiten Plänen horizontal scrollen.</p>
+      <div className="tournament-hall-scroller" role="region" aria-label="Spielflächenplan" tabIndex={0}>
         <div className="tournament-hall-plan">
           {layout.deskDock === 'top' && <div className="tournament-hall-desk outside">Turnierleitung</div>}
           <div className="tournament-hall-row">
@@ -37,6 +41,7 @@ export function TournamentHallView({
               {layout.cells.map((cell, index) => {
                 if (cell.startsWith('table:')) {
                   const table = `Tisch ${cell.slice(6)}`;
+                  const displayName = displayVenueName(sport, table);
                   const match = matchesByTable.get(table);
                   const blocked = blockedTables.has(table);
                   const selected = selectedTable === table;
@@ -46,7 +51,7 @@ export function TournamentHallView({
                       key={index}
                       className={`tournament-hall-table ${match ? 'running' : blocked ? 'locked' : 'free'}${selected ? ' selected' : ''}`}
                       aria-pressed={selected}
-                      aria-label={`${table}, ${match ? `${match.sideA} gegen ${match.sideB}, ${match.score || 'noch kein Ergebnis'}` : blocked ? 'gesperrt' : 'frei'}. Details öffnen`}
+                      aria-label={`${displayName}, ${match ? `${match.sideA} gegen ${match.sideB}, ${match.score || 'noch kein Ergebnis'}` : blocked ? 'gesperrt' : 'frei'}. Details öffnen`}
                       onClick={() => onSelectTable(table)}
                       onDragOver={(event) => { if (canAssign && !match && !blocked) event.preventDefault(); }}
                       onDrop={(event) => {
@@ -56,7 +61,7 @@ export function TournamentHallView({
                         if (matchId && onAssignToTable(matchId, table)) onSelectTable(table);
                       }}
                     >
-                      <span className="tournament-hall-table-head"><strong>{table}</strong><span>{match ? 'läuft' : blocked ? 'gesperrt' : 'frei'}</span></span>
+                      <span className="tournament-hall-table-head"><strong>{displayName}</strong><span>{match ? 'läuft' : blocked ? 'gesperrt' : 'frei'}</span></span>
                       {match ? (
                         <span className="tournament-hall-match">
                           <span title={match.sideA}>{match.sideA}</span>

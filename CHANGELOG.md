@@ -1,3 +1,9 @@
+## 2026-10-24 – Sportartgerechte Spielorte und neutraler Spielflächenplan
+- Die Oberfläche bezeichnet Spielorte passend zur Sportart: Tischtennis-Tische, Fußballplätze sowie Spielfelder für Handball und Basketball; für weitere Sportarten werden Plätze verwendet.
+- Die bisherige „Hallenansicht“ heißt jetzt „Planansicht“ und der Hallenplan „Spielflächenplan“ – für Hallen und Außengelände gleichermaßen.
+- Erstellung, Layout-Editor, Turnierleitung, Hilfe, Filter, Zuweisungen, Zuschauer-, Spieler- und Ergebniseingabe zeigen die passenden Begriffe, während bestehende gespeicherte Tischkennungen aus Kompatibilitätsgründen unverändert bleiben.
+- Zusätzliche Tests prüfen die Sportarten und sportbezogenen Hinweise.
+
 ## 2026-10-24 – Qualifikationsmarkierungen rechts sauber abrunden
 - Rechte Tabellenwerte erhalten denselben optischen Abstand zur Markierung wie die Platzierungsziffern links.
 - Grüne und blaue Qualifikationszeilen schließen mit sanft gerundeter Kante und feinem Rand ab, ohne die Spaltenausrichtung zu verändern.

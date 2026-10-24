@@ -1,5 +1,6 @@
 import { VenueLayoutEditor } from '@/components/VenueLayout';
 import { createVenueLayout, resizeVenueLayout } from '@/domain/venueLayout';
+import { getVenueTerminology } from '@/domain/venueTerminology';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -290,6 +291,7 @@ export function CreateTournamentPage() {
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(false);
   const [name, setName] = useState('');
   const [sport, setSport] = useState('table_tennis');
+  const venue = getVenueTerminology(sport);
   const timedSport = sport !== 'table_tennis';
   const [timedMatchMinutes, setTimedMatchMinutes] = useState('');
   const [venueTurnoverMinutes, setVenueTurnoverMinutes] = useState('');
@@ -734,9 +736,9 @@ export function CreateTournamentPage() {
                 </select>
               </div>
               <div className="field full">
-                <label>Anzahl Tische</label>
+                <label>Anzahl {venue.plural}</label>
                 <NumberChoice
-                  ariaLabel="Anzahl Tische"
+                  ariaLabel={`Anzahl ${venue.plural}`}
                   value={tables}
                   presets={Array.from({ length: 12 }, (_, index) => index + 1)}
                   custom={customTables}
@@ -748,9 +750,9 @@ export function CreateTournamentPage() {
               </div>
             </div>
             <div className="venue-optional">
-              <label className="format-toggle"><input type="checkbox" role="switch" checked={venueLayoutEnabled} onChange={(event) => setVenueLayoutEnabled(event.target.checked)} /> <strong>Hallenlayout verwenden</strong></label>
-              <p className="field-hint">Der Hallenplan ist immer sichtbar und startet mit 10 Spalten × 3 Reihen. Mit dem Schalter legst du fest, ob er im Turnier verwendet und gespeichert wird.</p>
-              <VenueLayoutEditor layout={venueLayout} tableCount={tables} onChange={setVenueLayout} />
+              <label className="format-toggle"><input type="checkbox" role="switch" checked={venueLayoutEnabled} onChange={(event) => setVenueLayoutEnabled(event.target.checked)} /> <strong>Spielflächenplan verwenden</strong></label>
+              <p className="field-hint">Der Plan kann eine Halle oder ein Außengelände darstellen und startet mit 10 Spalten × 3 Reihen. Mit dem Schalter legst du fest, ob die Anordnung ins Turnier übernommen wird.</p>
+              <VenueLayoutEditor layout={venueLayout} tableCount={tables} sport={sport} onChange={setVenueLayout} />
               {!venueLayoutEnabled && <p className="field-hint">Layout deaktiviert – deine Anordnung bleibt im Editor erhalten, wird aber nicht ins Turnier übernommen.</p>}
             </div>
           </section>
@@ -904,7 +906,7 @@ export function CreateTournamentPage() {
                 <input id="match-duration" type="number" min="1" step="1" required={timedSport} value={timedSport ? timedMatchMinutes : '15'} disabled={!timedSport} placeholder={timedSport ? 'Pflichtfeld – z. B. 12' : undefined} onChange={(event) => setTimedMatchMinutes(event.target.value)} />
                 {!timedSport && <span className="field-hint">Tischtennis: fest 15 Minuten je Satz.</span>}
                 {timedSport && <>
-                  <label htmlFor="venue-turnover">Pause zwischen Spielen am selben Platz (Minuten)</label>
+                  <label htmlFor="venue-turnover">Pause zwischen Spielen auf derselben Spielfläche (Minuten)</label>
                   <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => setVenueTurnoverMinutes(event.target.value)} />
                   <span className="field-hint">Die Pause wird in der groben Spielplan-Dauer berücksichtigt; leer bedeutet 0 Minuten.</span>
                   {(!validMatchDuration || !validTurnover) && <span className="field-error">Bitte gültige ganze Minutenwerte angeben. Die Spieldauer ist erforderlich.</span>}
@@ -914,7 +916,7 @@ export function CreateTournamentPage() {
                 <strong>{participantCount}</strong>
                 <span>{discipline === 'SINGLES' ? 'Teilnehmer' : 'Doppel'}</span>
                 <strong>{tables}</strong>
-                <span>Tische</span>
+                <span>{venue.plural}</span>
               </div>
             </div>
           </section>
@@ -944,7 +946,7 @@ export function CreateTournamentPage() {
                     <h3>{item.label}</h3>
                     <p>{item.description}</p>
                     <p className="muted">Geschätzte Spiele insgesamt: {item.estimatedMatches}</p>
-                    <p className="muted">Basisdauer: ca. {formatDuration(item.estimatedDurationMinutes)} · {timedSport ? `${matchDurationMinutes} Min. Spieldauer + ${breakMinutes} Min. Platzwechsel` : '15 Min. pro Satz und mindestens 1 Satz pro Spiel'}.</p>
+                    <p className="muted">Basisdauer: ca. {formatDuration(item.estimatedDurationMinutes)} · {timedSport ? `${matchDurationMinutes} Min. Spieldauer + ${breakMinutes} Min. Wechselzeit` : '15 Min. pro Satz und mindestens 1 Satz pro Spiel'}.</p>
                   </button>
                 ))}
               </div>
@@ -1245,7 +1247,7 @@ export function CreateTournamentPage() {
                   <div><dt>Turnier</dt><dd>{name}</dd></div>
                   <div><dt>Disziplin</dt><dd>{discipline === 'SINGLES' ? 'Einzel' : 'Doppel'}</dd></div>
                   <div><dt>Teilnehmer</dt><dd>{participantCount}</dd></div>
-                  <div><dt>Tische</dt><dd>{tables}</dd></div>
+                  <div><dt>{venue.plural}</dt><dd>{tables}</dd></div>
                   <div><dt>Mindestspiele</dt><dd>{minimumMatches}</dd></div>
                   <div><dt>Turnierdauer (grob)</dt><dd>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : '–'}</dd></div>
                 </dl>
@@ -1295,7 +1297,7 @@ export function CreateTournamentPage() {
 
                 {phaseDrafts.length > 0 && (
                   <p className="muted creation-summary-note">
-                    Schätzung mit 15 Min. pro Satz, durchschnittlicher Satzanzahl je Best-of und paralleler Nutzung der verfügbaren Tische.
+                    {timedSport ? 'Schätzung mit eingestellter Spieldauer und möglicher Wechselzeit' : 'Schätzung mit 15 Min. pro Satz und durchschnittlicher Satzanzahl je Best-of'} bei paralleler Nutzung der verfügbaren {venue.dativePlural}.
                   </p>
                 )}
               </aside>

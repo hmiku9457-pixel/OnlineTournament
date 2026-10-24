@@ -17,6 +17,7 @@ import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwi
 import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { VenueLayoutMini } from '@/components/VenueLayout';
+import { displayVenueMessage, displayVenueName, getVenueTerminology } from '@/domain/venueTerminology';
 import { TableStateLegend, TournamentHallView } from '@/components/TournamentHallView';
 import { ControlHelpButton, TournamentControlHelp } from '@/components/TournamentControlHelp';
 import { getControlGuide, type ControlHelpTopic } from '@/domain/controlGuide';
@@ -382,6 +383,9 @@ export function TournamentControlPage() {
   const navigate = useNavigate();
   const initialTournament = useMemo(() => getMockTournament(tournamentId), [tournamentId]);
   const [tournament, setTournament] = useState(initialTournament);
+  const venue = getVenueTerminology(tournament.sport);
+  const venueName = (name: string) => displayVenueName(tournament.sport, name);
+  const venueMessage = (message: string) => displayVenueMessage(tournament.sport, message);
   const [tab, setTab] = useState<ControlTab>('overview');
   const [tableView, setTableView] = useState<'cards' | 'hall'>('cards');
   const [selectedHallTable, setSelectedHallTable] = useState<string | null>(null);
@@ -431,7 +435,7 @@ export function TournamentControlPage() {
   const queueAssignableTables = useMemo(() => getMockQueueAssignableTables(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   const blockedTables = useMemo(() => new Set(getBlockedMockTables(runtimeSource.tournament)), [runtimeSource]);
   const restTimeLabel = useMemo(
-    () => formatRemainingTournamentDuration(estimateRemainingTournamentMinutes(phaseRuntimeSource.tournament)),
+    () => formatRemainingTournamentDuration(estimateRemainingTournamentMinutes(phaseRuntimeSource.tournament), getVenueTerminology(phaseRuntimeSource.tournament.sport).plural),
     [phaseRuntimeSource],
   );
   const auditEntries = useMemo(() => getMockAudit(runtimeSource.tournament.id), [runtimeSource]);
@@ -476,6 +480,7 @@ export function TournamentControlPage() {
   ), [phaseRuntimeSource, activeStage]);
   const guide = getControlGuide({
     status: tournament.status,
+    sport: tournament.sport,
     hasStarted: Boolean(tournament.hasStarted),
     hasActiveStage: Boolean(activeStage),
     hasNextStage: Boolean(nextStartableStage),
@@ -644,7 +649,7 @@ export function TournamentControlPage() {
   function assignToTable(matchId: string, table: string) {
     const blockReason = getMockAssignmentBlockReason(tournament, matchId, table);
     if (blockReason) {
-      setAssignmentMessage(blockReason);
+      setAssignmentMessage(venueMessage(blockReason));
       refreshRuntime();
       return false;
     }
@@ -664,11 +669,11 @@ export function TournamentControlPage() {
 
   function moveToTable(matchId: string, table: string) {
     if (!moveMockMatchToTable(tournament, matchId, table)) {
-      setAssignmentMessage('Tischwechsel nicht möglich: Ziel ist nicht frei oder gesperrt.');
+      setAssignmentMessage(`${venue.singular}wechsel nicht möglich: Ziel ist nicht frei oder gesperrt.`);
       return;
     }
     setMovingMatchId(null);
-    setAssignmentMessage(`Partie nach ${table} verlegt. Satzergebnisse und ursprüngliche Pausenzeit bleiben erhalten.`);
+    setAssignmentMessage(`Partie nach ${venueName(table)} verlegt. Satzergebnisse und ursprüngliche Pausenzeit bleiben erhalten.`);
     refreshRuntime();
   }
 
@@ -680,7 +685,7 @@ export function TournamentControlPage() {
     const firstReason = freeTables
       .map((table) => getMockAssignmentBlockReason(tournament, matchId, table))
       .find((reason) => reason);
-    setAssignmentMessage(firstReason ?? 'Aktuell ist kein geeigneter Tisch frei.');
+    setAssignmentMessage(firstReason ? venueMessage(firstReason) : `Aktuell ist kein geeigneter ${venue.singular} frei.`);
     refreshRuntime();
   }
 
@@ -729,14 +734,14 @@ export function TournamentControlPage() {
                     }}
                   >
                     <div className="table-status-top">
-                      <strong>{tableName}</strong>
+                      <strong>{venueName(tableName)}</strong>
                       <div className="table-head-controls">
                         <span className={isLive ? 'badge live' : isBlocked ? 'badge blocked-badge' : 'badge'}>{isLive ? 'läuft' : isBlocked ? 'gesperrt' : 'frei'}</span>
                         {isLive && isBlocked && <span className="badge blocked-badge">gesperrt</span>}
                         <button
                           className="btn small table-lock-button"
                           type="button"
-                          aria-label={`${tableName} ${isBlocked ? 'freigeben' : 'sperren'}`}
+                          aria-label={`${venueName(tableName)} ${isBlocked ? 'freigeben' : 'sperren'}`}
                           aria-pressed={isBlocked}
                           onClick={() => toggleTableLock(tableName)}
                         >{isBlocked ? 'Freigeben' : 'Sperren'}</button>
@@ -748,15 +753,15 @@ export function TournamentControlPage() {
                         <SetBySetEntry match={match} swissAdminEntry={(activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')} onSaved={refreshRuntime} compact sideARecord={swissRecordFor(match, match.sideA)} sideBRecord={swissRecordFor(match, match.sideB)} />
                         {!(requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED') && (
                           <div className="table-operational-actions">
-                            <button className="btn small" type="button" onClick={() => setMovingMatchId((old) => old === match.id ? null : match.id)}>Tisch wechseln</button>
+                            <button className="btn small" type="button" onClick={() => setMovingMatchId((old) => old === match.id ? null : match.id)}>{venue.singular} wechseln</button>
                             <button className="btn small" type="button" onClick={() => unassignFromTable(match.id)}>Zuweisung aufheben</button>
                           </div>
                         )}
                         {movingMatchId === match.id && !(requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED') && (
-                          <div className="table-assignment-picker" role="group" aria-label="Neuen Tisch auswählen">
+                          <div className="table-assignment-picker" role="group" aria-label="Neuen Spielort auswählen">
                             {freeTables.length ? freeTables.map((table) => (
-                              <button key={table} className="btn small" type="button" onClick={() => moveToTable(match.id, table)}>{table}</button>
-                            )) : <span className="muted">Kein anderer freier Tisch.</span>}
+                              <button key={table} className="btn small" type="button" onClick={() => moveToTable(match.id, table)}>{venueName(table)}</button>
+                            )) : <span className="muted">Keine andere freie Spielfläche.</span>}
                           </div>
                         )}
                         {isMockThirdPlaceMatch(match.id) && !match.sets?.length && (
@@ -768,7 +773,7 @@ export function TournamentControlPage() {
                     ) : (
                       <div className="free-table-message">
                         <strong>{isBlocked ? 'Für dieses Turnier gesperrt' : 'Frei für die nächste Partie'}</strong>
-                        <span>{isBlocked ? 'Keine automatische oder manuelle Zuweisung möglich.' : tableView === 'hall' ? 'Wartende Partie direkt zuweisen oder auf den Tisch im Hallenplan ziehen.' : 'Spiel hierher ziehen oder über „Zuweisen“ auswählen.'}</span>
+                        <span>{isBlocked ? 'Keine automatische oder manuelle Zuweisung möglich.' : tableView === 'hall' ? 'Wartende Partie direkt zuweisen oder auf die Spielfläche im Plan ziehen.' : 'Spiel hierher ziehen oder über „Zuweisen“ auswählen.'}</span>
                         {tableView === 'hall' && tournament.venueLayout && !isBlocked && tournament.status === 'RUNNING' && (
                           <div className="hall-table-modal-assign">
                             <label htmlFor={`hall-assign-${index}`}>Wartendes Spiel</label>
@@ -811,7 +816,7 @@ export function TournamentControlPage() {
               <h1>{tournament.name}</h1>
               <span className={`badge control-tournament-status status-${tournament.status.toLowerCase()}`}>Status: {statusLabel(tournament.status)}</span>
             </div>
-            <p className="muted">{tournament.phasesLabel} · {tournament.participants} Teilnehmer · {tournament.tables} Tische</p>
+            <p className="muted">{tournament.phasesLabel} · {tournament.participants} Teilnehmer · {tournament.tables} {venue.plural}</p>
           </div>
           <div className="actions control-primary-actions no-print">
             {editableStage && ['GROUPS', 'SWISS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(editableStage.type) && (
@@ -858,14 +863,14 @@ export function TournamentControlPage() {
           <div>
             <div className="control-section-head control-table-section-head">
               <div>
-                <div className="control-help-title"><h2>Tische</h2><ControlHelpButton topic="tables" onOpen={setHelpTopic} /></div>
-                <p className="muted">{tableView === 'hall' && tournament.venueLayout ? 'Spielübersicht nach den tatsächlichen Tischpositionen.' : 'Alle Spielorte auf einen Blick – auch freie Tische bleiben sichtbar.'}</p>
+                <div className="control-help-title"><h2>{venue.plural}</h2><ControlHelpButton topic="tables" onOpen={setHelpTopic} /></div>
+                <p className="muted">{tableView === 'hall' && tournament.venueLayout ? 'Spielübersicht nach den tatsächlichen Positionen im Plan.' : `Alle Spielorte auf einen Blick – auch freie ${venue.plural} bleiben sichtbar.`}</p>
               </div>
               <div className="control-table-head-actions">
                 {tournament.venueLayout && (
-                  <div className="table-view-switch" role="group" aria-label="Darstellung der Tische">
-                    <button type="button" className={tableView === 'cards' ? 'active' : ''} aria-pressed={tableView === 'cards'} onClick={() => { setTableView('cards'); setSelectedHallTable(null); setMovingMatchId(null); }}>Tischkarten</button>
-                    <button type="button" className={tableView === 'hall' ? 'active' : ''} aria-pressed={tableView === 'hall'} onClick={() => { setTableView('hall'); setSelectedHallTable(null); setMovingMatchId(null); }}>Hallenansicht</button>
+                  <div className="table-view-switch" role="group" aria-label="Darstellung der Spielflächen">
+                    <button type="button" className={tableView === 'cards' ? 'active' : ''} aria-pressed={tableView === 'cards'} onClick={() => { setTableView('cards'); setSelectedHallTable(null); setMovingMatchId(null); }}>Kartenansicht</button>
+                    <button type="button" className={tableView === 'hall' ? 'active' : ''} aria-pressed={tableView === 'hall'} onClick={() => { setTableView('hall'); setSelectedHallTable(null); setMovingMatchId(null); }}>Planansicht</button>
                   </div>
                 )}
                 <span className="badge live">{tableMatches.length} laufend</span>
@@ -879,12 +884,13 @@ export function TournamentControlPage() {
                 </button>
               </div>
             </div>
-            {tournament.status === 'PAUSED' && <div className="assignment-message" role="status">Turnier pausiert: Neue Tischzuweisungen sind gesperrt. Laufende Spiele dürfen beendet werden.</div>}
+            {tournament.status === 'PAUSED' && <div className="assignment-message" role="status">Turnier pausiert: Neue Zuweisungen sind gesperrt. Laufende Spiele dürfen beendet werden.</div>}
             {assignmentMessage && <div className="assignment-message" role="status">{assignmentMessage}</div>}
-            <div className="control-table-legend"><TableStateLegend /></div>
+            <div className="control-table-legend"><TableStateLegend sport={tournament.sport} /></div>
             {tableView === 'hall' && tournament.venueLayout && (
               <TournamentHallView
                 layout={tournament.venueLayout}
+                sport={tournament.sport}
                 matchesByTable={matchesByTable}
                 blockedTables={blockedTables}
                 selectedTable={selectedHallTable}
@@ -912,14 +918,14 @@ export function TournamentControlPage() {
                   >
                     <div className="hall-table-modal-head">
                       <div>
-                        <span className="badge">HALLENANSICHT</span>
-                        <h2 id="hall-table-modal-title">{selectedHallTable} · Bedienung</h2>
+                        <span className="badge">PLANANSICHT</span>
+                        <h2 id="hall-table-modal-title">{venueName(selectedHallTable)} · Bedienung</h2>
                       </div>
                       <button className="btn small" type="button" autoFocus onClick={() => { setSelectedHallTable(null); setMovingMatchId(null); }}>Schließen</button>
                     </div>
                     <details className="control-inline-help">
-                      <summary>Wie bediene ich diesen Tisch?</summary>
-                      <p>Freie Tische: Partie auswählen und „Zuweisen“ drücken – das Spiel beginnt sofort. Laufende Partien: Sätze aus Sicht des linken Spielers eingeben (7 = 11:7, −7 = 7:11), danach das Endergebnis bestätigen. Tischwechsel und aufgehobene Zuweisungen behalten bereits erfasste Sätze.</p>
+                      <summary>Wie bediene ich diese Spielfläche?</summary>
+                      <p>Freie Spielflächen: Partie auswählen und „Zuweisen“ drücken – das Spiel beginnt sofort. Laufende Partien: Sätze aus Sicht des linken Spielers eingeben (7 = 11:7, −7 = 7:11), danach das Endergebnis bestätigen. Spielortwechsel und aufgehobene Zuweisungen behalten bereits erfasste Sätze.</p>
                     </details>
                     <div className="hall-table-modal-content">{tableCards}</div>
                   </section>
@@ -955,7 +961,7 @@ export function TournamentControlPage() {
                 </div>
               )}
               <div className="match-queue">
-                {nextMatches.length === 0 && <div className="control-empty-message">{!tournament.hasStarted ? 'Noch keine wartenden Spiele. Starte zuerst das Turnier.' : activeStage ? 'Zurzeit wartet keine Partie auf einen Tisch.' : 'Aktuell keine wartenden Spiele. Prüfe den Turnierverlauf für die nächste Phase.'}</div>}
+                {nextMatches.length === 0 && <div className="control-empty-message">{!tournament.hasStarted ? 'Noch keine wartenden Spiele. Starte zuerst das Turnier.' : activeStage ? 'Zurzeit wartet keine Partie auf eine Zuweisung.' : 'Aktuell keine wartenden Spiele. Prüfe den Turnierverlauf für die nächste Phase.'}</div>}
                 {nextMatches.length > 0 && filteredNextMatches.length === 0 && <div className="control-empty-message">Keine wartenden Spiele passen zu diesen Filtern. Passe die Auswahl an oder setze die Filter zurück.</div>}
                 {filteredNextMatches.map((match) => {
                   const busyPlayers = getMockParticipantTableConflicts(match, matches);
@@ -978,20 +984,20 @@ export function TournamentControlPage() {
                   >
                     <span className="queue-position" title="Ursprüngliche Position in der Warteliste">{queuePositions.get(match.id)}</span>
                     <div className="match-queue-main">
-                      <strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseA)}</em>{busyA && <span className="queue-player-table-flag">Bereits an {busyA.table}</span>}</strong>
-                      <strong>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseB)}</em>{busyB && <span className="queue-player-table-flag">Bereits an {busyB.table}</span>}</strong>
-                      <span className="muted">{match.phase} · {match.round}{match.matchDay ? ` · Spieltag ${match.matchDay}` : ''}{match.note ? ` · ${match.note}` : ''}</span>
+                      <strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseA)}</em>{busyA && <span className="queue-player-table-flag">Bereits an {venueName(busyA.table)}</span>}</strong>
+                      <strong>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseB)}</em>{busyB && <span className="queue-player-table-flag">Bereits an {venueName(busyB.table)}</span>}</strong>
+                      <span className="muted">{match.phase} · {match.round}{match.matchDay ? ` · Spieltag ${match.matchDay}` : ''}{match.note ? ` · ${venueMessage(match.note)}` : ''}</span>
                       {isBusy && <span className="queue-conflict-hint">Zuweisung möglich, sobald {busyPlayers.length === 1 ? 'dieser Teilnehmer wieder frei ist.' : 'beide Teilnehmer wieder frei sind.'}</span>}
-                      {otherBlockReason && <span className="queue-conflict-hint">Derzeit nicht zuweisbar: {otherBlockReason}</span>}
+                      {otherBlockReason && <span className="queue-conflict-hint">Derzeit nicht zuweisbar: {venueMessage(otherBlockReason)}</span>}
                       {assigningMatchId === match.id && canAssign && (
                         <div className="table-assignment-picker">
                           {eligibleTables.map((table) => (
-                            <button className="btn small" type="button" key={table} onClick={() => assignToTable(match.id, table)}>{table}</button>
+                            <button className="btn small" type="button" key={table} onClick={() => assignToTable(match.id, table)}>{venueName(table)}</button>
                           ))}
                         </div>
                       )}
                     </div>
-                    <span className="badge">{match.table}</span>
+                    <span className="badge">{venueMessage(match.table)}</span>
                     <div className="queue-row-actions">
                       <>
                         {isMockThirdPlaceMatch(match.id) && (
@@ -1012,9 +1018,9 @@ export function TournamentControlPage() {
               <div className="card control-status-card">
                 <div className="control-help-title"><h3>Turnierstatus</h3><ControlHelpButton topic="queue" onOpen={setHelpTopic} /></div>
                 <div className="control-metrics-grid">
-                  <div><span className="muted">Tischbelegung</span><strong>{tableMatches.length}/{tournament.tables} · {blockedTables.size} gesperrt</strong></div>
+                  <div><span className="muted">{venue.singular}belegung</span><strong>{tableMatches.length}/{tournament.tables} · {blockedTables.size} gesperrt</strong></div>
                   <div><button className="control-metric-link" type="button" disabled={nextMatches.length === 0} onClick={() => openWaitingQueue()} title={nextMatches.length ? 'Zu den wartenden Spielen springen' : undefined}><span className="muted">Wartende Spiele</span><strong>{nextMatches.length}</strong></button></div>
-                  <div><span className="muted">Restzeit grob</span><strong title="Prognose aus offenen Spielen, Best-of und verfügbaren Tischen (15 Minuten je Satz).">{restTimeLabel}</strong></div>
+                  <div><span className="muted">Restzeit grob</span><strong title={`Prognose aus offenen Spielen, Best-of und verfügbaren ${venue.dativePlural} (bei Tischtennis 15 Minuten je Satz).`}>{restTimeLabel}</strong></div>
                 </div>
               </div>
               <div className="card control-progress-card">
@@ -1032,8 +1038,8 @@ export function TournamentControlPage() {
               </div>
               {tournament.venueLayout && tableView === 'cards' && (
                 <div className="card control-hall-layout">
-                  <h3>Hallenlayout</h3>
-                  <VenueLayoutMini layout={tournament.venueLayout} />
+                  <h3>Spielflächenplan</h3>
+                  <VenueLayoutMini layout={tournament.venueLayout} sport={tournament.sport} />
                 </div>
               )}
             </aside>
@@ -1043,14 +1049,14 @@ export function TournamentControlPage() {
 
       {tab === 'audit' && (
         <section className="card control-tab-panel">
-          <div className="control-section-head"><div><div className="control-help-title"><h2>Änderungsprotokoll</h2><ControlHelpButton topic="audit" onOpen={setHelpTopic} /></div><p className="muted">Nachvollziehbare lokale Änderungen an Tischen, Ergebnissen, Bestätigungen und Turnierpause. „Turnierleitung (lokal)“ ist im Prototyp keine verifizierte Benutzeridentität.</p></div></div>
+          <div className="control-section-head"><div><div className="control-help-title"><h2>Änderungsprotokoll</h2><ControlHelpButton topic="audit" onOpen={setHelpTopic} /></div><p className="muted">Nachvollziehbare lokale Änderungen an Spielflächen, Ergebnissen, Bestätigungen und Turnierpause. „Turnierleitung (lokal)“ ist im Prototyp keine verifizierte Benutzeridentität.</p></div></div>
           <div className="audit-list">
             {auditEntries.length === 0 && <p className="muted">Noch keine Aktionen protokolliert.</p>}
             {auditEntries.map((entry) => (
               <article className="audit-row" key={entry.id}>
                 <span className="muted">{new Date(entry.at).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' })}</span>
-                <div><strong>{entry.description}</strong><div className="muted">{entry.actor}{entry.matchId ? ` · ${entry.matchId}` : ''}</div>
-                  {(entry.before || entry.after) && <div className="audit-values"><span>Vorher: {entry.before ?? '–'}</span><span>Nachher: {entry.after ?? '–'}</span></div>}
+                <div><strong>{venueMessage(entry.description)}</strong><div className="muted">{entry.actor}{entry.matchId ? ` · ${entry.matchId}` : ''}</div>
+                  {(entry.before || entry.after) && <div className="audit-values"><span>Vorher: {venueMessage(entry.before ?? '–')}</span><span>Nachher: {venueMessage(entry.after ?? '–')}</span></div>}
                   {entry.action === 'RESULT_CORRECTED' && auditEntries.find((item) => item.matchId === entry.matchId && ['RESULT_CORRECTED', 'RESULT_RECORDED', 'RESULT_RESTORED'].includes(item.action))?.id === entry.id && <button className="btn small" type="button" onClick={() => { if (restoreMockCorrectedResult(tournament, entry.id)) refreshRuntime(); else setAssignmentMessage('Korrektur ist bereits gesperrt oder wurde zwischenzeitlich geändert.'); }}>Korrektur rückgängig machen</button>}
                 </div>
               </article>
@@ -1112,7 +1118,7 @@ export function TournamentControlPage() {
 
       {tab === 'matches' && (
         <section className="card control-tab-panel">
-          <div className="control-section-head"><div><div className="control-help-title"><h2>Alle Spiele</h2><ControlHelpButton topic="matches" onOpen={setHelpTopic} /></div><p className="muted">Partien nach Status, Phase, Tisch oder Teilnehmer eingrenzen.</p></div></div>
+          <div className="control-section-head"><div><div className="control-help-title"><h2>Alle Spiele</h2><ControlHelpButton topic="matches" onOpen={setHelpTopic} /></div><p className="muted">Partien nach Status, Phase, Spielort oder Teilnehmer eingrenzen.</p></div></div>
           {allTournamentMatches.length === 0 && <p className="muted">Noch keine Spiele verfügbar. Die Paarungen erscheinen hier, sobald du die erste Phase gestartet hast. Die Auslosung kannst du vorher im Turnierverlauf bearbeiten.</p>}
           {allTournamentMatches.length > 0 && <>
             <div className="control-match-filters" role="search" aria-label="Spiele filtern">
@@ -1128,21 +1134,21 @@ export function TournamentControlPage() {
               <div className="control-match-filter-fields">
                 <label>Teilnehmer suchen<input type="search" value={matchFilters.search} placeholder="Name eingeben …" onChange={(event) => setMatchFilters((current) => ({ ...current, search: event.target.value }))} /></label>
                 <label>Phase<select value={matchFilters.phase} onChange={(event) => setMatchFilters((current) => ({ ...current, phase: event.target.value }))}><option value="">Alle Phasen</option>{matchFilterPhases.map((phase) => <option key={phase} value={phase}>{phase}</option>)}</select></label>
-                <label>Tisch<select value={matchFilters.table} onChange={(event) => setMatchFilters((current) => ({ ...current, table: event.target.value }))}><option value="">Alle Tische</option>{matchFilterTables.map((table) => <option key={table} value={table}>{table}</option>)}</select></label>
+                <label>{venue.singular}<select value={matchFilters.table} onChange={(event) => setMatchFilters((current) => ({ ...current, table: event.target.value }))}><option value="">Alle {venue.plural}</option>{matchFilterTables.map((table) => <option key={table} value={table}>{venueName(table)}</option>)}</select></label>
               </div>
               <div className="control-match-filter-summary"><span>{filteredTournamentMatches.length} von {allTournamentMatches.length} Spielen</span>{(matchFilters.status !== 'all' || matchFilters.phase || matchFilters.table || matchFilters.search) && <button type="button" className="btn small" onClick={() => setMatchFilters({ status: 'all', phase: '', table: '', search: '' })}>Filter zurücksetzen</button>}</div>
             </div>
             {filteredTournamentMatches.length === 0 && <div className="control-empty-message control-matches-empty">Keine Spiele passen zu diesen Filtern. Versuche andere Suchbegriffe oder setze die Filter zurück.</div>}
             {filteredTournamentMatches.length > 0 && <div className="table-wrap">
             <table>
-              <thead><tr><th>Status</th><th>Phase</th><th>Spiel</th><th>Pausenzeit</th><th>Tisch</th><th>Stand</th><th></th></tr></thead>
+              <thead><tr><th>Status</th><th>Phase</th><th>Spiel</th><th>Pausenzeit</th><th>{venue.singular}</th><th>Stand</th><th></th></tr></thead>
               <tbody>{filteredTournamentMatches.map((match) => (
                 <tr key={match.id}>
                   <td><span className={match.status === 'LIVE' ? 'badge live' : match.status === 'READY' ? 'badge ready' : 'badge'}>{matchStatusLabel(match.status)}</span></td>
                   <td>{match.phase}<div className="muted">{match.round}</div></td>
                   <td><strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>}</strong><div>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>}</div></td>
                   <td>{formatMockMatchRest(match, 'A')} / {formatMockMatchRest(match, 'B')}</td>
-                  <td>{match.table}</td><td>{match.score}</td>
+                  <td>{venueMessage(match.table)}</td><td>{match.score}</td>
                   <td><div className="actions compact-actions"><button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Ergebnis anzeigen</button>{match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) && <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Bearbeiten</button>}</div></td>
                 </tr>
               ))}</tbody>
@@ -1349,7 +1355,7 @@ export function TournamentControlPage() {
           </section>
         </div>
       )}
-      {helpTopic && <TournamentControlHelp initialTopic={helpTopic} onClose={() => setHelpTopic(null)} />}
+      {helpTopic && <TournamentControlHelp sport={tournament.sport} initialTopic={helpTopic} onClose={() => setHelpTopic(null)} />}
       {correctionNotice && <div className={`control-correction-toast ${correctionNotice.error ? 'error' : ''}`} role="status">
         <span className="control-correction-toast-icon" aria-hidden="true">{correctionNotice.error ? '!' : '✓'}</span>
         <strong>{correctionNotice.message}</strong>

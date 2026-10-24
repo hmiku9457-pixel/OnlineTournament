@@ -6,6 +6,7 @@ import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
 import { getMockTournament } from '@/services/mockTournamentStore';
+import { displayVenueMessage, getVenueTerminology } from '@/domain/venueTerminology';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 
 
@@ -14,6 +15,8 @@ export function SpectatorPage() {
   const navigate = useNavigate();
   const [selectedSwiss, setSelectedSwiss] = useState<{ name: string; stageId: string } | null>(null);
   const tournament = useMemo(() => getMockTournament(tournamentId), [tournamentId]);
+  const venue = getVenueTerminology(tournament.sport);
+  const venueName = (name: string) => displayVenueMessage(tournament.sport, name);
   const matches = useMemo(() => getMockRuntimeMatches(tournament), [tournament]);
   const live = matches.filter((match) => match.status === 'LIVE' || match.status === 'CONFIRMATION');
   const next = matches.filter((match) => match.status === 'READY' || match.status === 'WAITING');
@@ -35,13 +38,13 @@ export function SpectatorPage() {
       </header>
 
       <section className="spectator-section">
-        <div className="spectator-section-head"><h2>Live auf den Tischen</h2><span className="muted">{live.length} laufende Spiele</span></div>
+        <div className="spectator-section-head"><h2>Live auf den {venue.dativePlural}</h2><span className="muted">{live.length} laufende Spiele</span></div>
         <div className="spectator-live-grid">
           {live.length === 0 ? (
             <div className="card empty-state">Aktuell laufen keine Spiele.</div>
           ) : live.map((match) => (
             <article className="card spectator-match-card" key={match.id}>
-              <div className="spectator-match-head"><span className="badge live">LIVE</span><strong>{match.table}</strong></div>
+              <div className="spectator-match-head"><span className="badge live">LIVE</span><strong>{venueName(match.table)}</strong></div>
               <span className="muted">{match.round}</span>
               <div className="spectator-team">{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>}</div>
               <div className="spectator-score">{match.score}</div>
@@ -159,11 +162,11 @@ export function SpectatorPage() {
       })()}
 
       <section className="card spectator-next-card">
-        <div className="control-section-head"><div><h2>Nächste Spiele</h2><p className="muted">Tisch- und Warteschlangenübersicht.</p></div></div>
+        <div className="control-section-head"><div><h2>Nächste Spiele</h2><p className="muted">Spielort- und Warteschlangenübersicht.</p></div></div>
         <div className="spectator-next-list">
           {next.map((match) => (
             <div className="spectator-next-row" key={match.id}>
-              <span className={match.status === 'READY' ? 'badge ready' : 'badge'}>{match.table}</span>
+              <span className={match.status === 'READY' ? 'badge ready' : 'badge'}>{venueName(match.table)}</span>
               <div><strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>} – {match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>}</strong><span className="muted">{match.phase} · {match.round}</span></div>
               <span className="muted">{match.status === 'READY' ? 'bereit' : 'wartet'}</span>
             </div>

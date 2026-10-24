@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getVenueTerminology } from '@/domain/venueTerminology';
 import {
   createVenueLayout,
   dockVenueDesk,
@@ -13,15 +14,16 @@ const dockNames: Record<DeskDock, string> = {
   none: 'Kein Außen-Dock', top: 'Oben', right: 'Rechts', bottom: 'Unten', left: 'Links',
 };
 
-function tileLabel(token: VenueCell, compact: boolean) {
+function tileLabel(token: VenueCell, compact: boolean, sport: string) {
   if (token === 'desk') return compact ? 'TL' : 'Turnierleitung';
   if (token === 'space') return compact ? '·' : 'Freifläche';
-  if (token.startsWith('table:')) return compact ? token.slice(6) : `Tisch ${token.slice(6)}`;
+  if (token.startsWith('table:')) return compact ? token.slice(6) : `${getVenueTerminology(sport).singular} ${token.slice(6)}`;
   return '';
 }
 
-function HallGrid({ layout, compact, selected, onPlace, onSelect }: {
+function HallGrid({ layout, compact, selected, onPlace, onSelect, sport }: {
   layout: VenueLayout;
+  sport: string;
   compact: boolean;
   selected?: VenueCell | null;
   onPlace?: (index: number, source?: VenueCell) => void;
@@ -38,7 +40,7 @@ function HallGrid({ layout, compact, selected, onPlace, onSelect }: {
               <button
                 key={index}
                 type="button"
-                title={tileLabel(token, false) || 'Freier Rasterplatz'}
+                title={tileLabel(token, false, sport) || 'Freier Rasterplatz'}
                 className={`hall-cell ${token.startsWith('table:') ? 'table-cell' : token === 'desk' ? 'desk-cell' : token === 'space' ? 'space-cell' : 'blank-cell'} ${selected && token === selected ? 'selected' : ''}`}
                 disabled={!onPlace}
                 draggable={Boolean(onPlace && token && token !== 'space')}
@@ -50,7 +52,7 @@ function HallGrid({ layout, compact, selected, onPlace, onSelect }: {
                   if (selected !== null) onPlace(index);
                   else if (token && onSelect) onSelect(token);
                 }}
-              >{tileLabel(token, compact)}</button>
+              >{tileLabel(token, compact, sport)}</button>
             ))}
           </div>
           {layout.deskDock === 'right' && <div className="hall-desk-outside side">TL</div>}
@@ -61,12 +63,14 @@ function HallGrid({ layout, compact, selected, onPlace, onSelect }: {
   );
 }
 
-export function VenueLayoutEditor({ layout, tableCount, onChange }: {
+export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
   layout: VenueLayout;
   tableCount: number;
+  sport: string;
   onChange: (layout: VenueLayout) => void;
 }) {
   const [selected, setSelected] = useState<VenueCell | null>(null);
+  const venue = getVenueTerminology(sport);
   function place(target: number, source?: VenueCell) {
     const token = source ?? selected;
     if (!token) return;
@@ -90,23 +94,23 @@ export function VenueLayoutEditor({ layout, tableCount, onChange }: {
           </label>
         </div>
       </div>
-      <p className="field-hint">Wähle einen Tisch oder ziehe ihn auf ein anderes Feld. Belegte Felder werden getauscht. Freiflächen bleiben absichtlich leer.</p>
+      <p className="field-hint">Wähle {venue.singular === 'Spielfeld' ? 'ein Spielfeld' : `einen ${venue.singular}`} oder ziehe es auf ein anderes Rasterfeld. Belegte Felder werden getauscht. Freiflächen bleiben absichtlich leer.</p>
       <div className="hall-editor-tools">
         <button type="button" className={`btn small ${selected === 'space' ? 'primary' : ''}`} onClick={() => setSelected('space')}>Freifläche setzen</button>
         <button type="button" className={`btn small ${selected === 'desk' ? 'primary' : ''}`} onClick={() => setSelected('desk')}>Turnierleitung im Raster</button>
-        <button type="button" className="btn small" onClick={() => onChange({ ...resizeVenueLayout(createVenueLayout(tableCount), tableCount, 1, tableCount), deskDock: layout.deskDock })}>Tische in eine Reihe</button>
+        <button type="button" className="btn small" onClick={() => onChange({ ...resizeVenueLayout(createVenueLayout(tableCount), tableCount, 1, tableCount), deskDock: layout.deskDock })}>{venue.plural} in eine Reihe</button>
         {selected !== null && <button type="button" className="btn small" onClick={() => setSelected(null)}>Auswahl aufheben</button>}
       </div>
-      <HallGrid layout={layout} compact={false} selected={selected} onPlace={place} onSelect={setSelected} />
+      <HallGrid layout={layout} sport={sport} compact={false} selected={selected} onPlace={place} onSelect={setSelected} />
     </div>
   );
 }
 
-export function VenueLayoutMini({ layout }: { layout: VenueLayout }) {
+export function VenueLayoutMini({ layout, sport }: { layout: VenueLayout; sport: string }) {
   return (
     <div className="hall-mini">
-      <div className="hall-mini-legend"><span>■ Tisch</span><span>▤ Turnierleitung</span><span>· Freifläche</span></div>
-      <HallGrid layout={layout} compact />
+      <div className="hall-mini-legend"><span>■ {getVenueTerminology(sport).singular}</span><span>▤ Turnierleitung</span><span>· Freifläche</span></div>
+      <HallGrid layout={layout} sport={sport} compact />
     </div>
   );
 }
