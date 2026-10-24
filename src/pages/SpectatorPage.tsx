@@ -4,6 +4,7 @@ import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStag
 import { getMockRuntimeMatches, getMockStageMatches, isMockParticipantWithdrawn, getSwissRecordBeforeRound, getSwissCurrentRecord } from '@/services/mockRuntime';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
+import { BracketRoundViewport } from '@/components/BracketRoundViewport';
 import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
@@ -123,8 +124,8 @@ export function SpectatorPage() {
             return (
               <section className="spectator-stage-block" key={stage.id}>
                 <div className="competition-stage-head"><div><span className="badge">K.-O.</span><h3>{stage.name}</h3></div></div>
-                <div className="bracket-scroll"><div className="bracket-board">
-                  {rounds.map((round, roundIndex) => (
+                <BracketRoundViewport key={stage.id} rounds={rounds}
+                  renderRound={(round, roundIndex) => (
                     <div className="bracket-round" key={round.label}>
                       <h4>{round.label}</h4>
                       <div className={roundIndex === rounds.length - 1 ? 'bracket-round-matches bracket-final-round-matches' : 'bracket-round-matches'}>
@@ -137,8 +138,8 @@ export function SpectatorPage() {
                       )}
                       </div>
                     </div>
-                  ))}
-                </div></div>
+                  )}
+                />
               </section>
             );
           }

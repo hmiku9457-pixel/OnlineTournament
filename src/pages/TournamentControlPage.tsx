@@ -7,6 +7,7 @@ import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
+import { BracketRoundViewport } from '@/components/BracketRoundViewport';
 import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
@@ -278,9 +279,8 @@ function StageCompetitionView({
             </div>
           )}
         </div>
-        <div className="bracket-scroll">
-          <div className={editable ? 'bracket-board editable' : 'bracket-board'}>
-            {rounds.map((round, roundIndex) => (
+        <BracketRoundViewport key={stage.id} rounds={rounds} className={editable ? 'bracket-board editable' : 'bracket-board'} editable={editable}
+          renderRound={(round, roundIndex) => (
               <div className="bracket-round" key={round.label}>
                 <h4>{round.label}</h4>
                 <div className={roundIndex === rounds.length - 1 ? 'bracket-round-matches bracket-final-round-matches' : 'bracket-round-matches'}>
@@ -358,9 +358,8 @@ function StageCompetitionView({
                 )}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
+          )}
+        />
       </section>
     );
   }

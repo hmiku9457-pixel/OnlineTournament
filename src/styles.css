@@ -541,6 +541,14 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .group-more-games { padding-top: 8px; font-size: .75rem; }
 .compact-table { min-width: 620px; }
 .bracket-scroll { overflow-x: auto; padding-bottom: 6px; }
+.bracket-viewport { display: grid; gap: 12px; min-width: 0; }
+.bracket-round-toggle-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 10px 13px; border: 1px solid #e4e7ec; border-radius: 10px; background: #f8fafc; }
+.bracket-round-toggle-info { display: grid; gap: 3px; }
+.bracket-round-toggle-info strong { color: #344054; font-size: .8rem; }
+.bracket-round-toggle-info span { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #667085; font-size: .75rem; }
+.bracket-round-toggle-info small { color: #667085; font-size: .72rem; }
+.bracket-round-toggle-info em { font-style: normal; font-weight: 800; color: #067647; }
+.bracket-round-toggle-bar .btn { flex-shrink: 0; }
 .bracket-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(210px, 1fr); gap: 24px; min-width: max-content; align-items: stretch; padding: 4px; }
 .bracket-round { display: grid; grid-template-rows: auto 1fr; gap: 10px; min-width: 210px; }
 .bracket-round h4 { margin: 0; text-align: center; color: #667085; font-size: .8rem; }
