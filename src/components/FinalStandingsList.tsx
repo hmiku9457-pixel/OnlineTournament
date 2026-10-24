@@ -17,7 +17,8 @@ interface PlacementGroup {
 function groupPlacements(standings: readonly FinalStanding[]): PlacementGroup[] {
   const groups: PlacementGroup[] = [];
   for (const row of standings) {
-    const placement = row.placement ?? (row.status === 'Zurückgezogen' ? 'Zurückgezogen' : 'Keine Platzierung');
+    // Die Gruppenherkunft ist Zusatzinformation des Spielers, nicht Teil des Gesamtrangs.
+    const placement = (row.placement ?? (row.status === 'Zurückgezogen' ? 'Zurückgezogen' : 'Keine Platzierung')).split(' · ')[0];
     const previous = groups[groups.length - 1];
     if (previous && previous.placement === placement && previous.placementNumber === row.placementNumber && previous.stageIndex === row.stageIndex) {
       previous.participants.push(row);
@@ -49,10 +50,11 @@ function participantTag(status: FinalStanding['status']) {
 }
 
 function playerName(row: FinalStanding) {
+  const groupOrigin = row.placement?.split(' · ').slice(1).join(' · ');
   return (
     <span className="final-standing-person">
-      <strong>{row.name}</strong>
-      {participantTag(row.status)}
+      <span className="final-standing-person-main"><strong>{row.name}</strong>{participantTag(row.status)}</span>
+      {groupOrigin && <small className="final-standing-origin">{groupOrigin}</small>}
     </span>
   );
 }

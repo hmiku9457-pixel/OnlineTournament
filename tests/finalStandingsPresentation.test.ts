@@ -48,6 +48,24 @@ describe('Endplatzierungen: verdichtete Ergebnisübersicht', () => {
     for (const row of standings) expect(html).toContain(row.name);
   });
 
+  it('zeigt bei Gruppenrangbereichen nur den Gesamtplatz im Badge und die Gruppe beim Namen', () => {
+    const html = renderToStaticMarkup(createElement(FinalStandingsList, {
+      standings: [
+        { name: 'Spieler A', placement: 'Platz 14–16 · 4. Platz Gruppe A', placementNumber: 14, stageIndex: 0, status: 'Ausgeschieden' },
+        { name: 'Spieler B', placement: 'Platz 14–16 · 4. Platz Gruppe B', placementNumber: 14, stageIndex: 0, status: 'Ausgeschieden' },
+        { name: 'Spieler C', placement: 'Platz 14–16 · 4. Platz Gruppe C', placementNumber: 14, stageIndex: 0, status: 'Zurückgezogen' },
+      ],
+      phaseNames,
+    }));
+    expect((html.match(/final-ranking-badge/g) ?? [])).toHaveLength(1);
+    expect((html.match(/Platz 14–16/g) ?? [])).toHaveLength(1);
+    expect(html).toContain('4. Platz Gruppe C');
+    expect(html).toContain('final-standing-origin');
+    expect(html).toContain('Spieler A');
+    expect(html).toContain('Spieler B');
+    expect(html).toContain('Spieler C');
+  });
+
   it('zeigt auch einzelne Phasen ohne Podest und teilt gleiche Ränge nicht auf', () => {
     const html = renderToStaticMarkup(createElement(FinalStandingsList, {
       standings: [
