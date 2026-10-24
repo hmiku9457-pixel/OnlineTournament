@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { MatchSet } from '@/domain/types';
 import { getMatchFinalization, requiresFinalApproval } from '@/domain/matchFinalization';
@@ -33,6 +33,8 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
   const [playedSets, setPlayedSets] = useState<MatchSet[]>(match.sets ?? []);
   const [editingFinished, setEditingFinished] = useState(false);
   const [currentValue, setCurrentValue] = useState('');
+  const [quickHelpOpen, setQuickHelpOpen] = useState(false);
+  const quickHelpId = useId();
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionValues, setCorrectionValues] = useState<string[]>([]);
   const [correctionError, setCorrectionError] = useState<string | null>(null);
@@ -48,6 +50,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
   useEffect(() => {
     setPlayedSets(match.sets ?? []);
     setCurrentValue('');
+    setQuickHelpOpen(false);
     setError(null);
     setEditingFinished(false);
     setCorrectionOpen(false);
@@ -163,7 +166,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
 
       {!alreadyFinished && !needsFinalApproval && currentSetNumber <= match.bestOf && (
         <div className="current-set-entry-group">
-          <div className="current-set-entry-row">
+          <div className={compact ? 'current-set-entry-row has-entry-help' : 'current-set-entry-row'}>
             <label className="current-set-field">
               <span>Satz {currentSetNumber}</span>
               <input
@@ -179,8 +182,30 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
             <button className="btn small primary" type="button" disabled={!parsedCurrent} onClick={confirmSet}>
               Satz {currentSetNumber} bestätigen
             </button>
+            {compact && (
+              <div className="set-entry-help" onKeyDown={(event) => {
+                if (event.key === 'Escape') setQuickHelpOpen(false);
+              }}>
+                <button
+                  className="set-entry-help-button"
+                  type="button"
+                  aria-label="Hilfe zur Satzeingabe"
+                  aria-expanded={quickHelpOpen}
+                  aria-controls={quickHelpId}
+                  onClick={() => setQuickHelpOpen((open) => !open)}
+                  title="Eingabehilfe anzeigen"
+                >?</button>
+                {quickHelpOpen && (
+                  <div className="set-entry-help-tooltip" id={quickHelpId} role="tooltip">
+                    {rules.shortSetEntry
+                      ? 'Kurzform (linker Spieler): 7 = 11:7 · -7 = 7:11 · 10 = 12:10.'
+                      : `${match.sport}: Satzergebnis als ${target}:18 eingeben.`}
+                    <span>Enter bestätigt den Satz.</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          {compact && <span className="field-hint set-entry-quick-hint">{rules.shortSetEntry ? 'Kurzform (linker Spieler): 7 = 11:7 · −7 = 7:11 · 10 = 12:10.' : `${match.sport}: Satzergebnis als ${target}:18 eingeben.`} Enter bestätigt den Satz.</span>}
         </div>
       )}
 
