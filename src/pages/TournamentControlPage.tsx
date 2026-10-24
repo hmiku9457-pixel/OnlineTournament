@@ -15,6 +15,7 @@ import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, countM
 import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { VenueLayoutMini } from '@/components/VenueLayout';
+import { TournamentHallView } from '@/components/TournamentHallView';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getStageEntrants, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
@@ -321,6 +322,8 @@ export function TournamentControlPage() {
   const initialTournament = useMemo(() => getMockTournament(tournamentId), [tournamentId]);
   const [tournament, setTournament] = useState(initialTournament);
   const [tab, setTab] = useState<ControlTab>('overview');
+  const [tableView, setTableView] = useState<'cards' | 'hall'>('cards');
+  const [selectedHallTable, setSelectedHallTable] = useState<string | null>('Tisch 1');
   const [runtimeVersion, setRuntimeVersion] = useState(0);
   const [restClockTick, setRestClockTick] = useState(0);
   useEffect(() => {
@@ -590,7 +593,7 @@ export function TournamentControlPage() {
 
       <nav className="control-tabs" aria-label="Turnierleitungsbereiche">
         {(tournament.status === 'FINISHED' ? [...tabs, { id: 'final' as const, label: 'Endplatzierungen' }] : tabs).map((item) => (
-          <button className={tab === item.id ? 'control-tab active' : 'control-tab'} key={item.id} type="button" onClick={() => setTab(item.id)}>{item.label}</button>
+          <button className={tab === item.id ? 'control-tab active' : 'control-tab'} key={item.id} type="button" aria-current={tab === item.id ? 'page' : undefined} onClick={() => setTab(item.id)}>{item.label}</button>
         ))}
       </nav>
 
@@ -600,9 +603,15 @@ export function TournamentControlPage() {
             <div className="control-section-head control-table-section-head">
               <div>
                 <h2>Tische</h2>
-                <p className="muted">Alle Spielorte auf einen Blick – auch freie Tische bleiben sichtbar.</p>
+                <p className="muted">{tableView === 'hall' && tournament.venueLayout ? 'Spielübersicht nach den tatsächlichen Tischpositionen.' : 'Alle Spielorte auf einen Blick – auch freie Tische bleiben sichtbar.'}</p>
               </div>
               <div className="control-table-head-actions">
+                {tournament.venueLayout && (
+                  <div className="table-view-switch" role="group" aria-label="Darstellung der Tische">
+                    <button type="button" className={tableView === 'cards' ? 'active' : ''} aria-pressed={tableView === 'cards'} onClick={() => setTableView('cards')}>Tischkarten</button>
+                    <button type="button" className={tableView === 'hall' ? 'active' : ''} aria-pressed={tableView === 'hall'} onClick={() => setTableView('hall')}>Hallenansicht</button>
+                  </div>
+                )}
                 <span className="badge live">{tableMatches.length} laufend</span>
                 <button
                   className="btn small primary"
@@ -616,8 +625,24 @@ export function TournamentControlPage() {
             </div>
             {tournament.status === 'PAUSED' && <div className="assignment-message" role="status">Turnier pausiert: Neue Tischzuweisungen sind gesperrt. Laufende Spiele dürfen beendet werden.</div>}
             {assignmentMessage && <div className="assignment-message" role="status">{assignmentMessage}</div>}
-            <div className="overview-table-grid">
+            {tableView === 'hall' && tournament.venueLayout && (
+              <TournamentHallView
+                layout={tournament.venueLayout}
+                matchesByTable={matchesByTable}
+                blockedTables={blockedTables}
+                selectedTable={selectedHallTable}
+                canAssign={tournament.status === 'RUNNING'}
+                onSelectTable={setSelectedHallTable}
+                onAssignToTable={assignToTable}
+              />
+            )}
+            {tableView === 'hall' && tournament.venueLayout && selectedHallTable && (
+              <h3 className="hall-table-detail-heading">{selectedHallTable} · Bedienung</h3>
+            )}
+            <div className={tableView === 'hall' && tournament.venueLayout ? 'overview-table-grid hall-table-detail' : 'overview-table-grid'}>
               {Array.from({ length: tournament.tables }, (_, index) => {
+                const tableName = `Tisch ${index + 1}`;
+                if (tableView === 'hall' && tournament.venueLayout && tableName !== selectedHallTable) return null;
                 const tableName = `Tisch ${index + 1}`;
                 const match = matchesByTable.get(tableName);
                 const isLive = match?.status === 'LIVE' || match?.status === 'CONFIRMATION' || match?.status === 'READY';
@@ -739,18 +764,12 @@ export function TournamentControlPage() {
                   <div><span className="muted">Restzeit grob</span><strong title="Prognose aus offenen Spielen, Best-of und verfügbaren Tischen (15 Minuten je Satz).">{restTimeLabel}</strong></div>
                 </div>
               </div>
-              {tournament.venueLayout && (
+              {tournament.venueLayout && tableView === 'cards' && (
                 <div className="card control-hall-layout">
                   <h3>Hallenlayout</h3>
                   <VenueLayoutMini layout={tournament.venueLayout} />
                 </div>
               )}
-              <div className="card control-alert-card">
-                <div className="control-section-head"><h3>Schnellzugriff</h3><span className="badge">Mock</span></div>
-                <button className="btn" type="button" onClick={() => setTab('flow')}>Tabellen & Turnierbaum</button>
-                <button className="btn" type="button" onClick={() => setTab('participants')}>Teilnehmer verwalten</button>
-                <button className="btn" type="button" onClick={() => setTab('matches')}>Alle Spiele</button>
-              </div>
             </aside>
           </div>
         </section>

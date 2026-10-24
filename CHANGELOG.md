@@ -1,3 +1,10 @@
+## 2026-10-24 – Abschluss der Turnierleitungs-Übersicht
+- Die nicht mehr benötigte „Schnellzugriff“-Mock-Karte wurde aus der Übersicht entfernt.
+- Der aktive Turnierleitungs-Tab ist mit kontrastreichem Blau und Tastaturfokus klar gekennzeichnet.
+- Die Tischübersicht bietet bei vorhandenem Hallenplan einen Umschalter „Tischkarten / Hallenansicht“. Standard bleiben die bisherigen vollständigen Tischkarten.
+- Hallenansicht: Echtzeitstatus, Spielpaarung und Spielstand an den tatsächlichen Tischpositionen; ein Klick öffnet die bisherige Bedienkarte für den gewählten Tisch. Wartende Partien lassen sich per Drag & Drop auf freie, ungesperrte Tischpositionen zuweisen.
+- Große Hallenpläne bleiben lesbar und sind horizontal scrollbar; es erfolgt keine automatische Verkleinerung der Schrift. Die redundante kleine Hallenvorschau wird im Hallenmodus ausgeblendet.
+
 ## 2026-10-24 – Schweizer Bilanzanzeige und turnierweite Endplatzierungen
 - Schweizer Standing-Tags bei Spielen nur, wenn genau die zugehörige Schweizer Phase aktuell läuft. Bei aufeinanderfolgenden Schweizer Phasen werden ältere Partien nicht mit der neuen Bilanz etikettiert (Turnierleitung, Zuschauer, Spieler und Satzeingabe).
 - Abschlussrangfolge durchgehend über alle begonnenen Phasen: Teilnehmer der späteren Phase stehen vor ausgeschiedenen/zurückgezogenen Teilnehmern früherer Phasen. Rückzüge behalten ihren Status und ihren sportlich erreichten Rang innerhalb ihrer Ausscheidungsstufe.

@@ -1513,3 +1513,96 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 /* Swiss match history: show before-round and current opponent records side by side. */
 .swiss-history-opponent .swiss-record-current { background: #eff8ff; color: #175cd3; }
 .swiss-history-opponent { row-gap: 4px; }
+
+/* Turnierleitung: aktiver Bereich ist auch bei schneller Navigation eindeutig erkennbar. */
+.control-tabs .control-tab.active,
+.control-tabs .control-tab[aria-current="page"] {
+  background: #1d4ed8;
+  color: #fff;
+  box-shadow: 0 2px 5px rgb(29 78 216 / 22%);
+}
+.control-tabs .control-tab.active:hover { background: #1e40af; color: #fff; }
+.control-tabs .control-tab:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+
+/* Tischkarten und Hallenplan sind alternative, gleichwertige Ansichten. */
+.table-view-switch {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid #d0d5dd;
+  border-radius: 9px;
+  background: #f2f4f7;
+}
+.table-view-switch button {
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: #475467;
+  background: transparent;
+  font-weight: 700;
+  font-size: .79rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.table-view-switch button.active { background: #fff; color: #101828; box-shadow: 0 1px 3px rgb(16 24 40 / 13%); }
+.table-view-switch button:focus-visible { outline: 2px solid #2563eb; outline-offset: 1px; }
+.tournament-hall { margin-top: 10px; min-width: 0; }
+.tournament-hall-legend { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: .75rem; color: #475467; }
+.hall-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.hall-legend-item::before { content: ''; width: 9px; height: 9px; border-radius: 50%; border: 1px solid; }
+.hall-legend-item.running::before { background: #12b76a; border-color: #027a48; }
+.hall-legend-item.free::before { background: #dbeafe; border-color: #60a5fa; }
+.hall-legend-item.locked::before { background: #d0d5dd; border-color: #667085; }
+.tournament-hall-hint { margin: 6px 0 10px; font-size: .75rem; }
+.tournament-hall-scroller {
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 13px;
+  scrollbar-width: thin;
+  scrollbar-color: #98a2b3 #f2f4f7;
+}
+.tournament-hall-scroller:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.tournament-hall-plan { width: max-content; }
+.tournament-hall-row { display: flex; align-items: stretch; gap: 6px; }
+.tournament-hall-grid { display: grid; gap: 7px; }
+.tournament-hall-table {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 162px;
+  min-width: 0;
+  min-height: 116px;
+  padding: 9px;
+  gap: 8px;
+  border: 1px solid #93c5fd;
+  border-radius: 9px;
+  background: #eff6ff;
+  color: #101828;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.tournament-hall-table.running { border-color: #86efac; background: #f0fdf4; }
+.tournament-hall-table.locked { border-color: #d0d5dd; background: #eaecf0; }
+.tournament-hall-table.selected { outline: 3px solid #2563eb; outline-offset: 1px; }
+.tournament-hall-table:hover { border-color: #1d4ed8; }
+.tournament-hall-table:focus-visible { outline: 3px solid #2563eb; outline-offset: 1px; }
+.tournament-hall-table-head { display: flex; justify-content: space-between; align-items: center; gap: 5px; font-size: .78rem; }
+.tournament-hall-table-head > span { font-size: .63rem; color: #475467; }
+.tournament-hall-match { display: grid; gap: 3px; min-width: 0; font-size: .76rem; font-weight: 600; }
+.tournament-hall-match > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tournament-hall-score { font-size: .94rem; text-align: center; font-variant-numeric: tabular-nums; }
+.tournament-hall-empty { margin-top: auto; font-size: .73rem; color: #667085; }
+.tournament-hall-space { min-height: 116px; border-radius: 7px; }
+.tournament-hall-space.walkway { background: #e4e7ec; }
+.tournament-hall-space.desk, .tournament-hall-desk { display: grid; place-items: center; background: #fef3c7; border: 1px solid #fbbf24; color: #92400e; font-weight: 800; font-size: .75rem; }
+.tournament-hall-desk { min-height: 30px; padding: 6px; border-radius: 7px; }
+.tournament-hall-desk.outside { margin: 5px 0; }
+.tournament-hall-desk.side { min-width: 33px; }
+.hall-table-detail-heading { margin: 17px 0 8px; font-size: 1rem; }
+.overview-table-grid.hall-table-detail { display: block; max-width: 440px; margin-top: 0; }
+.overview-table-grid.hall-table-detail .overview-table-card { width: 100%; }
