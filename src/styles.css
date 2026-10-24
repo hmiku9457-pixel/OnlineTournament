@@ -1973,6 +1973,22 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .compact-table .standing-ratio-cell { text-align: center; font-variant-numeric: tabular-nums; }
 .compact-table .standing-difference-cell { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* Schweizer System: eine gut lesbare Tabellenzeile statt zwei Textzeilen je Spieler. */
+.swiss-standings-card { padding: 9px 13px; }
+.swiss-standings-table th { padding: 7px 9px; font-size: .69rem; }
+.swiss-standings-table td { padding: 5px 9px; font-size: .82rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.swiss-standings-table tbody tr { height: 34px; }
+.swiss-standing-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 7px; min-width: 0; }
+.swiss-standings-table .standing-player-button { display: inline-flex; align-items: center; min-width: 0; line-height: 1.2; }
+.swiss-standings-table .standing-player-button strong { overflow-wrap: anywhere; }
+.swiss-standings-table .swiss-standing-origin {
+  display: inline-flex; align-items: center; margin: 0; padding: 2px 5px;
+  border-radius: 5px; background: #f2f4f7; color: #667085;
+  font-size: .65rem; font-weight: 600; line-height: 1.15; white-space: nowrap;
+}
+.swiss-standings-table .standing-withdrawn { margin: 0; }
+
+
 /* Status-Tags der Teilnehmer haben eigene, klar unterscheidbare Farben. */
 .participant-inline-status.active { color: #175cd3; background: #eff8ff; border: 1px solid #b2ddff; }
 .participant-inline-status.playing { color: #067647; background: #dcfae6; border: 1px solid #75e0a7; }
