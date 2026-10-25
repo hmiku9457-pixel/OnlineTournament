@@ -823,7 +823,7 @@ export interface SwissCutoffStatus {
 function swissCutoffStatus(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]): SwissCutoffStatus | null {
   if (stage.type !== 'SWISS' || !isStageStarted(tournament, stage)) return null;
   const nextStage = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) + 1];
-  if (!nextStage || isStageStarted(tournament, nextStage)) return null;
+  if (!nextStage) return null;
   const base = baseStageMatches(tournament, stage, results);
   const roundCount = Number(stage.settings.rounds) || 4;
   if (!base.some((match) => match.round === `Runde ${roundCount}`)) return null;
