@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createMockTournament, updateMockTournamentStatus, getMockTournament } from '@/services/mockTournamentStore';
 import type { MockPhaseInput } from '@/services/mockTournamentStore';
@@ -70,6 +71,7 @@ describe('Abnahme: Spielercodes, Bronze, Rückzugsplatzierungen', () => {
     start(t);
     const firstRound = getMockStageMatches(t, t.stages[0]);
     firstRound.forEach((m) => completeMockMatch(m.id, winA));
+    expect(approveMockProgress(t)?.kind).toBe('ROUND');
     const player = firstRound[0].sideA;
     expect(withdrawMockParticipant(t, player)).toBe(true);
     const actualRank = buildSwissStandings(t, t.stages[0]).find((row) => row.name === player)?.rank;
@@ -81,6 +83,7 @@ describe('Abnahme: Spielercodes, Bronze, Rückzugsplatzierungen', () => {
     for (let attempt = 0; attempt < 10 && !isStageCompleted(t, t.stages[0]); attempt += 1) {
       const open = getMockStageMatches(t, t.stages[0]).filter((match) => match.status !== 'FINISHED');
       open.forEach((match) => completeMockMatch(match.id, winA));
+      approveMockProgress(t);
     }
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
     const completed = getMockTournament(t.id);
