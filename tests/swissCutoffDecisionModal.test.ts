@@ -19,7 +19,7 @@ const status: SwissCutoffStatus = {
   decision: null,
 };
 const ignore = () => null;
-const props = { status, tournament, onSet: ignore, onLot: ignore, onBegin: ignore, onResult: ignore, onReset: () => {} };
+const props = { status, tournament, onSet: ignore, onLot: ignore, onBegin: ignore, onReset: () => {} };
 
 describe('Modal für Schweizer Qualifikationsgleichstand', () => {
   it('blockiert die Phase sichtbar und bietet Entscheidungssatz oder physischen Losentscheid an', () => {
@@ -33,7 +33,9 @@ describe('Modal für Schweizer Qualifikationsgleichstand', () => {
     expect(html).toContain('Spieler 13');
     expect(html).toContain('Entscheidungssatz spielen');
     expect(html).toContain('Physischer Losentscheid');
-    expect(html).toContain('alphabetische Reihenfolge entscheidet nicht');
+    expect(html).toContain('Der Name entscheidet niemals über das Weiterkommen');
+    expect(html).toContain('Offene Qualifikationsplätze');
+    expect((html.match(/class="swiss-cutoff-method"/g) ?? [])).toHaveLength(2);
     expect(html).toContain('Schweizer Tabelle');
     expect(html).toContain('swiss-cutoff-highlight');
     expect(html).toContain('swiss-cutoff-table-side');
@@ -47,20 +49,20 @@ describe('Modal für Schweizer Qualifikationsgleichstand', () => {
     expect(html).toContain('Physischer Losentscheid');
     expect(html).toContain('Jeder gegen Jeden');
     expect(html).not.toContain('Entscheidungssatz spielen');
+    expect((html.match(/class="swiss-cutoff-method"/g) ?? [])).toHaveLength(3);
   });
 
-  it('benutzt für den begonnenen Zusatzmodus denselben Satzeingabe-Knopf wie normale Spiele', () => {
+  it('leitet für eine begonnene Phase 1.5 zur regulären Turnierleitung statt einer Satzeingabe im Modal', () => {
     const large: SwissCutoffStatus = { ...status,
       tie: { players: ['Spieler 12', 'Spieler 13', 'Spieler 14'], slots: 1, firstRank: 1 },
       decision: {
-        signature: 'test', mode: 'ROUND', eliminated: [], sets: [],
-        extraRounds: [{ kind: 'ROUND', bye: 'Spieler 14', matches: [{ sideA: 'Spieler 12', sideB: 'Spieler 13' }] }],
+        signature: 'test', mode: 'ROUND_ROBIN', eliminated: [], sets: [],
+        extraRounds: [{ kind: 'ROUND_ROBIN', matches: [{ sideA: 'Spieler 12', sideB: 'Spieler 13' }] }],
       },
     };
     const html = renderToStaticMarkup(createElement(SwissCutoffDecisionModal, { ...props, status: large }));
-    expect(html).toContain('Zusätzliche Entscheidungsrunde');
-    expect(html).toContain('Satz 1 bestätigen');
-    expect(html).toContain('aria-label="Satz 1"');
-    expect(html).toContain('Freilos');
+    expect(html).toContain('Phase 1.5 läuft in der Turnierleitung');
+    expect(html).toContain('Tische zu');
+    expect(html).not.toContain('Satz 1 bestätigen');
   });
 });
