@@ -34,6 +34,30 @@ describe('Schweizer Entscheidung dokumentieren', () => {
     expect(html).toContain('Buchholzzahl');
   });
 
+  it('zeigt bei Ergebnissportarten Tore, Remis und Punkte statt Sätze oder BHZ', () => {
+    const footballDecision: StoredSwissCutoffDecision = {
+      signature: 'football', mode: 'ROUND_ROBIN', sets: [], eliminated: [],
+      qualificationSlots: 1,
+      extraRounds: [{ kind: 'ROUND_ROBIN', matches: [
+        { sideA: 'FC A', sideB: 'FC B', pointsA: 1, pointsB: 1, matchDay: 1 },
+        { sideA: 'FC B', sideB: 'FC C', pointsA: 0, pointsB: 0, matchDay: 2 },
+        { sideA: 'FC A', sideB: 'FC C', pointsA: 2, pointsB: 2, matchDay: 3 },
+      ] }],
+    };
+    const html = renderToStaticMarkup(createElement(SwissRoundRobinHistory, {
+      phaseNumber: '1.5', decision: footballDecision, sport: 'football',
+    }));
+    expect(html).toContain('>Tore</th>');
+    expect(html).toContain('>Pkt.</th>');
+    expect(html).toContain('title="Unentschieden">U</th>');
+    expect(html).not.toContain('>BHZ</span>');
+    expect(html).not.toContain('>Sätze</th>');
+    expect(html).toContain('Spieltag 1');
+    expect(html).toContain('Spieltag 2');
+    expect(html).toContain('Spieltag 3');
+    expect(html).toContain('physischer Losentscheid');
+  });
+
   it('zeigt nach Entscheidungsspielen einen Weiter-/Raus-Tag ohne die sportlichen Werte zu verändern', () => {
     const html = renderToStaticMarkup(createElement(SwissStandingsTable, {
       standings: [standing('Anna', 1), standing('Ben', 2)],
