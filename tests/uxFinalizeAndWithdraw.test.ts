@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { getMatchFinalization } from '@/domain/matchFinalization';
 import { createVenueLayout, placeVenueCell } from '@/domain/venueLayout';
@@ -81,6 +82,7 @@ describe('Pre-phase withdrawal restoration', () => {
     startFirstStage(tournament);
     const running = updateMockTournamentStatus(tournament.id, 'RUNNING');
     getMockRuntimeMatches(running).forEach((match) => completeMockMatch(match.id, scores));
+    expect(approveMockProgress(running)?.kind).toBe('STAGE');
     expect(isStageCompleted(running, running.stages[0])).toBe(true);
     const finalist = getStageEntrants(running, running.stages[1])[0];
     expect(withdrawMockParticipant(running, finalist)).toBe(true);
