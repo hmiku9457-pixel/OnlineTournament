@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockTournament, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import { getStageEntrants, isStageCompleted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
-import { completeMockMatch, getMockStageMatches, withdrawMockParticipant } from '@/services/mockRuntime';
+import { completeMockMatch, getMockStageMatches, withdrawMockParticipant, getPendingSwissCutoff, recordSwissCutoffLot } from '@/services/mockRuntime';
 import { getMockFinalStandings } from '@/services/mockParticipantProgress';
 
 const store = new Map<string, string>();
@@ -39,6 +39,11 @@ function finish(t: ReturnType<typeof tournament>, index: number) {
         completeMockMatch(match.id, result);
       }
     }
+  }
+  // A fully level Swiss qualification cutoff now requires the director's decision.
+  const pending = getPendingSwissCutoff(t);
+  if (pending?.stageId === stage.id) {
+    expect(recordSwissCutoffLot(t, pending.tie.players.slice(0, pending.tie.slots))).toBeNull();
   }
   expect(isStageCompleted(t, stage)).toBe(true);
 }
