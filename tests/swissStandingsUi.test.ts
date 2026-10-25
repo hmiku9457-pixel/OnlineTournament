@@ -27,7 +27,7 @@ describe('Schweizer Tabelle: Spalten und BHZ-Hilfe', () => {
   it('ordnet S / N / BHZ / Sätze / ± / Bälle / ± und zeigt die BHZ normalgewichtig', () => {
     const html = renderToStaticMarkup(createElement(SwissStandingsTable, { ...common, scoreSport: false, scoreUnit: 'Bälle' }));
     const head = html.split('<thead>')[1].split('</thead>')[0];
-    const headers = [...head.matchAll(/<th\\b[^>]*>([\\s\\S]*?)<\\/th>/g)]
+    const headers = [...head.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)]
       .map(([, value]) => value.replace(/<[^>]+>/g, '').replace('?', '').trim());
     expect(headers).toEqual(['#', 'Teilnehmer', 'Sp.', 'S', 'N', 'BHZ', 'Sätze', '±', 'Bälle', '±']);
     expect(head.match(/swiss-stat-ratio swiss-stat-group-start/g)).toHaveLength(2);
@@ -45,7 +45,7 @@ describe('Schweizer Tabelle: Spalten und BHZ-Hilfe', () => {
   it('ordnet für Ergebnissportarten die BHZ nach S / U / N und die Differenz hinter die Tore', () => {
     const html = renderToStaticMarkup(createElement(SwissStandingsTable, { ...common, scoreSport: true, scoreUnit: 'Tore' }));
     const head = html.split('<thead>')[1].split('</thead>')[0];
-    const headers = [...head.matchAll(/<th\\b[^>]*>([\\s\\S]*?)<\\/th>/g)]
+    const headers = [...head.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)]
       .map(([, value]) => value.replace(/<[^>]+>/g, '').replace('?', '').trim());
     expect(headers).toEqual(['#', 'Teilnehmer', 'Sp.', 'S', 'U', 'N', 'BHZ', 'Tore', '±', 'Pkt.']);
     expect(head.match(/swiss-stat-ratio swiss-stat-group-start/g)).toHaveLength(1);
