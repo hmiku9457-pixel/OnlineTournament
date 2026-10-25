@@ -549,7 +549,9 @@ export function getMockStageMatches(tournament: DemoTournament, stage: Tournamen
       matchDay: match.matchDay,
       bestOf: match.bestOf ?? stage.bestOf,
       sport: tournament.sport,
-      requiresWinner: ['SWISS', 'KNOCKOUT', 'DOUBLE_ELIMINATION', 'PLACEMENT'].includes(stage.type),
+      requiresWinner: stage.type === 'SWISS'
+        ? !sportScoring(tournament.sport).allowsDraw
+        : ['KNOCKOUT', 'DOUBLE_ELIMINATION', 'PLACEMENT'].includes(stage.type),
       pauseA: getElapsedRestMinutes(lastFinishByParticipant.get(match.sideA), now),
       pauseB: getElapsedRestMinutes(lastFinishByParticipant.get(match.sideB), now),
       note: 'Wartet auf Tischzuweisung',
@@ -1311,7 +1313,9 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
   if (tournament && stage && status === 'FINISHED') {
     const bestOf = matchId.includes('-sw-playoff-') || matchId.includes('-sw-cutoff-set-') ? 1
       : getMockStageMatches(tournament, stage).find((match) => match.id === matchId)?.bestOf ?? stage.bestOf;
-    const isKnockout = ['KNOCKOUT', 'DOUBLE_ELIMINATION', 'PLACEMENT', 'SWISS'].includes(stage.type);
+    const isKnockout = ['KNOCKOUT', 'DOUBLE_ELIMINATION', 'PLACEMENT'].includes(stage.type)
+      || (stage.type === 'SWISS' && !sportScoring(tournament.sport).allowsDraw)
+      || matchId.includes('-sw-cutoff-set-') || matchId.includes('-sw-playoff-');
     const validationError = validateCompleteResult(tournament.sport, bestOf, sets, isKnockout, decisionSide);
     if (validationError) throw new Error(validationError);
     const decisionError = validateScoreDecision(tournament.sport, sets, decisionSide, decision);
