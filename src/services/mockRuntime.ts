@@ -1147,13 +1147,13 @@ export function recordSwissCutoffLot(tournament: DemoTournament, winners: string
 
 export function resetSwissCutoffSets(tournament: DemoTournament): void {
   const current = getPendingSwissCutoff(tournament);
-  if (!current || !current.decision || (!current.decision.sets.length && !current.decision.extraRounds?.length)) return;
+  if (!current || !current.decision) return;
   // A restarted decision must not inherit completed or assigned games from
   // an earlier attempt with the same deterministic fixture identifiers.
-  if (current.decision.extraRounds?.length) {
-    const prefix = `${current.stageId}-sw-playoff-`;
-    writeResults(readResults().filter((result) => !result.matchId.startsWith(prefix)));
-    writeRuntime(readRuntime().filter((runtime) => !runtime.matchId.startsWith(prefix)));
+  if (current.decision.extraRounds?.length || current.decision.mode === 'SET') {
+    const prefixes = [`${current.stageId}-sw-playoff-`, `${current.stageId}-sw-cutoff-set-`];
+    writeResults(readResults().filter((result) => !prefixes.some((prefix) => result.matchId.startsWith(prefix))));
+    writeRuntime(readRuntime().filter((runtime) => !prefixes.some((prefix) => runtime.matchId.startsWith(prefix))));
   }
   clearSwissCutoffDecision(tournament.id, current.stageId);
 }
