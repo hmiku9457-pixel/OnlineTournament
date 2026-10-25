@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { DrawActionButton } from '@/components/DrawActionButton';
@@ -38,6 +38,7 @@ import { ControlHelpButton, TournamentControlHelp } from '@/components/Tournamen
 import type { ControlHelpTopic } from '@/domain/controlGuide';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
+import { generateUniquePlayerCode } from '@/services/mockPlayerCodes';
 import { getStageEntrants, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
 import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
 import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration } from '@/services/mockDuration';
@@ -451,9 +452,10 @@ function StageCompetitionView({
   return <StageCard stage={stage} />;
 }
 
-function ParticipantEditFields({ name, code, onSave, onCancel }: {
+function ParticipantEditFields({ name, code, usedCodes, onSave, onCancel }: {
   name: string;
   code: string;
+  usedCodes: ReadonlySet<string>;
   onSave: (firstName: string, lastName: string, playerCode: string) => boolean;
   onCancel: () => void;
 }) {
@@ -462,6 +464,14 @@ function ParticipantEditFields({ name, code, onSave, onCancel }: {
   const [lastName, setLastName] = useState(nameParts.slice(1).join(' '));
   const [playerCode, setPlayerCode] = useState(code);
   const [error, setError] = useState('');
+  function generateNewCode() {
+    try {
+      setPlayerCode(generateUniquePlayerCode(new Set([...usedCodes, code, playerCode])));
+      setError('');
+    } catch {
+      setError('Es konnte kein neuer Spielercode erzeugt werden.');
+    }
+  }
   return (
     <form className="participant-edit-grid" onSubmit={(event) => {
       event.preventDefault();
@@ -469,7 +479,13 @@ function ParticipantEditFields({ name, code, onSave, onCancel }: {
     }}>
       <label className="field"><span>Vorname</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="off" /></label>
       <label className="field"><span>Nachname</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="off" /></label>
-      <label className="field"><span>Spielercode</span><input value={playerCode} onChange={(event) => setPlayerCode(event.target.value)} inputMode="numeric" autoComplete="off" /></label>
+      <div className="field participant-code-field">
+        <label htmlFor="participant-edit-code">Spielercode</label>
+        <div className="participant-code-controls">
+          <input id="participant-edit-code" value={playerCode} onChange={(event) => { setPlayerCode(event.target.value); setError(''); }} inputMode="numeric" autoComplete="off" />
+          <button className="btn small" type="button" onClick={generateNewCode}>Neuer Code</button>
+        </div>
+      </div>
       <div className="actions participant-edit-actions">
         <button className="btn small primary" type="submit">Speichern</button>
         <button className="btn small" type="button" onClick={onCancel}>Abbrechen</button>
@@ -501,6 +517,40 @@ export function TournamentControlPage() {
   const [drawVersion, setDrawVersion] = useState(0);
   const [phaseVersion, setPhaseVersion] = useState(0);
   const [participantPanel, setParticipantPanel] = useState<{ name: string; mode: 'edit' | 'games' } | null>(null);
+  const [participantQuery, setParticipantQuery] = useState('');
+  const [participantStatusFilter, setParticipantStatusFilter] = useState<'all' | 'active' | 'playing' | 'eliminated' | 'withdrawn'>('all');
+  const participantModalRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!participantPanel) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    participantModalRef.current?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setParticipantPanel(null);
+        return;
+      }
+      if (event.key !== 'Tab' || !participantModalRef.current) return;
+      const focusable = Array.from(participantModalRef.current.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])',
+      ));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !participantModalRef.current.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !participantModalRef.current.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      previousFocus?.focus();
+    };
+  }, [participantPanel]);
   const [pendingWithdrawal, setPendingWithdrawal] = useState<string | null>(null);
   const [participantVersion, setParticipantVersion] = useState(0);
   const [showParticipantAdd, setShowParticipantAdd] = useState(false);
@@ -571,6 +621,24 @@ export function TournamentControlPage() {
   const queueGroups = useMemo(() => [...new Set(matches.filter((match) => match.status === 'WAITING' && match.round.startsWith('Gruppe ')).map((match) => match.round))].sort((a, b) => a.localeCompare(b, 'de', { numeric: true })), [matches]);
   const queueMatchDays = useMemo(() => [...new Set(matches.filter((match) => match.status === 'WAITING').map((match) => match.matchDay).filter((day): day is number => typeof day === 'number'))].sort((a, b) => a - b), [matches]);
   const tableMatches = matches.filter((match) => ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) && match.table.startsWith('Tisch '));
+  const filteredParticipantProgress = participantProgress.map(({ name, progress }, index) => ({ name, progress, index }))
+    .filter(({ name, progress, index }) => {
+      const query = participantQuery.trim().toLocaleLowerCase('de');
+      const code = tournament.participantCodes?.[name] ?? String(4100 + index).slice(-4);
+      if (query && !name.toLocaleLowerCase('de').includes(query) && !code.includes(query)) return false;
+      const isPlaying = tableMatches.some((match) => match.sideA === name || match.sideB === name);
+      switch (participantStatusFilter) {
+        case 'active': return progress.status === 'Aktiv';
+        case 'playing': return isPlaying;
+        case 'eliminated': return progress.status === 'Ausgeschieden';
+        case 'withdrawn': return progress.status === 'Zurückgezogen';
+        default: return true;
+      }
+    });
+  const selectedParticipantIndex = participants.indexOf(participantPanel?.name ?? '');
+  const selectedParticipantMatches = participantPanel?.mode === 'games'
+    ? allTournamentMatches.filter((match) => match.sideA === participantPanel.name || match.sideB === participantPanel.name)
+    : [];
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table) && !blockedTables.has(table));
   const activeStage = useMemo(() => getActiveStage(phaseSource.tournament), [phaseSource]);
@@ -1390,8 +1458,25 @@ export function TournamentControlPage() {
               {participantAddError && <p role="alert" className="field-error">{participantAddError}</p>}
             </form>
           )}
+          <div className="participant-search-bar no-print">
+            <label>Teilnehmer suchen
+              <input type="search" value={participantQuery} placeholder="Name oder Spielercode …" onChange={(event) => setParticipantQuery(event.target.value)} />
+            </label>
+            <label>Status
+              <select value={participantStatusFilter} onChange={(event) => setParticipantStatusFilter(event.target.value as typeof participantStatusFilter)}>
+                <option value="all">Alle Teilnehmer</option>
+                <option value="active">Aktiv</option>
+                <option value="playing">Spielt gerade</option>
+                <option value="eliminated">Ausgeschieden</option>
+                <option value="withdrawn">Zurückgezogen</option>
+              </select>
+            </label>
+            <span className="participant-filter-count" role="status">{filteredParticipantProgress.length} von {participantProgress.length} Teilnehmern</span>
+            {(participantQuery || participantStatusFilter !== 'all') && <button className="btn small" type="button" onClick={() => { setParticipantQuery(''); setParticipantStatusFilter('all'); }}>Zurücksetzen</button>}
+          </div>
+          {filteredParticipantProgress.length === 0 && <p className="participant-filter-empty">Keine Teilnehmer gefunden. Suchbegriff oder Statusfilter anpassen.</p>}
           <div className="participant-control-list participant-control-grid">
-            {participantProgress.map(({ name: participant, progress }, index) => {
+            {filteredParticipantProgress.map(({ name: participant, progress, index }) => {
               const isWithdrawn = progress.status === 'Zurückgezogen';
               const statusText = isWithdrawn ? getWithdrawalLabel(tournament, participant) ?? 'Zurückgezogen'
                 : progress.status === 'Aktiv' && tableMatches.some((match) => match.sideA === participant || match.sideB === participant) ? 'Spielt gerade' : progress.status;
@@ -1411,43 +1496,6 @@ export function TournamentControlPage() {
                       ? <span className="btn small withdrawal-locked" aria-disabled="true" title="Nach einem Ausscheiden in der K.-o.-Phase ist kein Rückzug mehr möglich.">Rückzug gesperrt</span>
                       : <button className="btn small danger-outline" type="button" onClick={() => requestParticipantWithdrawal(participant)}>Zurückziehen</button>}
                   </div>
-                  {participantPanel?.name === participant && (
-                    <div className={participantPanel.mode === 'edit' ? 'participant-inline-panel is-editing' : 'participant-inline-panel'}>
-                      {participantPanel.mode === 'edit' ? (
-                        <>
-                          <ParticipantEditFields key={participant} name={participant} code={tournament.participantCodes?.[participant] ?? String(4100 + index).slice(-4)}
-                            onSave={(first, last, code) => {
-                              if (!updateMockParticipantName(tournament.id, participant, first, last, code)) return false;
-                              setParticipantPanel(null);
-                              setParticipantVersion((value) => value + 1);
-                              refreshRuntime();
-                              return true;
-                            }} onCancel={() => setParticipantPanel(null)} />
-                        </>
-                      ) : (
-                        <>
-                          <strong>Alle Partien von {participant}</strong>
-                          <div className="participant-games-table table-wrap">
-                            <table><thead><tr><th>Phase</th><th>Runde</th><th>Gegner</th><th>Status</th><th>Ergebnis</th><th>Aktion</th></tr></thead><tbody>
-                              {allTournamentMatches.filter((match) => match.sideA === participant || match.sideB === participant).map((match) => {
-                                const stage = tournament.stages.find((item) => item.id === match.stageId);
-                                return <tr key={match.id}>
-                                  <td>{match.phase}</td><td>{match.round}</td>
-                                  <td>{match.sideA === participant ? match.sideB : match.sideA}</td>
-                                  <td>{matchStatusLabel(match.status)}</td><td><MatchResultDetails {...resultForMatchParticipant(match, participant)} sport={tournament.sport} decision={match.decision} decisionReversed={match.sideB === participant} /></td>
-                                  <td>{match.status === 'FINISHED' && stage && canEditMockMatch(tournament, match.id)
-                                    ? <button className="btn small" type="button" onClick={() => setAdminEditMatchId(match.id)}>Spiel bearbeiten</button>
-                                    : stage && isStageStarted(tournament, stage) && match.status !== 'FINISHED'
-                                      ? <Link className="btn small" to={`/score/${match.id}`}>Spiel bearbeiten</Link>
-                                      : <span className="muted">{match.status === 'FINISHED' ? 'Gesperrt' : 'Phase noch nicht gestartet'}</span>}</td>
-                                </tr>;
-                              })}
-                            </tbody></table>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
                 </article>
               );
             })}
