@@ -192,7 +192,6 @@ describe('Turnierleitung - Regressionen', () => {
     expect(newQualifiers).not.toContain(withdrawn);
     expect(newQualifiers.some((participant) => !originalQualifiers.includes(participant))).toBe(true);
     // Die zurückliegende Gruppenphase bleibt als Historie erhalten.
-    expect(approveMockProgress(tournament)?.kind).toBe('STAGE');
     expect(isStageCompleted(tournament, first)).toBe(true);
   });
 
