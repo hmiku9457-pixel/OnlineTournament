@@ -30,7 +30,9 @@ describe('Schweizer Entscheidung dokumentieren', () => {
     expect(html).toContain('Anna');
     expect(html).toContain('Ben');
     expect(html).toContain('11:7');
-    expect(html).toContain('1:0');
+    expect(html).toContain('11:7');
+    expect(html).not.toContain('Anna gegen Ben: 1:0');
+    expect(html).toContain('standing-player-button');
     expect(html).toContain('Jeder gegen Jeden · weiter');
     expect(html).toContain('Kreuztabelle');
     expect(html).toContain('group-match-list');
@@ -51,13 +53,24 @@ describe('Schweizer Entscheidung dokumentieren', () => {
     const html = renderToStaticMarkup(createElement(SwissRoundRobinMatrix, {
       players: ['Anna', 'Ben', 'Clara'], rounds: [round], sport: 'table_tennis',
     }));
-    expect(html).toContain('Anna gegen Ben: 1:0 (Satzpunkte 11:7)');
-    expect(html).toContain('Ben gegen Anna: 0:1 (Satzpunkte 7:11)');
+    expect(html).toContain('Anna gegen Ben: 11:7');
+    expect(html).toContain('Ben gegen Anna: 7:11');
     expect(html).toContain('Anna gegen Clara: noch offen');
-    expect(html).toContain('Clara gegen Ben: 1:0 (Satzpunkte 11:7)');
+    expect(html).toContain('Clara gegen Ben: 11:7');
     expect((html.match(/swiss-matrix-diagonal/g) ?? [])).toHaveLength(3);
     expect(html).toContain('swiss-matrix-result win');
     expect(html).toContain('swiss-matrix-result loss');
+  });
+
+  it('zeigt auch bei Ergebnissportarten die konkreten Werte aus Sicht des Zeilenspielers', () => {
+    const round = { kind: 'ROUND_ROBIN' as const, matches: [
+      { sideA: 'Adler', sideB: 'Bären', pointsA: 3, pointsB: 2, matchDay: 1 },
+    ] };
+    const html = renderToStaticMarkup(createElement(SwissRoundRobinMatrix, {
+      players: ['Adler', 'Bären'], rounds: [round], sport: 'football',
+    }));
+    expect(html).toContain('Adler gegen Bären: 3:2');
+    expect(html).toContain('Bären gegen Adler: 2:3');
   });
 
   it('verwendet dieselben Spieltagszeilen und die Live-Markierung wie die Gruppenphase', () => {
