@@ -23,7 +23,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, recordSwissCutoffSet, recordSwissCutoffLot, beginSwissCutoffPlayoff, recordSwissCutoffPlayoffResult, resetSwissCutoffSets } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, recordSwissCutoffSet, recordSwissCutoffLot, beginSwissCutoffPlayoff, recordSwissCutoffPlayoffResult, resetSwissCutoffSets } from '@/services/mockRuntime';
 import { canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getStageWithdrawalLabel, getWithdrawalLabel } from '@/services/mockWithdrawals';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
@@ -224,9 +224,12 @@ function StageCompetitionView({
       .map((row) => row.name));
     const swissCutoffIndex = getSwissCutoffRowIndex(standings, qualifyingPlaces, withdrawnSwissPlayers);
     const swissFinished = isStageCompleted(tournament, stage);
+    const cutoffHistory = getSwissCutoffHistory(tournament, stage);
+    const lotPlayers = cutoffHistory?.mode === 'LOT' ? new Set(cutoffHistory.eliminated.concat(cutoffHistory.winners ?? [])) : undefined;
+    const lotWinners = cutoffHistory?.mode === 'LOT' ? new Set(cutoffHistory.winners ?? []) : undefined;
     return (
       <section className="competition-stage-section">
-        <div className="competition-stage-head"><div><span className="badge">SCHWEIZER SYSTEM</span><h3>{stage.name}</h3></div><div className="actions"><span className="muted">{Number(stage.settings.rounds) || 4} Runden</span>{swissEditable && <button className="btn small" type="button" onClick={() => {
+        <div className="competition-stage-head"><div><span className="badge">SCHWEIZER SYSTEM</span><h3>{stage.name}</h3></div><div className="actions"><span className="muted">{getTotalSwissRoundCount(tournament, stage)} Runden</span>{swissEditable && <button className="btn small" type="button" onClick={() => {
                   if (randomizeSwissOrder(tournament, stage)) {
                     setSwissDrawNotice('Neue Zufallsreihenfolge gespeichert.');
                     onDrawChanged?.();
@@ -248,6 +251,8 @@ function StageCompetitionView({
             finalized={swissFinished}
             onSelectPlayer={setSelectedSwissPlayer}
             onShowBuchholz={() => setShowSwissBuchholzHelp(true)}
+            lotParticipants={lotPlayers}
+            lotWinners={lotWinners}
           />
           <SwissRoundCard
             fixtures={swissRoundFixtures}
