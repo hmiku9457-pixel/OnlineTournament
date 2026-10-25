@@ -44,12 +44,12 @@ function getTopics(sport: string): Array<{ id: ControlHelpTopic; label: string; 
       { title: 'Spielstand erfassen', description: `Die ${rules.plural.toLowerCase()} beider Seiten als ganze Zahlen eingeben. „Zwischenstand speichern“ aktualisiert die Live-Anzeige, ohne die Partie zu beenden.` },
       { title: 'Unentschieden und Entscheidung', description: rules.allowsDraw ? 'Bei einem Remis in Entscheidungsspielen stehen Verlängerung, Elfmeterschießen und Losentscheid zur Wahl. In der Verlängerung lassen sich auch unentschiedene Live-Stände speichern; beim Abschluss muss ein Sieger feststehen.' : 'Bei Basketball bitte den Spielstand nach Verlängerung eingeben; ein Unentschieden ist nicht zulässig.' },
       { title: 'Spiel abschließen', description: 'Mit „Spiel abschließen“ den Endstand speichern. Die Spielfläche wird wieder frei und die Tabelle wird aktualisiert.' },
-      { title: 'Korrekturen', description: 'Unter „Spiele“ kann die Turnierleitung ein abgeschlossenes Ergebnis bearbeiten, solange noch keine Folgephase die Korrektur sperrt.' },
+      { title: 'Korrekturen', description: 'In Schweizer und K.-o.-Runden bleiben Ergebnisse bearbeitbar, bis erstmals ein Spiel einer späteren Runde einem Tisch zugewiesen wurde. Nach Start der nächsten Phase sind Korrekturen der vorigen Phase ebenfalls gesperrt.' },
     ] : [
       { title: 'Sätze eingeben', description: rules.shortSetEntry ? 'Kurzform: 7 bedeutet 11:7, −7 bedeutet 7:11 und 10 bedeutet 12:10. Auch 11:9 ist möglich.' : 'Jeden Satz als Punkte links:rechts eingeben. Die Gewinnpunkte und ein möglicher Entscheidungssatz richten sich nach der Sportart.' },
       { title: 'Jeden Satz bestätigen', description: 'Mit Enter oder „Satz bestätigen“ speichern. Gespeicherte Sätze lassen sich durch Anklicken des Satzstands korrigieren.' },
       { title: 'Endergebnis abschließen', description: 'Bei längeren Best-of-Partien und im Schweizer System bzw. K.-o.-Modus das vorläufige Endergebnis ausdrücklich bestätigen. Erst dann wird die Spielfläche wieder frei.' },
-      { title: 'Danach ist das Spiel abgeschlossen', description: 'Nach dem endgültigen Speichern wird die Spielfläche frei. Im Bereich „Spiele“ bleibt das Ergebnis einsehbar und kann bei Bedarf korrigiert werden, solange die Phase es zulässt.' },
+      { title: 'Danach ist das Spiel abgeschlossen', description: 'Nach dem endgültigen Speichern wird die Spielfläche frei. In Schweizer und K.-o.-Runden sind Korrekturen noch bis zur ersten Tischzuweisung in einer späteren Runde erlaubt; der Start der nächsten Phase sperrt die vorherige Phase.' },
     ],
   },
   {
@@ -58,6 +58,7 @@ function getTopics(sport: string): Array<{ id: ControlHelpTopic; label: string; 
       { title: 'Phase auswählen', description: 'Die Phasenleiste zeigt „Bearbeitbar“, „Läuft“, „Beendet“ oder „Gesperrt“. Durch Anklicken die jeweilige Phase öffnen.' },
       { title: 'Vor dem Start bearbeiten', description: 'Solange „Bearbeitbar“ angezeigt wird, lassen sich Gruppen oder K.-o.-Startplätze verändern. Änderungen werden unmittelbar gespeichert.' },
       { title: 'Automatischer Abschluss', description: 'Nach dem letzten regulären Spiel wird die Phase abgeschlossen und die Qualifizierten werden für die nächste Phase übernommen – sofern kein Stichentscheid nötig ist.' },
+      { title: 'Schweizer Begegnungen', description: 'Bei Sportarten mit Unentschieden werden die Paarungsgruppen nach 3 Punkten je Sieg, 1 je Unentschieden und 0 je Niederlage gebildet. Die SB-Wertung ist eine separate Feinwertung.' },
       { title: 'Schweizer Gleichstand am Cut-off', description: 'Sind alle sportlichen Tie-Breaker an der Qualifikationsgrenze identisch, bleibt die Phase offen. Die Turnierleitung dokumentiert dann einen zusätzlich gespielten Entscheidungssatz oder wählt nach einem physischen Losentscheid die qualifizierte Person aus.' },
       { title: 'Nächste Phase bewusst starten', description: 'Erst die neue Auslosung prüfen, dann „Nächste Phase starten“ wählen. Danach ist ihre Setzung gesperrt.' },
     ],
@@ -83,7 +84,7 @@ function getTopics(sport: string): Array<{ id: ControlHelpTopic; label: string; 
     id: 'audit', label: 'Protokoll', intro: 'Wichtige Verwaltungsaktionen werden chronologisch aufgelistet.',
     steps: [
       { title: 'Änderungen nachverfolgen', description: 'Spielortzuweisungen, Ergebnisänderungen, Bestätigungen und Turnierpausen sind mit Zeitpunkt und Vorher/Nachher-Werten sichtbar.' },
-      { title: 'Korrektur zurücknehmen', description: 'Die jüngste Ergebniskorrektur lässt sich gegebenenfalls rückgängig machen, solange keine Folgephase die Änderung sperrt.' },
+      { title: 'Korrektur zurücknehmen', description: 'Die jüngste Ergebniskorrektur lässt sich rückgängig machen, solange keine spätere Runde erstmals einem Tisch zugewiesen wurde und keine Folgephase gestartet ist.' },
       { title: 'Lokaler Testbetrieb', description: 'Die Einträge stammen aktuell aus dem Browser und sind keine manipulationssichere, verifizierte Benutzerhistorie.' },
     ],
   },
