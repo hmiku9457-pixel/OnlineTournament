@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { startFirstStage, getStageEntrants, isStageCompleted } from '@/services/mockPhaseLifecycle';
@@ -48,6 +49,7 @@ describe('3/1/0-Paarungsgruppen für Ergebnissportarten', () => {
     const winners = new Set([first[0].sideA, first[1].sideA]);
     const losers = new Set([first[0].sideB, first[1].sideB]);
     const drawn = new Set([first[2].sideA, first[2].sideB, first[3].sideA, first[3].sideB]);
+    expect(approveMockProgress(t)?.kind).toBe('ROUND');
     const second = getMockStageMatches(t, t.stages[0]).filter((m) => m.round === 'Runde 2');
     expect(second).toHaveLength(4);
     const scoreGroup = (name: string) => winners.has(name) ? 3 : drawn.has(name) ? 1 : losers.has(name) ? 0 : -1;
@@ -62,6 +64,7 @@ describe('Geteilte Endplatzierung, aber alphabetische Qualifikation', () => {
     const t = tournament('ROUND_ROBIN', 4, true);
     const stage = t.stages[0];
     getMockStageMatches(t, stage).forEach((m) => completeMockMatch(m.id, score(1, 1)));
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, stage)).toBe(true);
     const names = getStageEntrants(t, stage).sort((a, b) => a.localeCompare(b, 'de'));
     expect(getStageEntrants(t, t.stages[1])).toEqual(names.slice(0, 2));
@@ -75,6 +78,7 @@ describe('Geteilte Endplatzierung, aber alphabetische Qualifikation', () => {
   it('vergibt auch bei abschließendem Jeder gegen Jeden denselben Endplatz bei absoluten Gleichstand', () => {
     const t = tournament('ROUND_ROBIN', 4, false);
     getMockStageMatches(t, t.stages[0]).forEach((m) => completeMockMatch(m.id, score(1, 1)));
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
     const final = getMockFinalStandings(t);
     expect(final).toHaveLength(4);
