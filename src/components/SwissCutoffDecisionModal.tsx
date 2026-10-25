@@ -256,6 +256,7 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
                 cutoffIndex={getSwissCutoffRowIndex(standings, qualifyingPlaces)}
                 finalized={false}
                 highlightPlayers={selectedPlayers}
+                readOnly
                 onSelectPlayer={() => {}}
                 onShowBuchholz={() => setShowBuchholz(true)}
               />;
