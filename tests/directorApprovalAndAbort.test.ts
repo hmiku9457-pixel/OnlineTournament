@@ -3,7 +3,7 @@ import { compareRankingRows } from '@/domain/sportScoring';
 import { createMockTournament, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { isStageCompleted, startFirstStage } from '@/services/mockPhaseLifecycle';
 import {
-  abortMockTournament, adminConfirmMockMatch, approveMockProgress, assignMockMatchToTable,
+  abortMockTournament, adminConfirmMockMatch, approveMockProgress,
   completeMockMatch, getMockStageMatches, getMockStoredResult, getPendingMockApproval,
   getMockAssignmentBlockReason,
 } from '@/services/mockRuntime';
