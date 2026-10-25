@@ -784,7 +784,7 @@ export function restoreMockParticipant(tournament: DemoTournament, name: string)
 
 type RankingRow = RankedParticipant;
 
-function rankParticipants(participants: string[], matches: BaseStageMatch[], results: StoredMatchResult[], sport: string): RankingRow[] {
+function rankParticipants(participants: string[], matches: BaseStageMatch[], results: StoredMatchResult[], sport: string, swiss = false, plannedRounds?: number): RankingRow[] {
   const resultById = new Map(results.map((result) => [result.matchId, result]));
   const automaticWins = matches
     .filter((match) => match.sideB === 'Freilos' && match.autoWinner)
@@ -797,7 +797,7 @@ function rankParticipants(participants: string[], matches: BaseStageMatch[], res
       forcedWinner: result?.forcedWinner, decisionSide: result?.decisionSide,
     };
   });
-  return rankStandings(participants, rankingMatches, sport, automaticWins);
+  return rankStandings(participants, rankingMatches, sport, automaticWins, swiss, plannedRounds);
 }
 
 function stageQualifierCount(tournament: DemoTournament, stage: TournamentStage) {
@@ -829,7 +829,9 @@ function computeStageQualifiers(tournament: DemoTournament, stage: TournamentSta
   }
 
   if (stage.type === 'ROUND_ROBIN' || stage.type === 'SWISS') {
-    return rankParticipants(getStageEntrants(tournament, stage), matches, results, tournament.sport).filter((row) => !isMockParticipantWithdrawn(tournament, row.name)).slice(0, targetCount).map((row) => row.name);
+    return rankParticipants(getStageEntrants(tournament, stage), matches, results, tournament.sport,
+      stage.type === 'SWISS', stage.type === 'SWISS' ? Number(stage.settings.rounds) || 4 : undefined)
+      .filter((row) => !isMockParticipantWithdrawn(tournament, row.name)).slice(0, targetCount).map((row) => row.name);
   }
 
   return getStageEntrants(tournament, stage).filter((name) => !isMockParticipantWithdrawn(tournament, name)).slice(0, targetCount);
