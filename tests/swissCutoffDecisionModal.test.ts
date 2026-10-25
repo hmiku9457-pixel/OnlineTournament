@@ -76,6 +76,31 @@ describe('Modal für Schweizer Qualifikationsgleichstand', () => {
     expect(html).not.toContain('Jeder gegen Jeden</strong>');
   });
 
+  it('verwendet für einen laufenden Entscheidungssatz dieselbe kompakte Eingabemaske wie die Tischkarte', () => {
+    const inProgress: SwissCutoffStatus = {
+      ...status,
+      tie: { players: ['Spieler 12', 'Spieler 13', 'Spieler 14'], slots: 1, firstRank: 1 },
+      decision: {
+        signature: 'test', mode: 'SET', eliminated: ['Spieler 13'],
+        sets: [{
+          sideA: 'Spieler 12', sideB: 'Spieler 13',
+          pointsA: 11, pointsB: 7, winner: 'Spieler 12',
+        }],
+      },
+    };
+    const html = renderToStaticMarkup(createElement(SwissCutoffDecisionModal, {
+      ...props, status: inProgress,
+    }));
+    expect(html).toContain('set-by-set-entry compact swiss-cutoff-game-entry');
+    expect(html).toContain('current-set-entry-row has-entry-help');
+    expect(html).toContain('set-entry-scoreline');
+    expect(html).toContain('Satz 1 bestätigen');
+    expect(html).toContain('aria-label="Hilfe zur Satzeingabe"');
+    expect(html).toContain('aria-label="Satz 1"');
+    expect(html).toContain('Spieler 12');
+    expect(html).toContain('Spieler 14');
+  });
+
   it('leitet für eine begonnene Phase 1.5 zur regulären Turnierleitung statt einer Satzeingabe im Modal', () => {
     const large: SwissCutoffStatus = { ...status,
       tie: { players: ['Spieler 12', 'Spieler 13', 'Spieler 14'], slots: 1, firstRank: 1 },
