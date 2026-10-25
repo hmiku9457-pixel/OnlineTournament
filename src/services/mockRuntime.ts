@@ -1273,6 +1273,7 @@ export function refreshCompletedStageQualifiers(tournament: DemoTournament, stag
 
 /** Match completion records the score but never advances without director approval. */
 function reconcileCompletedPhase(_matchId: string) {
+  void _matchId;
   // Progression is deliberately controlled by approveMockProgress().
 }
 
