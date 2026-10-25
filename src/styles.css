@@ -2776,3 +2776,67 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 @media (max-width: 600px) {
   .swiss-intermediate-matrix-modal { width: 98vw; height: 94vh; max-height: 94vh; padding: 12px; }
 }
+
+/* Maximized cross table: up to 32 entrants are scaled in both directions.
+   The ResizeObserver supplies the available width/height and resulting sizes.
+   Larger fields retain the existing scrollable presentation. */
+.swiss-intermediate-matrix-modal.is-auto-fit {
+  width: min(1700px, 98vw);
+  height: min(1200px, 96dvh);
+  max-height: 96dvh;
+  padding: clamp(8px, 1.4vw, 20px);
+}
+.swiss-intermediate-matrix-modal.is-auto-fit .swiss-intermediate-matrix-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.swiss-intermediate-matrix-modal.is-auto-fit .swiss-intermediate-matrix-table {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  table-layout: fixed;
+  font-size: var(--matrix-cell-font, 8px);
+  line-height: 1;
+}
+.swiss-intermediate-matrix-modal.is-auto-fit .swiss-intermediate-matrix-table tr {
+  height: var(--matrix-row-height, auto);
+}
+.swiss-intermediate-matrix-modal.is-auto-fit .swiss-intermediate-matrix-table th,
+.swiss-intermediate-matrix-modal.is-auto-fit .swiss-intermediate-matrix-table td {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: none;
+  height: var(--matrix-row-height, auto);
+  padding: 0 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1;
+}
+.swiss-intermediate-matrix-modal.is-auto-fit .swiss-intermediate-matrix-table .swiss-matrix-name {
+  width: var(--matrix-name-width, 145px);
+  min-width: 0;
+  max-width: var(--matrix-name-width, 145px);
+  padding-left: 4px;
+  font-size: var(--matrix-name-font, 10px);
+}
+.swiss-intermediate-matrix-modal.is-auto-fit .swiss-intermediate-matrix-table tbody .swiss-matrix-name > span:last-child {
+  max-width: calc(var(--matrix-name-width, 145px) - 20px);
+}
+.swiss-intermediate-matrix-modal.is-auto-fit .swiss-matrix-seed {
+  font-size: inherit;
+  margin-right: 2px;
+}
+.swiss-intermediate-matrix-modal.is-auto-fit .swiss-matrix-result button {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1;
+  padding: 0;
+}
