@@ -2128,3 +2128,38 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 }
 @media (prefers-reduced-motion: reduce) { .control-progress-fill { transition: none; } }
 @media print { .control-match-filters, .control-correction-toast { display: none !important; } }
+
+
+/* Schweizer Turnierverlauf: Rangliste und aktuelle Spielrunde im Zweispaltenlayout. */
+.swiss-progress-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(335px, 1fr); gap: 12px; align-items: start; min-width: 0; }
+.swiss-progress-layout > * { min-width: 0; }
+.swiss-progress-layout .swiss-standings-card { padding: 9px 10px; }
+.swiss-progress-layout .swiss-standings-table { min-width: 610px; }
+.swiss-progress-layout .swiss-standings-table th,
+.swiss-progress-layout .swiss-standings-table td { padding-inline: 5px; }
+.swiss-round-card { padding: 12px; }
+.swiss-round-card-heading { display: flex; justify-content: space-between; align-items: start; gap: 7px; margin-bottom: 9px; }
+.swiss-round-card-heading > div { display: grid; gap: 3px; }
+.swiss-round-card-heading h4 { margin: 0; font-size: .87rem; }
+.swiss-round-card-heading .muted { font-size: .7rem; }
+.swiss-round-live-count { border-radius: 999px; background: #d1fadf; color: #067647; font-size: .67rem; font-weight: 800; padding: 3px 8px; white-space: nowrap; }
+.swiss-round-match-list { display: grid; gap: 5px; }
+.swiss-round-match { position: relative; padding: 5px 8px; border: 1px solid #e4e7ec; border-left: 2px solid #d0d5dd; border-radius: 7px; background: #f9fafb; min-width: 0; }
+.swiss-round-match.is-live { border-color: #abefc6; border-left-color: #12b76a; background: #ecfdf3; }
+.swiss-round-match.is-finished { background: #fff; }
+.swiss-round-match-meta { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 2px 6px; color: #667085; font-size: .65rem; }
+.swiss-round-match.is-live .swiss-round-match-meta { color: #067647; font-weight: 750; }
+.swiss-round-match-row.group-match-row { position: relative; grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr); gap: 5px; padding: 2px 0 0; margin: 0; min-height: 24px; border: 0; background: transparent; font-size: .75rem; }
+.swiss-round-match-row .group-match-side { min-width: 0; }
+.swiss-round-match-row .group-match-side:last-child { text-align: right; }
+.swiss-round-match-row .match-result-trigger { font-variant-numeric: tabular-nums; font-size: .77rem; }
+.swiss-round-match-row .group-match-live-dot { left: -5px; }
+.swiss-round-match-row .swiss-bye-score { font-size: .69rem; color: #667085; font-weight: 800; }
+@media (max-width: 1120px) {
+  .swiss-progress-layout { grid-template-columns: minmax(0, 1fr); }
+  .swiss-progress-layout .swiss-standings-table { min-width: 610px; }
+  .swiss-round-match-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  .swiss-round-match-list { grid-template-columns: minmax(0, 1fr); }
+}

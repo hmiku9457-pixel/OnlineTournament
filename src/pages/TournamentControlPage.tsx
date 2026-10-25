@@ -8,6 +8,7 @@ import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
 import { BracketRoundViewport } from '@/components/BracketRoundViewport';
+import { SwissRoundCard } from '@/components/SwissRoundCard';
 import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
@@ -204,9 +205,7 @@ function StageCompetitionView({
     const standings = buildSwissStandings(tournament, stage);
     const swissMatches = getMockStageMatches(tournament, stage);
     const swissEditable = canEditDraw(tournament, stage);
-    const openingPairings = swissEditable
-      ? getMockStageBaseMatches(tournament, stage).filter((match) => match.round === 'Runde 1')
-      : [];
+    const swissRoundFixtures = getMockStageBaseMatches(tournament, stage);
     return (
       <section className="competition-stage-section">
         <div className="competition-stage-head"><div><span className="badge">SCHWEIZER SYSTEM</span><h3>{stage.name}</h3></div><div className="actions"><span className="muted">{Number(stage.settings.rounds) || 4} Runden</span>{swissEditable && <button className="btn small" type="button" onClick={() => {
@@ -215,30 +214,26 @@ function StageCompetitionView({
                     onDrawChanged?.();
                   }
                 }}>Neue Zufallsreihenfolge</button>}</div></div>
-        {swissEditable && (
-          <div className="swiss-draw-preview" aria-label="Vorschau der Schweizer Erstrunden-Paarungen">
-            <div className="swiss-draw-preview-head">
-              <strong>Runde 1 · Vorschau</strong>
-              <span className="muted">Vor Phasenstart änderbar · {openingPairings.length} Paarungen</span>
-            </div>
-            {swissDrawNotice && <p className="swiss-draw-notice" role="status">{swissDrawNotice}</p>}
-            <div className="swiss-draw-pairings">
-              {openingPairings.map((match) => <div className="swiss-draw-pair" key={match.id}>
-                <span title={match.sideA}>{match.sideA}</span>
-                <span className="swiss-draw-versus">–</span>
-                <span title={match.sideB}>{match.sideB}</span>
-              </div>)}
-            </div>
-          </div>
-        )}
         {!swissEditable && isStageStarted(tournament, stage) && (
           <p className="swiss-draw-lock-note">Die Startreihenfolge ist seit Beginn des Schweizer Systems eingefroren. Sie kann nur vor dem Phasenstart verändert werden.</p>
         )}
-        <div className="card table-wrap swiss-standings-card">
-          <table className="compact-table swiss-standings-table">
-            <thead><tr><th>#</th><th>Teilnehmer</th><th>Spiele</th><th>Siege</th><th>{scoreSport ? 'Unent.' : 'Niederlagen'}</th><th className="standing-ratio-cell">{scoreSport ? 'Niederlagen' : 'Sätze'}</th><th className="standing-difference-cell">{scoreSport ? scoreUnit : 'Satz ±'}</th><th className="standing-ratio-cell">{scoreSport ? 'Differenz' : 'Bälle'}</th><th className="standing-difference-cell">{scoreSport ? 'Punkte' : 'Ball ±'}</th></tr></thead>
+        <div className="swiss-progress-layout">
+          <div className="card table-wrap swiss-standings-card">
+            <table className="compact-table swiss-standings-table">
+            <thead><tr><th>#</th><th>Teilnehmer</th><th title="Spiele">Sp.</th><th title="Siege">S</th><th title={scoreSport ? 'Unentschieden' : 'Niederlagen'}>{scoreSport ? 'U' : 'N'}</th><th className="standing-ratio-cell" title={scoreSport ? 'Niederlagen' : 'Satzverhältnis'}>{scoreSport ? 'N' : 'Sätze'}</th><th className="standing-difference-cell" title={scoreSport ? scoreUnit : 'Satzdifferenz'}>{scoreSport ? scoreUnit : 'Satz ±'}</th><th className="standing-ratio-cell" title={scoreSport ? 'Differenz' : 'Ballverhältnis'}>{scoreSport ? '±' : 'Bälle'}</th><th className="standing-difference-cell" title={scoreSport ? 'Punkte' : 'Balldifferenz'}>{scoreSport ? 'Pkt.' : 'Ball ±'}</th></tr></thead>
             <tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><span className="swiss-standing-identity"><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{previousFinishLabels[row.name] && <small className="participant-origin swiss-standing-origin">{previousFinishLabels[row.name]}</small>}{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}</span></td><td>{row.played}</td><td>{row.wins}</td><td>{scoreSport ? row.draws : row.losses}</td>{scoreSport ? <><td>{row.losses}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td><td className="standing-difference-cell">{row.points}</td></> : <><td className="standing-ratio-cell"><StandingRatio value={row.sets} /></td><td className="standing-difference-cell">{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></>}</tr>)}</tbody>
-          </table>
+            </table>
+          </div>
+          <SwissRoundCard
+            fixtures={swissRoundFixtures}
+            matches={swissMatches}
+            sport={tournament.sport}
+            editable={swissEditable}
+            notice={swissDrawNotice}
+            venueName={(name) => displayVenueName(tournament.sport, name)}
+            onEditResult={onEditResult}
+            canEditResult={(matchId) => canEditMockMatch(tournament, matchId)}
+          />
         </div>
         {selectedSwissPlayer && (
           <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setSelectedSwissPlayer(null)}>
