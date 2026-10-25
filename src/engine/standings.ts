@@ -16,7 +16,7 @@ export function calculateStandings(participants: Participant[], matches: Match[]
   }
 
   const confirmed = matches.filter((match) => ['CONFIRMED', 'WALKOVER'].includes(match.status));
-  const opponents = new Map<UUID, UUID[]>();
+  const opponents = new Map<UUID, Array<{ id: UUID; result: number }>>();
 
   for (const match of confirmed) {
     if (!match.sideAId || !match.sideBId) continue;
@@ -33,16 +33,22 @@ export function calculateStandings(participants: Participant[], matches: Match[]
     if (match.winnerSideId === match.sideAId) { a.wins += 1; b.losses += 1; }
     if (match.winnerSideId === match.sideBId) { b.wins += 1; a.losses += 1; }
 
-    opponents.set(a.participantId, [...(opponents.get(a.participantId) ?? []), b.participantId]);
-    opponents.set(b.participantId, [...(opponents.get(b.participantId) ?? []), a.participantId]);
+    // One point for winning, half for a drawn game, zero for losing.
+    // Each encounter contributes separately, including repeat opponents.
+    const resultA = match.winnerSideId === match.sideAId ? 1
+      : match.winnerSideId === match.sideBId ? 0 : 0.5;
+    opponents.set(a.participantId, [...(opponents.get(a.participantId) ?? []), { id: b.participantId, result: resultA }]);
+    opponents.set(b.participantId, [...(opponents.get(b.participantId) ?? []), { id: a.participantId, result: 1 - resultA }]);
   }
 
   for (const row of rows.values()) row.setDifference = row.setsWon - row.setsLost;
 
-  // Buchholz = Summe der Siege aller Gegner. Besonders relevant im Schweizer System.
+  // Sonneborn-Berger: Nur Siege (voll) und Remis (halb) gegen Gegner
+  // tragen deren aktuelle Gesamtpunkte zur Feinwertung bei.
+  // Das historische Datenfeld buchholz bleibt vorerst API-kompatibel.
   for (const row of rows.values()) {
     row.buchholz = (opponents.get(row.participantId) ?? []).reduce(
-      (sum, opponentId) => sum + (rows.get(opponentId)?.wins ?? 0),
+      (sum, opponent) => sum + opponent.result * (rows.get(opponent.id)?.wins ?? 0),
       0,
     );
   }
