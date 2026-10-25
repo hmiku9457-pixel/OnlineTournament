@@ -44,11 +44,11 @@ export function SwissStandingsTable({
           <col className="swiss-col-count" />
           {scoreSport && <col className="swiss-col-count" />}
           <col className="swiss-col-buchholz" />
-          <col className="swiss-col-difference" />
           <col className="swiss-col-ratio" />
+          <col className="swiss-col-difference" />
           {scoreSport ? <col className="swiss-col-points" /> : <>
-            <col className="swiss-col-difference" />
             <col className="swiss-col-ratio" />
+            <col className="swiss-col-difference" />
           </>}
         </colgroup>
         <thead>
@@ -65,11 +65,11 @@ export function SwissStandingsTable({
                 <button type="button" className="swiss-bhz-help-trigger" aria-label="Buchholzzahl (BHZ) erklären" aria-haspopup="dialog" title="Was ist die BHZ?" onClick={onShowBuchholz}>?</button>
               </span>
             </th>
-            <th className="swiss-stat-difference swiss-stat-group-start" title={scoreSport ? `${scoreUnit}differenz` : 'Satzdifferenz'}>{scoreSport ? '±' : 'Satz ±'}</th>
-            <th className="swiss-stat-ratio" title={scoreSport ? scoreUnit : 'Satzverhältnis'}>{scoreSport ? scoreUnit : 'Sätze'}</th>
+            <th className="swiss-stat-ratio swiss-stat-group-start" title={scoreSport ? scoreUnit : 'Satzverhältnis'}>{scoreSport ? scoreUnit : 'Sätze'}</th>
+            <th className="swiss-stat-difference" title={scoreSport ? `Differenz (${scoreUnit})` : 'Satzdifferenz'}>±</th>
             {scoreSport ? <th title="Tabellenpunkte">Pkt.</th> : <>
-              <th className="swiss-stat-difference swiss-stat-group-start" title="Balldifferenz">Ball ±</th>
-              <th className="swiss-stat-ratio" title="Ballverhältnis">Bälle</th>
+              <th className="swiss-stat-ratio swiss-stat-group-start" title="Ballverhältnis">Bälle</th>
+              <th className="swiss-stat-difference" title="Balldifferenz">±</th>
             </>}
           </tr>
         </thead>
@@ -92,11 +92,11 @@ export function SwissStandingsTable({
                   <td>{scoreSport ? row.draws : row.losses}</td>
                   {scoreSport && <td>{row.losses}</td>}
                   <td className="swiss-buchholz-cell">{formatBuchholz(row.buchholz)}</td>
-                  <td className="swiss-stat-difference swiss-stat-group-start">{difference(scoreSport ? row.ballDifference : row.setDifference)}</td>
-                  <td className="swiss-stat-ratio"><SwissRatio value={scoreSport ? row.balls : row.sets} /></td>
+                  <td className="swiss-stat-ratio swiss-stat-group-start"><SwissRatio value={scoreSport ? row.balls : row.sets} /></td>
+                  <td className="swiss-stat-difference">{difference(scoreSport ? row.ballDifference : row.setDifference)}</td>
                   {scoreSport ? <td className="swiss-points-cell">{row.points}</td> : <>
-                    <td className="swiss-stat-difference swiss-stat-group-start">{difference(row.ballDifference)}</td>
-                    <td className="swiss-stat-ratio"><SwissRatio value={row.balls} /></td>
+                    <td className="swiss-stat-ratio swiss-stat-group-start"><SwissRatio value={row.balls} /></td>
+                    <td className="swiss-stat-difference">{difference(row.ballDifference)}</td>
                   </>}
                 </tr>
                 {index === cutoffIndex && <SwissQualificationCutoffRow qualifyingPlaces={qualifyingPlaces} finalized={finalized} />}
