@@ -38,7 +38,10 @@ describe('Schweizer Stichentscheid: Zusatzrunden und Jeder gegen Jeden', () => {
     const round = newPlayoffRound(players, 'ROUND_ROBIN', []);
     expect(round.matches).toHaveLength(6);
     expect(playoffQualified(players, 2, [round])).toBeNull();
-    const played = { ...round, matches: round.matches.map((game) => ({ ...game, pointsA: 11, pointsB: 0 })) };
+    const played = { ...round, matches: round.matches.map((game) => ({
+      ...game, pointsA: players.indexOf(game.sideA) < players.indexOf(game.sideB) ? 11 : 0,
+      pointsB: players.indexOf(game.sideB) < players.indexOf(game.sideA) ? 11 : 0,
+    })) };
     const qualified = playoffQualified(players, 2, [played]);
     expect(qualified).toHaveLength(2);
     expect(playoffScores(players, [played]).map((row) => row.points)).toEqual([3, 2, 1, 0]);
