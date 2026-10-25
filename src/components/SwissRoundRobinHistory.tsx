@@ -1,8 +1,10 @@
 import type { StoredSwissCutoffDecision } from '@/services/mockSwissCutoffStore';
 import type { MockRuntimeMatch } from '@/services/mockRuntime';
 import { SwissStandingsTable } from '@/components/SwissStandingsTable';
+import { SwissRoundRobinMatrix } from '@/components/SwissRoundRobinMatrix';
+import { GroupMatchDayList, type GroupMatchDayItem } from '@/components/GroupMatchDayList';
 import { playoffBoundaryTie, playoffRankingsWithHeadToHead, type PlayoffRound } from '@/domain/swissCutoffPlayoff';
-import { sportScoring } from '@/domain/sportScoring';
+import { resultScore, sportScoring } from '@/domain/sportScoring';
 import type { MockStanding } from '@/services/mockCompetitionViews';
 
 interface Props {
@@ -47,6 +49,24 @@ export function SwissRoundRobinHistory({
   if (completed && decision.winners?.length && decision.mode !== 'LOT') {
     names.forEach((name) => { decisionTags[name] = { label: 'Jeder gegen Jeden', qualified: qualified.has(name) }; });
   }
+  const scheduledMatches: GroupMatchDayItem[] = rounds.flatMap((round, roundIndex) =>
+    round.matches.map((match, index) => {
+      const game = matches.find((item) => item.id.endsWith(`-sw-playoff-r${roundIndex + 1}-m${index + 1}`));
+      const finished = match.pointsA !== undefined && match.pointsB !== undefined;
+      const recordedSets = finished
+        ? [{ number: 1, sideAScore: match.pointsA!, sideBScore: match.pointsB! }]
+        : game?.sets ?? [];
+      return {
+        id: game?.id ?? `sw-playoff-r${roundIndex + 1}-m${index + 1}`,
+        sideA: match.sideA,
+        sideB: match.sideB,
+        matchDay: match.matchDay ?? index + 1,
+        score: recordedSets.length ? resultScore(sport, recordedSets) : '–',
+        sets: recordedSets,
+        status: finished ? 'played'
+          : game?.status === 'LIVE' || game?.status === 'CONFIRMATION' ? 'live' : 'open',
+      };
+    }));
   return (
     <section className="competition-stage-section swiss-intermediate-stage" aria-label={`Phase ${phaseNumber}: Jeder gegen Jeden`}>
       <div className="competition-stage-head">
@@ -81,34 +101,18 @@ export function SwissRoundRobinHistory({
             onShowBuchholz={() => {}}
           />
         </div>
-        <div className="card swiss-intermediate-matches">
-          <h4>Spielplan und Ergebnisse</h4>
-          {rounds.map((round, roundIndex) => {
-            const gameDays = [...new Set(round.matches.map((match, index) => match.matchDay ?? index + 1))]
-              .sort((a, b) => a - b);
-            return <div key={roundIndex} className="swiss-intermediate-round">
-              {rounds.length > 1 && <h5>Durchgang {roundIndex + 1}</h5>}
-              {gameDays.map((day) => <div className="swiss-intermediate-matchday" key={day}>
-                <h5>Spieltag {day}</h5>
-                {round.matches.map((match, index) => {
-                  if ((match.matchDay ?? index + 1) !== day) return null;
-                  const game = matches.find((item) => item.id.endsWith(`-sw-playoff-r${roundIndex + 1}-m${index + 1}`));
-                  return <div className="swiss-intermediate-game" key={index}>
-                    <span>{match.sideA}</span>
-                    <div className="swiss-intermediate-game-result">
-                      <strong>{match.pointsA === undefined ? 'Offen' : `${match.pointsA} : ${match.pointsB}`}</strong>
-                      {game && <span className="muted">{game.status === 'LIVE' ? game.table : game.status === 'WAITING' ? 'Wartet auf Tisch' : game.status === 'FINISHED' ? 'Beendet' : game.status}</span>}
-                      {game && onEditResult && ['READY', 'LIVE', 'CONFIRMATION', 'FINISHED'].includes(game.status) &&
-                        <button type="button" className="btn small" onClick={() => onEditResult(game.id)}>Ergebnis</button>}
-                    </div>
-                    <span>{match.sideB}</span>
-                  </div>;
-                })}
-              </div>)}
-            </div>;
-          })}
-        </div>
+        <SwissRoundRobinMatrix
+          players={standings.map((row) => row.name)}
+          rounds={rounds}
+          sport={sport}
+          matches={matches}
+          onEditResult={onEditResult}
+        />
       </div>
+      <article className="card group-overview-card swiss-intermediate-schedule">
+        <h4>Spielplan und Ergebnisse</h4>
+        <GroupMatchDayList matches={scheduledMatches} sport={sport} onEditResult={onEditResult} />
+      </article>
       {completed && unresolved && !decision.winners?.length && <p className="swiss-cutoff-still-tied" role="status">
         Der direkte Vergleich der gleichplatzierten Spieler führt zu keiner eindeutigen Qualifikation.
         Ein physischer Losentscheid zwischen {unresolved.players.join(', ')} ist erforderlich.
