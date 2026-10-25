@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getStageEntrants, isStageCompleted, isStageLockedWaiting, startFirstStage } from '@/services/mockPhaseLifecycle';
@@ -86,6 +87,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(isStageCompleted(t, t.stages[0])).toBe(false);
 
     completeMockMatch(match.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]);
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
     expect(getPendingSwissCutoff(t)).toBeNull();
     expect(getStageEntrants(t, t.stages[1])).toEqual([pending.tie.players[0]]);
@@ -118,6 +120,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     const [winner, loser] = pending.tie.players;
     expect(recordSwissCutoffSet(t, 11, 7)).toBeNull();
     expect(getPendingSwissCutoff(t)).toBeNull();
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
     expect(getStageEntrants(t, t.stages[1])).toEqual([winner]);
     const standings = buildSwissStandings(t, t.stages[0]);
@@ -133,6 +136,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(recordSwissCutoffLot(t, [alphabetical, chosen])).toContain('genau 1');
     expect(isStageCompleted(t, t.stages[0])).toBe(false);
     expect(recordSwissCutoffLot(t, [chosen])).toBeNull();
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(getStageEntrants(t, t.stages[1])).toEqual([chosen]);
     expect(buildSwissStandings(t, t.stages[0])[0].name).toBe(chosen);
     expect(getSwissCutoffHistory(t, t.stages[0])?.mode).toBe('LOT');
@@ -146,6 +150,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(pending.tie).toMatchObject({ slots: 2 });
     expect(pending.tie.players).toHaveLength(3);
     expect(recordSwissCutoffSet(t, 11, 7)).toBeNull();
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
     expect(getStageEntrants(t, t.stages[1])).toHaveLength(2);
   });
@@ -160,6 +165,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     resetSwissCutoffSets(t);
     expect(getPendingSwissCutoff(t)?.decision).toBeNull();
     expect(recordSwissCutoffLot(t, [initial.tie.players[initial.tie.players.length - 1]])).toBeNull();
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
   });
 
@@ -209,6 +215,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
       const [a, b] = points(game);
       expect(recordSwissCutoffPlayoffResult(t, i + 1, a, b)).toBeNull();
     });
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
     current = getPendingSwissCutoff(t)!;
     expect(current).toBeNull();
@@ -235,6 +242,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(getPendingSwissCutoff(t)?.decision?.winners).toBeUndefined();
     expect(recordSwissCutoffLot(t, [a])).toContain('genau 2');
     expect(recordSwissCutoffLot(t, [a, b])).toBeNull();
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
     expect(getStageEntrants(t, t.stages[1])).toEqual([a, b]);
     const history = getSwissCutoffHistory(t, t.stages[0]);
@@ -270,6 +278,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(getMockRuntimeMatches(t).find((match) => match.id === first.id)?.status).toBe('FINISHED');
     expect(isStageCompleted(t, t.stages[0])).toBe(false);
     active.slice(1).forEach((game) => completeMockMatch(game.id, [target(game)]));
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
     expect(getSwissRoundRobinMatches(t, t.stages[0])).toHaveLength(3);
     expect(getStageEntrants(t, t.stages[1])).toHaveLength(2);
@@ -304,12 +313,13 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     completeRound(t);
     const old = getPendingSwissCutoff(t)!;
     expect(recordSwissCutoffLot(t, [old.tie.players[0]])).toBeNull();
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
     const fixtures = getMockStageMatches(t, t.stages[0]);
     // Erst entsteht eine klare Rangfolge. Danach besteht wieder sportlicher
     // Gleichstand, aber das ursprünglich dokumentierte Los ist nicht mehr gültig.
     completeMockMatch(fixtures[0].id, [{ number: 1, sideAScore: 11, sideBScore: 6 }]);
-    expect(refreshCompletedStageQualifiers(t, t.stages[0])).toBe(true);
+    expect(refreshCompletedStageQualifiers(t, t.stages[0])).toBe(false);
     completeMockMatch(fixtures[1].id, [{ number: 1, sideAScore: 11, sideBScore: 6 }]);
     expect(refreshCompletedStageQualifiers(t, t.stages[0])).toBe(false);
     expect(isStageCompleted(t, t.stages[0])).toBe(false);
@@ -317,6 +327,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(getPendingSwissCutoff(t)?.decision).toBeNull();
     expect(getPendingSwissCutoff(t)?.signature).not.toBe(old.signature);
     expect(recordSwissCutoffLot(t, [getPendingSwissCutoff(t)!.tie.players[1]])).toBeNull();
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
   });
 
@@ -324,6 +335,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     const t = create();
     completeRound(t, [6, 3]);
     expect(getPendingSwissCutoff(t)).toBeNull();
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
   });
 });
