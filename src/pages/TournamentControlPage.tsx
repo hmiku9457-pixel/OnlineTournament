@@ -10,7 +10,9 @@ import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { BracketLiveStatus, BracketScoreCells, BracketSetScores, BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
 import { BracketRoundViewport } from '@/components/BracketRoundViewport';
 import { SwissRoundCard } from '@/components/SwissRoundCard';
-import { getSwissCutoffRowIndex, SwissQualificationCutoffRow } from '@/components/SwissQualificationCutoff';
+import { SwissStandingsTable } from '@/components/SwissStandingsTable';
+import { SwissBuchholzHelpModal } from '@/components/SwissBuchholzHelpModal';
+import { getSwissCutoffRowIndex } from '@/components/SwissQualificationCutoff';
 import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
@@ -110,6 +112,7 @@ function StageCompetitionView({
 }) {
   const [selectedGroupPlayer, setSelectedGroupPlayer] = useState<{ groupLabel: string; player: string } | null>(null);
   const [selectedSwissPlayer, setSelectedSwissPlayer] = useState<string | null>(null);
+  const [showSwissBuchholzHelp, setShowSwissBuchholzHelp] = useState(false);
   const [swissDrawNotice, setSwissDrawNotice] = useState<string | null>(null);
   const previousFinishLabels = getPreviousStageFinishLabels(tournament, stage);
   const scoreSport = sportScoring(tournament.sport).mode === 'score';
@@ -232,28 +235,19 @@ function StageCompetitionView({
           <p className="swiss-draw-lock-note">Die Startreihenfolge ist seit Beginn des Schweizer Systems eingefroren. Sie kann nur vor dem Phasenstart verändert werden.</p>
         )}
         <div className="swiss-progress-layout">
-          <div className="card table-wrap swiss-standings-card">
-            <table className="compact-table swiss-standings-table">
-              <colgroup>
-                <col className="swiss-col-rank" />
-                <col className="swiss-col-participant" />
-                <col className="swiss-col-count" />
-                <col className="swiss-col-count" />
-                <col className="swiss-col-count" />
-                <col className="swiss-col-buchholz" />
-                <col className="swiss-col-ratio" />
-                <col className="swiss-col-difference" />
-                <col className="swiss-col-ratio" />
-                <col className="swiss-col-difference" />
-              </colgroup>
-            <thead><tr><th>#</th><th>Teilnehmer</th><th title="Spiele">Sp.</th><th title="Siege">S</th><th title="Buchholzzahl: Summe der Wertungspunkte der Gegner (Freilose und kampflose Spiele mit virtueller Wertung)">Buchh.</th><th title={scoreSport ? 'Unentschieden' : 'Niederlagen'}>{scoreSport ? 'U' : 'N'}</th><th className="standing-ratio-cell" title={scoreSport ? 'Niederlagen' : 'Satzverhältnis'}>{scoreSport ? 'N' : 'Sätze'}</th><th className="standing-difference-cell" title={scoreSport ? scoreUnit : 'Satzdifferenz'}>{scoreSport ? scoreUnit : 'Satz ±'}</th><th className="standing-ratio-cell" title={scoreSport ? 'Differenz' : 'Ballverhältnis'}>{scoreSport ? '±' : 'Bälle'}</th><th className="standing-difference-cell" title={scoreSport ? 'Punkte' : 'Balldifferenz'}>{scoreSport ? 'Pkt.' : 'Ball ±'}</th></tr></thead>
-            <tbody>{standings.map((row, index) => <Fragment key={row.name}><tr><td>{row.rank}</td><td><span className="swiss-standing-identity"><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{previousFinishLabels[row.name] && <small className="participant-origin swiss-standing-origin">{previousFinishLabels[row.name]}</small>}{getStageWithdrawalLabel(tournament, row.name, stage.id) && <span className="standing-withdrawn" title="Zeitpunkt des Rückzugs">{getStageWithdrawalLabel(tournament, row.name, stage.id)}</span>}</span></td><td>{row.played}</td><td>{row.wins}{swissUnplayedWinners.has(row.name) && <sup className="swiss-bye-marker" title="Mindestens ein Sieg durch Freilos oder kampflose Wertung" aria-label="Mindestens ein Sieg durch Freilos oder kampflose Wertung">*</sup>}</td><td className="swiss-buchholz-cell">{Number.isInteger(row.buchholz) ? row.buchholz : row.buchholz.toLocaleString('de-DE', { maximumFractionDigits: 1 })}</td><td>{scoreSport ? row.draws : row.losses}</td>{scoreSport ? <><td>{row.losses}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td><td className="standing-difference-cell">{row.points}</td></> : <><td className="standing-ratio-cell"><StandingRatio value={row.sets} /></td><td className="standing-difference-cell">{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></>}</tr>{index === swissCutoffIndex && (
-              <SwissQualificationCutoffRow qualifyingPlaces={qualifyingPlaces} finalized={swissFinished} />
-            )}</Fragment>)}</tbody>
-            </table>
-            {swissUnplayedWinners.size > 0 && <p className="muted swiss-bye-legend">* Kennzeichnet mindestens einen Sieg durch Freilos oder kampflose Wertung.</p>}
-            <p className="muted swiss-ranking-legend">Reihenfolge: Siege (bei Unentschieden halbe Wertung) → Buchholz → Satzdifferenz → Balldifferenz. Buchholz berücksichtigt die Stärke aller Gegner; bei Freilos und kampflosen Partien gelten virtuelle Gegnerwerte.</p>
-          </div>
+          <SwissStandingsTable
+            standings={standings}
+            scoreSport={scoreSport}
+            scoreUnit={scoreUnit}
+            unplayedWinners={swissUnplayedWinners}
+            previousFinishLabels={previousFinishLabels}
+            withdrawalLabel={(name) => getStageWithdrawalLabel(tournament, name, stage.id)}
+            qualifyingPlaces={qualifyingPlaces}
+            cutoffIndex={swissCutoffIndex}
+            finalized={swissFinished}
+            onSelectPlayer={setSelectedSwissPlayer}
+            onShowBuchholz={() => setShowSwissBuchholzHelp(true)}
+          />
           <SwissRoundCard
             fixtures={swissRoundFixtures}
             matches={swissMatches}
@@ -266,6 +260,7 @@ function StageCompetitionView({
             canEditResult={(matchId) => canEditMockMatch(tournament, matchId)}
           />
         </div>
+        {showSwissBuchholzHelp && <SwissBuchholzHelpModal rounds={Number(stage.settings.rounds) || 4} onClose={() => setShowSwissBuchholzHelp(false)} />}
         {selectedSwissPlayer && (
           <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setSelectedSwissPlayer(null)}>
             <div className="prototype-modal player-games-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
