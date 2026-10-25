@@ -47,15 +47,18 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
   const alreadyFinished = !editingFinished && match.status === 'FINISHED';
   const needsFinalApproval = requiresFinalApproval(match.bestOf, playedSets, swissAdminEntry) && !alreadyFinished;
 
+  // Runtime/clock updates create a fresh match.sets array even when its contents
+  // have not changed. Only a real change of game or score may reset the editor.
+  const storedSetsKey = JSON.stringify(match.sets ?? []);
   useEffect(() => {
-    setPlayedSets(match.sets ?? []);
+    setPlayedSets(JSON.parse(storedSetsKey) as MatchSet[]);
     setCurrentValue('');
     setQuickHelpOpen(false);
     setError(null);
     setEditingFinished(false);
     setCorrectionOpen(false);
     setCorrectionError(null);
-  }, [match.id, match.sets]);
+  }, [match.id, storedSetsKey]);
 
   function confirmSet() {
     if (alreadyFinished) return;
@@ -129,9 +132,22 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
     setError(null);
     setCorrectionOpen(false);
     setCorrectionError(null);
-    // Nur den laufenden Entwurf speichern, das Spiel nicht automatisch abschließen.
-    saveMockMatchSets(match.id, validSets, 'LIVE');
-    onSaved?.();
+    // Während einer abgeschlossenen Ergebniskorrektur bleibt das Original
+    // unverändert, bis das vollständige neue Endergebnis bestätigt wird.
+    if (!editingFinished) {
+      saveMockMatchSets(match.id, validSets, 'LIVE');
+      onSaved?.();
+    }
+  }
+
+  function cancelFinishedCorrection() {
+    setPlayedSets(match.sets ?? []);
+    setCurrentValue('');
+    setEditingFinished(false);
+    setCorrectionOpen(false);
+    setCorrectionValues([]);
+    setCorrectionError(null);
+    setError(null);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -296,7 +312,10 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
       )}
 
       {allowEditFinished && editingFinished && (
-        <div className="field-hint">Korrekturmodus: Das bisherige Ergebnis bleibt gespeichert, bis das neue Endergebnis vollständig eingegeben wurde.</div>
+        <div className="finished-result-correction-footer">
+          <span className="field-hint">Korrekturmodus: Das bisherige Ergebnis bleibt gespeichert, bis das neue Endergebnis vollständig eingegeben wurde.</span>
+          <button className="btn small" type="button" onClick={cancelFinishedCorrection}>Abbrechen</button>
+        </div>
       )}
       {error && <div className="field-error">{error}</div>}
     </div>
