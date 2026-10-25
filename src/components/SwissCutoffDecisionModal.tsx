@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { DemoTournament } from '@/data/demoTournaments';
 import { SwissStandingsTable } from '@/components/SwissStandingsTable';
 import { SwissBuchholzHelpModal } from '@/components/SwissBuchholzHelpModal';
-import { getSwissCutoffPair, type SwissCutoffStatus } from '@/services/mockRuntime';
+import type { SwissCutoffStatus } from '@/services/mockRuntime';
 import { buildSwissStandings, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
 import { getSwissCutoffRowIndex } from '@/components/SwissQualificationCutoff';
 import { getStageWithdrawalLabel } from '@/services/mockWithdrawals';
@@ -29,7 +29,6 @@ export function SwissCutoffDecisionModal({ status, tournament, onBeginSet, onLot
   const stage = tournament.stages.find((item) => item.id === status.stageId);
   const rules = sportScoring(tournament.sport);
   const scoreSport = rules.mode === 'score';
-  const pair = getSwissCutoffPair(status);
   const played = status.decision?.sets ?? [];
   const extraRounds = status.decision?.extraRounds ?? [];
   const lastRound = extraRounds[extraRounds.length - 1];
@@ -46,7 +45,6 @@ export function SwissCutoffDecisionModal({ status, tournament, onBeginSet, onLot
   const multiPlayer = status.tie.players.length > 2;
   const selectedPlayers = new Set(status.tie.players);
   const eliminated = new Set(status.decision?.eliminated ?? []);
-  const remaining = status.tie.players.filter((name) => !eliminated.has(name));
   const outcomeType = scoreSport ? 'Entscheidungsspiel' : 'Entscheidungssatz';
 
   function startSetMatch() {
