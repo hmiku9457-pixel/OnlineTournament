@@ -32,6 +32,6 @@ describe('Schweizer Cut-off zur folgenden Turnierphase', () => {
     expect(provisional).toContain('Cut-off · 8 Qualifikationsplätze · vorläufig');
     expect(completed).toContain('Cut-off · 8 Qualifikationsplätze');
     expect(completed).not.toContain('vorläufig');
-    expect(completed).toContain('colSpan="9"');
+    expect(completed).toContain('colSpan="10"');
   });
 });
