@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { seededKnockoutSlots, snakeSeededGroupOrder } from '@/engine/seededDraws';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
@@ -43,6 +44,7 @@ function finishFirstStage(tournament: ReturnType<typeof createTwoStage>) {
   const first = tournament.stages[0];
   // For BO1, a single set is sufficient to finish the match.
   getMockStageMatches(tournament, first).forEach((match) => completeMockMatch(match.id, set));
+  expect(approveMockProgress(tournament)?.kind).toBe('STAGE');
   expect(isStageCompleted(tournament, first)).toBe(true);
 }
 
