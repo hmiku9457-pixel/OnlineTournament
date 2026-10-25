@@ -86,6 +86,12 @@ function computeStandings(members: string[], matches: ReturnType<typeof getMockS
     }));
 }
 
+/** The regular all-player round-robin uses the same sport-specific standings
+ * calculation as a group, without Buchholz. */
+export function buildRoundRobinStandings(tournament: DemoTournament, stage: TournamentStage): MockStanding[] {
+  return computeStandings(getStageEntrants(tournament, stage), getMockStageMatches(tournament, stage), tournament.sport);
+}
+
 export function buildMockGroups(tournament: DemoTournament, stage: TournamentStage): MockGroupView[] {
   const participants = getStageEntrants(tournament, stage);
   const groupCount = Math.max(1, Number(stage.settings.groups) || 1);
