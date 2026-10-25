@@ -2134,7 +2134,18 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .swiss-progress-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(335px, 1fr); gap: 12px; align-items: start; min-width: 0; }
 .swiss-progress-layout > * { min-width: 0; }
 .swiss-progress-layout .swiss-standings-card { padding: 9px 10px; }
-.swiss-progress-layout .swiss-standings-table { min-width: 610px; }
+.swiss-progress-layout .swiss-standings-table { min-width: 610px; table-layout: fixed; }
+.swiss-standings-table .swiss-col-rank { width: 30px; }
+.swiss-standings-table .swiss-col-count { width: 34px; }
+.swiss-standings-table .swiss-col-ratio { width: 67px; }
+.swiss-standings-table .swiss-col-difference { width: 56px; }
+/* Die Teilnehmerspalte nutzt den Rest; Sätze/± und Bälle/± bleiben beieinander. */
+.swiss-standings-table th:nth-child(3),
+.swiss-standings-table th:nth-child(4),
+.swiss-standings-table th:nth-child(5),
+.swiss-standings-table td:nth-child(3),
+.swiss-standings-table td:nth-child(4),
+.swiss-standings-table td:nth-child(5) { text-align: center; }
 .swiss-progress-layout .swiss-standings-table th,
 .swiss-progress-layout .swiss-standings-table td { padding-inline: 5px; }
 .swiss-round-card { padding: 12px; }

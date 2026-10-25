@@ -220,6 +220,17 @@ function StageCompetitionView({
         <div className="swiss-progress-layout">
           <div className="card table-wrap swiss-standings-card">
             <table className="compact-table swiss-standings-table">
+              <colgroup>
+                <col className="swiss-col-rank" />
+                <col className="swiss-col-participant" />
+                <col className="swiss-col-count" />
+                <col className="swiss-col-count" />
+                <col className="swiss-col-count" />
+                <col className="swiss-col-ratio" />
+                <col className="swiss-col-difference" />
+                <col className="swiss-col-ratio" />
+                <col className="swiss-col-difference" />
+              </colgroup>
             <thead><tr><th>#</th><th>Teilnehmer</th><th title="Spiele">Sp.</th><th title="Siege">S</th><th title={scoreSport ? 'Unentschieden' : 'Niederlagen'}>{scoreSport ? 'U' : 'N'}</th><th className="standing-ratio-cell" title={scoreSport ? 'Niederlagen' : 'Satzverhältnis'}>{scoreSport ? 'N' : 'Sätze'}</th><th className="standing-difference-cell" title={scoreSport ? scoreUnit : 'Satzdifferenz'}>{scoreSport ? scoreUnit : 'Satz ±'}</th><th className="standing-ratio-cell" title={scoreSport ? 'Differenz' : 'Ballverhältnis'}>{scoreSport ? '±' : 'Bälle'}</th><th className="standing-difference-cell" title={scoreSport ? 'Punkte' : 'Balldifferenz'}>{scoreSport ? 'Pkt.' : 'Ball ±'}</th></tr></thead>
             <tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><span className="swiss-standing-identity"><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{previousFinishLabels[row.name] && <small className="participant-origin swiss-standing-origin">{previousFinishLabels[row.name]}</small>}{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}</span></td><td>{row.played}</td><td>{row.wins}</td><td>{scoreSport ? row.draws : row.losses}</td>{scoreSport ? <><td>{row.losses}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td><td className="standing-difference-cell">{row.points}</td></> : <><td className="standing-ratio-cell"><StandingRatio value={row.sets} /></td><td className="standing-difference-cell">{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></>}</tr>)}</tbody>
             </table>
