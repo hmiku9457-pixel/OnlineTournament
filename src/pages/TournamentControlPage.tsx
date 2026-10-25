@@ -1008,6 +1008,14 @@ export function TournamentControlPage() {
               </div>
             </div>
           </div>
+          <div className="control-header-guide no-print">
+            <div className="control-guide-copy"><strong>{guide.title}</strong><span>{guide.text}</span></div>
+            <div className="control-guide-actions">
+              {assignableWaitingMatches.length > 0 && <button type="button" className="btn small control-guide-action" onClick={() => openWaitingQueue(true)}>{assignableWaitingMatches.length} {assignableWaitingMatches.length === 1 ? 'Spiel' : 'Spiele'} anzeigen →</button>}
+              {nextStartableStage && !activeStage && <button type="button" className="btn small control-guide-action" onClick={openNextStagePreparation}>Phase vorbereiten →</button>}
+              <ControlHelpButton topic={guide.topic} onOpen={setHelpTopic} label="So geht's →" />
+            </div>
+          </div>
         </div>
       </header>
 
@@ -1025,15 +1033,6 @@ export function TournamentControlPage() {
         </div>
         <button type="button" className="btn primary" onClick={() => setApprovalModalOpen(true)}>Ergebnisse prüfen und freigeben</button>
       </div>}
-
-      <div className="control-guide-strip no-print">
-        <div className="control-guide-copy"><strong>{guide.title}</strong><span>{guide.text}</span></div>
-        <div className="control-guide-actions">
-          {assignableWaitingMatches.length > 0 && <button type="button" className="btn small control-guide-action" onClick={() => openWaitingQueue(true)}>{assignableWaitingMatches.length} {assignableWaitingMatches.length === 1 ? 'Spiel' : 'Spiele'} anzeigen →</button>}
-          {nextStartableStage && !activeStage && <button type="button" className="btn small control-guide-action" onClick={openNextStagePreparation}>Phase vorbereiten →</button>}
-          <ControlHelpButton topic={guide.topic} onOpen={setHelpTopic} label="So geht's →" />
-        </div>
-      </div>
 
       {tab === 'overview' && (
         <section className="control-overview-stack">
