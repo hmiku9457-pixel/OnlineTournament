@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { DrawActionButton } from '@/components/DrawActionButton';
@@ -13,6 +13,7 @@ import { SwissRoundCard } from '@/components/SwissRoundCard';
 import { SwissStandingsTable } from '@/components/SwissStandingsTable';
 import { SwissBuchholzHelpModal } from '@/components/SwissBuchholzHelpModal';
 import { SwissCutoffDecisionModal } from '@/components/SwissCutoffDecisionModal';
+import { SwissRoundRobinHistory } from '@/components/SwissRoundRobinHistory';
 import { getSwissCutoffRowIndex } from '@/components/SwissQualificationCutoff';
 import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
@@ -547,7 +548,9 @@ export function TournamentControlPage() {
   const swissRecordFor = useMemo(() => getActiveSwissRecordLookup(swissSource.tournament), [swissSource]);
   const nextStartableStage = useMemo(() => getNextStartableStage(phaseSource.tournament), [phaseSource]);
   const editableStage = useMemo(() => phaseSource.tournament.stages.find((stage) => isStageEditable(phaseSource.tournament, stage)), [phaseSource]);
-  const selectedStage = useMemo(() => tournament.stages.find((stage) => stage.id === selectedStageId) ?? tournament.stages[0], [tournament, selectedStageId]);
+  const selectedRoundRobinStage = tournament.stages.find((stage) => selectedStageId === `${stage.id}::rr`);
+  const selectedRoundRobinDecision = selectedRoundRobinStage ? getSwissCutoffHistory(tournament, selectedRoundRobinStage) : null;
+  const selectedStage = useMemo(() => tournament.stages.find((stage) => stage.id === selectedStageId) ?? (selectedStageId.endsWith('::rr') ? undefined : tournament.stages[0]), [tournament, selectedStageId]);
   const tournamentProgress = useMemo(() => summarizeControlProgress(
     phaseRuntimeSource.tournament.stages.map((stage) => ({
       id: stage.id,
@@ -1174,22 +1177,41 @@ export function TournamentControlPage() {
               const started = isStageStarted(tournament, stage);
               const editable = isStageEditable(tournament, stage);
               const state = completed ? 'Beendet' : started ? 'Läuft' : editable ? 'Bearbeitbar' : 'Gesperrt';
+              const decision = stage.type === 'SWISS' ? getSwissCutoffHistory(tournament, stage) : null;
+              const roundRobin = decision?.extraRounds?.some((round) => round.kind === 'ROUND_ROBIN');
               return (
-                <button
-                  className={`phase-lifecycle-item phase-nav-button ${state.toLowerCase()} ${selectedStage?.id === stage.id ? 'selected' : ''}`}
-                  key={stage.id}
-                  type="button"
-                  onClick={() => setSelectedStageId(stage.id)}
-                >
-                  <span className="phase-nav-topline">
-                    <span className="phase-nav-index">Phase {index + 1}</span>
-                    <span className="badge phase-nav-status">{state}</span>
-                  </span>
-                  <strong className="phase-nav-name">{stage.name}</strong>
-                </button>
+                <Fragment key={stage.id}>
+                  <button
+                    className={`phase-lifecycle-item phase-nav-button ${state.toLowerCase()} ${selectedStage?.id === stage.id ? 'selected' : ''}`}
+                    type="button"
+                    onClick={() => setSelectedStageId(stage.id)}
+                  >
+                    <span className="phase-nav-topline">
+                      <span className="phase-nav-index">Phase {index + 1}</span>
+                      <span className="badge phase-nav-status">{state}</span>
+                    </span>
+                    <strong className="phase-nav-name">{stage.name}</strong>
+                  </button>
+                  {roundRobin && <button
+                    className={`phase-lifecycle-item phase-nav-button swiss-intermediate-nav ${decision?.winners?.length ? 'beendet' : 'läuft'} ${selectedStageId === `${stage.id}::rr` ? 'selected' : ''}`}
+                    type="button"
+                    onClick={() => setSelectedStageId(`${stage.id}::rr`)}
+                  >
+                    <span className="phase-nav-topline"><span className="phase-nav-index">Phase {index + 1}.5</span>
+                      <span className="badge phase-nav-status">{decision?.winners?.length ? 'Entschieden' : 'In Entscheidung'}</span>
+                    </span>
+                    <strong className="phase-nav-name">Jeder gegen Jeden</strong>
+                  </button>}
+                </Fragment>
               );
             })}
           </div>
+          {selectedRoundRobinStage && selectedRoundRobinDecision && (
+            <SwissRoundRobinHistory
+              phaseNumber={`${tournament.stages.indexOf(selectedRoundRobinStage) + 1}.5`}
+              decision={selectedRoundRobinDecision}
+            />
+          )}
           {selectedStage && (
             <div className="prestart-stage-block" key={selectedStage.id}>
               <PrestartDrawEditor
