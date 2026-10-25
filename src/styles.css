@@ -2149,8 +2149,8 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .swiss-standings-table .swiss-col-rank { width: 30px; }
 .swiss-standings-table .swiss-col-count { width: 34px; }
 .swiss-standings-table .swiss-col-buchholz { width: 54px; }
-.swiss-standings-table .swiss-col-ratio { width: 62px; }
-.swiss-standings-table .swiss-col-difference { width: 52px; }
+.swiss-standings-table .swiss-col-ratio { width: 60px; }
+.swiss-standings-table .swiss-col-difference { width: 46px; }
 .swiss-standings-table .swiss-col-points { width: 45px; }
 /* Zähler und BHZ werden zentriert; die Trennlinie steht vor jedem Verhältnis/Differenz-Paar. */
 .swiss-standings-table th:nth-child(3),
@@ -2180,16 +2180,27 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .swiss-progress-layout .swiss-standings-table td.swiss-stat-group-start {
   border-left: 1px solid #d0d5dd; padding-left: 6px;
 }
-.swiss-progress-layout .swiss-standings-table th.swiss-stat-difference,
-.swiss-progress-layout .swiss-standings-table td.swiss-stat-difference { text-align: right; padding-right: 2px; }
+/* Die Verhältnisse sitzen mittig, mit einer stabilen Mittelspalte für den Doppelpunkt. */
 .swiss-progress-layout .swiss-standings-table th.swiss-stat-ratio,
-.swiss-progress-layout .swiss-standings-table td.swiss-stat-ratio { text-align: left; padding-left: 3px; }
+.swiss-progress-layout .swiss-standings-table td.swiss-stat-ratio { text-align: center; }
+.swiss-progress-layout .swiss-standings-table th.swiss-stat-difference,
+.swiss-progress-layout .swiss-standings-table td.swiss-stat-difference { text-align: center; }
 .swiss-progress-layout .swiss-standings-table th.swiss-stat-ratio.swiss-stat-group-start,
 .swiss-progress-layout .swiss-standings-table td.swiss-stat-ratio.swiss-stat-group-start { padding-left: 7px; }
 .swiss-standings-table .swiss-stat-ratio .standing-ratio {
-  display: inline-grid; grid-template-columns: auto auto auto;
-  gap: 1px; width: auto; white-space: nowrap;
+  display: inline-grid; grid-template-columns: 3ch .65ch 3ch;
+  align-items: baseline; justify-content: center;
+  gap: 0; width: auto; white-space: nowrap;
 }
+/* Das Vorzeichen reserviert immer gleich viel Raum, Ziffern sind rechtsbündig.
+   Die komplette Differenz wird innerhalb ihrer schmalen Spalte zentriert. */
+.swiss-difference-value {
+  display: inline-grid; grid-template-columns: 1ch minmax(2ch, auto);
+  align-items: baseline; justify-content: center;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.swiss-difference-sign { text-align: center; }
+.swiss-difference-digits { text-align: right; }
 .swiss-standings-table .swiss-points-cell { text-align: center; }
 .swiss-standings-legend {
   display: grid; gap: 6px; border-top: 1px solid #e4e7ec;
