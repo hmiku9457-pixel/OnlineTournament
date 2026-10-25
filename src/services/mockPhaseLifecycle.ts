@@ -9,6 +9,7 @@ interface PhaseLifecycleState {
   tournamentId: string;
   startedStageIds: string[];
   completedStageIds: string[];
+  approvedSwissRounds?: Record<string, number[]>;
   stageEntrants?: Record<string, string[]>;
 }
 
@@ -34,6 +35,7 @@ function baseState(tournament: DemoTournament): PhaseLifecycleState {
     tournamentId: tournament.id,
     startedStageIds: tournament.hasStarted && firstStageId ? [firstStageId] : [],
     completedStageIds: [],
+    approvedSwissRounds: {},
     stageEntrants: {},
   };
 }
@@ -160,6 +162,50 @@ export function reopenStageForQualification(tournament: DemoTournament, stage: T
   if (!next || state.startedStageIds.includes(next.id)) return false;
   const entrants = { ...(state.stageEntrants ?? {}) };
   delete entrants[next.id];
+  saveState(tournament, {
+    ...state,
+    completedStageIds: state.completedStageIds.filter((id) => id !== stage.id),
+    stageEntrants: entrants,
+  });
+  return true;
+}
+
+/** Die naechste Schweizer Runde darf erst nach Freigabe angesetzt werden. */
+export function isSwissRoundApproved(tournament: DemoTournament, stage: TournamentStage, round: number): boolean {
+  return Boolean(getPhaseLifecycle(tournament).approvedSwissRounds?.[stage.id]?.includes(round));
+}
+
+export function approveSwissRound(tournament: DemoTournament, stage: TournamentStage, round: number): boolean {
+  if (stage.type !== 'SWISS' || !isStageStarted(tournament, stage) || round < 1) return false;
+  const state = getPhaseLifecycle(tournament);
+  const approved = state.approvedSwissRounds?.[stage.id] ?? [];
+  if (approved.includes(round)) return true;
+  saveState(tournament, {
+    ...state,
+    approvedSwissRounds: { ...state.approvedSwissRounds, [stage.id]: [...approved, round] },
+  });
+  return true;
+}
+
+export function revokeSwissRoundApprovals(tournament: DemoTournament, stage: TournamentStage, fromRound: number): boolean {
+  const state = getPhaseLifecycle(tournament);
+  const approved = state.approvedSwissRounds?.[stage.id] ?? [];
+  if (!approved.some((round) => round >= fromRound)) return false;
+  saveState(tournament, {
+    ...state,
+    approvedSwissRounds: { ...state.approvedSwissRounds, [stage.id]: approved.filter((round) => round < fromRound) },
+  });
+  return true;
+}
+
+/** Eine geaenderte Partie muss vor dem Start der Folgephase neu freigegeben werden. */
+export function reopenStageAfterCorrection(tournament: DemoTournament, stage: TournamentStage): boolean {
+  const state = getPhaseLifecycle(tournament);
+  if (!state.completedStageIds.includes(stage.id)) return false;
+  const next = tournament.stages[getStageIndex(tournament, stage) + 1];
+  if (next && state.startedStageIds.includes(next.id)) return false;
+  const entrants = { ...(state.stageEntrants ?? {}) };
+  if (next) delete entrants[next.id];
   saveState(tournament, {
     ...state,
     completedStageIds: state.completedStageIds.filter((id) => id !== stage.id),
