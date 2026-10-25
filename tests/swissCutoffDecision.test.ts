@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getStageEntrants, isStageCompleted, isStageLockedWaiting, startFirstStage } from '@/services/mockPhaseLifecycle';
 import {
-  completeMockMatch, getMockStageMatches, getPendingSwissCutoff,
+  completeMockMatch, getMockStageMatches, getPendingSwissCutoff, getSwissCutoffHistory,
   recordSwissCutoffSet, recordSwissCutoffLot, resetSwissCutoffSets, refreshCompletedStageQualifiers,
   beginSwissCutoffPlayoff, recordSwissCutoffPlayoffResult,
 } from '@/services/mockRuntime';
@@ -87,6 +87,8 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(recordSwissCutoffLot(t, [chosen])).toBeNull();
     expect(getStageEntrants(t, t.stages[1])).toEqual([chosen]);
     expect(buildSwissStandings(t, t.stages[0])[0].name).toBe(chosen);
+    expect(getSwissCutoffHistory(t, t.stages[0])?.mode).toBe('LOT');
+    expect(getSwissCutoffHistory(t, t.stages[0])?.winners).toEqual([chosen]);
   });
 
   it('behandelt mehr als zwei gleichplatzierte Spieler mit mehreren Entscheidungssätzen', () => {
@@ -153,6 +155,9 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     current = getPendingSwissCutoff(t)!;
     expect(current).toBeNull();
     expect(getStageEntrants(t, t.stages[1])).toHaveLength(2);
+    const history = getSwissCutoffHistory(t, t.stages[0]);
+    expect(history?.extraRounds?.filter((round) => round.kind === 'ROUND_ROBIN')).toHaveLength(1);
+    expect(history?.winners).toHaveLength(2);
   });
 
   it('gibt keine weitere Schweizer Runde frei, bevor alle angesetzten Spiele fertig sind', () => {
