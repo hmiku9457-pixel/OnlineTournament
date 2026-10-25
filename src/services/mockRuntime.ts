@@ -4,7 +4,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
 import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
-import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, isStageCompleted, isStageStarted, setStageEntrants } from '@/services/mockPhaseLifecycle';
+import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, isStageCompleted, isStageStarted, setStageEntrants, reopenStageForQualification } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
@@ -971,7 +971,12 @@ export function refreshCompletedStageQualifiers(tournament: DemoTournament, stag
   const nextStage = tournament.stages[stageIndex + 1];
   if (!nextStage || isStageStarted(tournament, nextStage)) return false;
   const qualified = computeStageQualifiers(tournament, stage, readResults());
-  if (stage.type === 'SWISS' && swissCutoffStatus(tournament, stage, readResults()) && !qualified.length) return false;
+  if (stage.type === 'SWISS' && swissCutoffStatus(tournament, stage, readResults()) && !qualified.length) {
+    // A result correction has changed/invalidated the earlier cutoff decision.
+    // Reopen the completed Swiss phase so the director must resolve it again.
+    reopenStageForQualification(tournament, stage);
+    return false;
+  }
   setStageEntrants(tournament, nextStage, qualified);
   return true;
 }
