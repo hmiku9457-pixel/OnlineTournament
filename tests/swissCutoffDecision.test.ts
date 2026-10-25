@@ -320,7 +320,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     // Gleichstand, aber das ursprünglich dokumentierte Los ist nicht mehr gültig.
     completeMockMatch(fixtures[0].id, [{ number: 1, sideAScore: 11, sideBScore: 6 }], 'FINISHED', true);
     expect(refreshCompletedStageQualifiers(t, t.stages[0])).toBe(false);
-    completeMockMatch(fixtures[1].id, [{ number: 1, sideAScore: 11, sideBScore: 6 }]);
+    completeMockMatch(fixtures[1].id, [{ number: 1, sideAScore: 11, sideBScore: 6 }], 'FINISHED', true);
     expect(refreshCompletedStageQualifiers(t, t.stages[0])).toBe(false);
     expect(isStageCompleted(t, t.stages[0])).toBe(false);
     expect(isStageLockedWaiting(t, t.stages[1])).toBe(true);
