@@ -4,7 +4,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
 import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
-import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, isStageCompleted, isStageStarted, setStageEntrants, reopenStageForQualification } from '@/services/mockPhaseLifecycle';
+import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, isStageCompleted, isStageStarted, setStageEntrants, reopenStageForQualification, isSwissRoundApproved, approveSwissRound, revokeSwissRoundApprovals, reopenStageAfterCorrection } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
@@ -20,7 +20,7 @@ import { isValidSportSet } from '@/domain/sportScoring';
 
 export { getRuntimeParticipantNames } from '@/services/mockParticipants';
 
-export type MockMatchState = 'LIVE' | 'READY' | 'WAITING' | 'CONFIRMATION' | 'FINISHED';
+export type MockMatchState = 'LIVE' | 'READY' | 'WAITING' | 'CONFIRMATION' | 'FINISHED' | 'CANCELLED';
 
 export interface MockRuntimeMatch {
   id: string;
@@ -53,6 +53,7 @@ interface StoredMatchResult {
   status: MockMatchState;
   confirmedA?: boolean;
   confirmedB?: boolean;
+  adminConfirmed?: boolean;
   forcedWinner?: string;
   decisionSide?: WinnerSide;
   decision?: ScoreDecision;
@@ -160,7 +161,7 @@ function invalidateUnstartedLaterRounds(tournament: DemoTournament, stage: Tourn
 // Die automatisch gewerteten Begegnungen dürfen daher nicht korrigiert werden.
 export function canEditMockMatch(tournament: DemoTournament, matchId: string) {
   const stage = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`));
-  if (!stage || !canEditFinishedResults(tournament, stage)) return false;
+  if (tournament.status === 'ABORTED' || !stage || !canEditFinishedResults(tournament, stage)) return false;
   const round = competitionRoundIndex(tournament, stage, matchId);
   if (round !== null && nextRoundAlreadyStarted(tournament, stage, round)) return false;
   if (readResults().find((item) => item.matchId === matchId)?.thirdPlaceSkipped) return false;
@@ -435,7 +436,7 @@ function swissMatches(tournament: DemoTournament, stage: TournamentStage, result
     if (round > 1) {
       const previous = matches.filter((match) => match.round === `Runde ${round - 1}` && !match.autoWinner);
       const previousDone = previous.every((match) => results.find((item) => item.matchId === match.id)?.status === 'FINISHED');
-      if (!previousDone) break;
+      if (!previousDone || !isSwissRoundApproved(tournament, stage, round - 1)) break;
     }
 
     const savedRound = readSwissFixtures().find((item) => item.tournamentId === tournament.id && item.stageId === stage.id && item.round === round);
@@ -555,7 +556,8 @@ export function getMockStageMatches(tournament: DemoTournament, stage: Tournamen
       pauseA: getElapsedRestMinutes(lastFinishByParticipant.get(match.sideA), now),
       pauseB: getElapsedRestMinutes(lastFinishByParticipant.get(match.sideB), now),
       note: 'Wartet auf Tischzuweisung',
-    }, results, runtime));
+    }, results, runtime))
+    .map((match) => tournament.status === 'ABORTED' && match.status !== 'FINISHED' ? { ...match, status: 'CANCELLED' as const, table: 'Noch offen' } : match);
 }
 
 /** Phase 1.5 fixtures share the regular table-assignment and result-entry
@@ -1269,33 +1271,90 @@ export function refreshCompletedStageQualifiers(tournament: DemoTournament, stag
   return true;
 }
 
-function reconcileCompletedPhase(matchId: string) {
-  for (const tournament of getAllMockTournaments()) {
-    const activeStage = getActiveStage(tournament);
-    if (!activeStage || !matchId.startsWith(`${activeStage.id}-`)) continue;
+/** Match completion records the score but never advances without director approval. */
+function reconcileCompletedPhase(_matchId: string) {
+  // Progression is deliberately controlled by approveMockProgress().
+}
 
-    const activeMatches = getMockStageMatches(tournament, activeStage);
-    const hasOpenMatches = activeMatches.some((match) => match.status !== 'FINISHED');
-    if (activeMatches.length === 0 || hasOpenMatches) return;
+export interface MockProgressApproval {
+  stageId: string;
+  stageName: string;
+  kind: 'ROUND' | 'STAGE';
+  round: number | null;
+  completedMatches: number;
+  totalRounds: number;
+  nextStageName?: string;
+  isLastStage: boolean;
+}
 
-    // Bei K.-o./Swiss können durch den Abschluss der aktuellen Runde neue Spiele entstehen.
-    const refreshedMatches = getMockStageMatches(tournament, activeStage);
-    const refreshedOpen = refreshedMatches.some((match) => match.status !== 'FINISHED');
-    if (refreshedOpen) return;
-
-    const baseMatches = getMockStageBaseMatches(tournament, activeStage).filter((match) => !match.autoWinner && match.sideA !== 'TBD' && match.sideB !== 'TBD' && match.sideA !== 'Freilos' && match.sideB !== 'Freilos');
-    if (baseMatches.some((match) => readResults().find((result) => result.matchId === match.id)?.status !== 'FINISHED')) return;
-
-    // Suspend phase completion until the tournament director resolves a perfect
-    // sporting tie at the cut. No alphabetic auto-qualification is permitted.
-    const cutoff = swissCutoffStatus(tournament, activeStage, readResults());
-    if (cutoff && cutoff.decision?.winners?.length !== cutoff.tie.slots) return;
-    const qualifiedForNext = computeStageQualifiers(tournament, activeStage, readResults());
-    completeStage(tournament, activeStage, qualifiedForNext);
-    const isLastStage = tournament.stages[tournament.stages.length - 1]?.id === activeStage.id;
-    updateMockTournamentStatus(tournament.id, isLastStage ? 'FINISHED' : 'PAUSED');
-    return;
+export function getPendingMockApproval(tournament: DemoTournament): MockProgressApproval | null {
+  if (tournament.status === 'ABORTED' || tournament.status === 'FINISHED') return null;
+  const stage = getActiveStage(tournament);
+  if (!stage) return null;
+  const matches = getMockStageMatches(tournament, stage);
+  if (!matches.length || matches.some((match) => match.status !== 'FINISHED')) return null;
+  const totalRounds = stage.type === 'SWISS' ? getTotalSwissRoundCount(tournament, stage) : 0;
+  const round = stage.type === 'SWISS'
+    ? Math.max(0, ...matches.map((match) => Number(match.id.match(/-sw-r(\d+)-m\d+$/)?.[1] ?? 0)))
+    : null;
+  if (stage.type === 'SWISS' && (!round || (round < totalRounds && isSwissRoundApproved(tournament, stage, round)))) return null;
+  const lastRound = stage.type !== 'SWISS' || round === totalRounds;
+  if (lastRound) {
+    const cutoff = swissCutoffStatus(tournament, stage, readResults());
+    if (cutoff && cutoff.decision?.winners?.length !== cutoff.tie.slots) return null;
   }
+  const index = tournament.stages.findIndex((entry) => entry.id === stage.id);
+  return { stageId: stage.id, stageName: stage.name, kind: lastRound ? 'STAGE' : 'ROUND',
+    round, completedMatches: matches.length, totalRounds,
+    nextStageName: tournament.stages[index + 1]?.name,
+    isLastStage: index === tournament.stages.length - 1 };
+}
+
+export function approveMockProgress(tournament: DemoTournament): MockProgressApproval | null {
+  const latest = getAllMockTournaments().find((entry) => entry.id === tournament.id) ?? tournament;
+  const pending = getPendingMockApproval(latest);
+  if (!pending) return null;
+  const stage = latest.stages.find((entry) => entry.id === pending.stageId)!;
+  const ids = new Set(getMockStageMatches(latest, stage)
+    .filter((match) => pending.kind === 'STAGE'
+      || Number(match.id.match(/-sw-r(\d+)-m\d+$/)?.[1] ?? 0) === pending.round)
+    .map((match) => match.id));
+  writeResults(readResults().map((entry) => ids.has(entry.matchId) && entry.status === 'FINISHED'
+    ? { ...entry, adminConfirmed: true } : entry));
+  if (pending.kind === 'ROUND') {
+    if (!approveSwissRound(latest, stage, pending.round!)) return null;
+    recordMockAudit({ tournamentId: latest.id, actor: 'Turnierleitung', action: 'SWISS_ROUND_APPROVED',
+      description: `Schweizer Runde ${pending.round} von ${stage.name} nach Ergebniskontrolle freigegeben` });
+  } else {
+    const qualified = computeStageQualifiers(latest, stage, readResults());
+    if (!completeStage(latest, stage, qualified)) return null;
+    updateMockTournamentStatus(latest.id, pending.isLastStage ? 'FINISHED' : 'PAUSED');
+    recordMockAudit({ tournamentId: latest.id, actor: 'Turnierleitung', action: 'STAGE_APPROVED',
+      description: `Phase ${stage.name} nach Ergebniskontrolle freigegeben`,
+      after: pending.isLastStage ? 'Turnier beendet' : `Qualifiziert: ${qualified.join(', ')}` });
+  }
+  return pending;
+}
+
+export function abortMockTournament(tournament: DemoTournament, reason: string): boolean {
+  const latest = getAllMockTournaments().find((entry) => entry.id === tournament.id) ?? tournament;
+  if (latest.status === 'ABORTED' || latest.status === 'FINISHED') return false;
+  const stages = latest.stages.filter((stage) => isStageStarted(latest, stage));
+  const prefixes = stages.map((stage) => `${stage.id}-`);
+  const results = readResults();
+  const states = readRuntime();
+  const ids = new Set(states.map((entry) => entry.matchId));
+  const cancelled = stages.flatMap((stage) => getMockStageMatches(latest, stage))
+    .filter((match) => match.status !== 'FINISHED')
+    .map((match) => ({ matchId: match.id, table: 'Noch offen', status: 'CANCELLED' as const }));
+  writeRuntime([...states.map((entry) => prefixes.some((prefix) => entry.matchId.startsWith(prefix))
+    && !results.some((result) => result.matchId === entry.matchId && result.status === 'FINISHED')
+    ? { ...entry, status: 'CANCELLED' as const, table: 'Noch offen' } : entry),
+    ...cancelled.filter((entry) => !ids.has(entry.matchId))]);
+  updateMockTournamentStatus(latest.id, 'ABORTED');
+  recordMockAudit({ tournamentId: latest.id, actor: 'Turnierleitung', action: 'TOURNAMENT_ABORTED',
+    description: 'Turnier vorzeitig abgebrochen', after: reason.trim() || 'Keine Begründung angegeben' });
+  return true;
 }
 
 export function completeMockMatch(matchId: string, sets: MatchSet[], status: MockMatchState = 'FINISHED', confirmedByAdmin = false, decisionSide?: WinnerSide, decision?: ScoreDecision) {
