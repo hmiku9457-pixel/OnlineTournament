@@ -1,6 +1,8 @@
 export interface SwissScorePlayer {
   name: string;
   wins: number;
+  /** Pairing points: for draw-capable sports 3/1/0, otherwise one per win. */
+  pairingPoints?: number;
   losses: number;
   byes: number;
   order: number;
@@ -69,10 +71,10 @@ function avoidRepeatPairings(pairings: SwissNamePairing[], players: SwissScorePl
     if (!names.length) return true;
     if (++attempts > 20000) return false;
     const a = names[0];
-    const aWins = state.get(a)?.wins ?? 0;
+    const aWins = state.get(a)?.pairingPoints ?? state.get(a)?.wins ?? 0;
     const choices = names.slice(1)
       .filter((b) => !state.get(a)?.opponents.has(b))
-      .sort((b, c) => Math.abs(aWins - (state.get(b)?.wins ?? 0)) - Math.abs(aWins - (state.get(c)?.wins ?? 0)));
+      .sort((b, c) => Math.abs(aWins - (state.get(b)?.pairingPoints ?? state.get(b)?.wins ?? 0)) - Math.abs(aWins - (state.get(c)?.pairingPoints ?? state.get(c)?.wins ?? 0)));
     for (const b of choices) {
       solution.push([a, b]);
       if (search(names.filter((name) => name !== a && name !== b))) return true;
@@ -86,16 +88,16 @@ function avoidRepeatPairings(pairings: SwissNamePairing[], players: SwissScorePl
 export function generateScoreGroupedSwissPairings(players: SwissScorePlayer[]): SwissNamePairing[] {
   const state = new Map(players.map((player) => [player.name, player]));
   const sorted = [...players].sort((a, b) => (
-    b.wins - a.wins
+    (b.pairingPoints ?? b.wins) - (a.pairingPoints ?? a.wins)
     || a.losses - b.losses
     || a.order - b.order
   ));
 
   const groups = new Map<number, string[]>();
   sorted.forEach((player) => {
-    const bucket = groups.get(player.wins) ?? [];
+    const bucket = groups.get(player.pairingPoints ?? player.wins) ?? [];
     bucket.push(player.name);
-    groups.set(player.wins, bucket);
+    groups.set(player.pairingPoints ?? player.wins, bucket);
   });
 
   const pairings: SwissNamePairing[] = [];
