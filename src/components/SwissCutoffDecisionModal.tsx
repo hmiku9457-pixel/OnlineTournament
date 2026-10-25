@@ -142,13 +142,14 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
                 <strong>Wie soll entschieden werden?</strong>
                 <div className="swiss-cutoff-choice-actions">
                   {multiPlayer ? (
-                    <button type="button" className="btn primary" autoFocus onClick={() => begin('ROUND')}>Weitere Runde ausspielen</button>
+                    <button type="button" className="btn primary" autoFocus title="Reguläre zusätzliche Schweizer Runde mit allen noch teilnahmeberechtigten Spielern; zählt für Siege, Sätze und BHZ." onClick={() => begin('ROUND')}>Weitere Runde ausspielen</button>
                   ) : (
                     <button type="button" className="btn primary" autoFocus onClick={() => { setChosenMode('SET'); clearInputs(); }}>{outcomeType} spielen</button>
                   )}
                   <button type="button" className="btn" onClick={() => { setChosenMode('LOT'); setError(''); }}>Physischer Losentscheid</button>
                   {multiPlayer && <button type="button" className="btn" onClick={() => begin('ROUND_ROBIN')}>Jeder gegen Jeden</button>}
                 </div>
+                {multiPlayer && <p className="muted swiss-cutoff-round-explainer"><strong>Weitere Runde:</strong> Alle noch teilnahmeberechtigten Spieler der Schweizer Phase erhalten neue reguläre Paarungen. Die Spiele erscheinen in der nächsten Schweizer Runde und zählen für sämtliche Tabellen- und Buchholzwerte. <strong>Jeder gegen Jeden:</strong> Nur die Gleichplatzierten spielen in einer gesondert dokumentierten Zwischenphase (Phase 1.5).</p>}
               </div>
             )}
 
