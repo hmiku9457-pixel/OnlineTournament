@@ -16,6 +16,8 @@ interface Props {
   onShowBuchholz: () => void;
   highlightPlayers?: ReadonlySet<string>;
   readOnly?: boolean;
+  lotWinners?: ReadonlySet<string>;
+  lotParticipants?: ReadonlySet<string>;
 }
 
 function SwissRatio({ value }: { value: string }) {
@@ -40,6 +42,7 @@ function formatBuchholz(value: number) {
 export function SwissStandingsTable({
   standings, scoreSport, scoreUnit, unplayedWinners, previousFinishLabels, withdrawalLabel,
   qualifyingPlaces, cutoffIndex, finalized, onSelectPlayer, onShowBuchholz, highlightPlayers, readOnly = false,
+  lotWinners, lotParticipants,
 }: Props) {
   return (
     <div className="card table-wrap swiss-standings-card">
@@ -93,6 +96,9 @@ export function SwissStandingsTable({
                       {readOnly ? <strong>{row.name}</strong> : <button className="standing-player-button" type="button" onClick={() => onSelectPlayer(row.name)}><strong>{row.name}</strong></button>}
                       {previousFinishLabels[row.name] && <small className="participant-origin swiss-standing-origin">{previousFinishLabels[row.name]}</small>}
                       {withdrawn && <span className="standing-withdrawn" title="Zeitpunkt des Rückzugs">{withdrawn}</span>}
+                      {lotParticipants?.has(row.name) && <span className={lotWinners?.has(row.name) ? 'swiss-lot-tag is-qualified' : 'swiss-lot-tag is-eliminated'} title="Qualifikation nach physischem Losentscheid">
+                        {lotWinners?.has(row.name) ? 'Losentscheid · weiter' : 'Losentscheid · raus'}
+                      </span>}
                     </span>
                   </td>
                   <td>{row.played}</td>
