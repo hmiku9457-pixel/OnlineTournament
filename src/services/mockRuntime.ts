@@ -1036,6 +1036,33 @@ export function recordSwissCutoffPlayoffResult(
   return null;
 }
 
+/** Keep an intermediate phase's standings synchronized with the ordinary
+ * result editor, including later corrections before the next phase starts. */
+function syncSwissPlayoffFromStoredMatch(
+  tournament: DemoTournament, stage: TournamentStage, roundIndex: number, matchIndex: number,
+  pointsA: number, pointsB: number,
+) {
+  const current = swissCutoffStatus(tournament, stage, readResults());
+  const decision = current?.decision;
+  const oldRound = decision?.extraRounds?.[roundIndex];
+  if (!current || !decision || !oldRound || oldRound.kind !== 'ROUND_ROBIN' || !oldRound.matches[matchIndex]) return;
+  const rounds = decision.extraRounds!.map((round, index) => index === roundIndex ? {
+    ...round,
+    matches: round.matches.map((match, position) => position === matchIndex
+      ? { ...match, pointsA, pointsB } : match),
+  } : round);
+  const winners = playoffQualified(current.tie.players, current.tie.slots, rounds) ?? undefined;
+  saveSwissCutoffDecision(tournament.id, stage.id, {
+    ...decision, signature: current.signature, extraRounds: rounds, winners,
+  });
+  if (isStageCompleted(tournament, stage)) {
+    // The parent phase may need reopening when a corrected score revives a tie.
+    refreshCompletedStageQualifiers(tournament, stage);
+  } else if (winners) {
+    reconcileCompletedPhase(`${stage.id}-sw-cutoff-decision`);
+  }
+}
+
 export function recordSwissCutoffLot(tournament: DemoTournament, winners: string[]): string | null {
   const current = getPendingSwissCutoff(tournament);
   if (!current) return 'Kein offener Losentscheid vorhanden.';
@@ -1060,6 +1087,13 @@ export function recordSwissCutoffLot(tournament: DemoTournament, winners: string
 export function resetSwissCutoffSets(tournament: DemoTournament): void {
   const current = getPendingSwissCutoff(tournament);
   if (!current || !current.decision || (!current.decision.sets.length && !current.decision.extraRounds?.length)) return;
+  // A restarted decision must not inherit completed or assigned games from
+  // an earlier attempt with the same deterministic fixture identifiers.
+  if (current.decision.extraRounds?.length) {
+    const prefix = `${current.stageId}-sw-playoff-`;
+    writeResults(readResults().filter((result) => !result.matchId.startsWith(prefix)));
+    writeRuntime(readRuntime().filter((runtime) => !runtime.matchId.startsWith(prefix)));
+  }
   clearSwissCutoffDecision(tournament.id, current.stageId);
 }
 
@@ -1191,14 +1225,10 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
       // next phase only after every fixture is finished.
       const stage = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`));
       const roundMatch = matchId.match(/-sw-playoff-r(\d+)-m(\d+)$/);
-      const decision = stage ? getPendingSwissCutoff(tournament)?.decision : null;
-      if (stage && roundMatch && decision) {
-        const roundIndex = Number(roundMatch[1]) - 1;
-        const fixtureIndex = Number(roundMatch[2]) - 1;
-        const round = decision.extraRounds?.[roundIndex];
-        if (round?.kind === 'ROUND_ROBIN' && round.matches[fixtureIndex] && sets[0]) {
-          recordSwissCutoffPlayoffResult(tournament, fixtureIndex, sets[0].sideAScore, sets[0].sideBScore);
-        }
+      if (stage && roundMatch && sets[0]) {
+        syncSwissPlayoffFromStoredMatch(tournament, stage,
+          Number(roundMatch[1]) - 1, Number(roundMatch[2]) - 1,
+          sets[0].sideAScore, sets[0].sideBScore);
       }
     } else reconcileCompletedPhase(matchId);
   }
