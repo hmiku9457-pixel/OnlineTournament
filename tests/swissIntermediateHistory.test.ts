@@ -35,7 +35,7 @@ describe('Schweizer Entscheidung dokumentieren', () => {
   it('kennzeichnet die Siegerin und die Verliererin eines physischen Losentscheids in der Schweizer Tabelle', () => {
     const html = renderToStaticMarkup(createElement(SwissStandingsTable, {
       standings: [standing('Anna', 1), standing('Ben', 2)],
-      scoreSport: false, scoreUnit: 'Bälle', unplayedWinners: new Set(),
+      scoreSport: false, scoreUnit: 'Bälle', unplayedWinners: new Set<string>(),
       previousFinishLabels: {}, withdrawalLabel: () => null,
       qualifyingPlaces: 1, cutoffIndex: 0, finalized: true,
       onSelectPlayer: () => {}, onShowBuchholz: () => {},
