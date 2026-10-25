@@ -2957,37 +2957,44 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .participant-filter-count { margin-left: auto; align-self: center; color: #667085; font-size: .77rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .participant-filter-empty { margin: 12px 0 4px !important; padding: 12px; border: 1px dashed #d0d5dd; border-radius: 9px; color: #667085; background: #f9fafb; font-size: .82rem; }
 
-/* Zwei gleich breite, kompakte Teilnehmerkarten. */
+/* Flachere Teilnehmerkarten: mehr Einträge pro Bildschirmhöhe. */
 .participant-control-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
-  gap: 10px;
-  margin-top: 11px;
+  gap: 7px;
+  margin-top: 9px;
   border: 0;
   border-radius: 0;
   overflow: visible;
 }
 .participant-control-grid > .participant-control-row {
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 23px minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
   align-items: center;
-  gap: 8px 9px;
+  gap: 5px 8px;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 6px 9px;
   border: 1px solid #e4e7ec;
-  border-radius: 10px;
+  border-radius: 9px;
   background: #fff;
 }
 .participant-control-grid > .participant-control-row.withdrawn { background: #f9fafb; }
-.participant-control-grid .participant-list-number { grid-column: 1; grid-row: 1; }
+.participant-control-grid .participant-list-number {
+  grid-column: 1;
+  grid-row: 1;
+  width: 22px;
+  height: 22px;
+  font-size: .72rem;
+}
 .participant-control-grid .participant-control-identity { grid-column: 2; grid-row: 1; min-width: 0; }
 .participant-control-grid .participant-control-row > code {
   grid-column: 3;
   grid-row: 1;
   justify-self: end;
   min-width: 0;
-  padding: 4px 7px;
-  font-size: .72rem;
+  padding: 2px 6px;
+  font-size: .7rem;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 .participant-control-grid .participant-row-actions {
@@ -2998,7 +3005,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   width: 100%;
   max-width: none;
   justify-content: stretch;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
 }
 .participant-control-grid .participant-row-actions > .btn,
@@ -3007,11 +3014,13 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   grid-row: auto;
   width: 100%;
   min-width: 0;
-  min-height: 32px;
-  padding: 6px 5px;
+  min-height: 30px;
+  padding: 4px 5px;
+  border-radius: 7px;
   white-space: normal;
   overflow-wrap: anywhere;
   font-size: .73rem;
+  line-height: 1.2;
 }
 
 /* Eigenständige Modals statt ausklappender Teilnehmerkarten. */
@@ -3076,11 +3085,11 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .participant-management-modal { padding: 14px; max-height: 94dvh; }
 }
 @media (max-width: 520px) {
-  .participant-control-grid > .participant-control-row { padding: 9px; gap: 7px 6px; }
+  .participant-control-grid > .participant-control-row { padding: 7px 8px; gap: 5px 6px; }
   .participant-control-grid .participant-control-row > code { font-size: .68rem; }
   .participant-control-grid .participant-row-actions { gap: 4px; }
   .participant-control-grid .participant-row-actions > .btn,
-  .participant-control-grid .participant-row-actions > .withdrawal-locked { font-size: .69rem; padding: 6px 3px; }
+  .participant-control-grid .participant-row-actions > .withdrawal-locked { font-size: .69rem; padding: 5px 3px; }
   .participant-management-modal .participant-edit-grid { grid-template-columns: minmax(0, 1fr); }
   .participant-management-modal .participant-edit-grid > .field:nth-child(-n + 2),
   .participant-management-modal .participant-code-field,
