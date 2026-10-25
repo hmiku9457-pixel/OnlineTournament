@@ -882,7 +882,7 @@ export function TournamentControlPage() {
           </div>
           <div className="actions control-primary-actions no-print">
             {editableStage && ['GROUPS', 'SWISS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(editableStage.type) && (
-              <button className="btn" type="button" onClick={() => setTab('flow')}>Aktuelle Phase bearbeiten</button>
+              <button className={tab === 'flow' ? 'btn control-edit-phase-active' : 'btn'} type="button" aria-current={tab === 'flow' ? 'page' : undefined} onClick={() => setTab('flow')}>Aktuelle Phase bearbeiten</button>
             )}
             {!tournament.hasStarted && tournament.status !== 'FINISHED' && (
               <button className="btn primary" type="button" onClick={requestStartTournament}
@@ -1134,9 +1134,6 @@ export function TournamentControlPage() {
               <div className="control-help-title"><h2>Turnierverlauf</h2><ControlHelpButton topic="phases" onOpen={setHelpTopic} /></div>
               <p className="muted">Eine Phase endet automatisch mit dem letzten abgeschlossenen Spiel. Danach wird die nächste Phase bearbeitbar; mit ihrem Start wird die Auslosung eingefroren.</p>
             </div>
-            {nextStartableStage && !activeStage && tournament.hasStarted && (
-              <button className="btn primary" type="button" onClick={requestStartNextPhase}>Nächste Phase starten</button>
-            )}
           </div>
           <div className="phase-lifecycle-strip phase-navigation-strip">
             {tournament.stages.map((stage, index) => {

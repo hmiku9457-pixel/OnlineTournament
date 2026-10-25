@@ -1890,6 +1890,10 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .control-hero-bar h1 { overflow-wrap: anywhere; }
 .control-primary-actions { justify-content: flex-end; align-items: center; gap: 8px; }
 .control-primary-actions .btn { white-space: nowrap; }
+/* Markiert den Turnierverlauf im Header als aktiven Bearbeitungsbereich. */
+.control-primary-actions .btn.control-edit-phase-active { color: #fff; background: #1d4ed8; border-color: #1d4ed8; }
+.control-primary-actions .btn.control-edit-phase-active:hover { color: #fff; background: #1e40af; border-color: #1e40af; }
+.control-primary-actions .btn.control-edit-phase-active:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
 .control-tournament-status {
   gap: 8px;
   padding: 8px 12px;
