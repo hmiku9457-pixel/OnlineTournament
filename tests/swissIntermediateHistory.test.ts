@@ -35,6 +35,9 @@ describe('Schweizer Entscheidung dokumentieren', () => {
     expect(html).toContain('standing-player-button');
     expect(html).toContain('Jeder gegen Jeden · weiter');
     expect(html).toContain('Kreuztabelle');
+    expect(html).toContain('Kreuztabelle vergrößern');
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).not.toContain('Kreuztabelle – vergrößerte Ansicht');
     expect(html).toContain('group-match-list');
     expect(html).toContain('group-match-row');
     expect(html).toContain('swiss-intermediate-schedule');
