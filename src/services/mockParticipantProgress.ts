@@ -1,6 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
-import { buildMockBracket, buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
+import { buildMockBracket, buildMockGroups, buildRoundRobinStandings, buildSwissStandings } from '@/services/mockCompetitionViews';
 import { getStageEntrants, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getMockStageBaseMatches, getMockStoredResult, isMockParticipantWithdrawn } from '@/services/mockRuntime';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
@@ -191,4 +191,65 @@ export function getMockFinalStandings(tournament: DemoTournament) {
     }
   }
   return rows.sort((a, b) => a.placementNumber - b.placementNumber || a.name.localeCompare(b.name, 'de'));
+}
+
+/** Confirmed tournament-wide places while later phases are still open.
+ * Survivors are intentionally excluded: their final place is not known.
+ * A completed stage is required before its non-qualifiers receive a place. */
+export function getMockConfirmedFinalStandings(tournament: DemoTournament): ReturnType<typeof getMockFinalStandings> {
+  if (tournament.status === 'FINISHED') return getMockFinalStandings(tournament);
+
+  const eliminated: Array<{ name: string; stageIndex: number; rank: number; origin?: string }> = [];
+  tournament.stages.forEach((stage, stageIndex) => {
+    const next = tournament.stages[stageIndex + 1];
+    if (!next || !isStageCompleted(tournament, stage)) return;
+    const advancing = new Set(getStageEntrants(tournament, next));
+    const leaving = getStageEntrants(tournament, stage).filter((name) => !advancing.has(name));
+    if (!leaving.length) return;
+
+    const groups = stage.type === 'GROUPS' ? buildMockGroups(tournament, stage) : [];
+    const ranks = stage.type === 'SWISS' ? buildSwissStandings(tournament, stage)
+      : stage.type === 'ROUND_ROBIN' ? buildRoundRobinStandings(tournament, stage) : [];
+
+    leaving.forEach((name) => {
+      const group = groups.find((item) => item.standings.some((row) => row.name === name));
+      const rank = group
+        ? group.standings.find((row) => row.name === name)!.rank
+        : stage.type === 'KNOCKOUT' || stage.type === 'DOUBLE_ELIMINATION' || stage.type === 'PLACEMENT'
+          ? Number(knockoutPlacement(tournament, stage, name)?.match(/Platz\s+(\d+)/)?.[1] ?? 999999)
+          : ranks.find((row) => row.name === name)?.rank ?? 999999;
+      eliminated.push({ name, stageIndex, rank, origin: group ? `${rank}. Platz ${group.label}` : undefined });
+    });
+  });
+  if (!eliminated.length) return [];
+
+  const first = tournament.stages[0];
+  const entrantCount = first ? getStageEntrants(tournament, first).length : getRuntimeParticipantNames(tournament).length;
+  const order = [...eliminated].sort((a, b) => b.stageIndex - a.stageIndex || a.rank - b.rank
+    || a.name.localeCompare(b.name, 'de'));
+  let place = Math.max(1, entrantCount - eliminated.length + 1);
+  const result: ReturnType<typeof getMockFinalStandings> = [];
+
+  for (let i = 0; i < order.length;) {
+    const current = order[i];
+    let end = i + 1;
+    // Same-group rankings across different groups are intentionally shared.
+    while (end < order.length && order[end].stageIndex === current.stageIndex
+      && order[end].rank === current.rank) end++;
+    const count = end - i;
+    const label = `Platz ${place}${count > 1 ? `–${place + count - 1}` : ''}`;
+    order.slice(i, end).forEach((row) => {
+      const withdrawn = isMockParticipantWithdrawn(tournament, row.name);
+      result.push({
+        name: row.name,
+        status: withdrawn ? 'Zurückgezogen' : 'Ausgeschieden',
+        placement: row.origin ? `${label} · ${row.origin}` : label,
+        stageIndex: row.stageIndex,
+        placementNumber: place,
+      });
+    });
+    place += count;
+    i = end;
+  }
+  return result;
 }
