@@ -6,6 +6,7 @@ interface Props {
   score: string;
   sets?: MatchSet[];
   onEdit?: () => void;
+  onOpenResult?: () => void;
   className?: string;
   sport?: string;
   decision?: ScoreDecision;
@@ -18,7 +19,7 @@ function tooltip(sets?: MatchSet[], sport = 'Tischtennis') {
   return sets.map((set, index) => `Satz ${index + 1}: ${set.sideAScore}:${set.sideBScore}`).join(' · ');
 }
 
-export function MatchResultDetails({ score, sets, onEdit, className = '', sport = 'Tischtennis', decision, decisionReversed = false }: Props) {
+export function MatchResultDetails({ score, sets, onEdit, onOpenResult, className = '', sport = 'Tischtennis', decision, decisionReversed = false }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
 
@@ -34,17 +35,22 @@ export function MatchResultDetails({ score, sets, onEdit, className = '', sport 
   return (
     <span className={`match-result-details ${className}`.trim()} ref={ref}>
       <button
-        className="match-result-trigger"
+        className={onOpenResult ? 'match-result-trigger direct-result-trigger' : 'match-result-trigger'}
         type="button"
         title={score === 'W.O.' ? 'Kampflos gewertete Partie (Walkover)' : [tooltip(sets, sport), scoreDecisionSuffix(decision, decisionReversed)].filter(Boolean).join(' · ')}
         onClick={(event) => {
           event.stopPropagation();
+          if (onOpenResult) {
+            setOpen(false);
+            onOpenResult();
+            return;
+          }
           if (sets?.length) setOpen((value) => !value);
         }}
       >
         {score === 'W.O.' ? 'Kampflos' : [score, scoreDecisionSuffix(decision, decisionReversed)].filter(Boolean).join(' ')}
       </button>
-      {open && sets?.length ? (
+      {open && !onOpenResult && sets?.length ? (
         <span className="match-result-popover" role="dialog" onMouseDown={(event) => event.stopPropagation()}>
           <strong>{sportScoring(sport).mode === 'score' ? 'Spielstand' : 'Sätze'}</strong>
           <span className="match-result-set-list">

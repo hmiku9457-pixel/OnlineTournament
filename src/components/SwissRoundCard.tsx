@@ -80,6 +80,7 @@ export function SwissRoundCard({ fixtures, matches, sport, editable, notice, onE
                       sets={match?.sets}
                       sport={sport}
                       decision={match?.decision}
+                      onOpenResult={match && ['LIVE', 'READY', 'CONFIRMATION', 'FINISHED'].includes(match.status) && onEditResult ? () => onEditResult(fixture.id) : undefined}
                       onEdit={isFinished && onEditResult && canEditResult?.(fixture.id) ? () => onEditResult(fixture.id) : undefined}
                     />}
                 <span className="group-match-side" title={fixture.sideB}>{fixture.sideB}</span>

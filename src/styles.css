@@ -2200,3 +2200,9 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .phase-nav-button.bearbeitbar .phase-nav-status { color: #175cd3; background: #dbeafe; }
 .phase-nav-button.beendet .phase-nav-status { color: #6941c6; background: #ede9fe; }
 .phase-nav-button.gesperrt .phase-nav-status { color: #475467; background: #eaecf0; }
+
+/* Ergebniszellen im Turnierverlauf öffnen direkt das bestehende Ergebnis-Modal. */
+.bracket-result-action { appearance: none; border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.bracket-result-action:hover { background: #eff4ff; border-radius: 4px; }
+.bracket-result-action:focus-visible, .direct-result-trigger:focus-visible { outline: 2px solid #175cd3; outline-offset: 2px; border-radius: 4px; }
+.bracket-result-action.bracket-score-cells { justify-self: end; }

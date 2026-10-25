@@ -6,7 +6,7 @@ import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
-import { BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
+import { BracketScoreCells, BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
 import { BracketRoundViewport } from '@/components/BracketRoundViewport';
 import { SwissRoundCard } from '@/components/SwissRoundCard';
 import { getBracketScoreStages } from '@/domain/bracketScoreStages';
@@ -158,7 +158,7 @@ function StageCompetitionView({
                     {group.matches.filter((match) => (match.matchDay ?? 0) === matchDay).map((match) => (
                       <div className={match.status === 'live' ? 'group-match-row live' : 'group-match-row'} key={match.id}>
                         {match.status === 'live' && <span className="group-match-live-dot" role="img" aria-label="Laufendes Spiel" title="Läuft gerade" />}
-                        <span className="group-match-side" title={match.sideA}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Rückzug (${match.sideA})` : match.sideA}</span><MatchResultDetails score={match.score} sets={match.sets} sport={tournament.sport} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} /><span className="group-match-side" title={match.sideB}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Rückzug (${match.sideB})` : match.sideB}</span>
+                        <span className="group-match-side" title={match.sideA}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Rückzug (${match.sideA})` : match.sideA}</span><MatchResultDetails score={match.score} sets={match.sets} sport={tournament.sport} onOpenResult={match.status !== 'open' && onEditResult ? () => onEditResult(match.id) : undefined} /><span className="group-match-side" title={match.sideB}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Rückzug (${match.sideB})` : match.sideB}</span>
                       </div>
                     ))}
                   </div>
@@ -187,7 +187,7 @@ function StageCompetitionView({
                         <strong>vs. {opponent}</strong>
                         <span className="player-game-result-cell">
                           <PlayerGameOutcome score={displayedResult.score} finished={match.status === 'played'} />
-                          <MatchResultDetails score={displayedResult.score} sets={displayedResult.sets} sport={tournament.sport} onEdit={match.status === 'played' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
+                          <MatchResultDetails score={displayedResult.score} sets={displayedResult.sets} sport={tournament.sport} onOpenResult={match.status !== 'open' && onEditResult ? () => { setSelectedGroupPlayer(null); onEditResult(match.id); } : undefined} />
                         </span>
                       </div>
                     );
@@ -262,7 +262,7 @@ function StageCompetitionView({
                     <span className="muted swiss-history-round">{match.round}</span>
                     <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor der Runde">{opponentRecord}</span><span className="swiss-record swiss-record-current" title="Aktuelle Bilanz des Gegners">{opponentCurrentRecord}</span></span>
                     <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} wonByDecision={match.decisionSide ? match.decisionSide === (match.sideA === selectedSwissPlayer ? 'A' : 'B') : undefined} />
-                    <MatchResultDetails score={result.score} sets={result.sets} sport={tournament.sport} decision={match.decision} decisionReversed={match.sideB === selectedSwissPlayer} onEdit={match.status === 'FINISHED' && canEditMockMatch(tournament, match.id) ? () => onEditResult?.(match.id) : undefined} />
+                    <MatchResultDetails score={result.score} sets={result.sets} sport={tournament.sport} decision={match.decision} decisionReversed={match.sideB === selectedSwissPlayer} onOpenResult={['LIVE', 'READY', 'CONFIRMATION', 'FINISHED'].includes(match.status) && onEditResult ? () => { setSelectedSwissPlayer(null); onEditResult(match.id); } : undefined} />
                   </div>;
                 })}
               </div>
@@ -319,6 +319,8 @@ function StageCompetitionView({
                 <div className={roundIndex === rounds.length - 1 ? 'bracket-round-matches bracket-final-round-matches' : 'bracket-round-matches'}>
                   {round.matches.map((match, matchIndex) => {
                     const scoreStages = scoreSport ? getBracketScoreStages(match.sets, match.decision, match.extraTimeProgress, match.winner, match.sideA, match.sideB, match.live) : [];
+                    const openBracketResult = onEditResult && (match.live || (match.score && match.score !== 'Freilos' && match.score !== 'Beide Platz 3'))
+                      ? () => onEditResult(match.id) : undefined;
                     return (
                       <article className="bracket-match" key={match.id}>
                         {match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover, z. B. bei Rückzug)">Kampflos</span>}
@@ -356,10 +358,10 @@ function StageCompetitionView({
                                 )}</span>
                                 {previousFinishLabels[side] && <small className="participant-origin">{previousFinishLabels[side]}</small>}
                               </span>
-                              {scoreStages.length ? <BracketStageValues stages={scoreStages} sideIndex={sideIndex as 0 | 1} /> : <span className="bracket-score-cells">
+                              {scoreStages.length ? <BracketStageValues stages={scoreStages} sideIndex={sideIndex as 0 | 1} onOpenResult={openBracketResult} /> : <BracketScoreCells onOpenResult={openBracketResult}>
                                 {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
                                 <strong>{match.score === 'W.O.' ? (winner ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : match.score === 'Freilos' && side === 'Freilos' ? 'BYE' : ''}</strong>
-                              </span>}
+                              </BracketScoreCells>}
                             </div>
                           );
                         })}
@@ -371,6 +373,8 @@ function StageCompetitionView({
                     <h4>Spiel um Platz 3</h4>
                     {thirdPlaceRound.matches.map((match) => {
                       const scoreStages = scoreSport ? getBracketScoreStages(match.sets, match.decision, match.extraTimeProgress, match.winner, match.sideA, match.sideB, match.live) : [];
+                      const openBracketResult = onEditResult && (match.live || (match.score && match.score !== 'Freilos' && match.score !== 'Beide Platz 3'))
+                        ? () => onEditResult(match.id) : undefined;
                       return (
                         <article className="bracket-match" key={match.id}>
                           {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz · nicht ausgetragen</span>}
@@ -378,10 +382,10 @@ function StageCompetitionView({
                           {[match.sideA, match.sideB].map((side, sideIndex) => (
                             <div className={`${match.winner === side ? 'winner ' : ''}${scoreStages.length ? 'bracket-stage-row' : ''}`.trim()} key={`${match.id}-${sideIndex}`}>
                               <span>{side}</span>
-                              {scoreStages.length ? <BracketStageValues stages={scoreStages} sideIndex={sideIndex as 0 | 1} /> : <span className="bracket-score-cells">
+                              {scoreStages.length ? <BracketStageValues stages={scoreStages} sideIndex={sideIndex as 0 | 1} onOpenResult={openBracketResult} /> : <BracketScoreCells onOpenResult={openBracketResult}>
                                 {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
                                 <strong>{match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : ''}</strong>
-                              </span>}
+                              </BracketScoreCells>}
                             </div>
                           ))}
                         </article>
