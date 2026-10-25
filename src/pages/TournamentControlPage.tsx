@@ -1375,8 +1375,8 @@ export function TournamentControlPage() {
         if (!found) return null;
         const stage = found.tournament.stages.find((item) => item.id === found.match.stageId);
         return (
-          <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setAdminEditMatchId(null)}>
-            <section className="prototype-modal admin-result-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+          <div className="prototype-modal-backdrop" role="presentation">
+            <section className="prototype-modal admin-result-modal" role="dialog" aria-modal="true">
               <div className="player-games-modal-head">
                 <div><span className="badge">TURNIERLEITUNG</span><h2>{found.match.status === 'FINISHED' && !canEditMockMatch(tournament, found.match.id) ? 'Ergebnis anzeigen' : 'Spiel bearbeiten / Ergebnis anzeigen'}</h2></div>
                 <button className="btn small" type="button" onClick={() => setAdminEditMatchId(null)}>Schließen</button>
