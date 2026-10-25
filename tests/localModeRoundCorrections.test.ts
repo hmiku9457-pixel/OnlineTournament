@@ -75,7 +75,7 @@ describe('Korrekturen an abgeschlossenen K.-o.- und Schweizer Runden', () => {
     const key = 'online-tournament:swiss-round-fixtures:v1';
     expect((JSON.parse(data.get(key) ?? '[]') as Array<{round:number}>).some((entry) => entry.round === 2)).toBe(true);
     expect(canEditMockMatch(t, first[0].id)).toBe(true);
-    completeMockMatch(first[0].id, reverse);
+    completeMockMatch(first[0].id, reverse, 'FINISHED', true);
     // Eine Korrektur entzieht der Folgerunde ihre Freigabe.
     expect(getMockStageMatches(t, stage).filter((m) => m.round === 'Runde 2')).toHaveLength(0);
     expect(approveMockProgress(t)?.kind).toBe('ROUND');
