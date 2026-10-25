@@ -147,11 +147,21 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(beginSwissCutoffPlayoff(t, 'ROUND_ROBIN')).toBeNull();
     let current = getPendingSwissCutoff(t)!;
     expect(current.decision?.extraRounds?.[0].matches).toHaveLength(3);
-    expect(recordSwissCutoffPlayoffResult(t, 0, 11, 7)).toBeNull();
+    const fixtures = current.decision!.extraRounds![0].matches;
+    const favorite = current.tie.players[0];
+    const second = current.tie.players[1];
+    const points = (game: typeof fixtures[number]) => {
+      const winner = game.sideA === favorite || game.sideB === favorite ? favorite : second;
+      return game.sideA === winner ? [11, 7] : [7, 11];
+    };
+    const firstScore = points(fixtures[0]);
+    expect(recordSwissCutoffPlayoffResult(t, 0, firstScore[0], firstScore[1])).toBeNull();
     expect(isStageCompleted(t, t.stages[0])).toBe(false);
-    expect(recordSwissCutoffPlayoffResult(t, 0, 11, 7)).toContain('bereits');
-    expect(recordSwissCutoffPlayoffResult(t, 1, 11, 7)).toBeNull();
-    expect(recordSwissCutoffPlayoffResult(t, 2, 11, 7)).toBeNull();
+    expect(recordSwissCutoffPlayoffResult(t, 0, firstScore[0], firstScore[1])).toContain('bereits');
+    fixtures.slice(1).forEach((game, i) => {
+      const [a, b] = points(game);
+      expect(recordSwissCutoffPlayoffResult(t, i + 1, a, b)).toBeNull();
+    });
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
     current = getPendingSwissCutoff(t)!;
     expect(current).toBeNull();
@@ -202,24 +212,30 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
       table: 'Tisch 1', status: 'LIVE',
     });
     expect(getMockStageMatches(t, t.stages[0]).some((match) => match.id === first.id)).toBe(false);
-    completeMockMatch(first.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]);
-    expect(getPendingSwissCutoff(t)?.decision?.extraRounds?.[0].matches[0].pointsA).toBe(11);
+    const winnerOrder = [...new Set(active.flatMap((game) => [game.sideA, game.sideB]))];
+    const target = (game: typeof active[number]) => {
+      const aPreferred = winnerOrder.indexOf(game.sideA) < winnerOrder.indexOf(game.sideB);
+      return { number: 1, sideAScore: aPreferred ? 11 : 7, sideBScore: aPreferred ? 7 : 11 };
+    };
+    const firstResult = target(first);
+    completeMockMatch(first.id, [firstResult]);
+    expect(getPendingSwissCutoff(t)?.decision?.extraRounds?.[0].matches[0].pointsA).toBe(firstResult.sideAScore);
     expect(getMockRuntimeMatches(t).find((match) => match.id === first.id)?.status).toBe('FINISHED');
     expect(isStageCompleted(t, t.stages[0])).toBe(false);
-    active.slice(1).forEach((game) => {
-      completeMockMatch(game.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]);
-    });
+    active.slice(1).forEach((game) => completeMockMatch(game.id, [target(game)]));
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
     expect(getSwissRoundRobinMatches(t, t.stages[0])).toHaveLength(3);
     expect(getStageEntrants(t, t.stages[1])).toHaveLength(2);
     expect(buildSwissStandings(t, t.stages[0]).reduce((sum, row) => sum + row.played, 0)).toBe(6);
     // A correction from the ordinary match editor must update Phase 1.5's
     // separate table and historical results, never the original Swiss record.
-    completeMockMatch(first.id, [{ number: 1, sideAScore: 7, sideBScore: 11 }]);
+    const corrected = { ...firstResult, sideAScore: firstResult.sideBScore, sideBScore: firstResult.sideAScore };
+    completeMockMatch(first.id, [corrected]);
     expect(getSwissCutoffHistory(t, t.stages[0])?.extraRounds?.[0].matches[0]).toMatchObject({
-      pointsA: 7, pointsB: 11,
+      pointsA: corrected.sideAScore, pointsB: corrected.sideBScore,
     });
-    expect(getSwissRoundRobinMatches(t, t.stages[0]).find((game) => game.id === first.id)?.score).toBe('0:1');
+    expect(getSwissRoundRobinMatches(t, t.stages[0]).find((game) => game.id === first.id)?.score)
+      .toBe(firstResult.sideAScore > firstResult.sideBScore ? '0:1' : '1:0');
     expect(buildSwissStandings(t, t.stages[0]).reduce((sum, row) => sum + row.played, 0)).toBe(6);
   });
 
