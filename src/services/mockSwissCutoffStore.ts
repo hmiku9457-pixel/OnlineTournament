@@ -1,3 +1,4 @@
+import type { PlayoffRound } from '@/domain/swissCutoffPlayoff';
 export interface SwissCutoffSetDecision {
   sideA: string;
   sideB: string;
@@ -8,7 +9,8 @@ export interface SwissCutoffSetDecision {
 
 export interface StoredSwissCutoffDecision {
   signature: string;
-  mode: 'SET' | 'LOT';
+  mode: 'SET' | 'LOT' | 'ROUND' | 'ROUND_ROBIN';
+  extraRounds?: PlayoffRound[];
   eliminated: string[];
   sets: SwissCutoffSetDecision[];
   winners?: string[];
