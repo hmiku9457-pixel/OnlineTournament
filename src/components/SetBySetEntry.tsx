@@ -28,9 +28,10 @@ interface SetBySetEntryProps {
   allowEditFinished?: boolean;
   /** Schweizer System: Admin muss auch BO1 nach der Satzeingabe ausdrücklich bestätigen. */
   swissAdminEntry?: boolean;
+  directorEntry?: boolean;
 }
 
-export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, sideARecord, sideBRecord, allowEditFinished = false, swissAdminEntry = false }: SetBySetEntryProps) {
+export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, sideARecord, sideBRecord, allowEditFinished = false, swissAdminEntry = false, directorEntry = false }: SetBySetEntryProps) {
   const [playedSets, setPlayedSets] = useState<MatchSet[]>(match.sets ?? []);
   const [editingFinished, setEditingFinished] = useState(false);
   const [currentValue, setCurrentValue] = useState('');
@@ -74,7 +75,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
     // Best-of-1 is unambiguous and finishes after its single confirmed set.
     if (nextFinalization === 'AUTO_FINISH' && !swissAdminEntry) {
       try {
-        completeMockMatch(match.id, nextSets, 'FINISHED');
+        completeMockMatch(match.id, nextSets, 'FINISHED', directorEntry);
         setEditingFinished(false);
         onSaved?.();
         onCompleted?.(nextSets);
@@ -100,7 +101,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
   function finalizeResult() {
     if (!needsFinalApproval) return;
     try {
-      completeMockMatch(match.id, playedSets, 'FINISHED', swissAdminEntry);
+      completeMockMatch(match.id, playedSets, 'FINISHED', directorEntry);
       setEditingFinished(false);
       setError(null);
       onSaved?.();
