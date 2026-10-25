@@ -75,7 +75,7 @@ describe('Schweizer Tabelle: Spalten und Sonneborn-Berger-Hilfe', () => {
     expect(html).toContain('SB 5,5</strong>');
     expect(html).toContain('5 Runden');
     expect(html).toContain('2,5</strong> SB pro Freilos');
-    expect(html).toContain('Kampfloses Spiel');
+    expect(html).toContain('Kampfloser Sieg');
     expect(html).toContain('Schließen');
   });
 });
