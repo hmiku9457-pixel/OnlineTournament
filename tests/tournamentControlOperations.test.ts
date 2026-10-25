@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { startFirstStage } from '@/services/mockPhaseLifecycle';
@@ -217,6 +218,7 @@ describe('Schweizer Matchup-Historie', () => {
     expect(firstRound).toHaveLength(2);
     expect(getSwissRecordBeforeRound(tournament, stage, firstRound[0].sideA, 1)).toBe('0:0');
     firstRound.forEach((game) => completeMockMatch(game.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]));
+    expect(approveMockProgress(tournament)?.kind).toBe('ROUND');
     const secondRound = getMockStageMatches(tournament, stage).filter((game) => game.round === 'Runde 2');
     expect(secondRound.length).toBeGreaterThan(0);
     expect(secondRound.every((game) => ['1:0', '0:1'].includes(getSwissRecordBeforeRound(tournament, stage, game.sideB, 2)))).toBe(true);
