@@ -27,4 +27,20 @@ describe('score grouped Swiss pairing', () => {
     const crossScore = pairings.filter(([a, b]) => b !== 'Freilos' && scores.get(a) !== scores.get(b));
     expect(crossScore).toHaveLength(0);
   });
+  it('repariert eine vermeidbare Wiederholung durch einen Paarungstausch', () => {
+    const players = [
+      player('A', 2, 0, 0),
+      player('B', 2, 0, 1),
+      player('C', 2, 0, 2, ['D']),
+      player('D', 2, 0, 3, ['C']),
+    ];
+    const pairings = generateScoreGroupedSwissPairings(players);
+    expect(pairings).toHaveLength(2);
+    expect(pairings).not.toContainEqual(['C', 'D']);
+    for (const [a, b] of pairings) {
+      expect(players.find((item) => item.name === a)?.opponents.has(b)).toBe(false);
+    }
+    expect(new Set(pairings.flat())).toEqual(new Set(['A', 'B', 'C', 'D']));
+  });
+
 });
