@@ -307,6 +307,7 @@ function swissScoreState(participants: string[], matches: BaseStageMatch[], resu
     name,
     wins: 0,
     losses: 0,
+    draws: 0,
     byes: 0,
     order: index,
     opponents: new Set<string>(),
@@ -333,6 +334,9 @@ function swissScoreState(participants: string[], matches: BaseStageMatch[], resu
     } else if (winner === match.sideB) {
       b.wins += 1;
       a.losses += 1;
+    } else {
+      a.draws += 1;
+      b.draws += 1;
     }
   });
 
@@ -352,6 +356,7 @@ function swissRoundPairings(
     return {
       name,
       wins: row.wins,
+      pairingPoints: sportScoring(sport).mode === 'score' ? 3 * row.wins + row.draws : row.wins,
       losses: row.losses,
       byes: row.byes,
       order: row.order,
