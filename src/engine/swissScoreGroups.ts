@@ -25,6 +25,64 @@ function pairBucket(players: string[], state: Map<string, SwissScorePlayer>) {
   return { pairings, leftover: remaining[0] };
 }
 
+/** Entfernt vermeidbare Wiederholungen, ohne die ursprüngliche Paarung bei bereits gültigem Plan zu verändern.
+ *  Die Suche läuft nur als Fallback für Konfliktfälle und ist bewusst begrenzt. */
+function avoidRepeatPairings(pairings: SwissNamePairing[], players: SwissScorePlayer[]): SwissNamePairing[] {
+  const state = new Map(players.map((player) => [player.name, player]));
+  const bye = pairings.find(([, opponent]) => opponent === 'Freilos');
+  const matches = pairings.filter(([, opponent]) => opponent !== 'Freilos');
+  const repeated = ([a, b]: SwissNamePairing) => state.get(a)?.opponents.has(b) ?? false;
+  if (!matches.some(repeated)) return pairings;
+
+  // Erst lokale Tauschversuche; damit bleibt die Score-Gruppenstruktur möglichst erhalten.
+  let fixed = [...matches];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < fixed.length && !changed; i += 1) {
+      if (!repeated(fixed[i])) continue;
+      for (let j = 0; j < fixed.length && !changed; j += 1) {
+        if (i === j) continue;
+        const [a, b] = fixed[i];
+        const [c, d] = fixed[j];
+        const candidates: Array<[SwissNamePairing, SwissNamePairing]> = [
+          [[a, c], [b, d]], [[a, d], [b, c]],
+        ];
+        for (const [first, second] of candidates) {
+          if (repeated(first) || repeated(second)) continue;
+          fixed[i] = first;
+          fixed[j] = second;
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+  if (!fixed.some(repeated)) return bye ? [...fixed, bye] : fixed;
+
+  // Schwierige Konstellationen: begrenztes Backtracking, bevor tatsächlich eine
+  // unvermeidbare Wiederholung zugelassen wird.
+  const remaining = fixed.flatMap(([a, b]) => [a, b]);
+  const solution: SwissNamePairing[] = [];
+  let attempts = 0;
+  function search(names: string[]): boolean {
+    if (!names.length) return true;
+    if (++attempts > 20000) return false;
+    const a = names[0];
+    const aWins = state.get(a)?.wins ?? 0;
+    const choices = names.slice(1)
+      .filter((b) => !state.get(a)?.opponents.has(b))
+      .sort((b, c) => Math.abs(aWins - (state.get(b)?.wins ?? 0)) - Math.abs(aWins - (state.get(c)?.wins ?? 0)));
+    for (const b of choices) {
+      solution.push([a, b]);
+      if (search(names.filter((name) => name !== a && name !== b))) return true;
+      solution.pop();
+    }
+    return false;
+  }
+  return search(remaining) ? (bye ? [...solution, bye] : solution) : (bye ? [...fixed, bye] : fixed);
+}
+
 export function generateScoreGroupedSwissPairings(players: SwissScorePlayer[]): SwissNamePairing[] {
   const state = new Map(players.map((player) => [player.name, player]));
   const sorted = [...players].sort((a, b) => (
@@ -73,5 +131,5 @@ export function generateScoreGroupedSwissPairings(players: SwissScorePlayer[]): 
     }
   }
 
-  return pairings;
+  return avoidRepeatPairings(pairings, players);
 }
