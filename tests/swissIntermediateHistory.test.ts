@@ -32,6 +32,25 @@ describe('Schweizer Entscheidung dokumentieren', () => {
     expect(html).toContain('Buchholzzahl');
   });
 
+  it('zeigt nach Entscheidungsspielen einen Weiter-/Raus-Tag ohne die sportlichen Werte zu verändern', () => {
+    const html = renderToStaticMarkup(createElement(SwissStandingsTable, {
+      standings: [standing('Anna', 1), standing('Ben', 2)],
+      scoreSport: false, scoreUnit: 'Bälle', unplayedWinners: new Set<string>(),
+      previousFinishLabels: {}, withdrawalLabel: () => null,
+      qualifyingPlaces: 1, cutoffIndex: 0, finalized: true,
+      onSelectPlayer: () => {}, onShowBuchholz: () => {},
+      decisionTags: {
+        Anna: { label: 'Entscheidungsspiel', qualified: true },
+        Ben: { label: 'Entscheidungsspiel', qualified: false },
+      },
+    }));
+    expect(html).toContain('Entscheidungsspiel · weiter');
+    expect(html).toContain('Entscheidungsspiel · raus');
+    expect(html).toContain('swiss-lot-tag is-qualified');
+    expect(html).toContain('swiss-lot-tag is-eliminated');
+    expect(html).toContain('11,5');
+  });
+
   it('kennzeichnet die Siegerin und die Verliererin eines physischen Losentscheids in der Schweizer Tabelle', () => {
     const html = renderToStaticMarkup(createElement(SwissStandingsTable, {
       standings: [standing('Anna', 1), standing('Ben', 2)],
