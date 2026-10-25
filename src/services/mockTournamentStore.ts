@@ -192,6 +192,9 @@ export function updateMockParticipantName(tournamentId: string, oldName: string,
   const tournament = tournaments.find((item) => item.id === tournamentId);
   if (!tournament || !tournament.participantNames?.includes(oldName)) return false;
   if (name !== oldName && tournament.participantNames.includes(name)) return false;
+  // Ein Spielercode darf immer nur einem Teilnehmer des Turniers gehören.
+  if (Object.entries(tournament.participantCodes ?? {}).some(([participant, existingCode]) =>
+    participant !== oldName && existingCode === code.trim())) return false;
 
   // Für den lokalen Prototypen verwenden die Auslosungsdaten Namen als IDs.
   // Deshalb müssen bei Umbenennung auch die bereits gespeicherten Referenzen
