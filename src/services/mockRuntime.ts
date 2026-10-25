@@ -15,7 +15,7 @@ import { getWithdrawalAwardSets } from '@/domain/withdrawalScoring';
 import { newPlayoffRound, playoffQualified, playoffRoundFinished, type PlayoffMode } from '@/domain/swissCutoffPlayoff';
 import { addSwissExtraRound, getSwissExtraRoundCount } from '@/services/mockSwissExtendedRounds';
 import { applySwissCutoffDecision, findSwissCutoffTie, type SwissCutoffTie } from '@/domain/swissCutoffTie';
-import { clearSwissCutoffDecision, readSwissCutoffDecision, saveSwissCutoffDecision, type StoredSwissCutoffDecision } from '@/services/mockSwissCutoffStore';
+import { clearSwissCutoffDecision, readSwissCutoffDecision, readSwissRoundRobinHistory, saveSwissCutoffDecision, type StoredSwissCutoffDecision } from '@/services/mockSwissCutoffStore';
 import { isValidSportSet } from '@/domain/sportScoring';
 
 export { getRuntimeParticipantNames } from '@/services/mockParticipants';
@@ -864,7 +864,13 @@ export function getPendingSwissCutoff(tournament: DemoTournament): SwissCutoffSt
 /** Round-robin tie-break history remains viewable in the tournament timeline
  * after the Swiss phase was closed and the next phase has started. */
 export function getSwissCutoffHistory(tournament: DemoTournament, stage: TournamentStage): StoredSwissCutoffDecision | null {
-  return swissCutoffStatus(tournament, stage, readResults())?.decision ?? null;
+  const current = swissCutoffStatus(tournament, stage, readResults())?.decision;
+  const archive = readSwissRoundRobinHistory(tournament.id, stage.id);
+  if (!archive) return current ?? null;
+  // If a later full-field Swiss round led to another tie, the archive stays
+  // visible while the current decision (e.g. a draw) determines final qualifiers.
+  return { ...archive, ...(current ?? {}), extraRounds: current?.extraRounds?.some((round) => round.kind === 'ROUND_ROBIN')
+    ? current.extraRounds : archive.extraRounds };
 }
 
 /** Reflect the documented decision in the visible positions as well as qualification. */
