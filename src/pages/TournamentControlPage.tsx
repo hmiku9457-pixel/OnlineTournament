@@ -22,6 +22,7 @@ import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStag
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
 import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
+import { getStageWithdrawalLabel, getWithdrawalLabel } from '@/services/mockWithdrawals';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { FinalStandingsList } from '@/components/FinalStandingsList';
 import { VenueLayoutMini } from '@/components/VenueLayout';
@@ -123,7 +124,7 @@ function StageCompetitionView({
       : 0;
     const stageFinished = isStageCompleted(tournament, stage);
     const withdrawn = new Set(groups.flatMap((group) => group.standings.map((row) => row.name))
-      .filter((name) => isMockParticipantWithdrawn(tournament, name)));
+      .filter((name) => Boolean(getStageWithdrawalLabel(tournament, name, stage.id))));
     const qualificationHints = getGroupQualificationHints(groups, qualificationCount, withdrawn);
     const actualQualified = stageFinished && nextStage ? new Set(getStageEntrants(tournament, nextStage)) : null;
     return (
@@ -148,7 +149,7 @@ function StageCompetitionView({
                   return (
                     <div className={`mini-standing-row${isQualified ? ' qualification-zone' : isPossible ? ' qualification-possible' : ''}`} key={row.name}
                       title={isQualified ? stageFinished ? 'Für die nächste Phase qualifiziert' : 'Aktuell auf einem vorläufigen Qualifikationsplatz' : isPossible ? 'Weitere Qualifikationsplätze werden gruppenübergreifend vergeben' : undefined}>
-                      <span>{row.rank}</span><button className="standing-player-button" type="button" onClick={() => setSelectedGroupPlayer({ groupLabel: group.label, player: row.name })}><strong>{row.name}</strong>{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}{previousFinishLabels[row.name] && <small>{previousFinishLabels[row.name]}</small>}</button><span>{row.played}</span><span>{row.wins}</span><span>{scoreSport ? row.draws : row.losses}</span>{scoreSport ? <><span>{row.losses}</span><StandingRatio value={row.balls} /><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span><strong>{row.points}</strong></> : <><StandingRatio value={row.sets} /><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><StandingRatio value={row.balls} /><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span></>}
+                      <span>{row.rank}</span><button className="standing-player-button" type="button" onClick={() => setSelectedGroupPlayer({ groupLabel: group.label, player: row.name })}><strong>{row.name}</strong>{getStageWithdrawalLabel(tournament, row.name, stage.id) && <span className="standing-withdrawn" title="Zeitpunkt des Rückzugs">{getStageWithdrawalLabel(tournament, row.name, stage.id)}</span>}{previousFinishLabels[row.name] && <small>{previousFinishLabels[row.name]}</small>}</button><span>{row.played}</span><span>{row.wins}</span><span>{scoreSport ? row.draws : row.losses}</span>{scoreSport ? <><span>{row.losses}</span><StandingRatio value={row.balls} /><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span><strong>{row.points}</strong></> : <><StandingRatio value={row.sets} /><span>{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</span><StandingRatio value={row.balls} /><span>{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</span></>}
                     </div>
                   );
                 })}
@@ -160,7 +161,7 @@ function StageCompetitionView({
                     {group.matches.filter((match) => (match.matchDay ?? 0) === matchDay).map((match) => (
                       <div className={match.status === 'live' ? 'group-match-row live' : 'group-match-row'} key={match.id}>
                         {match.status === 'live' && <span className="group-match-live-dot" role="img" aria-label="Laufendes Spiel" title="Läuft gerade" />}
-                        <span className="group-match-side" title={match.sideA}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideA) ? `Rückzug (${match.sideA})` : match.sideA}</span><MatchResultDetails score={match.score} sets={match.sets} sport={tournament.sport} onOpenResult={match.status !== 'open' && onEditResult ? () => onEditResult(match.id) : undefined} /><span className="group-match-side" title={match.sideB}>{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, match.sideB) ? `Rückzug (${match.sideB})` : match.sideB}</span>
+                        <span className="group-match-side" title={match.sideA}>{match.score === 'W.O.' && getStageWithdrawalLabel(tournament, match.sideA, stage.id) ? `Rückzug (${match.sideA})` : match.sideA}</span><MatchResultDetails score={match.score} sets={match.sets} sport={tournament.sport} onOpenResult={match.status !== 'open' && onEditResult ? () => onEditResult(match.id) : undefined} /><span className="group-match-side" title={match.sideB}>{match.score === 'W.O.' && getStageWithdrawalLabel(tournament, match.sideB, stage.id) ? `Rückzug (${match.sideB})` : match.sideB}</span>
                       </div>
                     ))}
                   </div>
@@ -214,7 +215,7 @@ function StageCompetitionView({
         ? stage.advancement.value : Math.max(1, Number(nextStage.settings.entrants) || 1)
       : 0;
     const withdrawnSwissPlayers = new Set(standings
-      .filter((row) => isMockParticipantWithdrawn(tournament, row.name))
+      .filter((row) => Boolean(getStageWithdrawalLabel(tournament, row.name, stage.id)))
       .map((row) => row.name));
     const swissCutoffIndex = getSwissCutoffRowIndex(standings, qualifyingPlaces, withdrawnSwissPlayers);
     const swissFinished = isStageCompleted(tournament, stage);
@@ -244,7 +245,7 @@ function StageCompetitionView({
                 <col className="swiss-col-difference" />
               </colgroup>
             <thead><tr><th>#</th><th>Teilnehmer</th><th title="Spiele">Sp.</th><th title="Siege">S</th><th title={scoreSport ? 'Unentschieden' : 'Niederlagen'}>{scoreSport ? 'U' : 'N'}</th><th className="standing-ratio-cell" title={scoreSport ? 'Niederlagen' : 'Satzverhältnis'}>{scoreSport ? 'N' : 'Sätze'}</th><th className="standing-difference-cell" title={scoreSport ? scoreUnit : 'Satzdifferenz'}>{scoreSport ? scoreUnit : 'Satz ±'}</th><th className="standing-ratio-cell" title={scoreSport ? 'Differenz' : 'Ballverhältnis'}>{scoreSport ? '±' : 'Bälle'}</th><th className="standing-difference-cell" title={scoreSport ? 'Punkte' : 'Balldifferenz'}>{scoreSport ? 'Pkt.' : 'Ball ±'}</th></tr></thead>
-            <tbody>{standings.map((row, index) => <Fragment key={row.name}><tr><td>{row.rank}</td><td><span className="swiss-standing-identity"><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{previousFinishLabels[row.name] && <small className="participant-origin swiss-standing-origin">{previousFinishLabels[row.name]}</small>}{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}</span></td><td>{row.played}</td><td>{row.wins}</td><td>{scoreSport ? row.draws : row.losses}</td>{scoreSport ? <><td>{row.losses}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td><td className="standing-difference-cell">{row.points}</td></> : <><td className="standing-ratio-cell"><StandingRatio value={row.sets} /></td><td className="standing-difference-cell">{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></>}</tr>{index === swissCutoffIndex && (
+            <tbody>{standings.map((row, index) => <Fragment key={row.name}><tr><td>{row.rank}</td><td><span className="swiss-standing-identity"><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{previousFinishLabels[row.name] && <small className="participant-origin swiss-standing-origin">{previousFinishLabels[row.name]}</small>}{getStageWithdrawalLabel(tournament, row.name, stage.id) && <span className="standing-withdrawn" title="Zeitpunkt des Rückzugs">{getStageWithdrawalLabel(tournament, row.name, stage.id)}</span>}</span></td><td>{row.played}</td><td>{row.wins}</td><td>{scoreSport ? row.draws : row.losses}</td>{scoreSport ? <><td>{row.losses}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td><td className="standing-difference-cell">{row.points}</td></> : <><td className="standing-ratio-cell"><StandingRatio value={row.sets} /></td><td className="standing-difference-cell">{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></>}</tr>{index === swissCutoffIndex && (
               <SwissQualificationCutoffRow qualifyingPlaces={qualifyingPlaces} finalized={swissFinished} />
             )}</Fragment>)}</tbody>
             </table>
@@ -370,7 +371,7 @@ function StageCompetitionView({
                               onDrop={(event) => handleBracketDrop(event, slotIndex)}
                             >
                               <span>
-                                <span className="bracket-name-inline">{match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, side) ? `Rückzug (${side})` : side}{isEditableSlot && side !== 'Freilos' && (
+                                <span className="bracket-name-inline">{match.score === 'W.O.' && getStageWithdrawalLabel(tournament, side, stage.id) ? `Rückzug (${side})` : side}{isEditableSlot && side !== 'Freilos' && (
                                   <button className={pinnedSlots.has(slotIndex) ? 'bracket-pin pinned' : 'bracket-pin'} type="button"
                                     aria-label={`${side} ${pinnedSlots.has(slotIndex) ? 'lösen' : 'fixieren'}`}
                                     title={pinnedSlots.has(slotIndex) ? 'Fixierung lösen' : 'Platz fixieren'}
@@ -1234,7 +1235,8 @@ export function TournamentControlPage() {
           <div className="control-section-head"><div><h2>Endplatzierungen</h2>
             <p className="muted">Turnierweite Gesamtplatzierungen über alle Phasen. Gleiche Gruppenränge teilen sich einen Platzierungsbereich; Rückzüge werden gemäß ihrer letzten erreichten Phase eingeordnet.</p>
           </div></div>
-          <FinalStandingsList standings={finalStandings} phaseNames={tournament.stages.map((stage) => stage.name)} />
+          <FinalStandingsList standings={finalStandings} phaseNames={tournament.stages.map((stage) => stage.name)}
+            withdrawalLabels={Object.fromEntries(finalStandings.filter((row) => row.status === 'Zurückgezogen').map((row) => [row.name, getWithdrawalLabel(tournament, row.name) ?? 'Zurückgezogen']))} />
         </section>
       )}
 
@@ -1275,7 +1277,8 @@ export function TournamentControlPage() {
           <div className="participant-control-list">
             {participantProgress.map(({ name: participant, progress }, index) => {
               const isWithdrawn = progress.status === 'Zurückgezogen';
-              const statusText = progress.status === 'Aktiv' && tableMatches.some((match) => match.sideA === participant || match.sideB === participant) ? 'Spielt gerade' : progress.status;
+              const statusText = isWithdrawn ? getWithdrawalLabel(tournament, participant) ?? 'Zurückgezogen'
+                : progress.status === 'Aktiv' && tableMatches.some((match) => match.sideA === participant || match.sideB === participant) ? 'Spielt gerade' : progress.status;
               return (
                 <article className={isWithdrawn ? 'participant-control-row withdrawn' : 'participant-control-row'} key={`${participant}-${index}`}>
                   <span className="participant-list-number">{index + 1}</span>

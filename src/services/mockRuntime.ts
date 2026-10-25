@@ -1,4 +1,4 @@
-import { isParticipantWithdrawn, saveParticipantWithdrawal, removeParticipantWithdrawal, markWithdrawalRestoreEligibility, getWithdrawalRestoreEligibility } from '@/services/mockWithdrawals';
+import { isParticipantWithdrawn, saveParticipantWithdrawal, removeParticipantWithdrawal, markWithdrawalRestoreEligibility, getWithdrawalRestoreEligibility, saveWithdrawalTiming, type WithdrawalTiming } from '@/services/mockWithdrawals';
 import { reconcilePrestartDraws } from '@/services/mockDrawStore';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
@@ -717,6 +717,12 @@ export function withdrawMockParticipant(tournament: DemoTournament, name: string
     beforeFirstStart ? { kind: 'PRESTART', phaseId: tournament.stages[0]?.id ?? null }
       : qualifiedForUpcoming && next ? { kind: 'BETWEEN_PHASES', phaseId: next.id }
       : null);
+  const latestCompleted = [...tournament.stages].reverse().find((stage) => isStageCompleted(tournament, stage));
+  const withdrawalTiming: WithdrawalTiming = activeAtWithdrawal
+    ? { kind: 'DURING_PHASE', stageId: activeAtWithdrawal.id }
+    : latestCompleted ? { kind: 'AFTER_PHASE', stageId: latestCompleted.id }
+      : { kind: 'BEFORE_TOURNAMENT', stageId: null };
+  saveWithdrawalTiming(tournament.id, name, withdrawalTiming);
   saveParticipantWithdrawal(tournament, name);
   if (!tournament.hasStarted && !tournament.stages.some((stage) => isStageStarted(tournament, stage))) {
     // Eine zurückgezogene Person wird vor dem Turnierbeginn ersatzlos aus

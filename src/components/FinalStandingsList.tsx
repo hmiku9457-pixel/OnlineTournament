@@ -5,6 +5,7 @@ type FinalStanding = ReturnType<typeof getMockFinalStandings>[number];
 interface FinalStandingsListProps {
   standings: readonly FinalStanding[];
   phaseNames: readonly string[];
+  withdrawalLabels?: Readonly<Record<string, string>>;
 }
 
 interface PlacementGroup {
@@ -42,24 +43,24 @@ function groupByPhase(groups: PlacementGroup[]) {
   return phases;
 }
 
-function participantTag(status: FinalStanding['status']) {
-  if (status === 'Zurückgezogen') return <span className="final-standing-tag is-withdrawn">Zurückgezogen</span>;
+function participantTag(status: FinalStanding['status'], withdrawalLabel?: string) {
+  if (status === 'Zurückgezogen') return <span className="final-standing-tag is-withdrawn">{withdrawalLabel ?? 'Zurückgezogen'}</span>;
   if (status === 'Turniersieger') return <span className="final-standing-tag is-winner">Turniersieger</span>;
   if (status === 'Aktiv') return <span className="final-standing-tag is-active">Aktiv</span>;
   return null;
 }
 
-function playerName(row: FinalStanding) {
+function playerName(row: FinalStanding, withdrawalLabels?: Readonly<Record<string, string>>) {
   const groupOrigin = row.placement?.split(' · ').slice(1).join(' · ');
   return (
     <span className="final-standing-person">
-      <span className="final-standing-person-main"><strong>{row.name}</strong>{participantTag(row.status)}</span>
+      <span className="final-standing-person-main"><strong>{row.name}</strong>{participantTag(row.status, withdrawalLabels?.[row.name])}</span>
       {groupOrigin && <small className="final-standing-origin">{groupOrigin}</small>}
     </span>
   );
 }
 
-export function FinalStandingsList({ standings, phaseNames }: FinalStandingsListProps) {
+export function FinalStandingsList({ standings, phaseNames, withdrawalLabels }: FinalStandingsListProps) {
   const groups = groupPlacements(standings);
   const podium = groups.filter((group) => ['Platz 1', 'Platz 2', 'Platz 3'].includes(group.placement));
   const podiumGroups = new Set(podium);
@@ -80,7 +81,7 @@ export function FinalStandingsList({ standings, phaseNames }: FinalStandingsList
                   <div className="final-podium-content">
                     <span className="final-podium-rank">{group.placement}{group.participants.length > 1 ? ' · geteilt' : ''}</span>
                     <ul className="final-podium-players">
-                      {group.participants.map((row) => <li key={row.name}>{playerName(row)}</li>)}
+                      {group.participants.map((row) => <li key={row.name}>{playerName(row, withdrawalLabels)}</li>)}
                     </ul>
                   </div>
                 </article>
@@ -113,7 +114,7 @@ export function FinalStandingsList({ standings, phaseNames }: FinalStandingsList
                         {group.participants.length > 1 && <small>{group.participants.length} Teilnehmer</small>}
                       </div>
                       <ul className="final-ranking-players">
-                        {group.participants.map((row) => <li key={row.name}>{playerName(row)}</li>)}
+                        {group.participants.map((row) => <li key={row.name}>{playerName(row, withdrawalLabels)}</li>)}
                       </ul>
                     </article>
                   ))}

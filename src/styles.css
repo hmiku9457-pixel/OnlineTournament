@@ -2270,3 +2270,12 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   font-weight: 800;
   color: #101828;
 }
+
+/* Rückzugsstatus mit Phasenangabe darf in engen Tabellen/Karten umbrechen. */
+.standing-withdrawn,
+.participant-inline-status.withdrawn,
+.final-standing-tag.is-withdrawn {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+}

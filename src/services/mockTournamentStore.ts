@@ -226,6 +226,17 @@ export function updateMockParticipantName(tournamentId: string, oldName: string,
   }
   if (name !== oldName) {
     try {
+      const timingKey = 'online-tournament:withdrawal-timing:v1';
+      const timings = JSON.parse(window.localStorage.getItem(timingKey) ?? '{}') as Record<string, Record<string, unknown>>;
+      if (timings[tournamentId]?.[oldName]) {
+        timings[tournamentId][name] = timings[tournamentId][oldName];
+        delete timings[tournamentId][oldName];
+        window.localStorage.setItem(timingKey, JSON.stringify(timings));
+      }
+    } catch { /* No recorded withdrawal timing. */ }
+  }
+  if (name !== oldName) {
+    try {
       const key = 'online-tournament:withdrawal-restore:v1';
       const records = JSON.parse(window.localStorage.getItem(key) ?? '{}') as Record<string, Record<string, unknown>>;
       const current = records[tournamentId];
@@ -312,6 +323,7 @@ export function removeLocalPrototypeTournaments() {
   window.localStorage.removeItem('online-tournament:mock-phase-lifecycle:v1');
   window.localStorage.removeItem('online-tournament:withdrawn-participants:v1');
   window.localStorage.removeItem('online-tournament:withdrawal-restore:v1');
+  window.localStorage.removeItem('online-tournament:withdrawal-timing:v1');
   window.localStorage.removeItem('online-tournament:swiss-round-fixtures:v1');
 }
 
