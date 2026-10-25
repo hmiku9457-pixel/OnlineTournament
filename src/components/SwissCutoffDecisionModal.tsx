@@ -16,18 +16,17 @@ interface Props {
   onSet: (pointsA: number, pointsB: number) => string | null;
   onLot: (winners: string[]) => string | null;
   onBegin: (kind: PlayoffMode) => string | null;
-  onResult: (matchIndex: number, pointsA: number, pointsB: number) => string | null;
+  onOpenControl?: () => void;
   onReset: () => void;
 }
 
 /** Mandatory manual qualification decision with the unchanged Swiss table as context. */
-export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onBegin, onResult, onReset }: Props) {
+export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onBegin, onReset, onOpenControl }: Props) {
   const [chosenMode, setChosenMode] = useState<'SET' | 'LOT' | null>(null);
   const [setValue, setSetValue] = useState('');
   const [scoreA, setScoreA] = useState('');
   const [scoreB, setScoreB] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
-  const [selectedFixture, setSelectedFixture] = useState(-1);
   const [error, setError] = useState('');
   const [showBuchholz, setShowBuchholz] = useState(false);
 
@@ -41,10 +40,6 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
   const isRoundRunning = Boolean(lastRound && !playoffRoundFinished(lastRound));
   const roundFinishedButTied = Boolean(lastRound && playoffRoundFinished(lastRound));
   const mode = isRoundRunning ? lastRound!.kind : played.length ? 'SET' : chosenMode;
-  const pendingIndex = lastRound?.matches.findIndex((match) => match.pointsA === undefined) ?? -1;
-  const activeIndex = lastRound && selectedFixture >= 0 && lastRound.matches[selectedFixture]?.pointsA === undefined
-    ? selectedFixture : pendingIndex;
-  const activeMatch = lastRound && activeIndex >= 0 ? lastRound.matches[activeIndex] : null;
   const multiPlayer = status.tie.players.length > 2;
   const selectedPlayers = new Set(status.tie.players);
   const eliminated = new Set(status.decision?.eliminated ?? []);
@@ -66,20 +61,10 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
     const problem = onSet(a, b);
     if (problem) setError(problem); else clearInputs();
   }
-  function submitGame() {
-    if (!activeMatch || (!scoreSport && !parsedSet) || (scoreSport && !scored)) {
-      setError('Bitte zuerst ein gültiges Ergebnis eingeben.'); return;
-    }
-    const a = scoreSport ? Number(scoreA) : parsedSet!.sideAScore;
-    const b = scoreSport ? Number(scoreB) : parsedSet!.sideBScore;
-    const problem = onResult(activeIndex, a, b);
-    if (problem) setError(problem);
-    else { clearInputs(); setSelectedFixture(-1); setChosenMode(null); }
-  }
   function begin(kind: PlayoffMode) {
     const problem = onBegin(kind);
     if (problem) setError(problem);
-    else { setChosenMode(null); setSelectedFixture(-1); clearInputs(); }
+    else { setChosenMode(null); clearInputs(); }
   }
   function submitLot() {
     const problem = onLot(selected);
@@ -88,7 +73,6 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
   function reset() {
     onReset();
     setChosenMode(null);
-    setSelectedFixture(-1);
     setSelected([]);
     clearInputs();
   }
@@ -121,8 +105,12 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
             <div className="swiss-cutoff-heading">
               <span className="badge">ENTSCHEIDUNG ERFORDERLICH</span>
               <h2 id="swiss-cutoff-title">Gleichstand an der Qualifikationsgrenze</h2>
-              <p id="swiss-cutoff-description">Die letzte Schweizer Runde ist abgeschlossen. Für die nächste Phase {status.tie.slots === 1 ? 'ist' : 'sind'} noch <strong>{status.tie.slots}</strong> {status.tie.slots === 1 ? 'Platz' : 'Plätze'} offen. Die folgenden {status.tie.players.length} Teilnehmenden liegen nach <strong>allen sportlichen Tie-Breakern gleichauf</strong>.</p>
-              <p className="muted">Die Phase bleibt gesperrt, bis die Turnierleitung einen Stichentscheid dokumentiert. Die alphabetische Reihenfolge entscheidet nicht über die Qualifikation.</p>
+              <p id="swiss-cutoff-description" className="swiss-cutoff-intro">Nach der letzten Schweizer Runde liegen <strong>{status.tie.players.length} Teilnehmende</strong> bei allen sportlichen Tie-Breakern gleichauf.</p>
+              <div className="swiss-cutoff-summary">
+                <div><span>Offene Qualifikationsplätze</span><strong>{status.tie.slots}</strong></div>
+                <div><span>Spieler im Stichentscheid</span><strong>{status.tie.players.length}</strong></div>
+              </div>
+              <p className="swiss-cutoff-help-text">Die Rangfolge bleibt bis zur Entscheidung offen. Die Tabelle rechts zeigt die betroffenen Spieler. <strong>Der Name entscheidet niemals über das Weiterkommen.</strong></p>
             </div>
             <div className="swiss-cutoff-candidates" aria-label="Gleichplatzierte Teilnehmer">
               {status.tie.players.map((name) => (
@@ -139,24 +127,36 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
 
             {!mode && (
               <div className="swiss-cutoff-choice">
-                <strong>Wie soll entschieden werden?</strong>
-                <div className="swiss-cutoff-choice-actions">
+                <h3>Wie soll die Qualifikation entschieden werden?</h3>
+                <p className="muted">Wähle ein Verfahren. Erst das bestätigte Ergebnis gibt die nächste Phase frei.</p>
+                <div className="swiss-cutoff-choice-actions" role="group" aria-label="Entscheidungsverfahren auswählen">
                   {multiPlayer ? (
-                    <button type="button" className="btn primary" autoFocus title="Reguläre zusätzliche Schweizer Runde mit allen noch teilnahmeberechtigten Spielern; zählt für Siege, Sätze und BHZ." onClick={() => begin('ROUND')}>Weitere Runde ausspielen</button>
+                    <button type="button" className="swiss-cutoff-method" autoFocus onClick={() => begin('ROUND')}>
+                      <strong>Weitere Runde ausspielen</strong>
+                      <span>Eine reguläre Schweizer Runde für alle verbleibenden Spieler, inklusive Tabellen- und BHZ-Wertung.</span>
+                    </button>
                   ) : (
-                    <button type="button" className="btn primary" autoFocus onClick={() => { setChosenMode('SET'); clearInputs(); }}>{outcomeType} spielen</button>
+                    <button type="button" className="swiss-cutoff-method" autoFocus onClick={() => { setChosenMode('SET'); clearInputs(); }}>
+                      <strong>{outcomeType} spielen</strong>
+                      <span>Ein zusätzlicher Satz mit der gewohnten Ergebniseingabe entscheidet direkt.</span>
+                    </button>
                   )}
-                  <button type="button" className="btn" onClick={() => { setChosenMode('LOT'); setError(''); }}>Physischer Losentscheid</button>
-                  {multiPlayer && <button type="button" className="btn" onClick={() => begin('ROUND_ROBIN')}>Jeder gegen Jeden</button>}
+                  <button type="button" className="swiss-cutoff-method" onClick={() => { setChosenMode('LOT'); setError(''); }}>
+                    <strong>Physischer Losentscheid</strong>
+                    <span>Vor Ort auslosen und anschließend die qualifizierten Spieler verbindlich eintragen.</span>
+                  </button>
+                  {multiPlayer && <button type="button" className="swiss-cutoff-method" onClick={() => begin('ROUND_ROBIN')}>
+                    <strong>Jeder gegen Jeden</strong>
+                    <span>Die Gleichplatzierten spielen Phase 1.5 über die normale Tischverwaltung und Ergebniseingabe.</span>
+                  </button>}
                 </div>
-                {multiPlayer && <p className="muted swiss-cutoff-round-explainer"><strong>Weitere Runde:</strong> Alle noch teilnahmeberechtigten Spieler der Schweizer Phase erhalten neue reguläre Paarungen. Die Spiele erscheinen in der nächsten Schweizer Runde und zählen für sämtliche Tabellen- und Buchholzwerte. <strong>Jeder gegen Jeden:</strong> Nur die Gleichplatzierten spielen in einer gesondert dokumentierten Zwischenphase (Phase 1.5).</p>}
               </div>
             )}
 
             {mode === 'SET' && (
               <div className="swiss-cutoff-mode">
                 <h3>{outcomeType} erfassen</h3>
-                <p className="muted">Die Entscheidung nutzt dieselbe Eingabe und Gültigkeitsprüfung wie ein normales Spiel. Das Ergebnis zählt ausschließlich für die Qualifikation, nicht für die ursprüngliche Schweizer Tabelle.</p>
+                <p className="muted">Spielt einen Satz nach den üblichen Regeln und tragt ihn wie bei einem normalen Spiel ein. Das Ergebnis entscheidet ausschließlich über die Qualifikation; die Schweizer Tabellenwerte bleiben erhalten.</p>
                 {played.length > 0 && (
                   <div className="swiss-cutoff-history">
                     <strong>Bereits entschieden</strong>
@@ -174,28 +174,10 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
             )}
 
             {isRoundRunning && lastRound && (
-              <div className="swiss-cutoff-mode">
-                <h3>{lastRound.kind === 'ROUND' ? 'Zusätzliche Entscheidungsrunde' : 'Jeder gegen Jeden'}</h3>
-                <p className="muted">Alle hier erfassten Ergebnisse fließen nur in die separate Entscheidung ein. Die ursprüngliche Schweizer Wertung und die BHZ bleiben unverändert.</p>
-                <div className="swiss-cutoff-fixture-list" aria-label="Entscheidungsspiele">
-                  {lastRound.matches.map((match, index) => {
-                    const finished = match.pointsA !== undefined && match.pointsB !== undefined;
-                    return (
-                      <button key={index} type="button" disabled={finished}
-                        className={index === activeIndex ? 'swiss-cutoff-fixture current' : 'swiss-cutoff-fixture'}
-                        onClick={() => { setSelectedFixture(index); clearInputs(); }}>
-                        <span>{match.sideA} – {match.sideB}</span>
-                        <strong>{finished ? `${match.pointsA}:${match.pointsB} ✓` : index === activeIndex ? 'Eingabe' : 'Offen'}</strong>
-                      </button>
-                    );
-                  })}
-                  {lastRound.bye && <div className="swiss-cutoff-fixture is-bye"><span>{lastRound.bye}</span><strong>Freilos</strong></div>}
-                </div>
-                {activeMatch && <div className="swiss-cutoff-active-game">
-                  <h4>{lastRound.matches.filter((match) => match.pointsA !== undefined).length + 1} von {lastRound.matches.length} Partien</h4>
-                  {entry(submitGame, activeMatch.sideA, activeMatch.sideB)}
-                </div>}
-                <div className="actions"><button type="button" className="btn" onClick={reset}>Zusatzspiele verwerfen und neu wählen</button></div>
+              <div className="swiss-cutoff-mode swiss-cutoff-redirect">
+                <h3>Phase 1.5 läuft in der Turnierleitung</h3>
+                <p>Die Entscheidungsspiele sind bereits angesetzt. Weist ihnen wie gewohnt Tische zu und tragt die Ergebnisse in der normalen Spielmaske ein.</p>
+                {onOpenControl && <button type="button" className="btn primary" onClick={onOpenControl}>Zur regulären Turnierleitung</button>}
               </div>
             )}
 
@@ -218,7 +200,7 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
             {mode === 'LOT' && (
               <div className="swiss-cutoff-mode">
                 <h3>Losentscheid vor Ort</h3>
-                <p>Die Auslosung findet <strong>physisch</strong> statt. Trage anschließend ein, welche {status.tie.slots === 1 ? 'Person' : 'Personen'} das Los gezogen {status.tie.slots === 1 ? 'hat' : 'haben'}. Die Software lost nicht selbst.</p>
+                <p>Zieht die Lose <strong>vor Ort</strong>. Markiert danach die {status.tie.slots === 1 ? 'qualifizierte Person' : `${status.tie.slots} qualifizierten Personen`}. Die Software führt selbst keine Auslosung durch.</p>
                 <div className="swiss-cutoff-lot-choices" role="group" aria-label="Ausgeloste Qualifizierte">
                   {status.tie.players.map((name) => (
                     <label key={name}>
