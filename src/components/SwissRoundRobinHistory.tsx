@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import type { StoredSwissCutoffDecision } from '@/services/mockSwissCutoffStore';
 import type { MockRuntimeMatch } from '@/services/mockRuntime';
 import { SwissStandingsTable } from '@/components/SwissStandingsTable';
+import { MatchResultDetails } from '@/components/MatchResultDetails';
+import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
+import { resultForMatchParticipant } from '@/services/matchPresentation';
 import { SwissRoundRobinMatrix } from '@/components/SwissRoundRobinMatrix';
 import { GroupMatchDayList, type GroupMatchDayItem } from '@/components/GroupMatchDayList';
 import { playoffBoundaryTie, playoffRankingsWithHeadToHead, type PlayoffRound } from '@/domain/swissCutoffPlayoff';
@@ -21,6 +25,7 @@ interface Props {
 export function SwissRoundRobinHistory({
   phaseNumber, decision, sport = 'table_tennis', matches = [], onEditResult, onOpenControl,
 }: Props) {
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const rounds = (decision.extraRounds ?? []).filter((round) => round.kind === 'ROUND_ROBIN');
   const names = [...new Set(rounds.flatMap((round) => round.matches.flatMap((m) => [m.sideA, m.sideB])))];
   const rules = sportScoring(sport);
@@ -94,12 +99,11 @@ export function SwissRoundRobinHistory({
             cutoffIndex={qualifyingPlaces > 0 && qualifyingPlaces < standings.length ? qualifyingPlaces - 1 : null}
             finalized={completed && Boolean(decision.winners?.length)}
             hideBuchholz
-            readOnly
             highlightPlayers={new Set(unresolved?.players ?? [])}
             lotParticipants={lotteryCandidates}
             lotWinners={lotteryWinners}
             decisionTags={decisionTags}
-            onSelectPlayer={() => {}}
+            onSelectPlayer={setSelectedPlayer}
             onShowBuchholz={() => {}}
           />
         </div>
@@ -115,6 +119,38 @@ export function SwissRoundRobinHistory({
         <h4>Spielplan und Ergebnisse</h4>
         <GroupMatchDayList matches={scheduledMatches} sport={sport} onEditResult={onEditResult} />
       </article>
+      {selectedPlayer && (
+        <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setSelectedPlayer(null)}>
+          <div className="prototype-modal player-games-modal" role="dialog" aria-modal="true"
+            aria-label={`Spieleübersicht ${selectedPlayer}`} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="player-games-modal-head">
+              <div><span className="badge">Phase {phaseNumber} · Jeder gegen Jeden</span><h2>{selectedPlayer}</h2></div>
+              <button className="btn small" type="button" onClick={() => setSelectedPlayer(null)}>Schließen</button>
+            </div>
+            <div className="player-games-list">
+              {scheduledMatches.filter((match) => match.sideA === selectedPlayer || match.sideB === selectedPlayer)
+                .map((match) => {
+                  const opponent = match.sideA === selectedPlayer ? match.sideB : match.sideA;
+                  const displayed = resultForMatchParticipant({ ...match, sport }, selectedPlayer);
+                  return (
+                    <div className="player-game-row" key={match.id}>
+                      <span className="muted">Spieltag {match.matchDay}</span>
+                      <strong>vs. {opponent}</strong>
+                      <span className="player-game-result-cell">
+                        <PlayerGameOutcome score={displayed.score} finished={match.status === 'played'} />
+                        <MatchResultDetails score={displayed.score} sets={displayed.sets} sport={sport}
+                          onOpenResult={match.status !== 'open' && onEditResult ? () => {
+                            setSelectedPlayer(null);
+                            onEditResult(match.id);
+                          } : undefined} />
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
+      )}
       {completed && unresolved && !decision.winners?.length && <p className="swiss-cutoff-still-tied" role="status">
         Der direkte Vergleich der gleichplatzierten Spieler führt zu keiner eindeutigen Qualifikation.
         Ein physischer Losentscheid zwischen {unresolved.players.join(', ')} ist erforderlich.
