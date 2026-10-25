@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MockPhaseInput } from '@/services/mockTournamentStore';
 import { createMockTournament, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
@@ -38,6 +39,7 @@ describe('Teilnehmerstatus und K.-o.-Spiel um Platz 3', () => {
     updateMockTournamentStatus(tournament.id, 'RUNNING');
     const first = tournament.stages[0];
     getMockStageMatches(tournament, first).forEach((match) => completeMockMatch(match.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]));
+    expect(approveMockProgress(tournament)?.kind).toBe('STAGE');
     const standings = buildMockGroups(tournament, first)[0].standings;
     expect(isStageCompleted(tournament, first)).toBe(true);
     const second = tournament.stages[1];
@@ -69,6 +71,7 @@ describe('Teilnehmerstatus und K.-o.-Spiel um Platz 3', () => {
     expect(isStageCompleted(tournament, stage)).toBe(false);
     expect(skipMockThirdPlaceMatch(tournament, third!.id)).toBe(true);
     expect(getMockStoredResult(third!.id)?.thirdPlaceSkipped).toBe(true);
+    expect(approveMockProgress(tournament)?.kind).toBe('STAGE');
     expect(isStageCompleted(tournament, stage)).toBe(true);
     expect(getMockParticipantProgress(tournament, third!.sideA)).toEqual({ status: 'Ausgeschieden', placement: 'Platz 3' });
     expect(getMockParticipantProgress(tournament, third!.sideB)).toEqual({ status: 'Ausgeschieden', placement: 'Platz 3' });
