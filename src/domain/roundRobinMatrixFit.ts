@@ -3,6 +3,8 @@
  * Very small viewports inevitably result in small lettering; cell titles
  * preserve the full names and scores.
  */
+export const MATRIX_AUTOFIT_MAX_PLAYERS = 32;
+
 export interface RoundRobinMatrixFit {
   nameWidth: number;
   cellWidth: number;
@@ -12,7 +14,7 @@ export interface RoundRobinMatrixFit {
 }
 
 export function roundRobinMatrixFit(players: number, width: number, height: number): RoundRobinMatrixFit {
-  const count = Math.max(1, Math.min(32, Math.trunc(players) || 1));
+  const count = Math.max(1, Math.min(MATRIX_AUTOFIT_MAX_PLAYERS, Math.trunc(players) || 1));
   const availableWidth = Math.max(1, width - 2);
   const availableHeight = Math.max(1, height - 2);
   const nameWidth = Math.min(190, Math.max(38, availableWidth * (count >= 20 ? 0.17 : 0.23)));
