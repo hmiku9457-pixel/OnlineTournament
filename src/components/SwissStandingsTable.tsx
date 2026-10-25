@@ -121,7 +121,7 @@ export function SwissStandingsTable({
                     <td className="swiss-stat-difference"><SwissDifference value={row.ballDifference} /></td>
                   </>}
                 </tr>
-                {index === cutoffIndex && <SwissQualificationCutoffRow qualifyingPlaces={qualifyingPlaces} finalized={finalized} />}
+                {index === cutoffIndex && <SwissQualificationCutoffRow qualifyingPlaces={qualifyingPlaces} finalized={finalized} colSpan={hideBuchholz ? 9 : 10} />}
               </Fragment>
             );
           })}
