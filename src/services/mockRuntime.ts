@@ -775,6 +775,7 @@ export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: Moc
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
   const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
+  if (previous?.adminConfirmed) throw new Error('Dieses Ergebnis wurde durch die Turnierleitung bestätigt und kann nur dort korrigiert werden.');
   if (tournament && !canEditMockMatch(tournament, matchId)) throw new Error('Dieses Ergebnis ist gesperrt und wurde nicht gespeichert.');
   const next: StoredMatchResult = { ...previous, matchId, sets, status, decisionSide: undefined, decision: undefined, extraTimeProgress, forcedWinner: undefined, thirdPlaceSkipped: undefined, confirmedA: previous?.confirmedA, confirmedB: previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
@@ -1367,6 +1368,9 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
   const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
+  if (previous?.adminConfirmed && !confirmedByAdmin) {
+    throw new Error('Dieses Ergebnis wurde durch die Turnierleitung bestätigt und darf nicht durch Spieler überschrieben werden.');
+  }
   if (tournament && !canEditMockMatch(tournament, matchId)) throw new Error('Dieses Ergebnis ist gesperrt und wurde nicht gespeichert.');
   const previousFinal = previous?.status === 'FINISHED';
   if (previousFinal) {
