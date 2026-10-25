@@ -144,10 +144,17 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
   return [...byRound.entries()].map(([label, roundMatches]) => ({ label, matches: roundMatches }));
 }
 
+/** Namen der Spieler, die in dieser Schweizer Phase einen Sieg durch Freilos erhalten haben.
+ *  Ein Name kann mehrfach vorkommen, wenn ein Spieler mehr als ein Freilos erhalten hat. */
+export function getSwissByeWinners(tournament: DemoTournament, stage: TournamentStage): string[] {
+  return getMockStageBaseMatches(tournament, stage)
+    .filter((match) => match.autoWinner && match.sideB === 'Freilos')
+    .map((match) => match.autoWinner!);
+}
+
 export function buildSwissStandings(tournament: DemoTournament, stage: TournamentStage): MockStanding[] {
   const order = getSwissOrder(tournament, stage);
-  const automaticWins = getMockStageBaseMatches(tournament, stage).filter((match) => match.autoWinner && match.sideB === 'Freilos').map((match) => match.autoWinner!);
-  return computeStandings(order, getMockStageMatches(tournament, stage), tournament.sport, automaticWins);
+  return computeStandings(order, getMockStageMatches(tournament, stage), tournament.sport, getSwissByeWinners(tournament, stage));
 }
 
 
