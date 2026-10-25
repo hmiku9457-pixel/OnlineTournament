@@ -85,7 +85,7 @@ describe('Korrekturen an abgeschlossenen K.-o.- und Schweizer Runden', () => {
     expect(assignMockMatchToTable(t, regenerated[0].id, 'Tisch 1')).toBe(true);
     expect(canEditMockMatch(t, first[0].id)).toBe(false);
     const stored = getMockStoredResult(first[0].id);
-    expect(() => completeMockMatch(first[0].id, win)).toThrow('gesperrt');
+    expect(() => completeMockMatch(first[0].id, win, 'FINISHED', true)).toThrow('gesperrt');
     expect(getMockStoredResult(first[0].id)).toEqual(stored);
   });
 });
