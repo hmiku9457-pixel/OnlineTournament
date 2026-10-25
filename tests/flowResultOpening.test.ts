@@ -24,7 +24,7 @@ describe('Ergebnisse im Turnierverlauf direkt öffnen', () => {
     expect(active).toContain('<button');
     expect(active).toContain('bracket-result-action');
     expect(passive).not.toContain('<button');
-    const fallback = renderToStaticMarkup(createElement(BracketScoreCells, { onOpenResult: ignoreClick }, '3'));
+    const fallback = renderToStaticMarkup(createElement(BracketScoreCells, { onOpenResult: ignoreClick, children: '3' }));
     expect(fallback).toContain('bracket-result-action');
     expect(fallback).toContain('>3</button>');
   });
