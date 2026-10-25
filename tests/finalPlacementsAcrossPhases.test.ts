@@ -49,7 +49,7 @@ function finish(t: ReturnType<typeof tournament>, index: number) {
 }
 
 describe('Gesamtrangfolge über mehrere Phasen', () => {
-  it('vergibt 1–10, 11–15 und 16–20 ohne Dopplungen; Rückzug behält einen sportlich passenden Rang', () => {
+  it('berücksichtigt sportlich geteilte Endränge; Rückzug behält seinen Wertungsrang', () => {
     const t = tournament([
       { type: 'SWISS', entrants: 20 },
       { type: 'GROUPS', entrants: 15, groups: 5 },
@@ -74,11 +74,11 @@ describe('Gesamtrangfolge über mehrere Phasen', () => {
     expect(standings.filter((row) => row.stageIndex === 1)).toHaveLength(5);
     expect(standings.filter((row) => row.stageIndex === 0)).toHaveLength(5);
     expect(standings.filter((row) => row.stageIndex === 1).every((row) => /^Platz 11–15 · 3\. Platz Gruppe [A-E]$/.test(row.placement ?? ''))).toBe(true);
-    expect(standings.filter((row) => row.stageIndex === 0).map((row) => row.placementNumber)).toEqual([16, 17, 18, 19, 20]);
+    expect(standings.filter((row) => row.stageIndex === 0).map((row) => row.placementNumber)).toEqual([16, 17, 17, 17, 17]);
     const withdrawnRow = standings.find((row) => row.name === withdrawn);
     expect(withdrawnRow).toMatchObject({ status: 'Zurückgezogen', stageIndex: 0 });
     expect(withdrawnRow?.placementNumber).toBeGreaterThanOrEqual(16);
-    expect(withdrawnRow?.placement).toMatch(/^Platz (1[6-9]|20)$/);
+    expect(withdrawnRow?.placement).toMatch(/^Platz (16|17–20)$/);
   });
 
   it('zeigt das Schweizer Standing nur während der zugehörigen laufenden Schweizer Phase', () => {
@@ -97,7 +97,7 @@ describe('Gesamtrangfolge über mehrere Phasen', () => {
     expect(recordForCurrent(second, second.sideA)).toBe('0:0');
   });
 
-  it('vergibt bei reiner Vierergruppenphase geteilte Plätze 9–12 / 13–16 mit Gruppenbezug', () => {
+  it('vergibt bei exakt identischen Gruppenergebnissen geteilte Plätze 5–16', () => {
     const t = createMockTournament({
       name: 'Vier Gruppen', sport: 'table_tennis', discipline: 'SINGLES', tables: 8, minimumMatches: 1,
       participantNames: names.slice(0, 16), estimatedDurationMinutes: 100,
@@ -107,7 +107,7 @@ describe('Gesamtrangfolge über mehrere Phasen', () => {
     updateMockTournamentStatus(t.id, 'RUNNING');
     finish(t, 0);
     const standings = getMockFinalStandings(getMockTournament(t.id));
-    expect(standings.filter((r) => r.placement?.startsWith('Platz 9–12 · 3. Platz Gruppe'))).toHaveLength(4);
-    expect(standings.filter((r) => r.placement?.startsWith('Platz 13–16 · 4. Platz Gruppe'))).toHaveLength(4);
+    expect(standings.filter((r) => r.placement?.startsWith('Platz 1–4 · 1. Platz Gruppe'))).toHaveLength(4);
+    expect(standings.filter((r) => r.placement?.startsWith('Platz 5–16 · 2. Platz Gruppe'))).toHaveLength(12);
   });
 });
