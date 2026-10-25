@@ -2478,3 +2478,34 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .swiss-cutoff-modal { width: calc(100vw - 16px); padding: 14px; }
   .swiss-cutoff-game-entry .current-set-entry-row.has-entry-help { grid-template-columns: 85px minmax(0,1fr) 28px; }
 }
+
+/* Sichtbare Auslosungskennzeichnung statt unsichtbarem alphabetischen Tiebreak. */
+.swiss-lot-tag {
+  display: inline-flex; align-items: center; white-space: nowrap;
+  margin-left: 5px; padding: 2px 6px; border-radius: 5px;
+  border: 1px solid #d0d5dd; font-size: .66rem; line-height: 1.25; font-weight: 700;
+}
+.swiss-lot-tag.is-qualified { color: #067647; border-color: #a6f4c5; background: #ecfdf3; }
+.swiss-lot-tag.is-eliminated { color: #b42318; border-color: #fecdca; background: #fef3f2; }
+.swiss-cutoff-round-explainer { margin-top: 12px; line-height: 1.5; }
+.swiss-intermediate-nav { border-style: dashed; }
+.swiss-intermediate-stage { min-width: 0; }
+.swiss-intermediate-grid {
+  display: grid; grid-template-columns: minmax(280px, 1fr) minmax(300px, 1.2fr); gap: 14px;
+}
+.swiss-intermediate-grid .card { min-width: 0; padding: 14px; }
+.swiss-intermediate-grid h4 { margin: 0 0 12px; }
+.swiss-intermediate-game {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px; padding: 9px 4px; border-bottom: 1px solid #eaecf0; align-items: center;
+  font-size: .82rem;
+}
+.swiss-intermediate-game > span:last-child { text-align: right; }
+.swiss-intermediate-qualified {
+  display: inline-flex; margin-left: 7px; padding: 2px 5px;
+  background: #ecfdf3; border: 1px solid #a6f4c5; border-radius: 4px;
+  color: #067647; font-size: .67rem; font-weight: 700;
+}
+@media (max-width: 780px) {
+  .swiss-intermediate-grid { grid-template-columns: 1fr; }
+}
