@@ -65,8 +65,7 @@ describe('Zusatzbestätigung im Schweizer System', () => {
     saveMockMatchSets(match.id, oneSet, 'LIVE');
     expect(getMockRuntimeMatches(tournament).find((game) => game.id === match.id)?.status).toBe('LIVE');
     completeMockMatch(match.id, oneSet, 'FINISHED', true);
-    expect(getMockStoredResult(match.id)?.confirmedA).toBe(true);
-    expect(getMockStoredResult(match.id)?.confirmedB).toBe(true);
+    expect(getMockStoredResult(match.id)?.adminConfirmed).toBe(true);
     expect(countMockOpenConfirmations(tournament)).toBe(0);
   });
 
