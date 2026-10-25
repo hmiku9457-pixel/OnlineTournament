@@ -226,8 +226,10 @@ function StageCompetitionView({
     const swissCutoffIndex = getSwissCutoffRowIndex(standings, qualifyingPlaces, withdrawnSwissPlayers);
     const swissFinished = isStageCompleted(tournament, stage);
     const cutoffHistory = getSwissCutoffHistory(tournament, stage);
-    const lotPlayers = cutoffHistory?.mode === 'LOT' ? new Set(cutoffHistory.eliminated.concat(cutoffHistory.winners ?? [])) : undefined;
-    const lotWinners = cutoffHistory?.mode === 'LOT' ? new Set(cutoffHistory.winners ?? []) : undefined;
+    const lotPlayers = cutoffHistory?.mode === 'LOT'
+      ? new Set(cutoffHistory.lotPlayers ?? cutoffHistory.eliminated.concat(cutoffHistory.winners ?? [])) : undefined;
+    const lotWinners = cutoffHistory?.mode === 'LOT'
+      ? new Set(cutoffHistory.lotWinners ?? cutoffHistory.winners ?? []) : undefined;
     const decisionTags: Record<string, { label: string; qualified: boolean }> = {};
     if (cutoffHistory?.winners?.length && cutoffHistory.mode !== 'LOT') {
       const chosen = new Set(cutoffHistory.winners);
@@ -1230,6 +1232,7 @@ export function TournamentControlPage() {
             <SwissRoundRobinHistory
               phaseNumber={`${tournament.stages.indexOf(selectedRoundRobinStage) + 1}.5`}
               decision={selectedRoundRobinDecision}
+              sport={tournament.sport}
               matches={getSwissRoundRobinMatches(tournament, selectedRoundRobinStage)}
               onEditResult={setAdminEditMatchId}
               onOpenControl={() => setTab('overview')}
