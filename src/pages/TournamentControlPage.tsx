@@ -475,7 +475,16 @@ function ParticipantEditFields({ name, code, usedCodes, onSave, onCancel }: {
   return (
     <form className="participant-edit-grid" onSubmit={(event) => {
       event.preventDefault();
-      if (!onSave(firstName, lastName, playerCode)) setError('Bitte vollständigen Namen, eindeutigen Teilnehmer und 4–8 Ziffern beim Spielercode angeben.');
+      const trimmedCode = playerCode.trim();
+      if (!/^\d{4,8}$/.test(trimmedCode)) {
+        setError('Der Spielercode muss aus 4 bis 8 Ziffern bestehen.');
+        return;
+      }
+      if (usedCodes.has(trimmedCode)) {
+        setError('Dieser Spielercode ist bereits vergeben. Bitte einen anderen Code verwenden.');
+        return;
+      }
+      if (!onSave(firstName, lastName, trimmedCode)) setError('Bitte vollständigen, eindeutigen Teilnehmernamen und einen gültigen Spielercode angeben.');
     }}>
       <label className="field"><span>Vorname</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="off" /></label>
       <label className="field"><span>Nachname</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="off" /></label>
