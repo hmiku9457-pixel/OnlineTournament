@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import type { MockPhaseInput } from '@/services/mockTournamentStore';
@@ -133,7 +134,7 @@ describe('Turnierleitung - Regressionen', () => {
     expect(standings.find((row) => row.name === 'Testspieler 1')?.balls).toBe('0:99');
     expect(canEditMockMatch(tournament, played!.id)).toBe(false);
     const previouslySaved = getMockStoredResult(played!.id);
-    completeMockMatch(played!.id, [{ number: 1, sideAScore: 11, sideBScore: 0 }]);
+    expect(() => completeMockMatch(played!.id, [{ number: 1, sideAScore: 11, sideBScore: 0 }])).toThrow('gesperrt');
     expect(getMockStoredResult(played!.id)).toEqual(previouslySaved);
   });
 
@@ -149,6 +150,7 @@ describe('Turnierleitung - Regressionen', () => {
     getMockStageMatches(tournament, stage).filter((match) => match.status !== 'FINISHED').forEach((match) => {
       completeMockMatch(match.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]);
     });
+    expect(approveMockProgress(tournament)?.kind).toBe('ROUND');
     const secondRound = getMockStageBaseMatches(tournament, stage).filter((match) => match.round === 'Runde 2');
     expect(secondRound.length).toBeGreaterThan(0);
     expect(secondRound.every((match) => match.sideA !== withdrawn && match.sideB !== withdrawn)).toBe(true);
@@ -161,11 +163,12 @@ describe('Turnierleitung - Regressionen', () => {
     updateMockTournamentStatus(tournament.id, 'RUNNING');
     const matches = getMockStageMatches(tournament, first);
     matches.forEach((match) => completeMockMatch(match.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]));
+    expect(approveMockProgress(tournament)?.kind).toBe('STAGE');
     expect(isStageCompleted(tournament, first)).toBe(true);
     const saved = getMockStoredResult(matches[0].id);
     expect(startStage(tournament, tournament.stages[1])).toBe(true);
     expect(canEditFinishedResults(tournament, first)).toBe(false);
-    completeMockMatch(matches[0].id, [{ number: 1, sideAScore: 7, sideBScore: 11 }]);
+    expect(() => completeMockMatch(matches[0].id, [{ number: 1, sideAScore: 7, sideBScore: 11 }])).toThrow('gesperrt');
     expect(getMockStoredResult(matches[0].id)).toEqual(saved);
   });
   it('besetzt nach einem Rückzug zwischen zwei Phasen die Qualifikation neu', () => {
@@ -176,6 +179,7 @@ describe('Turnierleitung - Regressionen', () => {
     updateMockTournamentStatus(tournament.id, 'RUNNING');
     const matches = getMockStageMatches(tournament, first);
     matches.forEach((match) => completeMockMatch(match.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]));
+    expect(approveMockProgress(tournament)?.kind).toBe('STAGE');
     expect(isStageCompleted(tournament, first)).toBe(true);
 
     const originalQualifiers = getStageEntrants(tournament, second);
@@ -188,6 +192,7 @@ describe('Turnierleitung - Regressionen', () => {
     expect(newQualifiers).not.toContain(withdrawn);
     expect(newQualifiers.some((participant) => !originalQualifiers.includes(participant))).toBe(true);
     // Die zurückliegende Gruppenphase bleibt als Historie erhalten.
+    expect(approveMockProgress(tournament)?.kind).toBe('STAGE');
     expect(isStageCompleted(tournament, first)).toBe(true);
   });
 
