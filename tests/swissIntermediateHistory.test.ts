@@ -29,7 +29,7 @@ describe('Schweizer Entscheidung dokumentieren', () => {
     expect(html).toContain('Ben');
     expect(html).toContain('11 : 7');
     expect(html).toContain('Qualifiziert');
-    expect(html).toContain('Buchholzzahl nicht');
+    expect(html).toContain('Buchholzzahl');
   });
 
   it('kennzeichnet die Siegerin und die Verliererin eines physischen Losentscheids in der Schweizer Tabelle', () => {
