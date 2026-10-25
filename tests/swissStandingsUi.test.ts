@@ -23,15 +23,15 @@ const common = {
   onShowBuchholz: () => {},
 };
 
-describe('Schweizer Tabelle: Spalten und BHZ-Hilfe', () => {
-  it('ordnet S / N / BHZ / Sätze / ± / Bälle / ± und zeigt die BHZ normalgewichtig', () => {
+describe('Schweizer Tabelle: Spalten und Sonneborn-Berger-Hilfe', () => {
+  it('ordnet S / N / SB / Sätze / ± / Bälle / ± und zeigt die SB normalgewichtig', () => {
     const html = renderToStaticMarkup(createElement(SwissStandingsTable, { ...common, scoreSport: false, scoreUnit: 'Bälle' }));
     const head = html.split('<thead>')[1].split('</thead>')[0];
     const headers = [...head.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)]
       .map(([, value]) => value.replace(/<[^>]+>/g, '').replace('?', '').trim());
-    expect(headers).toEqual(['#', 'Teilnehmer', 'Sp.', 'S', 'N', 'BHZ', 'Sätze', '±', 'Bälle', '±']);
+    expect(headers).toEqual(['#', 'Teilnehmer', 'Sp.', 'S', 'N', 'SB', 'Sätze', '±', 'Bälle', '±']);
     expect(head.match(/swiss-stat-ratio swiss-stat-group-start/g)).toHaveLength(2);
-    expect(head).toContain('Buchholzzahl (BHZ) erklären');
+    expect(head).toContain('Sonneborn-Berger-Wertung (SB) erklären');
     const body = html.split('<tbody>')[1].split('</tbody>')[0];
     expect(body).toContain('class="swiss-buchholz-cell">12,5</td>');
     expect(body).toContain('<span class="swiss-difference-sign">+</span><span class="swiss-difference-digits">4</span>');
@@ -44,12 +44,12 @@ describe('Schweizer Tabelle: Spalten und BHZ-Hilfe', () => {
     expect(html).not.toContain('swiss-ranking-legend');
   });
 
-  it('ordnet für Ergebnissportarten die BHZ nach S / U / N und die Differenz hinter die Tore', () => {
+  it('ordnet für Ergebnissportarten die SB nach S / U / N und die Differenz hinter die Tore', () => {
     const html = renderToStaticMarkup(createElement(SwissStandingsTable, { ...common, scoreSport: true, scoreUnit: 'Tore' }));
     const head = html.split('<thead>')[1].split('</thead>')[0];
     const headers = [...head.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)]
       .map(([, value]) => value.replace(/<[^>]+>/g, '').replace('?', '').trim());
-    expect(headers).toEqual(['#', 'Teilnehmer', 'Sp.', 'S', 'U', 'N', 'BHZ', 'Tore', '±', 'Pkt.']);
+    expect(headers).toEqual(['#', 'Teilnehmer', 'Sp.', 'S', 'U', 'N', 'SB', 'Tore', '±', 'Pkt.']);
     expect(head.match(/swiss-stat-ratio swiss-stat-group-start/g)).toHaveLength(1);
     expect(html).toContain('class="swiss-buchholz-cell">12,5</td>');
     expect(html).toContain('<span class="swiss-difference-sign">+</span><span class="swiss-difference-digits">16</span>');
@@ -70,11 +70,11 @@ describe('Schweizer Tabelle: Spalten und BHZ-Hilfe', () => {
   it('zeigt im Modal die Formel, ein Rechenbeispiel und die zur Phase passende Freilos-Obergrenze', () => {
     const html = renderToStaticMarkup(createElement(SwissBuchholzHelpModal, { rounds: 5, onClose: () => {} }));
     expect(html).toContain('role="dialog"');
-    expect(html).toContain('Was ist die Buchholzzahl (BHZ)?');
-    expect(html).toContain('Gegner mit 4, 3 und 2,5');
-    expect(html).toContain('BHZ von <strong>9,5</strong>');
+    expect(html).toContain('Was ist die Sonneborn-Berger-Wertung (SB)?');
+    expect(html).toContain('Sieg gegen einen Spieler mit 4 Punkten');
+    expect(html).toContain('SB 5,5</strong>');
     expect(html).toContain('5 Runden');
-    expect(html).toContain('bei 2,5 pro Freilos');
+    expect(html).toContain('2,5</strong> SB pro Freilos');
     expect(html).toContain('Kampfloses Spiel');
     expect(html).toContain('Schließen');
   });
