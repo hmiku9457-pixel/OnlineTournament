@@ -26,7 +26,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, getPendingMockApproval, approveMockProgress, abortMockTournament, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
 import { canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getStageWithdrawalLabel, getWithdrawalLabel } from '@/services/mockWithdrawals';
 import { getMockConfirmedFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
@@ -78,6 +78,7 @@ function statusLabel(status: TournamentStatus) {
     case 'PAUSED': return 'Pausiert';
     case 'REGISTRATION': return 'Anmeldung';
     case 'FINISHED': return 'Beendet';
+    case 'ABORTED': return 'Abgebrochen';
     default: return status;
   }
 }
@@ -508,6 +509,9 @@ export function TournamentControlPage() {
   const [selectedStageId, setSelectedStageId] = useState<string>(() => initialTournament.stages[0]?.id ?? '');
   const [phaseCompletedModal, setPhaseCompletedModal] = useState<{ stageName: string; nextStageName?: string } | null>(null);
   const [startModal, setStartModal] = useState<{ kind: 'tournament' | 'phase'; stageName: string } | null>(null);
+  const [approvalModalOpen, setApprovalModalOpen] = useState(false);
+  const [abortModalOpen, setAbortModalOpen] = useState(false);
+  const [abortReason, setAbortReason] = useState('');
   const [skipThirdMatchId, setSkipThirdMatchId] = useState<string | null>(null);
   const [adminEditMatchId, setAdminEditMatchId] = useState<string | null>(null);
   const [matchFilters, setMatchFilters] = useState<ControlMatchFilters>({ status: 'all', phase: '', table: '', search: '' });
@@ -564,6 +568,11 @@ export function TournamentControlPage() {
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table) && !blockedTables.has(table));
   const activeStage = useMemo(() => getActiveStage(phaseSource.tournament), [phaseSource]);
+  const pendingApproval = useMemo(() => getPendingMockApproval(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
+  const reviewMatches = pendingApproval && activeStage
+    ? getMockStageMatches(tournament, activeStage).filter((match) => pendingApproval.kind === 'STAGE'
+      || Number(match.id.match(/-sw-r(\d+)-m\d+$/)?.[1] ?? 0) === pendingApproval.round)
+    : [];
   const pendingSwissCutoff = useMemo(() => getPendingSwissCutoff(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   // Intermediate round-robin fixtures run on the ordinary tournament tables;
   // the choice dialog only reappears if all playoff games remain deadlocked.
@@ -660,6 +669,30 @@ export function TournamentControlPage() {
 
   function setStatus(status: TournamentStatus) {
     setTournament(updateMockTournamentStatus(tournament.id, status));
+  }
+
+  function confirmPendingApproval() {
+    const approved = approveMockProgress(tournament);
+    if (!approved) {
+      setApprovalModalOpen(false);
+      setAssignmentMessage('Die Freigabe ist nicht mehr möglich. Bitte aktuelle Spiele und Ergebnisse prüfen.');
+      refreshRuntime();
+      return;
+    }
+    setApprovalModalOpen(false);
+    refreshRuntime();
+    if (approved.kind === 'ROUND') setSelectedStageId(approved.stageId);
+  }
+
+  function confirmTournamentAbort() {
+    if (!abortMockTournament(tournament, abortReason)) {
+      setAssignmentMessage('Das Turnier konnte nicht abgebrochen werden.');
+      return;
+    }
+    setAbortModalOpen(false);
+    setApprovalModalOpen(false);
+    setAbortReason('');
+    refreshRuntime();
   }
 
   function openWaitingQueue(onlyAssignable = false) {
@@ -863,6 +896,7 @@ export function TournamentControlPage() {
                         <SportResultEntry
                           match={match}
                           swissAdminEntry={(activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')}
+                          directorEntry
                           onSaved={refreshRuntime}
                           onCompleted={() => {
                             // Only close the hall's table modal after the match has actually finished.
@@ -947,12 +981,12 @@ export function TournamentControlPage() {
             {editableStage && ['GROUPS', 'SWISS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(editableStage.type) && (
               <button className={tab === 'flow' ? 'btn control-edit-phase-active' : 'btn'} type="button" aria-current={tab === 'flow' ? 'page' : undefined} onClick={() => setTab('flow')}>Aktuelle Phase bearbeiten</button>
             )}
-            {!tournament.hasStarted && tournament.status !== 'FINISHED' && (
+            {!tournament.hasStarted && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
               <button className="btn primary" type="button" onClick={requestStartTournament}
                 disabled={!tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
                 title={tournament.stages[0] && getStageEntrants(tournament, tournament.stages[0]).length < 2 ? 'Mindestens zwei aktive Teilnehmer erforderlich' : undefined}>Turnier starten</button>
             )}
-            {tournament.hasStarted && activeStage && tournament.status !== 'FINISHED' && (
+            {tournament.hasStarted && activeStage && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
               <>
                 {tournament.status === 'RUNNING' ? (
                   <button className="btn" type="button" onClick={() => setStatus('PAUSED')}>Turnier pausieren</button>
@@ -961,8 +995,14 @@ export function TournamentControlPage() {
                 )}
               </>
             )}
-            {tournament.hasStarted && !activeStage && nextStartableStage && tournament.status !== 'FINISHED' && (
+            {tournament.hasStarted && !activeStage && nextStartableStage && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
               <button className="btn primary" type="button" onClick={requestStartNextPhase}>Nächste Phase starten</button>
+            )}
+            {pendingApproval && <button className="btn primary" type="button" onClick={() => setApprovalModalOpen(true)}>
+              {pendingApproval.kind === 'ROUND' ? `Runde ${pendingApproval.round} prüfen` : 'Phase freigeben'}
+            </button>}
+            {!['FINISHED', 'ABORTED'].includes(tournament.status) && (
+              <button className="btn small" type="button" onClick={() => setAbortModalOpen(true)}>Turnier abbrechen</button>
             )}
           </div>
         </div>
@@ -973,6 +1013,15 @@ export function TournamentControlPage() {
           <button className={tab === item.id ? 'control-tab active' : 'control-tab'} key={item.id} type="button" aria-current={tab === item.id ? 'page' : undefined} onClick={() => setTab(item.id)}>{item.label}</button>
         ))}
       </nav>
+
+      {pendingApproval && <div className="control-review-alert no-print" role="status">
+        <div><strong>{pendingApproval.kind === 'ROUND'
+          ? `Schweizer Runde ${pendingApproval.round} ist abgeschlossen – Freigabe erforderlich`
+          : `${pendingApproval.stageName} ist abgeschlossen – Abschlusskontrolle erforderlich`}</strong>
+          <p>Alle {pendingApproval.completedMatches} Begegnungen sind abgeschlossen. Die Turnierleitung muss die Ergebnisse prüfen, bevor das Turnier fortgesetzt wird.</p>
+        </div>
+        <button type="button" className="btn primary" onClick={() => setApprovalModalOpen(true)}>Ergebnisse prüfen und freigeben</button>
+      </div>}
 
       <div className="control-guide-strip no-print">
         <div className="control-guide-copy"><strong>{guide.title}</strong><span>{guide.text}</span></div>
@@ -1195,7 +1244,7 @@ export function TournamentControlPage() {
           <div className="control-section-head">
             <div>
               <div className="control-help-title"><h2>Turnierverlauf</h2><ControlHelpButton topic="phases" onOpen={setHelpTopic} /></div>
-              <p className="muted">Eine Phase endet automatisch mit dem letzten abgeschlossenen Spiel. Danach wird die nächste Phase bearbeitbar; mit ihrem Start wird die Auslosung eingefroren.</p>
+              <p className="muted">Nach jeder Schweizer Runde und jeder Phase prüft die Turnierleitung die Ergebnisse und gibt den nächsten Schritt ausdrücklich frei. Mit dem Start einer Phase wird die Auslosung eingefroren.</p>
             </div>
           </div>
           <div className="phase-lifecycle-strip phase-navigation-strip">
@@ -1203,7 +1252,7 @@ export function TournamentControlPage() {
               const completed = isStageCompleted(tournament, stage);
               const started = isStageStarted(tournament, stage);
               const editable = isStageEditable(tournament, stage);
-              const state = completed ? 'Beendet' : started ? 'Läuft' : editable ? 'Bearbeitbar' : 'Gesperrt';
+              const state = completed ? 'Beendet' : pendingApproval?.stageId === stage.id ? 'Freigabe offen' : started ? 'Läuft' : editable ? 'Bearbeitbar' : 'Gesperrt';
               const decision = stage.type === 'SWISS' ? getSwissCutoffHistory(tournament, stage) : null;
               const roundRobin = decision?.extraRounds?.some((round) => round.kind === 'ROUND_ROBIN');
               return (
@@ -1446,6 +1495,7 @@ export function TournamentControlPage() {
               <SportResultEntry
                 match={found.match}
                 swissAdminEntry={stage?.type === 'SWISS' || stage?.type === 'KNOCKOUT'}
+                directorEntry
                 allowEditFinished={canEditMockMatch(tournament, found.match.id)}
                 onSaved={refreshRuntime}
                 onCompleted={() => {
@@ -1466,6 +1516,54 @@ export function TournamentControlPage() {
             <div className="actions">
               <button className="btn primary" type="button" onClick={() => { if (skipMockThirdPlaceMatch(tournament, skipThirdMatchId)) refreshRuntime(); setSkipThirdMatchId(null); }}>Beide auf Platz 3 setzen</button>
               <button className="btn" type="button" onClick={() => setSkipThirdMatchId(null)}>Abbrechen</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {approvalModalOpen && pendingApproval && (
+        <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setApprovalModalOpen(false)}>
+          <section className="prototype-modal control-approval-modal" role="dialog" aria-modal="true" aria-labelledby="control-approval-title" onMouseDown={(event) => event.stopPropagation()}>
+            <span className="badge ready">ABSCHLUSSKONTROLLE</span>
+            <h2 id="control-approval-title">{pendingApproval.kind === 'ROUND'
+              ? `Schweizer Runde ${pendingApproval.round} freigeben?`
+              : `${pendingApproval.stageName} abschließen?`}</h2>
+            <p>Bitte kontrolliere die folgenden {reviewMatches.length} Begegnungen. Mit der Freigabe bestätigt die Turnierleitung deren Ergebnisse verbindlich.</p>
+            <div className="control-approval-results">
+              {reviewMatches.map((match) => (
+                <div className="control-approval-result" key={match.id}>
+                  <span>{match.sideA} – {match.sideB}</span>
+                  <strong>{match.score}</strong>
+                </div>
+              ))}
+            </div>
+            {pendingApproval.kind === 'STAGE' && <p className="muted">
+              {pendingApproval.isLastStage
+                ? 'Nach der Bestätigung wird das gesamte Turnier regulär beendet und die Endplatzierung verbindlich.'
+                : `Danach stehen die Qualifikanten für „${pendingApproval.nextStageName}“ fest. Diese Folgephase kann anschließend vorbereitet werden.`}
+            </p>}
+            {pendingApproval.kind === 'ROUND' && <p className="muted">Anschließend werden die Paarungen der nächsten Schweizer Runde erstellt. Bei einer Korrektur vor deren Spielbeginn muss diese Runde erneut freigegeben werden.</p>}
+            <div className="actions">
+              <button className="btn primary" type="button" onClick={confirmPendingApproval}>
+                {pendingApproval.kind === 'ROUND' ? 'Runde verbindlich freigeben' : pendingApproval.isLastStage ? 'Phase bestätigen und Turnier beenden' : 'Phase verbindlich freigeben'}
+              </button>
+              <button className="btn" type="button" onClick={() => { setSelectedStageId(pendingApproval.stageId); setTab('flow'); setApprovalModalOpen(false); }}>Im Turnierverlauf prüfen</button>
+              <button className="btn" type="button" onClick={() => setApprovalModalOpen(false)}>Später</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {abortModalOpen && (
+        <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setAbortModalOpen(false)}>
+          <section className="prototype-modal control-abort-modal" role="dialog" aria-modal="true" aria-labelledby="control-abort-title" onMouseDown={(event) => event.stopPropagation()}>
+            <span className="badge">TURNIERVERWALTUNG</span>
+            <h2 id="control-abort-title">Turnier wirklich abbrechen?</h2>
+            <p>Offene Spiele werden ohne Sieger beendet. Bereits eingetragene Ergebnisse und der Turnierverlauf bleiben erhalten. Es wird kein regulärer Turniersieger ermittelt.</p>
+            <label htmlFor="control-abort-reason">Begründung (optional)</label>
+            <textarea id="control-abort-reason" rows={3} value={abortReason} onChange={(event) => setAbortReason(event.target.value)}
+              placeholder="Beispielsweise: Turnier vorzeitig wegen Hallenschließung beendet" />
+            <div className="actions">
+              <button className="btn danger" type="button" onClick={confirmTournamentAbort}>Turnier endgültig abbrechen</button>
+              <button className="btn" type="button" onClick={() => setAbortModalOpen(false)}>Zurück</button>
             </div>
           </section>
         </div>
