@@ -161,6 +161,32 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(history?.winners).toHaveLength(2);
   });
 
+  it('erzwingt bei einer 1:1-Dreier-Konstellation nach direktem Vergleich einen Losentscheid', () => {
+    const t = create(6, 2);
+    completeRound(t);
+    expect(beginSwissCutoffPlayoff(t, 'ROUND_ROBIN')).toBeNull();
+    const pending = getPendingSwissCutoff(t)!;
+    const [a, b, c] = pending.tie.players;
+    const preferredWinners = new Set([`${a}|${b}`, `${b}|${c}`, `${c}|${a}`]);
+    const games = pending.decision!.extraRounds![0].matches;
+    games.forEach((game, index) => {
+      const sideAWins = preferredWinners.has(`${game.sideA}|${game.sideB}`);
+      const result = sideAWins ? [11, 7] : [7, 11];
+      expect(recordSwissCutoffPlayoffResult(t, index, result[0], result[1])).toBeNull();
+    });
+    expect(isStageCompleted(t, t.stages[0])).toBe(false);
+    expect(getPendingSwissCutoff(t)?.decision?.winners).toBeUndefined();
+    expect(recordSwissCutoffLot(t, [a])).toContain('genau 2');
+    expect(recordSwissCutoffLot(t, [a, b])).toBeNull();
+    expect(isStageCompleted(t, t.stages[0])).toBe(true);
+    expect(getStageEntrants(t, t.stages[1])).toEqual([a, b]);
+    const history = getSwissCutoffHistory(t, t.stages[0]);
+    expect(history?.mode).toBe('LOT');
+    expect(history?.lotPlayers).toEqual(expect.arrayContaining([a, b, c]));
+    expect(history?.lotWinners).toEqual([a, b]);
+    expect(history?.extraRounds?.[0].matches).toHaveLength(3);
+  });
+
   it('führt Phase 1.5 über normale Warteschlange, Tischzuweisung und Ergebniserfassung aus', () => {
     const t = create(6, 2);
     completeRound(t);
