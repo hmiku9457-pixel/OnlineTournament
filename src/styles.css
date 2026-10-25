@@ -2840,3 +2840,42 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   line-height: 1;
   padding: 0;
 }
+
+
+/* Organizer review gates and destructive tournament action. */
+.control-review-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  margin: 0.75rem 0 1rem;
+  border: 1px solid var(--border, #a7b5c6);
+  border-radius: 0.75rem;
+  background: var(--panel, #f5f8fc);
+}
+.control-review-alert p { margin: 0.3rem 0 0; }
+.control-review-alert .btn { flex-shrink: 0; }
+.control-approval-modal { width: min(650px, 96vw); }
+.control-approval-results {
+  max-height: min(40vh, 360px);
+  overflow-y: auto;
+  margin: 0.75rem 0 1rem;
+  border: 1px solid var(--border, #b9c5d4);
+  border-radius: 0.55rem;
+}
+.control-approval-result {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid var(--border, #b9c5d4);
+}
+.control-approval-result:last-child { border-bottom: 0; }
+.control-approval-result strong { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.control-abort-modal textarea { display: block; width: 100%; margin: 0.5rem 0 1rem; }
+@media (max-width: 700px) {
+  .control-review-alert { flex-direction: column; align-items: stretch; }
+  .control-review-alert .btn { width: 100%; }
+  .control-approval-result { font-size: 0.9rem; }
+}
