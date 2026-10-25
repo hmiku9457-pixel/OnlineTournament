@@ -1436,11 +1436,31 @@ export function TournamentControlPage() {
               </button>
             )}
           </div>
-          <div className="participant-statistics" role="group" aria-label="Teilnehmerstatistik">
-            <div><strong>{participantStatistics.total}</strong><span>Teilnehmer gesamt</span></div>
-            <div><strong>{participantStatistics.remaining}</strong><span>Noch im Turnier</span></div>
-            <div><strong>{participantStatistics.eliminated}</strong><span>Ausgeschieden</span></div>
-            <div><strong>{participantStatistics.withdrawn}</strong><span>Zurückgezogen</span></div>
+          <div className="participant-summary-toolbar">
+            <div className="participant-statistics" role="group" aria-label="Teilnehmerstatistik">
+              <div><strong>{participantStatistics.total}</strong><span>Teilnehmer gesamt</span></div>
+              <div><strong>{participantStatistics.remaining}</strong><span>Noch im Turnier</span></div>
+              <div><strong>{participantStatistics.eliminated}</strong><span>Ausgeschieden</span></div>
+              <div><strong>{participantStatistics.withdrawn}</strong><span>Zurückgezogen</span></div>
+            </div>
+            <div className="participant-search-bar no-print">
+              <label>Teilnehmer suchen
+                <input type="search" value={participantQuery} placeholder="Name oder Spielercode …" onChange={(event) => setParticipantQuery(event.target.value)} />
+              </label>
+              <label>Status
+                <select value={participantStatusFilter} onChange={(event) => setParticipantStatusFilter(event.target.value as typeof participantStatusFilter)}>
+                  <option value="all">Alle Teilnehmer</option>
+                  <option value="active">Aktiv</option>
+                  <option value="playing">Spielt gerade</option>
+                  <option value="eliminated">Ausgeschieden</option>
+                  <option value="withdrawn">Zurückgezogen</option>
+                </select>
+              </label>
+              <div className="participant-filter-meta">
+                <span className="participant-filter-count" role="status">{filteredParticipantProgress.length} von {participantProgress.length} Teilnehmern</span>
+                {(participantQuery || participantStatusFilter !== 'all') && <button className="btn small" type="button" onClick={() => { setParticipantQuery(''); setParticipantStatusFilter('all'); }}>Zurücksetzen</button>}
+              </div>
+            </div>
           </div>
           {showParticipantAdd && !tournament.hasStarted && (
             <form className={`participant-add-panel${tournament.discipline === 'DOUBLES' ? ' is-doubles' : ''}`} onSubmit={(event) => { event.preventDefault(); handleAddParticipant(); }}>
@@ -1467,22 +1487,7 @@ export function TournamentControlPage() {
               {participantAddError && <p role="alert" className="field-error">{participantAddError}</p>}
             </form>
           )}
-          <div className="participant-search-bar no-print">
-            <label>Teilnehmer suchen
-              <input type="search" value={participantQuery} placeholder="Name oder Spielercode …" onChange={(event) => setParticipantQuery(event.target.value)} />
-            </label>
-            <label>Status
-              <select value={participantStatusFilter} onChange={(event) => setParticipantStatusFilter(event.target.value as typeof participantStatusFilter)}>
-                <option value="all">Alle Teilnehmer</option>
-                <option value="active">Aktiv</option>
-                <option value="playing">Spielt gerade</option>
-                <option value="eliminated">Ausgeschieden</option>
-                <option value="withdrawn">Zurückgezogen</option>
-              </select>
-            </label>
-            <span className="participant-filter-count" role="status">{filteredParticipantProgress.length} von {participantProgress.length} Teilnehmern</span>
-            {(participantQuery || participantStatusFilter !== 'all') && <button className="btn small" type="button" onClick={() => { setParticipantQuery(''); setParticipantStatusFilter('all'); }}>Zurücksetzen</button>}
-          </div>
+
           {filteredParticipantProgress.length === 0 && <p className="participant-filter-empty">Keine Teilnehmer gefunden. Suchbegriff oder Statusfilter anpassen.</p>}
           <div className="participant-control-list participant-control-grid">
             {filteredParticipantProgress.map(({ name: participant, progress, index }) => {
