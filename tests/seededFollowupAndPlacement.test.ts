@@ -97,7 +97,7 @@ describe('Setzungen und Gruppenrangbereiche', () => {
       expect(slots.indexOf(first) < 4).not.toBe(slots.indexOf(second) < 4);
     }
   });
-  it('zeigt bei 4 Gruppen gemeinsame Platzbereiche 9–12 und 13–16', () => {
+  it('zeigt bei identischer sportlicher Bilanz einen gemeinsamen Platzbereich', () => {
     const tournament = createMockTournament({
       name: 'Nur Gruppen', sport: 'table_tennis', discipline: 'SINGLES', tables: 8, minimumMatches: 1,
       participantNames: players, estimatedDurationMinutes: 100,
@@ -108,8 +108,8 @@ describe('Setzungen und Gruppenrangbereiche', () => {
     expect(isStageCompleted(tournament, tournament.stages[0])).toBe(true);
     const groups = buildMockGroups(tournament, tournament.stages[0]);
     for (const group of groups) {
-      expect(getMockParticipantProgress(tournament, group.standings[2].name).placement).toContain('Platz 9–12');
-      expect(getMockParticipantProgress(tournament, group.standings[3].name).placement).toContain('Platz 13–16');
+      expect(getMockParticipantProgress(tournament, group.standings[2].name).placement).toContain('Platz 5–16');
+      expect(getMockParticipantProgress(tournament, group.standings[3].name).placement).toContain('Platz 5–16');
     }
   });
   it('erzwingt bei Admin-K.-o.-BO1 die zusätzliche Bestätigung', () => {
