@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { MatchSet } from '@/domain/types';
 import type { BracketScoreStage } from '@/domain/bracketScoreStages';
 
 interface StageProps { stages: BracketScoreStage[] }
@@ -24,6 +25,18 @@ export function BracketStageValues({ stages, sideIndex, onOpenResult }: StagePro
   return onOpenResult
     ? <button className="bracket-stage-grid bracket-stage-values bracket-result-action" type="button" style={style} onClick={onOpenResult} title="Ergebnis öffnen">{values}</button>
     : <span className="bracket-stage-grid bracket-stage-values" style={style}>{values}</span>;
+}
+
+
+/** Nur die gewonnene Satzpunktzahl fett darstellen – unabhängig vom Matchsieger. */
+export function BracketSetScores({ sets, sideIndex }: { sets: readonly MatchSet[]; sideIndex: 0 | 1 }) {
+  return <>
+    {sets.map((set, index) => {
+      const own = sideIndex === 0 ? set.sideAScore : set.sideBScore;
+      const opposing = sideIndex === 0 ? set.sideBScore : set.sideAScore;
+      return <span key={set.number ?? index} className={own > opposing ? 'bracket-set-score is-set-winner' : 'bracket-set-score'}>{own}</span>;
+    })}
+  </>;
 }
 
 export function BracketScoreCells({ children, onOpenResult }: { children: ReactNode; onOpenResult?: () => void }) {

@@ -7,7 +7,7 @@ import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
-import { BracketLiveStatus, BracketScoreCells, BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
+import { BracketLiveStatus, BracketScoreCells, BracketSetScores, BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
 import { BracketRoundViewport } from '@/components/BracketRoundViewport';
 import { SwissRoundCard } from '@/components/SwissRoundCard';
 import { getSwissCutoffRowIndex, SwissQualificationCutoffRow } from '@/components/SwissQualificationCutoff';
@@ -354,7 +354,7 @@ function StageCompetitionView({
                           const winner = match.winner === side;
                           return (
                             <div
-                              className={`${winner ? 'winner ' : ''}${scoreStages.length ? 'bracket-stage-row ' : ''}${isEditableSlot ? 'editable-bracket-slot' : ''}${isEditableSlot && pinnedSlots.has(slotIndex) ? ' pinned-slot' : ''}${side === 'Freilos' ? ' bye' : ''}`.trim()}
+                              className={`${winner ? 'winner ' : ''}${!scoreSport && match.sets?.length ? 'bracket-set-row ' : ''}${scoreStages.length ? 'bracket-stage-row ' : ''}${isEditableSlot ? 'editable-bracket-slot' : ''}${isEditableSlot && pinnedSlots.has(slotIndex) ? ' pinned-slot' : ''}${side === 'Freilos' ? ' bye' : ''}`.trim()}
                               key={`${match.id}-${sideIndex}`}
                               draggable={isEditableSlot && !pinnedSlots.has(slotIndex)}
                               onDragStart={(event) => {
@@ -381,7 +381,7 @@ function StageCompetitionView({
                                 {previousFinishLabels[side] && <small className="participant-origin">{previousFinishLabels[side]}</small>}
                               </span>
                               {scoreStages.length ? <BracketStageValues stages={scoreStages} sideIndex={sideIndex as 0 | 1} onOpenResult={openBracketResult} /> : <BracketScoreCells onOpenResult={openBracketResult}>
-                                {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
+                                {!scoreSport && <BracketSetScores sets={match.sets ?? []} sideIndex={sideIndex as 0 | 1} />}
                                 <strong>{match.score === 'W.O.' ? (winner ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : match.score === 'Freilos' && side === 'Freilos' ? 'BYE' : ''}</strong>
                               </BracketScoreCells>}
                             </div>
@@ -403,10 +403,10 @@ function StageCompetitionView({
                           {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz · nicht ausgetragen</span>}
                           <BracketStageHeader stages={scoreStages} />
                           {[match.sideA, match.sideB].map((side, sideIndex) => (
-                            <div className={`${match.winner === side ? 'winner ' : ''}${scoreStages.length ? 'bracket-stage-row' : ''}`.trim()} key={`${match.id}-${sideIndex}`}>
+                            <div className={`${match.winner === side ? 'winner ' : ''}${!scoreSport && match.sets?.length ? 'bracket-set-row ' : ''}${scoreStages.length ? 'bracket-stage-row' : ''}`.trim()} key={`${match.id}-${sideIndex}`}>
                               <span>{side}</span>
                               {scoreStages.length ? <BracketStageValues stages={scoreStages} sideIndex={sideIndex as 0 | 1} onOpenResult={openBracketResult} /> : <BracketScoreCells onOpenResult={openBracketResult}>
-                                {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
+                                {!scoreSport && <BracketSetScores sets={match.sets ?? []} sideIndex={sideIndex as 0 | 1} />}
                                 <strong>{match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : ''}</strong>
                               </BracketScoreCells>}
                             </div>
