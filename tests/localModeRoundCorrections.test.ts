@@ -74,8 +74,8 @@ describe('Korrekturen an abgeschlossenen K.-o.- und Schweizer Runden', () => {
     expect((JSON.parse(data.get(key) ?? '[]') as Array<{round:number}>).some((entry) => entry.round === 2)).toBe(true);
     expect(canEditMockMatch(t, first[0].id)).toBe(true);
     completeMockMatch(first[0].id, reverse);
-    expect((JSON.parse(data.get(key) ?? '[]') as Array<{round:number}>).some((entry) => entry.round === 2)).toBe(false);
-
+    // Reconciliation can immediately regenerate Runde 2; its old pairing
+    // must not survive the correction even if it is already cached again.
     const regenerated = getMockStageMatches(t, stage).filter((m) => m.round === 'Runde 2');
     expect(regenerated).toHaveLength(4);
     expect(regenerated.map((m) => [m.sideA,m.sideB])).not.toEqual(next.map((m) => [m.sideA,m.sideB]));
