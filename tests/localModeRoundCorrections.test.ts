@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { startFirstStage } from '@/services/mockPhaseLifecycle';
@@ -56,7 +57,7 @@ describe('Korrekturen an abgeschlossenen K.-o.- und Schweizer Runden', () => {
     expect(assignMockMatchToTable(t, semifinalAfter[0].id, 'Tisch 1')).toBe(true);
     expect(canEditMockMatch(t, quarters[0].id)).toBe(false);
     const stored = getMockStoredResult(quarters[0].id);
-    completeMockMatch(quarters[0].id, win);
+    expect(() => completeMockMatch(quarters[0].id, win)).toThrow('gesperrt');
     expect(getMockStoredResult(quarters[0].id)).toEqual(stored);
     expect(unassignMockMatch(t, semifinalAfter[0].id)).toBe(true);
     expect(canEditMockMatch(t, quarters[0].id)).toBe(false);
@@ -68,21 +69,23 @@ describe('Korrekturen an abgeschlossenen K.-o.- und Schweizer Runden', () => {
     const first = getMockStageMatches(t, stage).filter((m) => m.round === 'Runde 1');
     expect(first).toHaveLength(4);
     first.forEach((m) => completeMockMatch(m.id, win));
+    expect(approveMockProgress(t)?.kind).toBe('ROUND');
     const next = getMockStageMatches(t, stage).filter((m) => m.round === 'Runde 2');
     expect(next).toHaveLength(4);
     const key = 'online-tournament:swiss-round-fixtures:v1';
     expect((JSON.parse(data.get(key) ?? '[]') as Array<{round:number}>).some((entry) => entry.round === 2)).toBe(true);
     expect(canEditMockMatch(t, first[0].id)).toBe(true);
     completeMockMatch(first[0].id, reverse);
-    // Reconciliation can immediately regenerate Runde 2; its old pairing
-    // must not survive the correction even if it is already cached again.
+    // Eine Korrektur entzieht der Folgerunde ihre Freigabe.
+    expect(getMockStageMatches(t, stage).filter((m) => m.round === 'Runde 2')).toHaveLength(0);
+    expect(approveMockProgress(t)?.kind).toBe('ROUND');
     const regenerated = getMockStageMatches(t, stage).filter((m) => m.round === 'Runde 2');
     expect(regenerated).toHaveLength(4);
     expect(regenerated.map((m) => [m.sideA,m.sideB])).not.toEqual(next.map((m) => [m.sideA,m.sideB]));
     expect(assignMockMatchToTable(t, regenerated[0].id, 'Tisch 1')).toBe(true);
     expect(canEditMockMatch(t, first[0].id)).toBe(false);
     const stored = getMockStoredResult(first[0].id);
-    completeMockMatch(first[0].id, win);
+    expect(() => completeMockMatch(first[0].id, win)).toThrow('gesperrt');
     expect(getMockStoredResult(first[0].id)).toEqual(stored);
   });
 });
