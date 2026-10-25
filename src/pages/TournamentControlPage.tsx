@@ -90,6 +90,7 @@ function matchStatusLabel(status: string) {
     case 'LIVE': return 'Läuft';
     case 'CONFIRMATION': return 'Endergebnis prüfen';
     case 'FINISHED': return 'Abgeschlossen';
+    case 'CANCELLED': return 'Nicht ausgetragen';
     default: return status;
   }
 }
@@ -1252,7 +1253,7 @@ export function TournamentControlPage() {
               const completed = isStageCompleted(tournament, stage);
               const started = isStageStarted(tournament, stage);
               const editable = isStageEditable(tournament, stage);
-              const state = completed ? 'Beendet' : pendingApproval?.stageId === stage.id ? 'Freigabe offen' : started ? 'Läuft' : editable ? 'Bearbeitbar' : 'Gesperrt';
+              const state = completed ? 'Beendet' : tournament.status === 'ABORTED' ? 'Abgebrochen' : pendingApproval?.stageId === stage.id ? 'Freigabe offen' : started ? 'Läuft' : editable ? 'Bearbeitbar' : 'Gesperrt';
               const decision = stage.type === 'SWISS' ? getSwissCutoffHistory(tournament, stage) : null;
               const roundRobin = decision?.extraRounds?.some((round) => round.kind === 'ROUND_ROBIN');
               return (
