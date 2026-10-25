@@ -44,7 +44,7 @@ describe('Schweizer Entscheidung dokumentieren', () => {
     expect(html.indexOf('swiss-intermediate-matrix')).toBeLessThan(html.indexOf('swiss-intermediate-schedule'));
     expect(html).toContain('Spieltag 1');
     expect(html).not.toContain('>BHZ<');
-    expect(html).toContain('Buchholzzahl');
+    expect(html).toContain('Sonneborn-Berger-Wertung');
   });
 
   it('ordnet in der Kreuztabelle Ergebnisse je Blickrichtung zu und markiert offene und diagonale Zellen', () => {
