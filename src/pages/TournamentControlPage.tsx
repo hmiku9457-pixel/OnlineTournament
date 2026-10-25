@@ -1134,9 +1134,11 @@ export function TournamentControlPage() {
                   type="button"
                   onClick={() => setSelectedStageId(stage.id)}
                 >
-                  <span>Phase {index + 1}</span>
-                  <strong>{stage.name}</strong>
-                  <span className="badge">{state}</span>
+                  <span className="phase-nav-topline">
+                    <span className="phase-nav-index">Phase {index + 1}</span>
+                    <span className="badge phase-nav-status">{state}</span>
+                  </span>
+                  <strong className="phase-nav-name">{stage.name}</strong>
                 </button>
               );
             })}

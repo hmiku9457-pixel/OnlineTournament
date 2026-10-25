@@ -2164,7 +2164,8 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .swiss-round-match-row .group-match-side { min-width: 0; }
 .swiss-round-match-row .group-match-side:last-child { text-align: right; }
 .swiss-round-match-row .match-result-trigger { font-variant-numeric: tabular-nums; font-size: .77rem; }
-.swiss-round-match-row .group-match-live-dot { left: -5px; }
+.swiss-round-match-status { display: inline-flex; align-items: center; gap: 5px; }
+.swiss-round-live-indicator { display: inline-block; flex: 0 0 6px; width: 6px; height: 6px; border-radius: 50%; background: #12b76a; }
 .swiss-round-match-row .swiss-bye-score { font-size: .69rem; color: #667085; font-weight: 800; }
 @media (max-width: 1120px) {
   .swiss-progress-layout { grid-template-columns: minmax(0, 1fr); }
@@ -2174,3 +2175,28 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 @media (max-width: 720px) {
   .swiss-round-match-list { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Kompakter Turnierverlauf: weniger Leerraum und zweizeilige Phasenkarten. */
+.competition-flow-page { gap: 12px; }
+.competition-flow-page .phase-navigation-strip {
+  margin: 0;
+  padding: 3px 0;
+  gap: 8px;
+}
+.competition-flow-page .prestart-stage-block { gap: 9px; margin-bottom: 10px; }
+.phase-nav-button {
+  display: grid;
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: 9px 11px;
+}
+.phase-nav-topline { display: flex; align-items: center; justify-content: space-between; min-width: 0; gap: 8px; }
+.phase-nav-index { color: #667085; font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+.phase-nav-button .phase-nav-name { font-size: .89rem; line-height: 1.25; overflow-wrap: anywhere; }
+.phase-nav-button .phase-nav-status { justify-self: auto; margin: 0; padding: 3px 8px; font-size: .68rem; line-height: 1.25; white-space: nowrap; text-transform: none; letter-spacing: normal; }
+.phase-nav-button.läuft .phase-nav-status { color: #067647; background: #d1fadf; }
+.phase-nav-button.bearbeitbar .phase-nav-status { color: #175cd3; background: #dbeafe; }
+.phase-nav-button.beendet .phase-nav-status { color: #6941c6; background: #ede9fe; }
+.phase-nav-button.gesperrt .phase-nav-status { color: #475467; background: #eaecf0; }

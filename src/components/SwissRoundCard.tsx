@@ -65,11 +65,13 @@ export function SwissRoundCard({ fixtures, matches, sport, editable, notice, onE
           return (
             <div className={`swiss-round-match${isLive ? ' is-live' : isFinished ? ' is-finished' : ''}`} key={fixture.id}>
               <div className="swiss-round-match-meta">
-                <span>{isBye ? 'Freilos' : isLive ? 'Läuft' : isFinished ? 'Beendet' : match?.status === 'READY' ? 'Zugewiesen' : match?.status === 'CONFIRMATION' ? 'Ergebnis prüfen' : editable ? 'Vorschau' : 'Wartet'}</span>
+                <span className="swiss-round-match-status">
+                  {isLive && <span className="swiss-round-live-indicator" aria-hidden="true" />}
+                  {isBye ? 'Freilos' : isLive ? 'Läuft' : isFinished ? 'Beendet' : match?.status === 'READY' ? 'Zugewiesen' : match?.status === 'CONFIRMATION' ? 'Ergebnis prüfen' : editable ? 'Vorschau' : 'Wartet'}
+                </span>
                 {assigned && <span>{venueName ? venueName(match.table!) : match.table}</span>}
               </div>
               <div className={`group-match-row swiss-round-match-row${isLive ? ' live' : ''}`}>
-                {isLive && <span className="group-match-live-dot" role="img" aria-label="Laufendes Spiel" />}
                 <span className="group-match-side" title={fixture.sideA}>{fixture.sideA}</span>
                 {isBye
                   ? <strong className="swiss-bye-score">Frei</strong>

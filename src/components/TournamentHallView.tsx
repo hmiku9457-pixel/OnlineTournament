@@ -58,7 +58,8 @@ export function TournamentHallView({
                         if (!canAssign || match || blocked) return;
                         event.preventDefault();
                         const matchId = event.dataTransfer.getData('text/mock-match-id');
-                        if (matchId && onAssignToTable(matchId, table)) onSelectTable(table);
+                        event.stopPropagation();
+                        if (matchId) onAssignToTable(matchId, table);
                       }}
                     >
                       <span className="tournament-hall-table-head"><strong>{displayName}</strong><span>{match ? 'läuft' : blocked ? 'gesperrt' : 'frei'}</span></span>

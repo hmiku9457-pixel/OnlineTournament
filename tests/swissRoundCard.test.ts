@@ -24,6 +24,9 @@ describe('Schweizer Spiele der aktuellen Runde', () => {
     expect(html).toContain('Runde 2 · Spiele');
     expect(html).toContain('2 von 3 abgeschlossen');
     expect(html).toContain('1 live');
+    expect(html).toContain('swiss-round-match-status');
+    expect((html.match(/swiss-round-live-indicator/g) ?? [])).toHaveLength(1);
+    expect(html).not.toContain('group-match-live-dot');
     expect(html).toContain('Anna');
     expect(html).toContain('Ben');
     expect(html).toContain('Tisch 2');
