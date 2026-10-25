@@ -826,7 +826,22 @@ export function TournamentControlPage() {
                     {match ? (
                       <>
                         <span className="muted">{match.phase} · {match.round}{sportScoring(match.sport).mode === 'sets' ? ` · BO${match.bestOf}` : ''}</span>
-                        <SportResultEntry match={match} swissAdminEntry={(activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')} onSaved={refreshRuntime} compact sideARecord={swissRecordFor(match, match.sideA)} sideBRecord={swissRecordFor(match, match.sideB)} />
+                        <SportResultEntry
+                          match={match}
+                          swissAdminEntry={(activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')}
+                          onSaved={refreshRuntime}
+                          onCompleted={() => {
+                            // Only close the hall's table modal after the match has actually finished.
+                            // Saving a live set or interim score must leave the entry open.
+                            if (tableView === 'hall' && tournament.venueLayout) {
+                              setSelectedHallTable(null);
+                              setMovingMatchId(null);
+                            }
+                          }}
+                          compact
+                          sideARecord={swissRecordFor(match, match.sideA)}
+                          sideBRecord={swissRecordFor(match, match.sideB)}
+                        />
                         {!(sportScoring(match.sport).mode === 'sets' && requiresFinalApproval(match.bestOf, match.sets ?? [], (activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')) && match.status !== 'FINISHED') && (
                           <div className="table-operational-actions">
                             <button className="btn small" type="button" onClick={() => setMovingMatchId((old) => old === match.id ? null : match.id)}>{venue.singular} wechseln</button>
