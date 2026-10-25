@@ -2589,3 +2589,70 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 @media (max-width: 1000px) {
   .swiss-intermediate-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Phase 1.5: Platzierung links, direkte Begegnungen rechts, Gruppenspielplan darunter. */
+.swiss-intermediate-grid {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.swiss-intermediate-matrix { min-width: 0; padding: 14px; }
+.swiss-intermediate-matrix-head {
+  display: flex; align-items: baseline; flex-wrap: wrap;
+  gap: 3px 10px; margin-bottom: 12px;
+}
+.swiss-intermediate-matrix-head h4 { margin: 0; }
+.swiss-intermediate-matrix-head .muted { font-size: .73rem; }
+.swiss-intermediate-matrix-scroll {
+  overflow-x: auto; max-width: 100%; border: 1px solid #e4e7ec;
+  border-radius: 8px;
+}
+.swiss-intermediate-matrix-table {
+  width: 100%; border-spacing: 0; border-collapse: separate;
+  font-size: .76rem; font-variant-numeric: tabular-nums;
+}
+.swiss-intermediate-matrix-table th, .swiss-intermediate-matrix-table td {
+  min-width: 49px; text-align: center;
+  padding: 10px 7px; border-right: 1px solid #f2f4f7;
+  border-bottom: 1px solid #eaecf0; white-space: nowrap;
+}
+.swiss-intermediate-matrix-table tr:last-child > * { border-bottom: none; }
+.swiss-intermediate-matrix-table tr > *:last-child { border-right: none; }
+.swiss-intermediate-matrix-table thead th { background: #f9fafb; color: #667085; font-weight: 800; }
+.swiss-intermediate-matrix-table .swiss-matrix-name {
+  min-width: 140px; max-width: 200px;
+  text-align: left; position: sticky; left: 0; z-index: 1;
+  background: #fff; box-shadow: 1px 0 0 #eaecf0;
+}
+.swiss-intermediate-matrix-table thead .swiss-matrix-name { background: #f9fafb; z-index: 2; }
+.swiss-intermediate-matrix-table tbody .swiss-matrix-name > span:last-child {
+  display: inline-block; max-width: 155px; overflow: hidden;
+  text-overflow: ellipsis; vertical-align: middle;
+}
+.swiss-matrix-seed { display: inline-block; margin-right: 6px; color: #667085; font-size: .7rem; }
+.swiss-intermediate-matrix-table .swiss-matrix-diagonal { background: #f2f4f7; color: #98a2b3; font-weight: 800; }
+.swiss-intermediate-matrix-table .swiss-matrix-result.win { background: #ecfdf3; color: #067647; font-weight: 800; }
+.swiss-intermediate-matrix-table .swiss-matrix-result.loss { background: #fef3f2; color: #b42318; font-weight: 800; }
+.swiss-intermediate-matrix-table .swiss-matrix-result.draw { background: #f9fafb; color: #475467; font-weight: 700; }
+.swiss-intermediate-matrix-table .swiss-matrix-result.live { background: #eff8ff; color: #175cd3; font-weight: 800; }
+.swiss-intermediate-matrix-table .swiss-matrix-result.open { color: #98a2b3; }
+.swiss-matrix-result button {
+  border: 0; background: transparent; color: inherit; font: inherit;
+  font-weight: inherit; cursor: pointer; padding: 3px 1px;
+}
+.swiss-matrix-result button:hover { text-decoration: underline; }
+.swiss-matrix-result button:focus-visible { outline: 2px solid #175cd3; border-radius: 4px; outline-offset: 2px; }
+.swiss-matrix-footnote { margin: 9px 0 0; font-size: .72rem; }
+.swiss-intermediate-schedule.group-overview-card {
+  width: 100%; max-width: none; margin-top: 14px; padding: 14px;
+}
+.swiss-intermediate-schedule .group-match-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 16px;
+}
+.swiss-intermediate-schedule .group-match-day { min-width: 0; }
+@media (max-width: 1120px) {
+  .swiss-intermediate-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 730px) {
+  .swiss-intermediate-schedule .group-match-list { grid-template-columns: 1fr; }
+}
