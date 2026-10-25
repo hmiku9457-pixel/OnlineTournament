@@ -1097,8 +1097,13 @@ export function beginSwissCutoffPlayoff(tournament: DemoTournament, kind: Playof
     const count = addSwissExtraRound(tournament.id, current.stageId);
     if (!count) return 'Es können keine weiteren Schweizer Runden angesetzt werden.';
     const stage = tournament.stages.find((item) => item.id === current.stageId)!;
-    const fixtures = getMockStageBaseMatches(tournament, stage);
     const round = getTotalSwissRoundCount(tournament, stage);
+    // Choosing an extra Swiss round is itself the director's approval of
+    // the completed preceding round; no duplicate confirmation is required.
+    approveSwissRound(tournament, stage, round - 1);
+    recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung',
+      action: 'SWISS_ROUND_APPROVED', description: `Schweizer Runde ${round - 1} fuer Zusatzrunde freigegeben` });
+    const fixtures = getMockStageBaseMatches(tournament, stage);
     recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'SWISS_TIE_SET',
       description: `Zusätzliche Schweizer Runde ${round} mit allen verbleibenden Teilnehmenden eröffnet (${fixtures.filter((match) => match.round === `Runde ${round}`).length} Paarungen inklusive Freilosen).` });
     return null;
