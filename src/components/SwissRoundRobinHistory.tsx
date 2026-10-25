@@ -79,8 +79,10 @@ export function SwissRoundRobinHistory({
         <button type="button" className="btn primary" onClick={onOpenControl}>Zur Tischzuweisung und Ergebniseingabe</button>
       </div>}
       <div className="swiss-intermediate-grid">
-        <div className="swiss-intermediate-standings">
-          <h4>Entscheidungstabelle</h4>
+        <div className="card swiss-intermediate-standings">
+          <div className="swiss-intermediate-panel-heading">
+            <h4>Entscheidungstabelle</h4>
+          </div>
           <SwissStandingsTable
             standings={standings}
             scoreSport={scoreSport}
