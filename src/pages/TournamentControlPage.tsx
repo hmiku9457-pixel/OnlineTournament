@@ -463,14 +463,19 @@ function ParticipantEditFields({ name, code, onSave, onCancel }: {
   const [playerCode, setPlayerCode] = useState(code);
   const [error, setError] = useState('');
   return (
-    <div className="participant-edit-grid">
-      <label className="field"><span>Vorname</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} /></label>
-      <label className="field"><span>Nachname</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} /></label>
-      <label className="field"><span>Spielercode</span><input value={playerCode} onChange={(event) => setPlayerCode(event.target.value)} inputMode="numeric" /></label>
-      <div className="actions"><button className="btn small primary" type="button" onClick={() => { if (!onSave(firstName, lastName, playerCode)) setError('Bitte vollständigen Namen, eindeutigen Teilnehmer und 4–8 Ziffern beim Spielercode angeben.'); }}>Speichern</button>
-        <button className="btn small" type="button" onClick={onCancel}>Abbrechen</button></div>
-      {error && <span className="field-error participant-edit-error">{error}</span>}
-    </div>
+    <form className="participant-edit-grid" onSubmit={(event) => {
+      event.preventDefault();
+      if (!onSave(firstName, lastName, playerCode)) setError('Bitte vollständigen Namen, eindeutigen Teilnehmer und 4–8 Ziffern beim Spielercode angeben.');
+    }}>
+      <label className="field"><span>Vorname</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="off" /></label>
+      <label className="field"><span>Nachname</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="off" /></label>
+      <label className="field"><span>Spielercode</span><input value={playerCode} onChange={(event) => setPlayerCode(event.target.value)} inputMode="numeric" autoComplete="off" /></label>
+      <div className="actions participant-edit-actions">
+        <button className="btn small primary" type="submit">Speichern</button>
+        <button className="btn small" type="button" onClick={onCancel}>Abbrechen</button>
+      </div>
+      {error && <span role="alert" className="field-error participant-edit-error">{error}</span>}
+    </form>
   );
 }
 
@@ -1407,7 +1412,7 @@ export function TournamentControlPage() {
                       : <button className="btn small danger-outline" type="button" onClick={() => requestParticipantWithdrawal(participant)}>Zurückziehen</button>}
                   </div>
                   {participantPanel?.name === participant && (
-                    <div className="participant-inline-panel">
+                    <div className={participantPanel.mode === 'edit' ? 'participant-inline-panel is-editing' : 'participant-inline-panel'}>
                       {participantPanel.mode === 'edit' ? (
                         <>
                           <ParticipantEditFields key={participant} name={participant} code={tournament.participantCodes?.[participant] ?? String(4100 + index).slice(-4)}
