@@ -2234,3 +2234,14 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   height: 2px;
   background: #75aaff;
 }
+
+/* Kurze Erfolgsmeldung direkt im Button, ohne Layoutsprung. */
+.draw-action-feedback { position: relative; white-space: nowrap; transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease; }
+.draw-action-feedback .draw-action-original.is-hidden { visibility: hidden; }
+.draw-action-feedback .draw-action-confirmation {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding: inherit; white-space: nowrap;
+}
+.draw-action-feedback.is-saved, .draw-action-feedback.is-saved:disabled {
+  background: #dcfae6; border-color: #75e0a7; color: #067647; opacity: 1; cursor: default;
+}

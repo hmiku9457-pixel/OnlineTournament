@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
+import { DrawActionButton } from '@/components/DrawActionButton';
 import { StageCard } from '@/components/StageCard';
 import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
@@ -317,11 +318,18 @@ function StageCompetitionView({
           {editable && (
             <div className="actions">
               {stage.type === 'KNOCKOUT' && ['GROUPS', 'SWISS'].includes(tournament.stages[tournament.stages.findIndex((entry) => entry.id === stage.id) - 1]?.type ?? '') && (
-                <button className="btn small" type="button" title="Setzliste aus der Vorphase: P1 gegen Pn, P1/P2 in verschiedenen Hälften; Freilose an die bestplatzierten Teilnehmer. Vorherige Pins werden gelöst." onClick={() => { if (applySeededBracketSlots(tournament, stage)) onDrawChanged?.(); }}>Brackets nach Seeding zuteilen</button>
+                <DrawActionButton
+                  label="Brackets nach Seeding zuteilen"
+                  title="Setzliste aus der Vorphase: P1 gegen Pn, P1/P2 in verschiedenen Hälften; Freilose an die bestplatzierten Teilnehmer. Vorherige Pins werden gelöst."
+                  onAction={() => applySeededBracketSlots(tournament, stage)}
+                  onChanged={() => onDrawChanged?.()}
+                />
               )}
-              <button className="btn small" type="button" onClick={() => { if (randomizeBracketSlots(tournament, stage)) onDrawChanged?.(); }}>
-                Neue Zufallsverteilung
-              </button>
+              <DrawActionButton
+                label="Neue Zufallsverteilung"
+                onAction={() => randomizeBracketSlots(tournament, stage)}
+                onChanged={() => onDrawChanged?.()}
+              />
             </div>
           )}
         </div>

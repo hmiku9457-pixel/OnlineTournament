@@ -1,4 +1,5 @@
 import type { DragEvent } from 'react';
+import { DrawActionButton } from '@/components/DrawActionButton';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import {
@@ -84,14 +85,17 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
             <p className="muted">Teilnehmer direkt greifen und in die gewünschte Gruppe ziehen. Der Stand wird sofort gespeichert.</p>
           </div>
           <div className="actions">
-            {precededBySwiss && <button className="btn small" type="button"
+            {precededBySwiss && <DrawActionButton
+              label="Tabellen nach Seeding erstellen"
               title="Nach Platzierung der abgeschlossenen Schweizer Phase schlangenförmig auf die Gruppen verteilen"
-              onClick={() => { if (applySeededGroupAssignments(tournament, stage)) changed(); }}>
-              Tabellen nach Seeding erstellen
-            </button>}
-            <button className="btn small" type="button" onClick={() => {
-              if (randomizeGroupAssignments(tournament, stage)) changed();
-            }}>Neue Zufallsverteilung</button>
+              onAction={() => applySeededGroupAssignments(tournament, stage)}
+              onChanged={changed}
+            />}
+            <DrawActionButton
+              label="Neue Zufallsverteilung"
+              onAction={() => randomizeGroupAssignments(tournament, stage)}
+              onChanged={changed}
+            />
           </div>
         </div>
         <div className="group-dnd-grid">
