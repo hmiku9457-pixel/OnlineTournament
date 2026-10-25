@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { seededGroupAssignments, seededKnockoutSlotsAvoidingGroups } from '@/engine/seededDraws';
 import { getMatchFinalization, requiresFinalApproval } from '@/domain/matchFinalization';
@@ -40,6 +41,7 @@ function finishOpeningStage(tournament: ReturnType<typeof createTransition>) {
   expect(startFirstStage(tournament)).toBe(true);
   updateMockTournamentStatus(tournament.id, 'RUNNING');
   getMockStageMatches(tournament, tournament.stages[0]).forEach((match) => completeMockMatch(match.id, oneSet));
+  expect(approveMockProgress(tournament)?.kind).toBe('STAGE');
   expect(isStageCompleted(tournament, tournament.stages[0])).toBe(true);
 }
 
@@ -105,6 +107,7 @@ describe('Setzungen und Gruppenrangbereiche', () => {
     });
     expect(startFirstStage(tournament)).toBe(true);
     getMockStageMatches(tournament, tournament.stages[0]).forEach((match) => completeMockMatch(match.id, oneSet));
+    expect(approveMockProgress(tournament)?.kind).toBe('STAGE');
     expect(isStageCompleted(tournament, tournament.stages[0])).toBe(true);
     const groups = buildMockGroups(tournament, tournament.stages[0]);
     for (const group of groups) {
@@ -123,6 +126,6 @@ describe('Setzungen und Gruppenrangbereiche', () => {
     expect(startFirstStage(tournament)).toBe(true);
     const match = getMockStageMatches(tournament, tournament.stages[0])[0];
     completeMockMatch(match.id, oneSet, 'FINISHED', true);
-    expect(getMockMatchConfirmation(match.id)).toEqual(expect.objectContaining({ confirmedA: true, confirmedB: true }));
+    expect(getMockMatchConfirmation(match.id)).toEqual(expect.objectContaining({ adminConfirmed: true }));
   });
 });
