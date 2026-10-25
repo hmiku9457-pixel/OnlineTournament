@@ -2,8 +2,8 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { rankStandings } from '@/domain/standingRankings';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { isStageCompleted, getStageEntrants, startFirstStage } from '@/services/mockPhaseLifecycle';
-import { buildSwissStandings, getSwissByeWinners } from '@/services/mockCompetitionViews';
-import { completeMockMatch, getMockStageBaseMatches, getMockStageMatches } from '@/services/mockRuntime';
+import { buildSwissStandings, getSwissByeWinners, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
+import { completeMockMatch, getMockStageBaseMatches, getMockStageMatches, withdrawMockParticipant } from '@/services/mockRuntime';
 
 const storage = new Map<string, string>();
 const localStorage = {
@@ -91,6 +91,28 @@ describe('Schweizer Qualifikation folgt exakt der sichtbaren Tabelle', () => {
     });
     expect(startFirstStage(tournament)).toBe(true);
     expect(getSwissByeWinners(tournament, tournament.stages[0])).toEqual([]);
+  });
+
+  it('markiert einen kampflosen Sieg und behält die Buchholz-Wertung nach Spieler-Rückzug bei', () => {
+    const tournament = createMockTournament({
+      name: 'Rückzug im Schweizer System', sport: 'table_tennis', discipline: 'SINGLES',
+      tables: 2, minimumMatches: 1,
+      participantNames: ['Anna', 'Ben', 'Clara', 'David'],
+      phases: [
+        { type: 'SWISS', label: 'Schweizer System', entrantCount: 4, groupCount: 1, swissRounds: 2, bestOf: 1, knockoutBestOf: [] },
+      ],
+      estimatedDurationMinutes: 60,
+    });
+    expect(startFirstStage(tournament)).toBe(true);
+    const running = updateMockTournamentStatus(tournament.id, 'RUNNING');
+    const stage = running.stages[0];
+    const game = getMockStageMatches(running, stage)[0];
+    expect(withdrawMockParticipant(running, game.sideB)).toBe(true);
+    expect(getSwissUnplayedWinWinners(running, stage)).toContain(game.sideA);
+    const table = buildSwissStandings(running, stage);
+    expect(table.find((row) => row.name === game.sideA)?.wins).toBeGreaterThanOrEqual(1);
+    expect(table.find((row) => row.name === game.sideA)?.sets).toBe('0:0');
+    expect(table.every((row) => Number.isFinite(row.buchholz))).toBe(true);
   });
 
 });
