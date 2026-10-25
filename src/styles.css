@@ -1072,13 +1072,58 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   padding-left: 9px;
   margin-left: 2px;
 }
-.participant-edit-grid { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: 10px; width: 100%; align-items: end; }
-.participant-edit-grid .actions { grid-column: 1 / -1; }
-.participant-edit-error { grid-column: 1 / -1; }
+/* Schmale, einzeilige Bearbeitungsmaske, nur unter dem gewählten Teilnehmer. */
+.participant-inline-panel.is-editing {
+  display: block !important;
+  grid-column: 2 / -1;
+  width: min(100%, 820px);
+  max-width: 100%;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid #e4e7ec;
+  border-left: 3px solid #98a2b3;
+  border-radius: 9px;
+  background: #fcfcfd;
+}
+.participant-edit-grid {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(130px, 1fr) minmax(100px, .6fr) auto;
+  align-items: end;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.participant-edit-grid .field { min-width: 0; gap: 3px; font-size: .76rem; color: #475467; }
+.participant-edit-grid .field input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: #fff;
+  color: #101828;
+  font-size: .85rem;
+}
+.participant-edit-grid .participant-edit-actions {
+  display: flex;
+  grid-column: auto;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 5px;
+}
+.participant-edit-actions .btn { min-height: 34px; padding: 6px 9px; font-size: .76rem; }
+.participant-edit-error { grid-column: 1 / -1; font-size: .77rem; }
 .participant-games-table { width: 100%; }
 .participant-games-table table { min-width: 620px; }
 .participant-inline-panel:has(.participant-games-table) { display: grid !important; width: 100%; }
-@media (max-width: 850px) { .participant-edit-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .participant-edit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .participant-inline-panel.is-editing { padding: 9px; }
+  .participant-edit-grid { grid-template-columns: minmax(0, 1fr); }
+  .participant-edit-actions { justify-content: flex-start; }
+}
 
 /* More readable groups: full table without scrolling on desktop, compact match days. */
 .group-overview-grid {
