@@ -14,6 +14,7 @@ interface Props {
   finalized: boolean;
   onSelectPlayer: (name: string) => void;
   onShowBuchholz: () => void;
+  highlightPlayers?: ReadonlySet<string>;
 }
 
 function SwissRatio({ value }: { value: string }) {
@@ -37,7 +38,7 @@ function formatBuchholz(value: number) {
 
 export function SwissStandingsTable({
   standings, scoreSport, scoreUnit, unplayedWinners, previousFinishLabels, withdrawalLabel,
-  qualifyingPlaces, cutoffIndex, finalized, onSelectPlayer, onShowBuchholz,
+  qualifyingPlaces, cutoffIndex, finalized, onSelectPlayer, onShowBuchholz, highlightPlayers,
 }: Props) {
   return (
     <div className="card table-wrap swiss-standings-card">
@@ -84,7 +85,7 @@ export function SwissStandingsTable({
             const withdrawn = withdrawalLabel(row.name);
             return (
               <Fragment key={row.name}>
-                <tr>
+                <tr className={highlightPlayers?.has(row.name) ? 'swiss-cutoff-highlight' : undefined} aria-label={highlightPlayers?.has(row.name) ? `${row.name}: Gleichstand an der Qualifikationsgrenze` : undefined}>
                   <td>{row.rank}</td>
                   <td>
                     <span className="swiss-standing-identity">
