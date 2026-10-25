@@ -497,7 +497,7 @@ export function getMockStageMatches(tournament: DemoTournament, stage: Tournamen
 
 /** Phase 1.5 fixtures share the regular table-assignment and result-entry
  * runtime. Their IDs live under the parent Swiss stage but never enter its
- * ranking matches, so Buchholz and original Swiss results are unaffected. */
+ * ranking matches, so Sonneborn-Berger and original Swiss results are unaffected. */
 export function getSwissRoundRobinMatches(tournament: DemoTournament, stage: TournamentStage): MockRuntimeMatch[] {
   const history = getSwissCutoffHistory(tournament, stage);
   if (!history) return [];
@@ -908,7 +908,7 @@ function stageQualifierCount(tournament: DemoTournament, stage: TournamentStage)
 }
 
 /** Pending/recorded manual decision at the Swiss qualifying boundary. A regular Swiss
- *  fixture is never fabricated for this: its result must not affect Swiss/Buchholz scores. */
+ *  fixture is never fabricated for this: its result must not affect Swiss/Sonneborn-Berger scores. */
 export interface SwissCutoffStatus {
   stageId: string;
   tie: SwissCutoffTie;
@@ -1028,7 +1028,7 @@ export function beginSwissCutoffPlayoff(tournament: DemoTournament, kind: Playof
   if (current.decision?.mode === 'LOT' || current.decision?.sets.length) return 'Ein anderer Stichentscheid wurde bereits begonnen.';
   if (kind === 'ROUND') {
     // Unlike the separate qualifying playoff, a further Swiss round includes
-    // the *whole eligible field* and counts fully toward Swiss standings/BHZ.
+    // the *whole eligible field* and counts fully toward Swiss standings/SB.
     const count = addSwissExtraRound(tournament.id, current.stageId);
     if (!count) return 'Es können keine weiteren Schweizer Runden angesetzt werden.';
     const stage = tournament.stages.find((item) => item.id === current.stageId)!;
@@ -1283,7 +1283,7 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
     if (tournament) settleWithdrawnMatches(tournament);
     if (tournament && matchId.includes('-sw-cutoff-set-')) {
       // The standard table card has completed the deciding BO1 game. Only
-      // its winner advances; the regular Swiss/BHZ results remain untouched.
+      // its winner advances; the regular Swiss/SB results remain untouched.
       const match = matchId.match(/-sw-cutoff-set-m(\d+)$/);
       const stage = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`));
       const pending = getPendingSwissCutoff(tournament);
