@@ -46,7 +46,7 @@ describe('Schweizer System: Buchholz und kampflose Ergebnisse', () => {
   it('zählt Begegnungen mit demselben Gegner jeweils für die Buchholzzahl', () => {
     const ranked = rankStandings(['A', 'B'], [game('A', 'B'), game('B', 'A')], 'table_tennis', [], true, 2);
     expect(ranked.map((row) => ({ name: row.name, buchholz: row.buchholz }))).toEqual([
-      { name: 'A', buchholz: 1 }, { name: 'B', buchholz: 1 },
+      { name: 'A', buchholz: 2 }, { name: 'B', buchholz: 2 },
     ]);
   });
 });
