@@ -28,7 +28,9 @@ describe('Schweizer Entscheidung dokumentieren', () => {
     expect(html).toContain('Anna');
     expect(html).toContain('Ben');
     expect(html).toContain('11 : 7');
-    expect(html).toContain('Qualifiziert');
+    expect(html).toContain('Jeder gegen Jeden · weiter');
+    expect(html).toContain('Spieltag 1');
+    expect(html).not.toContain('>BHZ<');
     expect(html).toContain('Buchholzzahl');
   });
 
