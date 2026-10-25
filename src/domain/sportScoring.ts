@@ -194,8 +194,8 @@ export function compareRankingRows(
   swiss = false,
 ) {
   if (swiss) {
-    // Schweizer System: Wertungspunkte, Stärke der Gegner (Buchholz),
-    // danach sportliche Satz-/Punktdifferenzen als weitere Feinwertung.
+    // Schweizer System: Wertungspunkte, ergebnisgewichtete Gegnerstärke
+    // (Sonneborn-Berger; legacy field buchholz), anschließend Satz-/Punktdifferenzen.
     return (b.wins + (b.draws ?? 0) / 2) - (a.wins + (a.draws ?? 0) / 2)
       || (b.buchholz ?? 0) - (a.buchholz ?? 0)
       || (b.setsWon - b.setsLost) - (a.setsWon - a.setsLost)
