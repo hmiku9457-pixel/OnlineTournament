@@ -187,6 +187,14 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(getSwissRoundRobinMatches(t, t.stages[0])).toHaveLength(3);
     expect(getStageEntrants(t, t.stages[1])).toHaveLength(2);
     expect(buildSwissStandings(t, t.stages[0]).reduce((sum, row) => sum + row.played, 0)).toBe(6);
+    // A correction from the ordinary match editor must update Phase 1.5's
+    // separate table and historical results, never the original Swiss record.
+    completeMockMatch(first.id, [{ number: 1, sideAScore: 7, sideBScore: 11 }]);
+    expect(getSwissCutoffHistory(t, t.stages[0])?.extraRounds?.[0].matches[0]).toMatchObject({
+      pointsA: 7, pointsB: 11,
+    });
+    expect(getSwissRoundRobinMatches(t, t.stages[0]).find((game) => game.id === first.id)?.score).toBe('0:1');
+    expect(buildSwissStandings(t, t.stages[0]).reduce((sum, row) => sum + row.played, 0)).toBe(6);
   });
 
   it('gibt keine weitere Schweizer Runde frei, bevor alle angesetzten Spiele fertig sind', () => {
