@@ -1,0 +1,52 @@
+import { describe, expect, it } from 'vitest';
+import { rankStandings, type RankingMatch } from '@/domain/standingRankings';
+
+const game = (sideA: string, sideB: string, sideAScore = 11, sideBScore = 7): RankingMatch => ({
+  sideA, sideB, status: 'FINISHED',
+  sets: [{ number: 1, sideAScore, sideBScore }],
+});
+
+describe('Schweizer System: Buchholz und kampflose Ergebnisse', () => {
+  it('entscheidet bei gleicher Siegzahl zuerst über die Stärke der Gegner, nicht über Satzpunkte', () => {
+    const matches = [
+      game('A', 'X', 11, 9), game('Y', 'A', 11, 7),
+      game('B', 'C', 11, 0), game('D', 'B', 11, 10),
+      game('X', 'Z'), game('Y', 'Z'), game('D', 'Z'),
+    ];
+    const names = ['A', 'B', 'C', 'D', 'X', 'Y', 'Z'];
+    const swiss = rankStandings(names, matches, 'table_tennis', [], true, 3);
+    const regular = rankStandings(names, matches, 'table_tennis');
+    expect(swiss.find((row) => row.name === 'A')).toMatchObject({ wins: 1, buchholz: 3 });
+    expect(swiss.find((row) => row.name === 'B')).toMatchObject({ wins: 1, buchholz: 2 });
+    expect(swiss.findIndex((row) => row.name === 'A')).toBeLessThan(swiss.findIndex((row) => row.name === 'B'));
+    expect(regular.findIndex((row) => row.name === 'B')).toBeLessThan(regular.findIndex((row) => row.name === 'A'));
+  });
+
+  it('gibt Freilosen einen begrenzten virtuellen Buchholz-Gegner ohne zusätzliche Sätze', () => {
+    const ranked = rankStandings(['A', 'B', 'C'], [game('B', 'C')], 'table_tennis', ['A', 'A'], true, 3);
+    expect(ranked.find((row) => row.name === 'A')).toMatchObject({
+      wins: 2, played: 2, setsWon: 0, setsLost: 0, buchholz: 3,
+    });
+    // Zwei Freilose: je min(eigene 2 Punkte, drei Runden / 2 = 1,5).
+    expect(ranked.find((row) => row.name === 'B')?.buchholz).toBe(0);
+  });
+
+  it('wertet kampflose Siege als Sieg ohne Sätze und mit begrenztem virtuellem Gegner', () => {
+    const matches: RankingMatch[] = [
+      { sideA: 'A', sideB: 'B', status: 'FINISHED', forcedWinner: 'A', sets: [] },
+      game('C', 'A'),
+    ];
+    const ranked = rankStandings(['A', 'B', 'C'], matches, 'table_tennis', [], true, 3);
+    expect(ranked.find((row) => row.name === 'A')).toMatchObject({
+      played: 2, wins: 1, losses: 1, setsWon: 0, setsLost: 1, buchholz: 1,
+    });
+    expect(ranked.find((row) => row.name === 'B')).toMatchObject({ played: 1, losses: 1, buchholz: 0 });
+  });
+
+  it('zählt Begegnungen mit demselben Gegner jeweils für die Buchholzzahl', () => {
+    const ranked = rankStandings(['A', 'B'], [game('A', 'B'), game('B', 'A')], 'table_tennis', [], true, 2);
+    expect(ranked.map((row) => ({ name: row.name, buchholz: row.buchholz }))).toEqual([
+      { name: 'A', buchholz: 1 }, { name: 'B', buchholz: 1 },
+    ]);
+  });
+});
