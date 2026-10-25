@@ -1033,6 +1033,13 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .match-result-popover { position: absolute; z-index: 40; top: calc(100% + 7px); left: 50%; transform: translateX(-50%); min-width: 190px; display: grid; gap: 8px; padding: 10px 11px; border: 1px solid #d0d5dd; border-radius: 10px; background: white; box-shadow: 0 10px 30px rgb(16 24 40 / 14%); text-align: left; }
 .match-result-set-list { display: grid; gap: 3px; font-size: .84rem; white-space: nowrap; }
 .finished-result-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.finished-result-correction-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px; padding-top: 10px;
+  border-top: 1px solid #e4e7ec;
+}
+.finished-result-correction-footer .field-hint { flex: 1 1 230px; margin: 0; }
+.finished-result-correction-footer .btn { flex: 0 0 auto; }
 .admin-result-modal { width: min(680px, calc(100vw - 32px)); }
 .start-phase-modal { width: min(520px, calc(100vw - 32px)); }
 .compact-actions { gap: 7px; align-items: center; }
