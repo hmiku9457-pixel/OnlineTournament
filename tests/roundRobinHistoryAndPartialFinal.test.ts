@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -38,6 +39,7 @@ function completeFirst(t: ReturnType<typeof create>) {
   updateMockTournamentStatus(t.id, 'RUNNING');
   getMockStageMatches(t, t.stages[0]).forEach((match) =>
     completeMockMatch(match.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]));
+  expect(approveMockProgress(t)?.kind).toBe('STAGE');
   expect(isStageCompleted(t, t.stages[0])).toBe(true);
 }
 
