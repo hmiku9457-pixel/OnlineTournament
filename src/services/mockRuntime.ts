@@ -952,7 +952,7 @@ export function beginSwissCutoffPlayoff(tournament: DemoTournament, kind: Playof
     extraRounds: [...previous, round],
   });
   recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'SWISS_TIE_SET',
-    description: kind === 'ROUND' ? 'Zusätzliche Schweizer Entscheidungsrunde angesetzt' : 'Jeder-gegen-Jeden-Entscheidung angesetzt' });
+    description: 'Jeder-gegen-Jeden-Entscheidung angesetzt' });
   return null;
 }
 
