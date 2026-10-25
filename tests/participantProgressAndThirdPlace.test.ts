@@ -48,7 +48,7 @@ describe('Teilnehmerstatus und K.-o.-Spiel um Platz 3', () => {
     expect(getMockParticipantProgress(tournament, eliminated!.name).status).toBe('Aktiv');
     expect(startStage(tournament, second)).toBe(true);
     expect(getMockParticipantProgress(tournament, eliminated!.name)).toEqual({
-      status: 'Ausgeschieden', placement: `Gruppe A · Platz ${eliminated!.rank}`,
+      status: 'Ausgeschieden', placement: 'Gruppe A · Platz 2–4',
     });
   });
 
