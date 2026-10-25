@@ -8,7 +8,7 @@ import { buildSwissStandings, getSwissUnplayedWinWinners } from '@/services/mock
 import { getSwissCutoffRowIndex } from '@/components/SwissQualificationCutoff';
 import { getStageWithdrawalLabel } from '@/services/mockWithdrawals';
 import { parseSportSet, sportScoring } from '@/domain/sportScoring';
-import { playoffRoundFinished, playoffScores, type PlayoffMode } from '@/domain/swissCutoffPlayoff';
+import { playoffBoundaryTie, playoffRoundFinished, playoffScores, type PlayoffMode } from '@/domain/swissCutoffPlayoff';
 
 interface Props {
   status: SwissCutoffStatus;
@@ -39,7 +39,14 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
   const lastRound = extraRounds[extraRounds.length - 1];
   const isRoundRunning = Boolean(lastRound && !playoffRoundFinished(lastRound));
   const roundFinishedButTied = Boolean(lastRound && playoffRoundFinished(lastRound));
-  const mode = isRoundRunning ? lastRound!.kind : played.length ? 'SET' : chosenMode;
+  // A deadlocked complete round robin cannot launch another sporting round:
+  // when direct comparisons cannot split the cutoff, a physical draw is mandatory.
+  const requiredDraw = lastRound?.kind === 'ROUND_ROBIN' && roundFinishedButTied
+    ? playoffBoundaryTie(status.tie.players, status.tie.slots, extraRounds, tournament.sport)
+    : null;
+  const mode = requiredDraw ? 'LOT' : isRoundRunning ? lastRound!.kind : played.length ? 'SET' : chosenMode;
+  const drawPlayers = requiredDraw?.players ?? status.tie.players;
+  const drawSlots = requiredDraw?.slots ?? status.tie.slots;
   const multiPlayer = status.tie.players.length > 2;
   const selectedPlayers = new Set(status.tie.players);
   const eliminated = new Set(status.decision?.eliminated ?? []);
@@ -122,7 +129,9 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
             </div>
 
             {roundFinishedButTied && !isRoundRunning && (
-              <p className="swiss-cutoff-still-tied" role="status">Die Zusatzspiele sind abgeschlossen, aber an der Qualifikationsgrenze besteht weiterhin Gleichstand. Bitte eine weitere Entscheidung auswählen.</p>
+              <p className="swiss-cutoff-still-tied" role="status">{requiredDraw
+                ? 'Alle Spiele sind beendet. Auch der direkte Vergleich führt zu keiner eindeutigen Qualifikation. Deshalb ist jetzt ein physischer Losentscheid zwingend erforderlich.'
+                : 'Die Zusatzspiele sind abgeschlossen, aber an der Qualifikationsgrenze besteht weiterhin Gleichstand. Bitte eine weitere Entscheidung auswählen.'}</p>
             )}
 
             {!mode && (
@@ -181,7 +190,7 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
               </div>
             )}
 
-            {extraRounds.length > 0 && (
+            {extraRounds.length > 0 && !extraRounds.some((round) => round.kind === 'ROUND_ROBIN') && (
               <div className="swiss-cutoff-extra-standings">
                 <strong>Zwischenstand der Zusatzspiele</strong>
                 <div className="swiss-cutoff-extra-grid">
@@ -200,9 +209,15 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
             {mode === 'LOT' && (
               <div className="swiss-cutoff-mode">
                 <h3>Losentscheid vor Ort</h3>
-                <p>Zieht die Lose <strong>vor Ort</strong>. Markiert danach die {status.tie.slots === 1 ? 'qualifizierte Person' : `${status.tie.slots} qualifizierten Personen`}. Die Software führt selbst keine Auslosung durch.</p>
+                <p>Zieht die Lose <strong>vor Ort</strong>. Markiert danach {drawSlots === 1 ? 'die qualifizierte Person' : `die ${drawSlots} qualifizierten Personen`}. Die Software führt selbst keine Auslosung durch.</p>
+                {requiredDraw && <p className="swiss-cutoff-draw-explanation">
+                  Alle sportlichen Kriterien einschließlich des direkten Vergleichs sind ausgeschöpft.
+                  {requiredDraw.alreadyQualified.length > 0 && <> Bereits sportlich qualifiziert: <strong>{requiredDraw.alreadyQualified.join(', ')}</strong>.
+                  Diese Plätze bleiben unberührt.</>}
+                  {' '}Nur die noch gleichplatzierten Spieler nehmen an der Auslosung teil.
+                </p>}
                 <div className="swiss-cutoff-lot-choices" role="group" aria-label="Ausgeloste Qualifizierte">
-                  {status.tie.players.map((name) => (
+                  {drawPlayers.map((name) => (
                     <label key={name}>
                       <input type="checkbox" checked={selected.includes(name)} onChange={(event) => {
                         setSelected((current) => event.target.checked ? [...current, name] : current.filter((item) => item !== name));
@@ -212,10 +227,10 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
                     </label>
                   ))}
                 </div>
-                <p className="muted">{selected.length} von {status.tie.slots} Qualifikationsplätzen ausgewählt</p>
+                <p className="muted">{selected.length} von {drawSlots} offenen Losplätzen ausgewählt</p>
                 <div className="actions">
-                  <button type="button" className="btn primary" disabled={selected.length !== status.tie.slots} onClick={submitLot}>Losentscheid verbindlich bestätigen</button>
-                  <button type="button" className="btn" onClick={() => { setChosenMode(null); setSelected([]); setError(''); }}>Zurück zur Auswahl</button>
+                  <button type="button" className="btn primary" disabled={selected.length !== drawSlots} onClick={submitLot}>Losentscheid verbindlich bestätigen</button>
+                  {!requiredDraw && <button type="button" className="btn" onClick={() => { setChosenMode(null); setSelected([]); setError(''); }}>Zurück zur Auswahl</button>}
                 </div>
               </div>
             )}
