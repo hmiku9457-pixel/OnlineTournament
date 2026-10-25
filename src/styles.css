@@ -3034,20 +3034,32 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .participant-management-heading h2 { margin: 0 0 4px; font-size: 1.15rem; }
 .participant-management-heading p { margin: 0; color: #667085; font-size: .82rem; }
 .participant-management-heading .btn { flex: none; }
+/* Vier gleich breite Rasterspalten: Namen je 50 %, darunter vier Aktionen je 25 %. */
 .participant-management-modal .participant-edit-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 8px;
+  row-gap: 12px;
+}
+.participant-management-modal .participant-edit-grid > .field:nth-child(-n + 2) { grid-column: span 2; }
+.participant-management-modal .participant-code-field { grid-column: span 2; }
+.participant-management-modal .participant-code-controls {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-.participant-management-modal .participant-code-field { grid-column: 1 / -1; }
-.participant-code-controls { display: flex; align-items: stretch; gap: 8px; }
-.participant-management-modal .participant-code-controls input { flex: 1 1 auto; min-width: 0; }
-.participant-code-controls .btn { flex: none; white-space: nowrap; padding: 6px 10px; font-size: .77rem; }
-.participant-management-modal .participant-edit-actions {
-  grid-column: 1 / -1;
-  justify-content: flex-end;
+  align-items: stretch;
   gap: 8px;
+  min-width: 0;
 }
-.participant-management-modal .participant-edit-actions .btn { min-height: 34px; min-width: 85px; }
+.participant-management-modal .participant-code-controls input { width: 100%; min-width: 0; }
+.participant-code-controls .btn { min-width: 0; white-space: nowrap; padding: 6px 6px; font-size: .77rem; }
+.participant-management-modal .participant-edit-actions {
+  display: grid;
+  grid-column: span 2;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+.participant-management-modal .participant-edit-actions .btn { width: 100%; min-width: 0; min-height: 34px; }
 .participant-management-modal .participant-edit-error { grid-column: 1 / -1; }
 .participant-management-modal .participant-code-note { margin: 9px 0 0; font-size: .74rem; line-height: 1.4; color: #667085; }
 .participant-management-modal .participant-games-table { max-height: calc(88dvh - 130px); overflow: auto; }
@@ -3070,7 +3082,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .participant-control-grid .participant-row-actions > .btn,
   .participant-control-grid .participant-row-actions > .withdrawal-locked { font-size: .69rem; padding: 6px 3px; }
   .participant-management-modal .participant-edit-grid { grid-template-columns: minmax(0, 1fr); }
+  .participant-management-modal .participant-edit-grid > .field:nth-child(-n + 2),
   .participant-management-modal .participant-code-field,
   .participant-management-modal .participant-edit-actions { grid-column: 1; }
-  .participant-management-modal .participant-code-controls { flex-wrap: wrap; }
 }
