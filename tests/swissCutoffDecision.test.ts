@@ -3,7 +3,7 @@ import { createMockTournament, updateMockTournamentStatus } from '@/services/moc
 import { getStageEntrants, isStageCompleted, isStageLockedWaiting, startFirstStage } from '@/services/mockPhaseLifecycle';
 import {
   completeMockMatch, getMockStageMatches, getPendingSwissCutoff, getSwissCutoffHistory,
-  getMockRuntimeMatches, getSwissRoundRobinMatches, assignMockMatchToTable, findMockRuntimeMatch,
+  getMockRuntimeMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, beginSwissCutoffSetMatch, assignMockMatchToTable, findMockRuntimeMatch,
   recordSwissCutoffSet, recordSwissCutoffLot, resetSwissCutoffSets, refreshCompletedStageQualifiers,
   beginSwissCutoffPlayoff, recordSwissCutoffPlayoffResult,
 } from '@/services/mockRuntime';
@@ -62,6 +62,53 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(recordSwissCutoffSet(t, 5, 5)).toContain('gültig');
     expect(recordSwissCutoffSet(t, 2, 3)).toContain('Ungültiges Satzergebnis');
     expect(isStageCompleted(t, t.stages[0])).toBe(false);
+  });
+
+  it('zeigt einen geplanten Entscheidungssatz in Warteschlange und an einem Tisch als BO1-Karte', () => {
+    const t = create();
+    completeRound(t);
+    const pending = getPendingSwissCutoff(t)!;
+    expect(beginSwissCutoffSetMatch(t)).toBeNull();
+    expect(getPendingSwissCutoff(t)?.decision?.mode).toBe('SET');
+    const waiting = getMockRuntimeMatches(t);
+    expect(waiting).toHaveLength(1);
+    const match = waiting[0];
+    expect(match).toMatchObject({
+      sideA: pending.tie.players[0], sideB: pending.tie.players[1],
+      status: 'WAITING', table: 'Noch offen', bestOf: 1, requiresWinner: true,
+    });
+    expect(match.phase).toContain('Stichentscheid');
+    expect(getMockStageMatches(t, t.stages[0]).some((game) => game.id === match.id)).toBe(false);
+    expect(findMockRuntimeMatch(match.id)?.match.id).toBe(match.id);
+    expect(assignMockMatchToTable(t, match.id, 'Tisch 1')).toBe(true);
+    expect(getMockRuntimeMatches(t)[0]).toMatchObject({ status: 'LIVE', table: 'Tisch 1' });
+    expect(assignMockMatchToTable(t, match.id, 'Tisch 2')).toBe(false);
+    expect(isStageCompleted(t, t.stages[0])).toBe(false);
+
+    completeMockMatch(match.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]);
+    expect(isStageCompleted(t, t.stages[0])).toBe(true);
+    expect(getPendingSwissCutoff(t)).toBeNull();
+    expect(getStageEntrants(t, t.stages[1])).toEqual([pending.tie.players[0]]);
+    expect(getSwissCutoffSetMatches(t, t.stages[0])).toHaveLength(1);
+    expect(getSwissCutoffHistory(t, t.stages[0])?.sets[0]).toMatchObject({
+      sideA: pending.tie.players[0], sideB: pending.tie.players[1], pointsA: 11, pointsB: 7,
+    });
+    // The independent play-off result must not count toward Swiss wins/BHZ.
+    const stats = buildSwissStandings(t, t.stages[0]);
+    expect(stats.reduce((sum, row) => sum + row.played, 0)).toBe(4);
+  });
+
+  it('kann einen vorgemerkten Stichentscheid ohne Ergebnis zurücknehmen', () => {
+    const t = create();
+    completeRound(t);
+    expect(beginSwissCutoffSetMatch(t)).toBeNull();
+    const match = getMockRuntimeMatches(t)[0];
+    expect(assignMockMatchToTable(t, match.id, 'Tisch 1')).toBe(true);
+    resetSwissCutoffSets(t);
+    expect(getPendingSwissCutoff(t)?.decision).toBeNull();
+    expect(getMockRuntimeMatches(t).find((game) => game.id === match.id)).toBeUndefined();
+    expect(beginSwissCutoffSetMatch(t)).toBeNull();
+    expect(getMockRuntimeMatches(t)[0].table).toBe('Noch offen');
   });
 
   it('setzt nach bestätigtem Entscheidungssatz den Sieger vor den Verlierer und gibt die Folgephase frei', () => {
