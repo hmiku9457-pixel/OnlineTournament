@@ -2,6 +2,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { SwissRoundRobinHistory } from '@/components/SwissRoundRobinHistory';
+import { SwissRoundRobinMatrix } from '@/components/SwissRoundRobinMatrix';
+import { GroupMatchDayList } from '@/components/GroupMatchDayList';
 import { SwissStandingsTable } from '@/components/SwissStandingsTable';
 import type { StoredSwissCutoffDecision } from '@/services/mockSwissCutoffStore';
 import type { MockStanding } from '@/services/mockCompetitionViews';
@@ -27,11 +29,52 @@ describe('Schweizer Entscheidung dokumentieren', () => {
     expect(html).toContain('Jeder gegen Jeden');
     expect(html).toContain('Anna');
     expect(html).toContain('Ben');
-    expect(html).toContain('11 : 7');
+    expect(html).toContain('11:7');
+    expect(html).toContain('1:0');
     expect(html).toContain('Jeder gegen Jeden · weiter');
+    expect(html).toContain('Kreuztabelle');
+    expect(html).toContain('group-match-list');
+    expect(html).toContain('group-match-row');
+    expect(html).toContain('swiss-intermediate-schedule');
+    expect(html.indexOf('swiss-intermediate-matrix')).toBeLessThan(html.indexOf('swiss-intermediate-schedule'));
     expect(html).toContain('Spieltag 1');
     expect(html).not.toContain('>BHZ<');
     expect(html).toContain('Buchholzzahl');
+  });
+
+  it('ordnet in der Kreuztabelle Ergebnisse je Blickrichtung zu und markiert offene und diagonale Zellen', () => {
+    const round = { kind: 'ROUND_ROBIN' as const, matches: [
+      { sideA: 'Anna', sideB: 'Ben', pointsA: 11, pointsB: 7, matchDay: 1 },
+      { sideA: 'Anna', sideB: 'Clara', matchDay: 2 },
+      { sideA: 'Ben', sideB: 'Clara', pointsA: 7, pointsB: 11, matchDay: 3 },
+    ] };
+    const html = renderToStaticMarkup(createElement(SwissRoundRobinMatrix, {
+      players: ['Anna', 'Ben', 'Clara'], rounds: [round], sport: 'table_tennis',
+    }));
+    expect(html).toContain('Anna gegen Ben: 1:0 (Satzpunkte 11:7)');
+    expect(html).toContain('Ben gegen Anna: 0:1 (Satzpunkte 7:11)');
+    expect(html).toContain('Anna gegen Clara: noch offen');
+    expect(html).toContain('Clara gegen Ben: 1:0 (Satzpunkte 11:7)');
+    expect((html.match(/swiss-matrix-diagonal/g) ?? [])).toHaveLength(3);
+    expect(html).toContain('swiss-matrix-result win');
+    expect(html).toContain('swiss-matrix-result loss');
+  });
+
+  it('verwendet dieselben Spieltagszeilen und die Live-Markierung wie die Gruppenphase', () => {
+    const html = renderToStaticMarkup(createElement(GroupMatchDayList, {
+      sport: 'table_tennis',
+      matches: [
+        { id: 'm1', sideA: 'Anna', sideB: 'Ben', matchDay: 1, status: 'live', score: '1:0',
+          sets: [{ number: 1, sideAScore: 11, sideBScore: 7 }] },
+        { id: 'm2', sideA: 'Ben', sideB: 'Clara', matchDay: 2, status: 'open', score: '–' },
+      ],
+    }));
+    expect(html).toContain('group-match-list');
+    expect(html).toContain('group-match-row live');
+    expect(html).toContain('group-match-live-dot');
+    expect(html).toContain('Spieltag 1');
+    expect(html).toContain('Spieltag 2');
+    expect(html).toContain('Satz 1: 11:7');
   });
 
   it('zeigt bei Ergebnissportarten Tore, Remis und Punkte statt Sätze oder BHZ', () => {
