@@ -2206,3 +2206,27 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .bracket-result-action:hover { background: #eff4ff; border-radius: 4px; }
 .bracket-result-action:focus-visible, .direct-result-trigger:focus-visible { outline: 2px solid #175cd3; outline-offset: 2px; border-radius: 4px; }
 .bracket-result-action.bracket-score-cells { justify-self: end; }
+
+/* Qualifikationsgrenze im Schweizer System: Linie hinter dem letzten berechtigten Platz. */
+.swiss-standings-table .swiss-qualification-cutoff > td {
+  padding: 0 5px 3px;
+  border: 0;
+  height: 18px;
+  background: white;
+}
+.swiss-qualification-cutoff-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #175cd3;
+  font-size: .65rem;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.swiss-qualification-cutoff-line::before {
+  content: '';
+  flex: 1 1 auto;
+  height: 2px;
+  background: #75aaff;
+}

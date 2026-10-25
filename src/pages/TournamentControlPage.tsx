@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { StageCard } from '@/components/StageCard';
@@ -9,6 +9,7 @@ import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { BracketScoreCells, BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
 import { BracketRoundViewport } from '@/components/BracketRoundViewport';
 import { SwissRoundCard } from '@/components/SwissRoundCard';
+import { getSwissCutoffRowIndex, SwissQualificationCutoffRow } from '@/components/SwissQualificationCutoff';
 import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
@@ -206,6 +207,16 @@ function StageCompetitionView({
     const swissMatches = getMockStageMatches(tournament, stage);
     const swissEditable = canEditDraw(tournament, stage);
     const swissRoundFixtures = getMockStageBaseMatches(tournament, stage);
+    const nextStage = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) + 1];
+    const qualifyingPlaces = nextStage
+      ? stage.advancement.type === 'top_n' && stage.advancement.value > 0
+        ? stage.advancement.value : Math.max(1, Number(nextStage.settings.entrants) || 1)
+      : 0;
+    const withdrawnSwissPlayers = new Set(standings
+      .filter((row) => isMockParticipantWithdrawn(tournament, row.name))
+      .map((row) => row.name));
+    const swissCutoffIndex = getSwissCutoffRowIndex(standings, qualifyingPlaces, withdrawnSwissPlayers);
+    const swissFinished = isStageCompleted(tournament, stage);
     return (
       <section className="competition-stage-section">
         <div className="competition-stage-head"><div><span className="badge">SCHWEIZER SYSTEM</span><h3>{stage.name}</h3></div><div className="actions"><span className="muted">{Number(stage.settings.rounds) || 4} Runden</span>{swissEditable && <button className="btn small" type="button" onClick={() => {
@@ -232,7 +243,9 @@ function StageCompetitionView({
                 <col className="swiss-col-difference" />
               </colgroup>
             <thead><tr><th>#</th><th>Teilnehmer</th><th title="Spiele">Sp.</th><th title="Siege">S</th><th title={scoreSport ? 'Unentschieden' : 'Niederlagen'}>{scoreSport ? 'U' : 'N'}</th><th className="standing-ratio-cell" title={scoreSport ? 'Niederlagen' : 'Satzverhältnis'}>{scoreSport ? 'N' : 'Sätze'}</th><th className="standing-difference-cell" title={scoreSport ? scoreUnit : 'Satzdifferenz'}>{scoreSport ? scoreUnit : 'Satz ±'}</th><th className="standing-ratio-cell" title={scoreSport ? 'Differenz' : 'Ballverhältnis'}>{scoreSport ? '±' : 'Bälle'}</th><th className="standing-difference-cell" title={scoreSport ? 'Punkte' : 'Balldifferenz'}>{scoreSport ? 'Pkt.' : 'Ball ±'}</th></tr></thead>
-            <tbody>{standings.map((row) => <tr key={row.name}><td>{row.rank}</td><td><span className="swiss-standing-identity"><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{previousFinishLabels[row.name] && <small className="participant-origin swiss-standing-origin">{previousFinishLabels[row.name]}</small>}{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}</span></td><td>{row.played}</td><td>{row.wins}</td><td>{scoreSport ? row.draws : row.losses}</td>{scoreSport ? <><td>{row.losses}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td><td className="standing-difference-cell">{row.points}</td></> : <><td className="standing-ratio-cell"><StandingRatio value={row.sets} /></td><td className="standing-difference-cell">{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></>}</tr>)}</tbody>
+            <tbody>{standings.map((row, index) => <Fragment key={row.name}><tr><td>{row.rank}</td><td><span className="swiss-standing-identity"><button className="standing-player-button" type="button" onClick={() => setSelectedSwissPlayer(row.name)}><strong>{row.name}</strong></button>{previousFinishLabels[row.name] && <small className="participant-origin swiss-standing-origin">{previousFinishLabels[row.name]}</small>}{isMockParticipantWithdrawn(tournament, row.name) && <span className="standing-withdrawn" title="Teilnehmer zurückgezogen">Zurückgezogen</span>}</span></td><td>{row.played}</td><td>{row.wins}</td><td>{scoreSport ? row.draws : row.losses}</td>{scoreSport ? <><td>{row.losses}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td><td className="standing-difference-cell">{row.points}</td></> : <><td className="standing-ratio-cell"><StandingRatio value={row.sets} /></td><td className="standing-difference-cell">{row.setDifference > 0 ? `+${row.setDifference}` : row.setDifference}</td><td className="standing-ratio-cell"><StandingRatio value={row.balls} /></td><td className="standing-difference-cell">{row.ballDifference > 0 ? `+${row.ballDifference}` : row.ballDifference}</td></>}</tr>{index === swissCutoffIndex && (
+              <SwissQualificationCutoffRow qualifyingPlaces={qualifyingPlaces} finalized={swissFinished} />
+            )}</Fragment>)}</tbody>
             </table>
           </div>
           <SwissRoundCard
