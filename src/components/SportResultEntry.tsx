@@ -13,6 +13,7 @@ export interface SportResultEntryProps {
   sideBRecord?: string;
   allowEditFinished?: boolean;
   swissAdminEntry?: boolean;
+  directorEntry?: boolean;
 }
 
 export function SportResultEntry(props: SportResultEntryProps) {
