@@ -102,11 +102,67 @@ export function canEditFinishedResults(tournament: DemoTournament, stage: Tourna
   return !next || !isStageStarted(tournament, next);
 }
 
+/** Real KO / Swiss round index, excluding separate cutoff fixtures.
+ * The bronze match is in the same round as the final. */
+function competitionRoundIndex(tournament: DemoTournament, stage: TournamentStage, matchId: string): number | null {
+  if (stage.type === 'SWISS') {
+    const swiss = matchId.match(/-sw-r(\d+)-m\d+$/);
+    return swiss ? Number(swiss[1]) : null;
+  }
+  if (!['KNOCKOUT', 'DOUBLE_ELIMINATION', 'PLACEMENT'].includes(stage.type)) return null;
+  if (matchId.endsWith('-third-place')) return Math.log2(getBracketSlots(tournament, stage).length);
+  const knockout = matchId.match(/-r(\d+)-m\d+$/);
+  return knockout ? Number(knockout[1]) : null;
+}
+
+/** As soon as ANY later-round game was assigned, previous rounds are frozen.
+ * startedAt persists after unassignment, so clearing the table cannot unlock
+ * an earlier round. Completed later matches are protected as well. */
+function nextRoundAlreadyStarted(tournament: DemoTournament, stage: TournamentStage, round: number): boolean {
+  const runtime = readRuntime();
+  const results = readResults();
+  return runtime.some((entry) => {
+    const index = competitionRoundIndex(tournament, stage, entry.matchId);
+    return index !== null && index > round && Boolean(entry.startedAt);
+  }) || results.some((entry) => {
+    const index = competitionRoundIndex(tournament, stage, entry.matchId);
+    return index !== null && index > round && (entry.status === 'FINISHED' || entry.sets.length > 0);
+  });
+}
+
+/** After editing an earlier completed match, not-yet-started later-round
+ * fixtures are invalidated and rebuilt using the corrected sporting results. */
+function invalidateUnstartedLaterRounds(tournament: DemoTournament, stage: TournamentStage, correctedMatchId: string) {
+  const round = competitionRoundIndex(tournament, stage, correctedMatchId);
+  if (round === null || nextRoundAlreadyStarted(tournament, stage, round)) return;
+  const isLater = (id: string) => {
+    const index = competitionRoundIndex(tournament, stage, id);
+    return index !== null && index > round;
+  };
+  const oldResults = readResults();
+  if (oldResults.some((result) => isLater(result.matchId))) {
+    writeResults(oldResults.filter((result) => !isLater(result.matchId)));
+  }
+  const oldRuntime = readRuntime();
+  if (oldRuntime.some((runtime) => isLater(runtime.matchId))) {
+    writeRuntime(oldRuntime.filter((runtime) => !isLater(runtime.matchId)));
+  }
+  if (stage.type === 'SWISS' && typeof window !== 'undefined') {
+    const fixtures = readSwissFixtures();
+    if (fixtures.some((entry) => entry.tournamentId === tournament.id && entry.stageId === stage.id && entry.round > round)) {
+      window.localStorage.setItem(SWISS_FIXTURE_KEY, JSON.stringify(fixtures.filter((entry) =>
+        entry.tournamentId !== tournament.id || entry.stageId !== stage.id || entry.round <= round)));
+    }
+  }
+}
+
 // Zurückgezogene Gruppen-Teilnehmer verlieren ausnahmslos alle Partien 0:11.
 // Die automatisch gewerteten Begegnungen dürfen daher nicht korrigiert werden.
 export function canEditMockMatch(tournament: DemoTournament, matchId: string) {
   const stage = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`));
   if (!stage || !canEditFinishedResults(tournament, stage)) return false;
+  const round = competitionRoundIndex(tournament, stage, matchId);
+  if (round !== null && nextRoundAlreadyStarted(tournament, stage, round)) return false;
   if (readResults().find((item) => item.matchId === matchId)?.thirdPlaceSkipped) return false;
   if (stage.type === 'GROUPS' || stage.type === 'ROUND_ROBIN') {
     const match = getMockStageBaseMatches(tournament, stage).find((item) => item.id === matchId);
@@ -1269,6 +1325,13 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
     finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt,
   };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
+  if (tournament && previousFinal && (
+    JSON.stringify(previous?.sets) !== JSON.stringify(sets) ||
+    previous?.decisionSide !== decisionSide || JSON.stringify(previous?.decision) !== JSON.stringify(decision)
+  )) {
+    const stageForCorrection = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`));
+    if (stageForCorrection) invalidateUnstartedLaterRounds(tournament, stageForCorrection, matchId);
+  }
   if (tournament && status === 'FINISHED') {
     const resultText = (value: StoredMatchResult | undefined) => {
       const scores = value?.sets.length
@@ -1327,7 +1390,10 @@ export function restoreMockCorrectedResult(tournament: DemoTournament, auditId: 
   const restored: StoredMatchResult = { ...previous, sets: event.beforeSets, decisionSide: event.beforeDecisionSide, decision: event.beforeDecision, confirmedA: false, confirmedB: false };
   writeResults([restored, ...current.filter((item) => item.matchId !== event.matchId)]);
   const stage = tournament.stages.find((item) => event.matchId!.startsWith(`${item.id}-`));
-  if (stage) refreshCompletedStageQualifiers(tournament, stage);
+  if (stage) {
+    invalidateUnstartedLaterRounds(tournament, stage, event.matchId);
+    refreshCompletedStageQualifiers(tournament, stage);
+  }
   recordMockAudit({ tournamentId: tournament.id, matchId: event.matchId, actor: 'Turnierleitung (lokal)', action: 'RESULT_RESTORED', description: 'Letzte Ergebniskorrektur rückgängig gemacht', before: event.after, after: event.before });
   return true;
 }
