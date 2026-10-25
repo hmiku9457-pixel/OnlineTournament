@@ -318,7 +318,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     const fixtures = getMockStageMatches(t, t.stages[0]);
     // Erst entsteht eine klare Rangfolge. Danach besteht wieder sportlicher
     // Gleichstand, aber das ursprünglich dokumentierte Los ist nicht mehr gültig.
-    completeMockMatch(fixtures[0].id, [{ number: 1, sideAScore: 11, sideBScore: 6 }]);
+    completeMockMatch(fixtures[0].id, [{ number: 1, sideAScore: 11, sideBScore: 6 }], 'FINISHED', true);
     expect(refreshCompletedStageQualifiers(t, t.stages[0])).toBe(false);
     completeMockMatch(fixtures[1].id, [{ number: 1, sideAScore: 11, sideBScore: 6 }]);
     expect(refreshCompletedStageQualifiers(t, t.stages[0])).toBe(false);
