@@ -2592,7 +2592,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 
 /* Phase 1.5: ranking uses available width, head-to-head matrix is compact. */
 .swiss-intermediate-grid {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 410px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   align-items: stretch;
 }
@@ -2692,4 +2692,87 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 }
 @media (max-width: 730px) {
   .swiss-intermediate-schedule .group-match-list { grid-template-columns: 1fr; }
+}
+
+/* Phase 1.5: equal-width table cards and a full-size, scrollable matrix modal. */
+.swiss-intermediate-matrix-head {
+  align-items: center;
+  justify-content: space-between;
+}
+.swiss-intermediate-matrix-title {
+  display: flex;
+  flex: 1 1 180px;
+  min-width: 0;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+}
+.swiss-intermediate-matrix-head .swiss-intermediate-expand-button {
+  margin-left: auto;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 9px;
+  font-size: .74rem;
+}
+.swiss-intermediate-matrix-backdrop { z-index: 1100; }
+.swiss-intermediate-matrix-modal {
+  width: min(1400px, 96vw);
+  height: min(900px, 92vh);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  overflow: hidden;
+}
+.swiss-intermediate-matrix-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.swiss-intermediate-matrix-modal-head h2 { margin: 0 0 5px; font-size: 1.25rem; }
+.swiss-intermediate-matrix-modal-head p { margin: 0; font-size: .84rem; }
+.swiss-intermediate-matrix-modal-head .btn { flex-shrink: 0; }
+.swiss-intermediate-matrix-modal .swiss-intermediate-matrix-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: 100%;
+  overflow: auto;
+}
+.swiss-intermediate-matrix-modal .swiss-intermediate-matrix-table {
+  width: max-content;
+  min-width: 100%;
+  font-size: .9rem;
+}
+.swiss-intermediate-matrix-modal .swiss-intermediate-matrix-table th,
+.swiss-intermediate-matrix-modal .swiss-intermediate-matrix-table td {
+  min-width: 68px;
+  padding: 13px 11px;
+}
+.swiss-intermediate-matrix-modal .swiss-intermediate-matrix-table .swiss-matrix-name {
+  min-width: 195px;
+  max-width: 270px;
+}
+.swiss-intermediate-matrix-modal .swiss-intermediate-matrix-table tbody .swiss-matrix-name > span:last-child {
+  max-width: 224px;
+}
+.swiss-intermediate-matrix-modal .swiss-intermediate-matrix-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+.swiss-intermediate-matrix-modal .swiss-intermediate-matrix-table thead .swiss-matrix-name {
+  z-index: 4;
+}
+.swiss-intermediate-matrix-modal .swiss-matrix-footnote {
+  margin: 10px 0 0;
+}
+@media (max-width: 1120px) {
+  .swiss-intermediate-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .swiss-intermediate-matrix-modal { width: 98vw; height: 94vh; max-height: 94vh; padding: 12px; }
 }
