@@ -68,6 +68,20 @@ export function ScoreMatchEntry({ match, onSaved, onCompleted, allowEditFinished
     setError('');
     clearSaved();
   }
+  function cancelFinishedCorrection() {
+    setA(String(storedA));
+    setB(String(storedB));
+    setRegulationScore(storedRegA === undefined || storedRegB === undefined
+      ? undefined : { number: 1, sideAScore: storedRegA, sideBScore: storedRegB });
+    setEditingFinished(false);
+    setDecisionStep(null);
+    setDecisionSide('');
+    setPenaltyA('');
+    setPenaltyB('');
+    setError('');
+    clearSaved();
+  }
+
   function saveProgress() {
     if (!scoreValid || finished || editingFinished) return;
     if (!validExtraTime) { setError('Tore aus der regulären Spielzeit dürfen in der Verlängerung nicht abgezogen werden.'); return; }
@@ -176,7 +190,10 @@ export function ScoreMatchEntry({ match, onSaved, onCompleted, allowEditFinished
         {!editingFinished && <button className={justSaved ? 'btn small save-success' : 'btn small'} type="button" disabled={!scoreValid || !validExtraTime} onClick={saveProgress}>{justSaved ? 'gespeichert ✓' : 'Zwischenstand speichern'}</button>}
         <button className="btn small primary" type="button" disabled={!scoreValid || !validExtraTime || Boolean(!needsDecision && validation)} onClick={finish}>{editingFinished ? 'Korrigiertes Ergebnis speichern' : 'Spiel abschließen'}</button>
       </div>}
-      {editingFinished && <p className="field-hint">Das bisherige Ergebnis bleibt gespeichert, bis die Korrektur abgeschlossen ist.</p>}
+      {editingFinished && <div className="finished-result-correction-footer">
+        <span className="field-hint">Das bisherige Ergebnis bleibt gespeichert, bis die Korrektur abgeschlossen ist.</span>
+        <button type="button" className="btn small" onClick={cancelFinishedCorrection}>Abbrechen</button>
+      </div>}
     </> : <>
       {match.decision && <p className="field-hint">{match.decision.type === 'LOT' ? 'Sieger nach Losentscheid' : match.decision.type === 'PENALTIES' ? 'Sieger im Elfmeterschießen' : 'Sieger nach Verlängerung'}: {match.decisionSide === 'A' || (!match.decisionSide && Number(a) > Number(b)) ? match.sideA : match.sideB}</p>}
       {!match.decision && match.decisionSide && <p className="field-hint">Sieger nach Entscheidung: {match.decisionSide === 'A' ? match.sideA : match.sideB}</p>}
