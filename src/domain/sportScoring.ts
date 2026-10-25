@@ -191,7 +191,18 @@ export function compareRankingRows(
   sport: string,
   a: { name: string; wins: number; draws?: number; setsWon: number; setsLost: number; ballsWon: number; ballsLost: number; buchholz?: number },
   b: { name: string; wins: number; draws?: number; setsWon: number; setsLost: number; ballsWon: number; ballsLost: number; buchholz?: number },
+  swiss = false,
 ) {
+  if (swiss) {
+    // Schweizer System: Wertungspunkte, Stärke der Gegner (Buchholz),
+    // danach sportliche Satz-/Punktdifferenzen als weitere Feinwertung.
+    return (b.wins + (b.draws ?? 0) / 2) - (a.wins + (a.draws ?? 0) / 2)
+      || (b.buchholz ?? 0) - (a.buchholz ?? 0)
+      || (b.setsWon - b.setsLost) - (a.setsWon - a.setsLost)
+      || (b.ballsWon - b.ballsLost) - (a.ballsWon - a.ballsLost)
+      || b.setsWon - a.setsWon || b.ballsWon - a.ballsWon
+      || a.name.localeCompare(b.name, 'de');
+  }
   if (sportScoring(sport).mode === 'score') {
     const pointsA = 3 * a.wins + (a.draws ?? 0);
     const pointsB = 3 * b.wins + (b.draws ?? 0);
