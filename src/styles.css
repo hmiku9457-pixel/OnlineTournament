@@ -2590,9 +2590,9 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .swiss-intermediate-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Phase 1.5: kompaktere Entscheidungstabelle und breitere Kreuztabelle. */
+/* Phase 1.5: ranking uses available width, head-to-head matrix is compact. */
 .swiss-intermediate-grid {
-  grid-template-columns: minmax(0, .86fr) minmax(0, 1.14fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 410px);
   gap: 14px;
   align-items: stretch;
 }
@@ -2637,7 +2637,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .swiss-intermediate-standings .swiss-standings-table td {
   padding-inline: 4px;
 }
-.swiss-intermediate-matrix { min-width: 0; padding: 14px; }
+.swiss-intermediate-matrix { min-width: 0; padding: 12px; }
 
 .swiss-intermediate-matrix-head .muted { font-size: .73rem; }
 .swiss-intermediate-matrix-scroll {
@@ -2645,25 +2645,25 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   border-radius: 8px;
 }
 .swiss-intermediate-matrix-table {
-  width: 100%; border-spacing: 0; border-collapse: separate;
-  font-size: .8rem; font-variant-numeric: tabular-nums;
+  width: 100%; min-width: 0; border-spacing: 0; border-collapse: separate;
+  font-size: .72rem; font-variant-numeric: tabular-nums;
 }
 .swiss-intermediate-matrix-table th, .swiss-intermediate-matrix-table td {
-  min-width: 49px; text-align: center;
-  padding: 10px 7px; border-right: 1px solid #f2f4f7;
+  min-width: 31px; text-align: center;
+  padding: 6px 3px; border-right: 1px solid #f2f4f7;
   border-bottom: 1px solid #eaecf0; white-space: nowrap;
 }
 .swiss-intermediate-matrix-table tr:last-child > * { border-bottom: none; }
 .swiss-intermediate-matrix-table tr > *:last-child { border-right: none; }
 .swiss-intermediate-matrix-table thead th { background: #f9fafb; color: #667085; font-weight: 800; }
 .swiss-intermediate-matrix-table .swiss-matrix-name {
-  min-width: 140px; max-width: 200px;
+  min-width: 112px; max-width: 142px;
   text-align: left; position: sticky; left: 0; z-index: 1;
   background: #fff; box-shadow: 1px 0 0 #eaecf0;
 }
 .swiss-intermediate-matrix-table thead .swiss-matrix-name { background: #f9fafb; z-index: 2; }
 .swiss-intermediate-matrix-table tbody .swiss-matrix-name > span:last-child {
-  display: inline-block; max-width: 155px; overflow: hidden;
+  display: inline-block; max-width: 117px; overflow: hidden;
   text-overflow: ellipsis; vertical-align: middle;
 }
 .swiss-matrix-seed { display: inline-block; margin-right: 6px; color: #667085; font-size: .7rem; }
