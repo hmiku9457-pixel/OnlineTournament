@@ -23,7 +23,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, recordSwissCutoffSet, recordSwissCutoffLot, resetSwissCutoffSets } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, recordSwissCutoffSet, recordSwissCutoffLot, beginSwissCutoffPlayoff, recordSwissCutoffPlayoffResult, resetSwissCutoffSets } from '@/services/mockRuntime';
 import { canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getStageWithdrawalLabel, getWithdrawalLabel } from '@/services/mockWithdrawals';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
@@ -1425,9 +1425,11 @@ export function TournamentControlPage() {
       )}
       {pendingSwissCutoff && <SwissCutoffDecisionModal
         status={pendingSwissCutoff}
-        sport={tournament.sport}
+        tournament={tournament}
         onSet={(a, b) => { const error = recordSwissCutoffSet(tournament, a, b); if (!error) refreshRuntime(); return error; }}
         onLot={(winners) => { const error = recordSwissCutoffLot(tournament, winners); if (!error) refreshRuntime(); return error; }}
+        onBegin={(kind) => { const error = beginSwissCutoffPlayoff(tournament, kind); if (!error) refreshRuntime(); return error; }}
+        onResult={(index, a, b) => { const error = recordSwissCutoffPlayoffResult(tournament, index, a, b); if (!error) refreshRuntime(); return error; }}
         onReset={() => { resetSwissCutoffSets(tournament); refreshRuntime(); }}
       />}
       {phaseCompletedModal && (
