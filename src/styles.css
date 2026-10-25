@@ -2924,3 +2924,111 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .control-review-alert .btn { width: 100%; }
   .control-approval-result { font-size: 0.9rem; }
 }
+
+/* Teilnehmerverwaltung: zwei kompakte Karten pro Zeile statt langer Vollbreiten-Liste. */
+.participant-control-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 10px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+.participant-control-grid > .participant-control-row {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 8px 9px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  background: #fff;
+}
+.participant-control-grid > .participant-control-row.withdrawn { background: #f9fafb; }
+.participant-control-grid .participant-list-number { grid-column: 1; grid-row: 1; }
+.participant-control-grid .participant-control-identity {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+.participant-control-grid .participant-control-row > code {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  min-width: 0;
+  padding: 4px 7px;
+  font-size: .72rem;
+  font-variant-numeric: tabular-nums;
+}
+.participant-control-grid .participant-row-actions {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  max-width: none;
+  justify-content: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+.participant-control-grid .participant-row-actions > .btn,
+.participant-control-grid .participant-row-actions > .withdrawal-locked {
+  grid-column: auto;
+  grid-row: auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 5px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: .73rem;
+}
+.participant-control-grid .participant-inline-panel {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  min-width: 0;
+}
+.participant-control-grid .participant-inline-panel.is-editing {
+  width: 100%;
+  padding: 9px;
+}
+.participant-control-grid .participant-edit-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.participant-control-grid .participant-edit-actions {
+  grid-column: 2;
+  flex-wrap: wrap;
+}
+.participant-control-grid .participant-edit-actions .btn {
+  grid-column: auto;
+  grid-row: auto;
+}
+/* Für die breite Spieltabelle kann der geöffnete Eintrag beide Spalten nutzen. */
+.participant-control-grid > .participant-control-row:has(.participant-games-table) {
+  grid-column: 1 / -1;
+}
+@media (max-width: 1050px) {
+  .participant-control-grid { grid-template-columns: minmax(0, 1fr); }
+  .participant-control-grid > .participant-control-row:has(.participant-games-table) { grid-column: auto; }
+}
+@media (min-width: 760px) and (max-width: 1050px) {
+  .participant-control-grid .participant-edit-grid {
+    grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) minmax(90px, .65fr) auto;
+  }
+  .participant-control-grid .participant-edit-actions { grid-column: 4; }
+}
+@media (max-width: 520px) {
+  .participant-control-grid > .participant-control-row { padding: 9px; gap: 7px 6px; }
+  .participant-control-grid .participant-control-row > code { font-size: .68rem; }
+  .participant-control-grid .participant-row-actions { gap: 4px; }
+  .participant-control-grid .participant-row-actions > .btn,
+  .participant-control-grid .participant-row-actions > .withdrawal-locked {
+    font-size: .69rem;
+    padding: 6px 3px;
+  }
+  .participant-control-grid .participant-edit-grid { grid-template-columns: 1fr; }
+  .participant-control-grid .participant-edit-actions { grid-column: 1; }
+}
