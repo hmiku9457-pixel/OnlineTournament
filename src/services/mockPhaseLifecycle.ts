@@ -151,6 +151,23 @@ export function completeStage(tournament: DemoTournament, stage: TournamentStage
   return true;
 }
 
+/** Reopen a completed stage if a correction invalidates a previously resolved
+ * qualifying cutoff, as long as the subsequent stage has not started. */
+export function reopenStageForQualification(tournament: DemoTournament, stage: TournamentStage): boolean {
+  const state = getPhaseLifecycle(tournament);
+  if (!state.completedStageIds.includes(stage.id)) return false;
+  const next = tournament.stages[getStageIndex(tournament, stage) + 1];
+  if (!next || state.startedStageIds.includes(next.id)) return false;
+  const entrants = { ...(state.stageEntrants ?? {}) };
+  delete entrants[next.id];
+  saveState(tournament, {
+    ...state,
+    completedStageIds: state.completedStageIds.filter((id) => id !== stage.id),
+    stageEntrants: entrants,
+  });
+  return true;
+}
+
 export function getNextStartableStage(tournament: DemoTournament) {
   return tournament.stages.find((stage) => isStageEditable(tournament, stage) && getStageIndex(tournament, stage) > 0);
 }
