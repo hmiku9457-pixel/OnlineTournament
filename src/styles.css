@@ -2148,10 +2148,11 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .swiss-progress-layout .swiss-standings-table { min-width: 680px; table-layout: fixed; }
 .swiss-standings-table .swiss-col-rank { width: 30px; }
 .swiss-standings-table .swiss-col-count { width: 34px; }
-.swiss-standings-table .swiss-col-buchholz { width: 48px; }
-.swiss-standings-table .swiss-col-ratio { width: 67px; }
-.swiss-standings-table .swiss-col-difference { width: 56px; }
-/* Die Teilnehmerspalte nutzt den Rest; Sätze/± und Bälle/± bleiben beieinander. */
+.swiss-standings-table .swiss-col-buchholz { width: 54px; }
+.swiss-standings-table .swiss-col-ratio { width: 62px; }
+.swiss-standings-table .swiss-col-difference { width: 52px; }
+.swiss-standings-table .swiss-col-points { width: 45px; }
+/* Zähler und BHZ werden zentriert; die Differenz gehört optisch zum folgenden Verhältnis. */
 .swiss-standings-table th:nth-child(3),
 .swiss-standings-table th:nth-child(4),
 .swiss-standings-table th:nth-child(5),
@@ -2163,9 +2164,53 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .swiss-progress-layout .swiss-standings-table th,
 .swiss-progress-layout .swiss-standings-table td { padding-inline: 5px; }
 .swiss-bye-marker { font-size: .72em; font-weight: 800; margin-left: 1px; vertical-align: super; }
-.swiss-bye-legend { margin: 8px 5px 2px; font-size: .72rem; line-height: 1.35; }
-.swiss-ranking-legend { margin: 5px 5px 2px; font-size: .68rem; line-height: 1.4; }
-.swiss-buchholz-cell { font-weight: 700; font-variant-numeric: tabular-nums; }
+/* BHZ steht nach N; die Hilfe sitzt ohne zusätzlichen Spaltenbedarf im Kopf. */
+.swiss-buchholz-cell { font-weight: 400; text-align: center; font-variant-numeric: tabular-nums; }
+.swiss-bhz-header { text-align: center; }
+.swiss-bhz-header-inner { display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
+.swiss-bhz-help-trigger {
+  display: inline-grid; place-items: center; width: 16px; height: 16px;
+  padding: 0; border: 1px solid #b2ddff; border-radius: 50%;
+  background: #eff8ff; color: #175cd3; font-weight: 800; font-size: .68rem;
+  line-height: 1; cursor: pointer;
+}
+.swiss-bhz-help-trigger:hover { background: #dbeafe; border-color: #84caff; }
+.swiss-bhz-help-trigger:focus-visible { outline: 2px solid #175cd3; outline-offset: 2px; }
+.swiss-progress-layout .swiss-standings-table th.swiss-stat-group-start,
+.swiss-progress-layout .swiss-standings-table td.swiss-stat-group-start {
+  border-left: 1px solid #d0d5dd; padding-left: 6px;
+}
+.swiss-progress-layout .swiss-standings-table th.swiss-stat-difference,
+.swiss-progress-layout .swiss-standings-table td.swiss-stat-difference { text-align: right; padding-right: 2px; }
+.swiss-progress-layout .swiss-standings-table th.swiss-stat-ratio,
+.swiss-progress-layout .swiss-standings-table td.swiss-stat-ratio { text-align: left; padding-left: 3px; }
+.swiss-standings-table .swiss-stat-ratio .standing-ratio {
+  display: inline-grid; grid-template-columns: auto auto auto;
+  gap: 1px; width: auto; white-space: nowrap;
+}
+.swiss-standings-table .swiss-points-cell { text-align: center; }
+.swiss-standings-legend {
+  display: grid; gap: 6px; border-top: 1px solid #e4e7ec;
+  padding: 10px 5px 3px; margin-top: 6px; color: #475467;
+  font-size: .71rem; line-height: 1.4;
+}
+.swiss-legend-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.swiss-legend-symbol {
+  flex: 0 0 auto; display: inline-grid; place-items: center;
+  width: 19px; height: 19px; border: 1px solid #d0d5dd;
+  border-radius: 5px; background: #f9fafb; color: #344054; font-weight: 800;
+}
+.swiss-legend-ranking { color: #667085; }
+.swiss-legend-label { font-weight: 700; color: #344054; }
+.swiss-bhz-modal { width: min(620px, 100%); max-height: 88vh; overflow-y: auto; }
+.swiss-bhz-modal h3 { margin: 18px 0 8px; font-size: .95rem; }
+.swiss-bhz-modal p { margin-bottom: 12px; line-height: 1.5; }
+.swiss-bhz-modal ul, .swiss-bhz-modal ol { padding-left: 23px; margin: 8px 0 14px; line-height: 1.55; }
+.swiss-bhz-modal li + li { margin-top: 7px; }
+.swiss-bhz-exception { border-left: 3px solid #b2ddff; padding: 8px 12px; background: #f9fafb; border-radius: 0 8px 8px 0; }
+.swiss-bhz-exception h3 { margin-top: 3px; }
+.swiss-bhz-modal p.swiss-bhz-footnote { margin-top: 14px; margin-bottom: 0; font-size: .8rem; }
+@media print { .swiss-bhz-help-trigger, .swiss-bhz-modal { display: none !important; } }
 .swiss-round-card { padding: 12px; }
 .swiss-round-card-heading { display: flex; justify-content: space-between; align-items: start; gap: 7px; margin-bottom: 9px; }
 .swiss-round-card-heading > div { display: grid; gap: 3px; }
