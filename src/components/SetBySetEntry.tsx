@@ -1,10 +1,10 @@
-import { useEffect, useId, useMemo, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { MatchSet } from '@/domain/types';
 import { getMatchFinalization, requiresFinalApproval } from '@/domain/matchFinalization';
 import { applySetCorrections } from '@/domain/shortSetNotation';
 import { storedResultSnapshot } from '@/domain/storedResultSnapshot';
 import { parseSportSet, sportScoring, setTarget } from '@/domain/sportScoring';
+import { MatchSetInput } from '@/components/MatchSetInput';
 import { completeMockMatch, saveMockMatchSets, type MockRuntimeMatch } from '@/services/mockRuntime';
 
 function winsFromSets(sets: MatchSet[]) {
@@ -34,8 +34,6 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
   const [playedSets, setPlayedSets] = useState<MatchSet[]>(match.sets ?? []);
   const [editingFinished, setEditingFinished] = useState(false);
   const [currentValue, setCurrentValue] = useState('');
-  const [quickHelpOpen, setQuickHelpOpen] = useState(false);
-  const quickHelpId = useId();
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correctionValues, setCorrectionValues] = useState<string[]>([]);
   const [correctionError, setCorrectionError] = useState<string | null>(null);
@@ -54,7 +52,6 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
   useEffect(() => {
     setPlayedSets(JSON.parse(storedSetsKey) as MatchSet[]);
     setCurrentValue('');
-    setQuickHelpOpen(false);
     setError(null);
     setEditingFinished(false);
     setCorrectionOpen(false);
@@ -151,12 +148,6 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
     setError(null);
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    confirmSet();
-  }
-
   return (
     <div className={compact ? 'set-by-set-entry compact' : 'set-by-set-entry'}>
       <div className="set-entry-scoreline">
@@ -182,48 +173,15 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
       )}
 
       {!alreadyFinished && !needsFinalApproval && currentSetNumber <= match.bestOf && (
-        <div className="current-set-entry-group">
-          <div className={compact ? 'current-set-entry-row has-entry-help' : 'current-set-entry-row'}>
-            <label className="current-set-field">
-              <span>Satz {currentSetNumber}</span>
-              <input
-                aria-label={`Satz ${currentSetNumber}`}
-                inputMode="numeric"
-                placeholder={rules.shortSetEntry ? '7 / -7' : `${target}:18`}
-                value={currentValue}
-                onChange={(event) => setCurrentValue(event.target.value)}
-                onKeyDown={handleKeyDown}
-                title={rules.shortSetEntry ? '7 = 11:7, -7 = 7:11' : 'Satzpunkte links:rechts eingeben'}
-              />
-            </label>
-            <button className="btn small primary" type="button" disabled={!parsedCurrent} onClick={confirmSet}>
-              Satz {currentSetNumber} bestätigen
-            </button>
-            {compact && (
-              <div className="set-entry-help" onKeyDown={(event) => {
-                if (event.key === 'Escape') setQuickHelpOpen(false);
-              }}>
-                <button
-                  className="set-entry-help-button"
-                  type="button"
-                  aria-label="Hilfe zur Satzeingabe"
-                  aria-expanded={quickHelpOpen}
-                  aria-controls={quickHelpId}
-                  onClick={() => setQuickHelpOpen((open) => !open)}
-                  title="Eingabehilfe anzeigen"
-                >?</button>
-                {quickHelpOpen && (
-                  <div className="set-entry-help-tooltip" id={quickHelpId} role="tooltip">
-                    {rules.shortSetEntry
-                      ? 'Kurzform (linker Spieler): 7 = 11:7 · -7 = 7:11 · 10 = 12:10.'
-                      : `${match.sport}: Satzergebnis als ${target}:18 eingeben.`}
-                    <span>Enter bestätigt den Satz.</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <MatchSetInput
+          sport={match.sport}
+          bestOf={match.bestOf}
+          setIndex={playedSets.length}
+          value={currentValue}
+          onChange={setCurrentValue}
+          onConfirm={confirmSet}
+          compact={compact}
+        />
       )}
 
 
