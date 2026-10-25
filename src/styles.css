@@ -2375,3 +2375,30 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+
+/* Schweizer Gleichstand am Qualifikations-Cut: blockierender Dialog für die Turnierleitung. */
+.swiss-cutoff-backdrop { z-index: 1100; }
+.swiss-cutoff-modal { width: min(650px, 100%); max-height: min(90vh, 860px); overflow-y: auto; }
+.swiss-cutoff-heading h2 { margin: 9px 0; }
+.swiss-cutoff-heading p { line-height: 1.45; margin-bottom: 10px; }
+.swiss-cutoff-candidates { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0 17px; }
+.swiss-cutoff-candidate {
+  display: flex; gap: 5px; flex-direction: column; border-radius: 8px;
+  border: 1px solid #d0d5dd; background: #f9fafb; padding: 7px 10px; font-size: .8rem;
+}
+.swiss-cutoff-candidate.eliminated { color: #667085; background: #f2f4f7; }
+.swiss-cutoff-candidate .muted { font-size: .7rem; }
+.swiss-cutoff-choice, .swiss-cutoff-mode { border-top: 1px solid #e4e7ec; padding-top: 14px; }
+.swiss-cutoff-choice > strong { display: block; margin-bottom: 12px; }
+.swiss-cutoff-choice .actions, .swiss-cutoff-mode .actions { display: flex; flex-wrap: wrap; gap: 9px; }
+.swiss-cutoff-mode h3 { font-size: 1rem; margin: 0 0 8px; }
+.swiss-cutoff-mode > p { margin-bottom: 12px; }
+.swiss-cutoff-score-input { display: grid; grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr); align-items: end; gap: 12px; margin: 12px 0 18px; }
+.swiss-cutoff-score-input label { display: grid; gap: 5px; min-width: 0; font-size: .79rem; font-weight: 600; }
+.swiss-cutoff-score-input label input { width: 100%; min-width: 0; }
+.swiss-cutoff-score-input > span { align-self: end; margin-bottom: 10px; font-weight: 700; }
+.swiss-cutoff-history { display: grid; gap: 4px; padding: 10px; border: 1px solid #e4e7ec; border-radius: 8px; margin-bottom: 12px; font-size: .79rem; }
+.swiss-cutoff-lot-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; margin: 12px 0; }
+.swiss-cutoff-lot-choices label { display: flex; align-items: center; gap: 8px; padding: 9px; border: 1px solid #e4e7ec; border-radius: 7px; cursor: pointer; }
+.swiss-cutoff-lot-choices input { flex: 0 0 auto; }
