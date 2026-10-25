@@ -15,6 +15,7 @@ import { SwissStandingsTable } from '@/components/SwissStandingsTable';
 import { SwissBuchholzHelpModal } from '@/components/SwissBuchholzHelpModal';
 import { SwissCutoffDecisionModal } from '@/components/SwissCutoffDecisionModal';
 import { SwissRoundRobinHistory } from '@/components/SwissRoundRobinHistory';
+import { RegularRoundRobinView } from '@/components/RegularRoundRobinView';
 import { getSwissCutoffRowIndex } from '@/components/SwissQualificationCutoff';
 import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
@@ -28,7 +29,7 @@ import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
 import { canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getStageWithdrawalLabel, getWithdrawalLabel } from '@/services/mockWithdrawals';
-import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
+import { getMockConfirmedFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { FinalStandingsList } from '@/components/FinalStandingsList';
 import { VenueLayoutMini } from '@/components/VenueLayout';
 import { displayVenueMessage, displayVenueName, getVenueTerminology } from '@/domain/venueTerminology';
@@ -120,6 +121,10 @@ function StageCompetitionView({
   const previousFinishLabels = getPreviousStageFinishLabels(tournament, stage);
   const scoreSport = sportScoring(tournament.sport).mode === 'score';
   const scoreUnit = sportScoring(tournament.sport).plural;
+
+  if (stage.type === 'ROUND_ROBIN') {
+    return <RegularRoundRobinView tournament={tournament} stage={stage} onEditResult={onEditResult} />;
+  }
 
   if (stage.type === 'GROUPS') {
     const groups = buildMockGroups(tournament, stage);
@@ -546,7 +551,8 @@ export function TournamentControlPage() {
   const participantStatistics = useMemo(() => summarizeParticipantStatuses(
     participantProgress.map(({ progress }) => progress.status),
   ), [participantProgress]);
-  const finalStandings = useMemo(() => standingsSource.tournament.status === 'FINISHED' ? getMockFinalStandings(standingsSource.tournament) : [], [standingsSource]);
+  const anyCompletedPhase = tournament.stages.some((stage) => isStageCompleted(tournament, stage));
+  const finalStandings = useMemo(() => getMockConfirmedFinalStandings(standingsSource.tournament), [standingsSource]);
   const nextMatches = matches.filter((match) => match.status === 'WAITING');
   const assignableWaitingMatches = nextMatches.filter((match) => (queueAssignableTables.get(match.id)?.length ?? 0) > 0);
   const assignableWaitingIds = new Set(assignableWaitingMatches.map((match) => match.id));
@@ -963,7 +969,7 @@ export function TournamentControlPage() {
       </header>
 
       <nav className="control-tabs" aria-label="Turnierleitungsbereiche">
-        {(tournament.status === 'FINISHED' ? [...tabs, { id: 'final' as const, label: 'Endplatzierungen' }] : tabs).map((item) => (
+        {(anyCompletedPhase ? [...tabs, { id: 'final' as const, label: 'Endplatzierungen' }] : tabs).map((item) => (
           <button className={tab === item.id ? 'control-tab active' : 'control-tab'} key={item.id} type="button" aria-current={tab === item.id ? 'page' : undefined} onClick={() => setTab(item.id)}>{item.label}</button>
         ))}
       </nav>
@@ -1299,11 +1305,14 @@ export function TournamentControlPage() {
         </section>
       )}
 
-      {tab === 'final' && tournament.status === 'FINISHED' && (
+      {tab === 'final' && anyCompletedPhase && (
         <section className="card control-tab-panel">
           <div className="control-section-head"><div><h2>Endplatzierungen</h2>
-            <p className="muted">Turnierweite Gesamtplatzierungen über alle Phasen. Gleiche Gruppenränge teilen sich einen Platzierungsbereich; Rückzüge werden gemäß ihrer letzten erreichten Phase eingeordnet.</p>
+            <p className="muted">{tournament.status === 'FINISHED'
+              ? 'Turnierweite Gesamtplatzierungen über alle Phasen. Gleiche Gruppenränge teilen sich einen Platzierungsbereich; Rückzüge werden gemäß ihrer letzten erreichten Phase eingeordnet.'
+              : 'Bereits feststehende Endplatzierungen ausgeschiedener Teilnehmer. Alle Spieler, die noch im Turnier sind, bleiben bis zu ihrem Ausscheiden oder dem Turnierende ohne endgültige Platzierung.'}</p>
           </div></div>
+          {finalStandings.length === 0 && <p className="muted">Noch keine endgültigen Platzierungen: Die nächste Phase steht für alle Teilnehmer noch offen.</p>}
           <FinalStandingsList standings={finalStandings} phaseNames={tournament.stages.map((stage) => stage.name)}
             withdrawalLabels={Object.fromEntries(finalStandings.filter((row) => row.status === 'Zurückgezogen').map((row) => [row.name, getWithdrawalLabel(tournament, row.name) ?? 'Zurückgezogen']))} />
         </section>
