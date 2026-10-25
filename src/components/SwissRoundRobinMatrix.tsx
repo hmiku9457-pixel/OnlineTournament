@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { MATRIX_AUTOFIT_MAX_PLAYERS, roundRobinMatrixFit } from '@/domain/roundRobinMatrixFit';
 import { sportScoring } from '@/domain/sportScoring';
 import type { PlayoffRound } from '@/domain/swissCutoffPlayoff';
 import type { MockRuntimeMatch } from '@/services/mockRuntime';
@@ -16,6 +17,27 @@ interface Props {
  * its row player; diagonal cells represent impossible self-matches. */
 export function SwissRoundRobinMatrix({ players, rounds, sport, matches = [], onEditResult, matchAt }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [fit, setFit] = useState<ReturnType<typeof roundRobinMatrixFit> | null>(null);
+  const enlargedTableRef = useRef<HTMLDivElement | null>(null);
+  const autoFit = players.length > 0 && players.length <= MATRIX_AUTOFIT_MAX_PLAYERS;
+
+  useEffect(() => {
+    if (!expanded || !autoFit || !enlargedTableRef.current) return;
+    const host = enlargedTableRef.current;
+    const resize = () => {
+      const width = host.clientWidth;
+      const height = host.clientHeight;
+      if (width && height) setFit(roundRobinMatrixFit(players.length, width, height));
+    };
+    resize();
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(resize);
+      observer.observe(host);
+      return () => observer.disconnect();
+    }
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, [expanded, autoFit, players.length]);
   const fixtures = rounds.flatMap((round, roundIndex) => round.kind === 'ROUND_ROBIN'
     ? round.matches.map((match, index) => ({
       ...match, game: matchAt?.(roundIndex, index) ?? matches.find((game) => game.id.endsWith(`-sw-playoff-r${roundIndex + 1}-m${index + 1}`)),
@@ -25,7 +47,13 @@ export function SwissRoundRobinMatrix({ players, rounds, sport, matches = [], on
   // Changes to fixtures/results appear identically in both views.
   const renderTable = (large = false) => (
     <>
-    <div className="swiss-intermediate-matrix-scroll">
+    <div className="swiss-intermediate-matrix-scroll" ref={large && autoFit ? enlargedTableRef : undefined}
+      style={large && autoFit && fit ? {
+        '--matrix-name-width': `${fit.nameWidth}px`,
+        '--matrix-cell-font': `${fit.cellFont}px`,
+        '--matrix-name-font': `${fit.nameFont}px`,
+        '--matrix-row-height': `${fit.rowHeight}px`,
+      } as CSSProperties : undefined}>
       <table className="swiss-intermediate-matrix-table">
         <thead>
           <tr>
@@ -95,7 +123,7 @@ export function SwissRoundRobinMatrix({ players, rounds, sport, matches = [], on
     </div>
     {expanded && (
       <div className="prototype-modal-backdrop swiss-intermediate-matrix-backdrop" role="presentation">
-        <section className="prototype-modal swiss-intermediate-matrix-modal" role="dialog" aria-modal="true"
+        <section className={`prototype-modal swiss-intermediate-matrix-modal${autoFit ? ' is-auto-fit' : ''}`} role="dialog" aria-modal="true"
           aria-label="Kreuztabelle – vergrößerte Ansicht"
           onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setExpanded(false); } }}>
           <div className="swiss-intermediate-matrix-modal-head">
