@@ -72,8 +72,8 @@ function placementInStage(tournament: DemoTournament, stage: TournamentStage, na
     return row ? `Platz ${row.rank}` : undefined;
   }
   if (stage.type === 'ROUND_ROBIN') {
-    // Bei nur einer Jeder-gegen-jeden-Phase wird die Rangfolge wie in der Gruppe berechnet.
-    return undefined;
+    const row = buildRoundRobinStandings(tournament, stage).find((item) => item.name === name);
+    return row ? `Platz ${row.rank}` : undefined;
   }
   if (stage.type === 'KNOCKOUT' || stage.type === 'DOUBLE_ELIMINATION' || stage.type === 'PLACEMENT') {
     return knockoutPlacement(tournament, stage, name);
@@ -154,12 +154,20 @@ export function getMockFinalStandings(tournament: DemoTournament) {
         }
         nextPlace += tied.length;
       }
-    } else if (stage?.type === 'SWISS') {
-      const ranks = new Map(buildSwissStandings(tournament, stage).map((standing) => [standing.name, standing.rank]));
-      participants.sort((a, b) => (ranks.get(a.name) ?? Infinity) - (ranks.get(b.name) ?? Infinity) || a.name.localeCompare(b.name, 'de'));
-      for (const row of participants) {
-        row.placement = asRange(nextPlace, 1);
-        row.placementNumber = nextPlace++;
+    } else if (stage?.type === 'SWISS' || stage?.type === 'ROUND_ROBIN') {
+      const standings = stage.type === 'SWISS'
+        ? buildSwissStandings(tournament, stage) : buildRoundRobinStandings(tournament, stage);
+      const ranks = new Map(standings.map((standing) => [standing.name, standing.rank]));
+      const rankValues = [...new Set(participants.map((row) => ranks.get(row.name) ?? Number.MAX_SAFE_INTEGER))]
+        .sort((a, b) => a - b);
+      for (const rank of rankValues) {
+        const tied = participants.filter((row) => (ranks.get(row.name) ?? Number.MAX_SAFE_INTEGER) === rank);
+        const label = asRange(nextPlace, tied.length);
+        for (const row of tied) {
+          row.placement = label;
+          row.placementNumber = nextPlace;
+        }
+        nextPlace += tied.length;
       }
     } else if (stage?.type === 'KNOCKOUT' || stage?.type === 'DOUBLE_ELIMINATION' || stage?.type === 'PLACEMENT') {
       const ranks = (name: string) => {
