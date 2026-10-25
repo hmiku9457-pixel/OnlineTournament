@@ -21,8 +21,14 @@ function SwissRatio({ value }: { value: string }) {
   return <span className="standing-ratio"><span>{left}</span><span>:</span><span>{right}</span></span>;
 }
 
-function difference(value: number) {
-  return value > 0 ? `+${value}` : String(value);
+function SwissDifference({ value }: { value: number }) {
+  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+  return (
+    <span className="swiss-difference-value">
+      <span className="swiss-difference-sign">{sign}</span>
+      <span className="swiss-difference-digits">{Math.abs(value)}</span>
+    </span>
+  );
 }
 
 function formatBuchholz(value: number) {
@@ -93,10 +99,10 @@ export function SwissStandingsTable({
                   {scoreSport && <td>{row.losses}</td>}
                   <td className="swiss-buchholz-cell">{formatBuchholz(row.buchholz)}</td>
                   <td className="swiss-stat-ratio swiss-stat-group-start"><SwissRatio value={scoreSport ? row.balls : row.sets} /></td>
-                  <td className="swiss-stat-difference">{difference(scoreSport ? row.ballDifference : row.setDifference)}</td>
+                  <td className="swiss-stat-difference"><SwissDifference value={scoreSport ? row.ballDifference : row.setDifference} /></td>
                   {scoreSport ? <td className="swiss-points-cell">{row.points}</td> : <>
                     <td className="swiss-stat-ratio swiss-stat-group-start"><SwissRatio value={row.balls} /></td>
-                    <td className="swiss-stat-difference">{difference(row.ballDifference)}</td>
+                    <td className="swiss-stat-difference"><SwissDifference value={row.ballDifference} /></td>
                   </>}
                 </tr>
                 {index === cutoffIndex && <SwissQualificationCutoffRow qualifyingPlaces={qualifyingPlaces} finalized={finalized} />}
