@@ -1,3 +1,4 @@
+import { sportScoring } from '@/domain/sportScoring';
 import type { PlayoffRound } from '@/domain/swissCutoffPlayoff';
 import type { MockRuntimeMatch } from '@/services/mockRuntime';
 
@@ -20,7 +21,7 @@ export function SwissRoundRobinMatrix({ players, rounds, sport, matches = [], on
   return <div className="card swiss-intermediate-matrix">
     <div className="swiss-intermediate-matrix-head">
       <h4>Kreuztabelle</h4>
-      <span className="muted">{sport === 'table_tennis' ? 'Satzpunkte aus Sicht des Zeilenspielers' : 'Ergebnisse aus Sicht des Zeilenspielers'}</span>
+      <span className="muted">{sportScoring(sport).mode === 'sets' ? 'Satzpunkte aus Sicht des Zeilenspielers' : 'Ergebnisse aus Sicht des Zeilenspielers'}</span>
     </div>
     <div className="swiss-intermediate-matrix-scroll">
       <table className="swiss-intermediate-matrix-table">
