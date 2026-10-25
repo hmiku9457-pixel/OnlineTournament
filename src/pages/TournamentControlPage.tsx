@@ -1503,6 +1503,66 @@ export function TournamentControlPage() {
         </section>
       )}
 
+      {tab === 'participants' && participantPanel && selectedParticipantIndex >= 0 && (
+        <div className="prototype-modal-backdrop participant-management-backdrop" role="presentation" onMouseDown={() => setParticipantPanel(null)}>
+          <section ref={participantModalRef} tabIndex={-1}
+            className={`prototype-modal participant-management-modal${participantPanel.mode === 'games' ? ' is-games' : ''}`}
+            role="dialog" aria-modal="true" aria-labelledby="participant-management-title"
+            onMouseDown={(event) => event.stopPropagation()}>
+            <div className="participant-management-heading">
+              <div>
+                <h2 id="participant-management-title">{participantPanel.mode === 'edit' ? 'Teilnehmer bearbeiten' : 'Spielübersicht'}</h2>
+                <p>{participantPanel.name} · Code {tournament.participantCodes?.[participantPanel.name] ?? String(4100 + selectedParticipantIndex).slice(-4)}</p>
+              </div>
+              <button type="button" className="btn small" onClick={() => setParticipantPanel(null)} aria-label="Fenster schließen">Schließen</button>
+            </div>
+            {participantPanel.mode === 'edit' ? (
+              <>
+                <ParticipantEditFields key={participantPanel.name} name={participantPanel.name}
+                  code={tournament.participantCodes?.[participantPanel.name] ?? String(4100 + selectedParticipantIndex).slice(-4)}
+                  usedCodes={new Set(Object.entries(tournament.participantCodes ?? {}).filter(([owner]) => owner !== participantPanel.name).map(([, code]) => code))}
+                  onSave={(first, last, code) => {
+                    if (!updateMockParticipantName(tournament.id, participantPanel.name, first, last, code)) return false;
+                    setParticipantPanel(null);
+                    setParticipantVersion((value) => value + 1);
+                    refreshRuntime();
+                    return true;
+                  }}
+                  onCancel={() => setParticipantPanel(null)} />
+                <p className="participant-code-note">„Neuer Code“ erzeugt einen freien Code. Erst mit „Speichern“ wird er übernommen.</p>
+              </>
+            ) : (
+              <>
+                {selectedParticipantMatches.length === 0 ? (
+                  <p className="participant-filter-empty">Für diesen Teilnehmer sind noch keine Spiele verfügbar.</p>
+                ) : (
+                  <div className="participant-games-table table-wrap">
+                    <table>
+                      <thead><tr><th>Phase</th><th>Runde</th><th>Gegner</th><th>Status</th><th>Ergebnis</th><th>Aktion</th></tr></thead>
+                      <tbody>{selectedParticipantMatches.map((match) => {
+                        const stage = tournament.stages.find((item) => item.id === match.stageId);
+                        return <tr key={match.id}>
+                          <td>{match.phase}</td>
+                          <td>{match.round}</td>
+                          <td>{match.sideA === participantPanel.name ? match.sideB : match.sideA}</td>
+                          <td>{matchStatusLabel(match.status)}</td>
+                          <td><MatchResultDetails {...resultForMatchParticipant(match, participantPanel.name)} sport={tournament.sport} decision={match.decision} decisionReversed={match.sideB === participantPanel.name} /></td>
+                          <td>{match.status === 'FINISHED' && stage && canEditMockMatch(tournament, match.id)
+                            ? <button className="btn small" type="button" onClick={() => { setParticipantPanel(null); setAdminEditMatchId(match.id); }}>Spiel bearbeiten</button>
+                            : stage && isStageStarted(tournament, stage) && match.status !== 'FINISHED'
+                              ? <Link className="btn small" to={`/score/${match.id}`}>Spiel bearbeiten</Link>
+                              : <span className="muted">{match.status === 'FINISHED' ? 'Gesperrt' : 'Phase noch nicht gestartet'}</span>}</td>
+                        </tr>;
+                      })}</tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </div>
+      )}
+
       {pendingWithdrawal && (
         <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setPendingWithdrawal(null)}>
           <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="withdrawal-warning-title" onMouseDown={(event) => event.stopPropagation()}>
