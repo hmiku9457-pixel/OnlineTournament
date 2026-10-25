@@ -20,6 +20,7 @@ interface Props {
   lotParticipants?: ReadonlySet<string>;
   /** Visible qualification outcome, independent of the normal Swiss ranking. */
   decisionTags?: Record<string, { label: string; qualified: boolean }>;
+  hideBuchholz?: boolean;
 }
 
 function SwissRatio({ value }: { value: string }) {
@@ -44,7 +45,7 @@ function formatBuchholz(value: number) {
 export function SwissStandingsTable({
   standings, scoreSport, scoreUnit, unplayedWinners, previousFinishLabels, withdrawalLabel,
   qualifyingPlaces, cutoffIndex, finalized, onSelectPlayer, onShowBuchholz, highlightPlayers, readOnly = false,
-  lotWinners, lotParticipants, decisionTags,
+  lotWinners, lotParticipants, decisionTags, hideBuchholz = false,
 }: Props) {
   return (
     <div className="card table-wrap swiss-standings-card">
@@ -56,7 +57,7 @@ export function SwissStandingsTable({
           <col className="swiss-col-count" />
           <col className="swiss-col-count" />
           {scoreSport && <col className="swiss-col-count" />}
-          <col className="swiss-col-buchholz" />
+          {!hideBuchholz && <col className="swiss-col-buchholz" />}
           <col className="swiss-col-ratio" />
           <col className="swiss-col-difference" />
           {scoreSport ? <col className="swiss-col-points" /> : <>
@@ -72,12 +73,12 @@ export function SwissStandingsTable({
             <th title="Siege">S</th>
             <th title={scoreSport ? 'Unentschieden' : 'Niederlagen'}>{scoreSport ? 'U' : 'N'}</th>
             {scoreSport && <th title="Niederlagen">N</th>}
-            <th className="swiss-bhz-header" title="Buchholzzahl">
+            {!hideBuchholz && <th className="swiss-bhz-header" title="Buchholzzahl">
               <span className="swiss-bhz-header-inner">
                 <span>BHZ</span>
                 <button type="button" className="swiss-bhz-help-trigger" aria-label="Buchholzzahl (BHZ) erklären" aria-haspopup="dialog" title="Was ist die BHZ?" onClick={onShowBuchholz}>?</button>
               </span>
-            </th>
+            </th>}
             <th className="swiss-stat-ratio swiss-stat-group-start" title={scoreSport ? scoreUnit : 'Satzverhältnis'}>{scoreSport ? scoreUnit : 'Sätze'}</th>
             <th className="swiss-stat-difference" title={scoreSport ? `Differenz (${scoreUnit})` : 'Satzdifferenz'}>±</th>
             {scoreSport ? <th title="Tabellenpunkte">Pkt.</th> : <>
@@ -112,7 +113,7 @@ export function SwissStandingsTable({
                   <td>{row.wins}{unplayedWinners.has(row.name) && <sup className="swiss-bye-marker" title="Mindestens ein Sieg durch Freilos oder kampflose Wertung" aria-label="Mindestens ein Sieg durch Freilos oder kampflose Wertung">*</sup>}</td>
                   <td>{scoreSport ? row.draws : row.losses}</td>
                   {scoreSport && <td>{row.losses}</td>}
-                  <td className="swiss-buchholz-cell">{formatBuchholz(row.buchholz)}</td>
+                  {!hideBuchholz && <td className="swiss-buchholz-cell">{formatBuchholz(row.buchholz)}</td>}
                   <td className="swiss-stat-ratio swiss-stat-group-start"><SwissRatio value={scoreSport ? row.balls : row.sets} /></td>
                   <td className="swiss-stat-difference"><SwissDifference value={scoreSport ? row.ballDifference : row.setDifference} /></td>
                   {scoreSport ? <td className="swiss-points-cell">{row.points}</td> : <>
@@ -135,7 +136,10 @@ export function SwissStandingsTable({
         )}
         <div className="swiss-legend-row swiss-legend-ranking">
           <span className="swiss-legend-label">Rangfolge</span>
-          <span>{scoreSport ? 'Siege/Remis → BHZ → Punktedifferenz' : 'Siege → BHZ → Satzdifferenz → Balldifferenz'}</span>
+          <span>{hideBuchholz
+            ? scoreSport ? 'Wertungspunkte → Punktedifferenz → erzielte Punkte → direkter Vergleich'
+              : 'Siege → Satzdifferenz → gewonnene Sätze → Balldifferenz → direkter Vergleich'
+            : scoreSport ? 'Siege/Remis → BHZ → Punktedifferenz' : 'Siege → BHZ → Satzdifferenz → Balldifferenz'}</span>
         </div>
       </div>
     </div>
