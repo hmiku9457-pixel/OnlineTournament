@@ -1,6 +1,6 @@
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import type { MatchSet } from '@/domain/types';
-import type { ScoreDecision } from '@/domain/sportScoring';
+import { sportScoring, type ScoreDecision } from '@/domain/sportScoring';
 
 export interface SwissRoundFixture {
   id: string;
@@ -19,6 +19,14 @@ export interface SwissRoundMatch {
   decision?: ScoreDecision;
 }
 
+/** Wertung aus derselben Schweizer Tabelle wie links im Turnierverlauf. */
+export interface SwissStandingRecord {
+  name: string;
+  wins: number;
+  losses: number;
+  draws: number;
+}
+
 /** Neueste angesetzte Schweizer Runde – auch bei Freilosen und nach Phasenende. */
 export function currentSwissRound<T extends SwissRoundFixture>(fixtures: readonly T[]) {
   if (!fixtures.length) return { round: 0, matches: [] as T[] };
@@ -30,6 +38,7 @@ export function currentSwissRound<T extends SwissRoundFixture>(fixtures: readonl
 interface Props {
   fixtures: readonly SwissRoundFixture[];
   matches: readonly SwissRoundMatch[];
+  standings?: readonly SwissStandingRecord[];
   sport: string;
   editable: boolean;
   notice?: string | null;
@@ -38,9 +47,16 @@ interface Props {
   venueName?: (table: string) => string;
 }
 
-export function SwissRoundCard({ fixtures, matches, sport, editable, notice, onEditResult, canEditResult, venueName }: Props) {
+export function SwissRoundCard({ fixtures, matches, standings = [], sport, editable, notice, onEditResult, canEditResult, venueName }: Props) {
   const { round, matches: currentFixtures } = currentSwissRound(fixtures);
   const matchById = new Map(matches.map((match) => [match.id, match]));
+  const hasDraws = sportScoring(sport).mode === 'score';
+  const recordByPlayer = new Map(standings.map((standing) => [
+    standing.name,
+    hasDraws
+      ? `${standing.wins}:${standing.draws}:${standing.losses}`
+      : `${standing.wins}:${standing.losses}`,
+  ]));
   const finished = currentFixtures.filter((fixture) => fixture.autoWinner || matchById.get(fixture.id)?.status === 'FINISHED').length;
   const running = currentFixtures.filter((fixture) => matchById.get(fixture.id)?.status === 'LIVE').length;
 
@@ -72,7 +88,14 @@ export function SwissRoundCard({ fixtures, matches, sport, editable, notice, onE
                 {assigned && <span>{venueName ? venueName(match.table!) : match.table}</span>}
               </div>
               <div className={`group-match-row swiss-round-match-row${isLive ? ' live' : ''}`}>
-                <span className="group-match-side" title={fixture.sideA}>{fixture.sideA}</span>
+                <span className="group-match-side swiss-round-player" title={fixture.sideA}>
+                  <span className="swiss-round-player-name">{fixture.sideA}</span>
+                  {recordByPlayer.has(fixture.sideA) && (
+                    <span className="swiss-round-standing-tag" title="Aktuelle Bilanz" aria-label={`Aktuelle Bilanz ${recordByPlayer.get(fixture.sideA)}`}>
+                      {recordByPlayer.get(fixture.sideA)}
+                    </span>
+                  )}
+                </span>
                 {isBye
                   ? <strong className="swiss-bye-score">Frei</strong>
                   : <MatchResultDetails
@@ -83,7 +106,14 @@ export function SwissRoundCard({ fixtures, matches, sport, editable, notice, onE
                       onOpenResult={match && ['LIVE', 'READY', 'CONFIRMATION', 'FINISHED'].includes(match.status) && onEditResult ? () => onEditResult(fixture.id) : undefined}
                       onEdit={isFinished && onEditResult && canEditResult?.(fixture.id) ? () => onEditResult(fixture.id) : undefined}
                     />}
-                <span className="group-match-side" title={fixture.sideB}>{fixture.sideB}</span>
+                <span className="group-match-side swiss-round-player swiss-round-player-right" title={fixture.sideB}>
+                  {recordByPlayer.has(fixture.sideB) && (
+                    <span className="swiss-round-standing-tag" title="Aktuelle Bilanz" aria-label={`Aktuelle Bilanz ${recordByPlayer.get(fixture.sideB)}`}>
+                      {recordByPlayer.get(fixture.sideB)}
+                    </span>
+                  )}
+                  <span className="swiss-round-player-name">{fixture.sideB}</span>
+                </span>
               </div>
             </div>
           );

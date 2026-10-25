@@ -253,6 +253,7 @@ function StageCompetitionView({
           <SwissRoundCard
             fixtures={swissRoundFixtures}
             matches={swissMatches}
+            standings={standings}
             sport={tournament.sport}
             editable={swissEditable}
             notice={swissDrawNotice}
