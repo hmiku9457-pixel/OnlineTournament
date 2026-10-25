@@ -961,14 +961,6 @@ export function TournamentControlPage() {
   return (
     <>
       <header className="control-head">
-        <div className="control-utility-bar no-print">
-          <button className="btn small control-back-button" type="button" onClick={() => navigate(-1)}>← Zurück</button>
-          <div className="control-utility-links">
-            <Link className="btn small" to={`/player/${tournament.id}`}>Spieleransicht</Link>
-            <Link className="btn small" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
-            <button className="btn small control-help-main-button" type="button" onClick={() => setHelpTopic('start')}>Anleitung & Hilfe</button>
-          </div>
-        </div>
         <div className="control-hero-bar">
           <div className="control-identity">
             <div className="control-kicker">Turnierleitung</div>
@@ -978,7 +970,8 @@ export function TournamentControlPage() {
             </div>
             <p className="muted">{tournament.phasesLabel} · {tournament.participants} Teilnehmer · {tournament.tables} {venue.plural}</p>
           </div>
-          <div className="actions control-primary-actions no-print">
+          <div className="control-header-tools no-print">
+            <div className="actions control-primary-actions">
             {editableStage && ['GROUPS', 'SWISS', 'KNOCKOUT', 'DOUBLE_ELIMINATION'].includes(editableStage.type) && (
               <button className={tab === 'flow' ? 'btn control-edit-phase-active' : 'btn'} type="button" aria-current={tab === 'flow' ? 'page' : undefined} onClick={() => setTab('flow')}>Aktuelle Phase bearbeiten</button>
             )}
@@ -1005,6 +998,15 @@ export function TournamentControlPage() {
             {!['FINISHED', 'ABORTED'].includes(tournament.status) && (
               <button className="btn small" type="button" onClick={() => setAbortModalOpen(true)}>Turnier abbrechen</button>
             )}
+            </div>
+            <div className="control-utility-bar">
+              <button className="btn small control-back-button" type="button" onClick={() => navigate(-1)}>← Zurück</button>
+              <div className="control-utility-links">
+                <Link className="btn small" to={`/player/${tournament.id}`}>Spieleransicht</Link>
+                <Link className="btn small" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
+                <button className="btn small control-help-main-button" type="button" onClick={() => setHelpTopic('start')}>Anleitung & Hilfe</button>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -1385,9 +1387,13 @@ export function TournamentControlPage() {
             <div><strong>{participantStatistics.withdrawn}</strong><span>Zurückgezogen</span></div>
           </div>
           {showParticipantAdd && !tournament.hasStarted && (
-            <form className="participant-add-panel" onSubmit={(event) => { event.preventDefault(); handleAddParticipant(); }}>
-              <strong>{tournament.discipline === 'DOUBLES' ? 'Doppelpaar nachtragen' : 'Spieler nachtragen'}</strong>
-              <div className="participant-add-fields">
+            <form className={`participant-add-panel${tournament.discipline === 'DOUBLES' ? ' is-doubles' : ''}`} onSubmit={(event) => { event.preventDefault(); handleAddParticipant(); }}>
+              <div className="participant-add-heading">
+                <strong>{tournament.discipline === 'DOUBLES' ? 'Doppelpaar nachtragen' : 'Spieler nachtragen'}</strong>
+                <span className="field-hint">Neue Teilnehmer werden vor Turnierstart direkt in die Auslosung aufgenommen.</span>
+              </div>
+              <div className="participant-add-body">
+                <div className="participant-add-fields">
                 <label className="field">Vorname<input value={newParticipantFirst} onChange={(event) => setNewParticipantFirst(event.target.value)} /></label>
                 <label className="field">Nachname<input value={newParticipantLast} onChange={(event) => setNewParticipantLast(event.target.value)} /></label>
                 {tournament.discipline === 'DOUBLES' && (
@@ -1396,10 +1402,13 @@ export function TournamentControlPage() {
                     <label className="field">Partner: Nachname<input value={newPartnerLast} onChange={(event) => setNewPartnerLast(event.target.value)} /></label>
                   </>
                 )}
+                </div>
+                <div className="actions participant-add-actions">
+                  <button className="btn small primary" type="submit">Nachtragen</button>
+                  <button className="btn small" type="button" onClick={() => setShowParticipantAdd(false)}>Abbrechen</button>
+                </div>
               </div>
-              <div className="actions"><button className="btn small primary" type="submit">Nachtragen</button><button className="btn small" type="button" onClick={() => setShowParticipantAdd(false)}>Abbrechen</button></div>
               {participantAddError && <p role="alert" className="field-error">{participantAddError}</p>}
-              <p className="field-hint">Neue Teilnehmer werden vor Turnierstart direkt in die Auslosung aufgenommen.</p>
             </form>
           )}
           <div className="participant-control-list">
