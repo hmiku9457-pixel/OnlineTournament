@@ -2159,6 +2159,8 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .swiss-standings-table td:nth-child(5) { text-align: center; }
 .swiss-progress-layout .swiss-standings-table th,
 .swiss-progress-layout .swiss-standings-table td { padding-inline: 5px; }
+.swiss-bye-marker { font-size: .72em; font-weight: 800; margin-left: 1px; vertical-align: super; }
+.swiss-bye-legend { margin: 8px 5px 2px; font-size: .72rem; line-height: 1.35; }
 .swiss-round-card { padding: 12px; }
 .swiss-round-card-heading { display: flex; justify-content: space-between; align-items: start; gap: 7px; margin-bottom: 9px; }
 .swiss-round-card-heading > div { display: grid; gap: 3px; }
