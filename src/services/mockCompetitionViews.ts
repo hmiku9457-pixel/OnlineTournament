@@ -18,6 +18,7 @@ export interface MockStanding {
   losses: number;
   draws: number;
   points: number;
+  buchholz: number;
   sets: string;
   setDifference: number;
   balls: string;
@@ -59,7 +60,7 @@ export interface MockBracketRound {
   matches: MockBracketMatch[];
 }
 
-function computeStandings(members: string[], matches: ReturnType<typeof getMockStageMatches>, sport: string, automaticWins: string[] = []): MockStanding[] {
+function computeStandings(members: string[], matches: ReturnType<typeof getMockStageMatches>, sport: string, automaticWins: string[] = [], swiss = false, plannedRounds?: number): MockStanding[] {
   const rankingMatches = matches.map((match) => {
     const result = getMockStoredResult(match.id);
     return {
@@ -67,7 +68,7 @@ function computeStandings(members: string[], matches: ReturnType<typeof getMockS
       sets: match.sets, forcedWinner: result?.forcedWinner, decisionSide: result?.decisionSide,
     };
   });
-  return rankStandings(members, rankingMatches, sport, automaticWins)
+  return rankStandings(members, rankingMatches, sport, automaticWins, swiss, plannedRounds)
     .map((row, index) => ({
       rank: index + 1,
       name: row.name,
@@ -76,6 +77,7 @@ function computeStandings(members: string[], matches: ReturnType<typeof getMockS
       losses: row.losses,
       draws: row.draws,
       points: 3 * row.wins + row.draws,
+      buchholz: row.buchholz,
       sets: `${row.setsWon}:${row.setsLost}`,
       setDifference: row.setsWon - row.setsLost,
       balls: `${row.ballsWon}:${row.ballsLost}`,
@@ -152,9 +154,21 @@ export function getSwissByeWinners(tournament: DemoTournament, stage: Tournament
     .map((match) => match.autoWinner!);
 }
 
+/** Schweizer Siege ohne tatsächlichen Spielgewinn: Freilos oder kampflose Wertung. */
+export function getSwissUnplayedWinWinners(tournament: DemoTournament, stage: TournamentStage): string[] {
+  const byes = getSwissByeWinners(tournament, stage);
+  const forfeits = getMockStageMatches(tournament, stage).flatMap((match) => {
+    if (match.status !== 'FINISHED') return [];
+    const winner = getMockStoredResult(match.id)?.forcedWinner;
+    return winner === match.sideA || winner === match.sideB ? [winner] : [];
+  });
+  return [...byes, ...forfeits];
+}
+
 export function buildSwissStandings(tournament: DemoTournament, stage: TournamentStage): MockStanding[] {
   const order = getSwissOrder(tournament, stage);
-  return computeStandings(order, getMockStageMatches(tournament, stage), tournament.sport, getSwissByeWinners(tournament, stage));
+  return computeStandings(order, getMockStageMatches(tournament, stage), tournament.sport,
+    getSwissByeWinners(tournament, stage), true, Number(stage.settings.rounds) || 4);
 }
 
 
