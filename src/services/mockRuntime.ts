@@ -505,11 +505,9 @@ export function getSwissRoundRobinMatches(tournament: DemoTournament, stage: Tou
   const runtime = readRuntime();
   const times = getLatestFinishedTimes(tournament, results);
   const rounds = history.extraRounds ?? [];
-  let sequence = 0;
   return rounds.flatMap((round, roundIndex) => {
     if (round.kind !== 'ROUND_ROBIN') return [];
     return round.matches.map((match) => {
-      sequence += 1;
       return applyStoredState({
         id: `${stage.id}-sw-playoff-r${roundIndex + 1}-m${round.matches.indexOf(match) + 1}`,
         table: 'Noch offen',
