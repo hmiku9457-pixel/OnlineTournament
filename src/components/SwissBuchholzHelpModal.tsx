@@ -3,11 +3,12 @@ interface SwissBuchholzHelpModalProps {
   onClose: () => void;
 }
 
-/** Erklärung der tatsächlich verwendeten Schweizer Buchholz-Formel. */
+/** Erläutert die Sonneborn-Berger-Wertung der Schweizer Phase.
+ * Der Komponentenname bleibt für die bestehenden Aufrufer kompatibel. */
 export function SwissBuchholzHelpModal({ rounds, onClose }: SwissBuchholzHelpModalProps) {
   const exampleRounds = Math.max(1, rounds);
   const virtualByeLimit = exampleRounds / 2;
-  const format = (value: number) => value.toLocaleString('de-DE', { maximumFractionDigits: 1 });
+  const format = (value: number) => value.toLocaleString('de-DE', { maximumFractionDigits: 2 });
 
   return (
     <div className="prototype-modal-backdrop" role="presentation" onMouseDown={onClose}>
@@ -22,30 +23,44 @@ export function SwissBuchholzHelpModal({ rounds, onClose }: SwissBuchholzHelpMod
         <div className="player-games-modal-head">
           <div>
             <span className="badge">SCHWEIZER SYSTEM</span>
-            <h2 id="swiss-bhz-modal-title">Was ist die Buchholzzahl (BHZ)?</h2>
+            <h2 id="swiss-bhz-modal-title">Was ist die Sonneborn-Berger-Wertung (SB)?</h2>
           </div>
           <button type="button" className="btn small" onClick={onClose} autoFocus>Schließen</button>
         </div>
 
-        <p>Die Buchholzzahl misst, wie stark die bisherigen Gegner eines Spielers sind. Bei gleicher eigener Wertung wird der Spieler mit der höheren BHZ vorgezogen.</p>
+        <p>Die <strong>Sonneborn-Berger-Wertung</strong> belohnt Erfolge gegen starke Gegner.
+          Bei gleichen eigenen Wertungspunkten steht der Spieler mit der höheren SB-Wertung vorne.
+          Im Unterschied zur früheren Buchholzzahl werden <strong>verlorene Spiele nicht als Stärke-Bonus</strong> angerechnet.</p>
 
-        <h3>So wird die BHZ berechnet</h3>
+        <h3>So wird die SB-Wertung berechnet</h3>
         <ol className="swiss-bhz-explanation-steps">
-          <li>Jeder Sieg zählt für die BHZ-Berechnung als <strong>1 Wertungspunkt</strong>, jedes Unentschieden als <strong>0,5</strong>, eine Niederlage als <strong>0</strong>.</li>
-          <li>Für jede tatsächlich gespielte Partie werden die bisherigen Gesamtwertungspunkte des jeweiligen Gegners addiert. Derselbe Gegner zählt bei mehreren Begegnungen entsprechend mehrfach.</li>
-          <li>Die Summe ergibt die <strong>Buchholzzahl</strong>. Beispiel: Gegner mit 4, 3 und 2,5 Punkten ergeben eine BHZ von <strong>9,5</strong>.</li>
+          <li>Für jeden Spieler werden die bisherigen Wertungspunkte ermittelt:
+            <strong> 1 für einen Sieg, 0,5 für ein Unentschieden, 0 für eine Niederlage</strong>.</li>
+          <li>Für jeden eigenen <strong>Sieg</strong> wird die aktuelle Gesamtwertung des besiegten Gegners vollständig addiert.
+            Für ein <strong>Unentschieden</strong> zählt die Hälfte seiner Gesamtwertung. Bei einer <strong>Niederlage</strong> zählt die Begegnung 0.</li>
+          <li>Die gewichteten Gegnerwerte ergeben die SB-Wertung.
+            Beispiel: Sieg gegen einen Spieler mit 4 Punkten (4), Remis gegen einen mit 3 Punkten (1,5),
+            Niederlage gegen einen mit 5 Punkten (0) ergeben <strong>SB 5,5</strong>.
+            Mehrere Begegnungen gegen denselben Gegner zählen jeweils separat.</li>
         </ol>
 
         <div className="swiss-bhz-exception">
           <h3>Freilose und kampflose Partien</h3>
-          <p>Damit ein ausgefallenes Spiel die BHZ nicht auf null setzt, verwendet unsere Turnierwertung virtuelle Gegnerwerte:</p>
+          <p>Ungespielte Partien erhalten eine begrenzte virtuelle Gegnerwertung:</p>
           <ul>
-            <li><strong>Freilos:</strong> Es zählt der kleinere Wert aus den eigenen Wertungspunkten und der halben Zahl geplanter Runden. Bei {exampleRounds} Runden liegt die Obergrenze deshalb bei {format(virtualByeLimit)} pro Freilos.</li>
-            <li><strong>Kampfloses Spiel:</strong> Es zählt der kleinere Wert aus den eigenen Wertungspunkten und denen des zugelosten Gegners. Das gilt für beide beteiligten Spieler.</li>
+            <li><strong>Freilos:</strong> Ein Freilos zählt als Sieg. Dafür wird der kleinere Wert aus den eigenen Wertungspunkten
+              und der halben Zahl geplanter Schweizer Runden verwendet.
+              Bei {exampleRounds} Runden ist dies höchstens <strong>{format(virtualByeLimit)}</strong> SB pro Freilos.</li>
+            <li><strong>Kampfloser Sieg:</strong> Als Gegnerwert zählt der kleinere Wert aus den eigenen Wertungspunkten
+              und denen des zugelosten Gegners.</li>
+            <li><strong>Kampflose Niederlage:</strong> Der Beitrag zur SB-Wertung ist 0.</li>
           </ul>
-          <p className="muted">Diese Ersatzwerte betreffen nur die BHZ. Siege, Niederlagen sowie Satz- und Ballstatistiken werden separat gewertet.</p>
+          <p className="muted">Diese Ersatzwerte verändern nur die SB-Wertung. Siege, Niederlagen sowie Satz- und Ballstatistiken
+            werden unabhängig davon erfasst.</p>
         </div>
-        <p className="muted swiss-bhz-footnote">Hinweis: Bei der BHZ gelten für alle Sportarten 1 / 0,5 / 0 Wertungspunkte, auch wenn in anderen Tabellenspalten andere Punktesysteme verwendet werden. Dies ist die für OnlineTournament hinterlegte Variante.</p>
+        <p className="muted swiss-bhz-footnote">Unsere Schweizer Wertung verwendet für die SB-Berechnung immer 1 / 0,5 / 0
+          Wertungspunkte je Spiel, auch bei Sportarten mit anderer Tabellenpunktvergabe.
+          Die Begrenzung ungespielter Partien orientiert sich an den FIDE-Regeln.</p>
       </section>
     </div>
   );
