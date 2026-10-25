@@ -195,17 +195,20 @@ export function getSwissUnplayedWinWinners(tournament: DemoTournament, stage: To
 
 export function buildSwissStandings(tournament: DemoTournament, stage: TournamentStage): MockStanding[] {
   const order = getSwissOrder(tournament, stage);
-  return applyResolvedSwissCutoffOrder(tournament, stage, computeStandings(order, getMockStageMatches(tournament, stage), tournament.sport,
-    getSwissByeWinners(tournament, stage), true, getTotalSwissRoundCount(tournament, stage)))
-    .map((row, index, sorted) => {
-      const previous = sorted[index - 1];
-      // Manual decisions at the qualification cutoff remain distinct.
-      const priorIsSame = previous && sameSportingStanding(previous, row, tournament.sport, true);
-      const decision = getSwissCutoffHistory(tournament, stage);
-      const winners = new Set(decision?.winners ?? []);
-      const acrossDecision = previous && winners.has(previous.name) !== winners.has(row.name);
-      return { ...row, rank: priorIsSame && !acrossDecision ? previous.rank : index + 1 };
-    });
+  const sorted = applyResolvedSwissCutoffOrder(tournament, stage, computeStandings(order,
+    getMockStageMatches(tournament, stage), tournament.sport, getSwissByeWinners(tournament, stage),
+    true, getTotalSwissRoundCount(tournament, stage)));
+  const winners = new Set(getSwissCutoffHistory(tournament, stage)?.winners ?? []);
+  const places: number[] = [];
+  return sorted.map((row, index) => {
+    const previous = sorted[index - 1];
+    // Only a manual sporting decision at the cutoff separates exact ties.
+    const shared = previous && sameSportingStanding(previous, row, tournament.sport, true)
+      && winners.has(previous.name) === winners.has(row.name);
+    const rank = shared ? places[index - 1] : index + 1;
+    places.push(rank);
+    return { ...row, rank };
+  });
 }
 
 
