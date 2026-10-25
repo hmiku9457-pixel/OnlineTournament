@@ -25,7 +25,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, recordSwissCutoffSet, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
 import { canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getStageWithdrawalLabel, getWithdrawalLabel } from '@/services/mockWithdrawals';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
@@ -530,7 +530,10 @@ export function TournamentControlPage() {
   const auditEntries = useMemo(() => getMockAudit(runtimeSource.tournament.id), [runtimeSource]);
   const allTournamentMatches = useMemo(() => phaseClockSource.tournament.stages.filter((stage) => isStageStarted(phaseClockSource.tournament, stage)).flatMap((stage) => [
     ...getMockStageMatches(phaseClockSource.tournament, stage),
-    ...(stage.type === 'SWISS' ? getSwissRoundRobinMatches(phaseClockSource.tournament, stage) : []),
+    ...(stage.type === 'SWISS' ? [
+      ...getSwissRoundRobinMatches(phaseClockSource.tournament, stage),
+      ...getSwissCutoffSetMatches(phaseClockSource.tournament, stage),
+    ] : []),
   ]), [phaseClockSource]);
   const filteredTournamentMatches = useMemo(() => filterControlMatches(allTournamentMatches, matchFilters), [allTournamentMatches, matchFilters]);
   const matchFilterPhases = useMemo(() => [...new Set(allTournamentMatches.map((match) => match.phase))], [allTournamentMatches]);
@@ -561,6 +564,7 @@ export function TournamentControlPage() {
   const activeRoundRobinPlayoff = Boolean(pendingSwissCutoff?.decision?.extraRounds?.some(
     (round) => round.kind === 'ROUND_ROBIN' && round.matches.some((match) => match.pointsA === undefined),
   ));
+  const activeCutoffSetMatch = pendingSwissCutoff?.decision?.mode === 'SET';
   const swissSource = useMemo(() => ({ ...runtimeSource, activeStage }), [runtimeSource, activeStage]);
   const swissRecordFor = useMemo(() => getActiveSwissRecordLookup(swissSource.tournament), [swissSource]);
   const nextStartableStage = useMemo(() => getNextStartableStage(phaseSource.tournament), [phaseSource]);
@@ -1471,10 +1475,14 @@ export function TournamentControlPage() {
           </section>
         </div>
       )}
-      {pendingSwissCutoff && !activeRoundRobinPlayoff && <SwissCutoffDecisionModal
+      {pendingSwissCutoff && !activeRoundRobinPlayoff && !activeCutoffSetMatch && <SwissCutoffDecisionModal
         status={pendingSwissCutoff}
         tournament={tournament}
-        onSet={(a, b) => { const error = recordSwissCutoffSet(tournament, a, b); if (!error) refreshRuntime(); return error; }}
+        onBeginSet={() => {
+          const error = beginSwissCutoffSetMatch(tournament);
+          if (!error) { refreshRuntime(); setTab('overview'); }
+          return error;
+        }}
         onLot={(winners) => { const error = recordSwissCutoffLot(tournament, winners); if (!error) refreshRuntime(); return error; }}
         onBegin={(kind) => { const error = beginSwissCutoffPlayoff(tournament, kind); if (!error) {
           refreshRuntime();
