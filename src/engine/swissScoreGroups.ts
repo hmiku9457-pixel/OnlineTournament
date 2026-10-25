@@ -35,7 +35,7 @@ function avoidRepeatPairings(pairings: SwissNamePairing[], players: SwissScorePl
   if (!matches.some(repeated)) return pairings;
 
   // Erst lokale Tauschversuche; damit bleibt die Score-Gruppenstruktur möglichst erhalten.
-  let fixed = [...matches];
+  const fixed = [...matches];
   let changed = true;
   while (changed) {
     changed = false;
