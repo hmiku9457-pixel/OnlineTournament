@@ -11,6 +11,11 @@ export interface StoredSwissCutoffDecision {
   signature: string;
   mode: 'SET' | 'LOT' | 'ROUND' | 'ROUND_ROBIN';
   extraRounds?: PlayoffRound[];
+  /** Number of qualifying places in the intermediate phase. */
+  qualificationSlots?: number;
+  /** Only the actually inseparable players draw lots; prior secured spots remain intact. */
+  lotPlayers?: string[];
+  lotWinners?: string[];
   eliminated: string[];
   sets: SwissCutoffSetDecision[];
   winners?: string[];
