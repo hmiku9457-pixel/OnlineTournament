@@ -2590,18 +2590,55 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .swiss-intermediate-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Phase 1.5: Platzierung links, direkte Begegnungen rechts, Gruppenspielplan darunter. */
+/* Phase 1.5: kompaktere Entscheidungstabelle und breitere Kreuztabelle. */
 .swiss-intermediate-grid {
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, .86fr) minmax(0, 1.14fr);
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
+}
+.swiss-intermediate-grid > .card { min-width: 0; padding: 14px; }
+.swiss-intermediate-standings {
+  display: flex;
+  flex-direction: column;
+}
+.swiss-intermediate-panel-heading,
+.swiss-intermediate-matrix-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+  min-height: 19px;
+  margin-bottom: 12px;
+}
+.swiss-intermediate-panel-heading h4,
+.swiss-intermediate-matrix-head h4 {
+  margin: 0;
+  color: #101828;
+  font-size: .9rem;
+  font-weight: 750;
+}
+.swiss-intermediate-standings .swiss-standings-card {
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+}
+.swiss-intermediate-standings .swiss-standings-table {
+  width: 100%;
+  min-width: 540px;
+  table-layout: fixed;
+}
+.swiss-intermediate-standings .swiss-col-rank { width: 27px; }
+.swiss-intermediate-standings .swiss-col-count { width: 30px; }
+.swiss-intermediate-standings .swiss-col-ratio { width: 56px; }
+.swiss-intermediate-standings .swiss-col-difference { width: 40px; }
+.swiss-intermediate-standings .swiss-standings-table th,
+.swiss-intermediate-standings .swiss-standings-table td {
+  padding-inline: 4px;
 }
 .swiss-intermediate-matrix { min-width: 0; padding: 14px; }
-.swiss-intermediate-matrix-head {
-  display: flex; align-items: baseline; flex-wrap: wrap;
-  gap: 3px 10px; margin-bottom: 12px;
-}
-.swiss-intermediate-matrix-head h4 { margin: 0; }
+
 .swiss-intermediate-matrix-head .muted { font-size: .73rem; }
 .swiss-intermediate-matrix-scroll {
   overflow-x: auto; max-width: 100%; border: 1px solid #e4e7ec;
@@ -2609,7 +2646,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 }
 .swiss-intermediate-matrix-table {
   width: 100%; border-spacing: 0; border-collapse: separate;
-  font-size: .76rem; font-variant-numeric: tabular-nums;
+  font-size: .8rem; font-variant-numeric: tabular-nums;
 }
 .swiss-intermediate-matrix-table th, .swiss-intermediate-matrix-table td {
   min-width: 49px; text-align: center;
