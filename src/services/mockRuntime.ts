@@ -13,6 +13,7 @@ import { rankStandings, type RankedParticipant } from '@/domain/standingRankings
 import { compareRankingRows, resultScore, resultWinnerSide, scoreWithDecision, sportScoring, validateCompleteResult, validateScoreDecision, type ExtraTimeProgress, type ScoreDecision, type WinnerSide } from '@/domain/sportScoring';
 import { getWithdrawalAwardSets } from '@/domain/withdrawalScoring';
 import { newPlayoffRound, playoffQualified, playoffRoundFinished, type PlayoffMode } from '@/domain/swissCutoffPlayoff';
+import { addSwissExtraRound, getSwissExtraRoundCount } from '@/services/mockSwissExtendedRounds';
 import { applySwissCutoffDecision, findSwissCutoffTie, type SwissCutoffTie } from '@/domain/swissCutoffTie';
 import { clearSwissCutoffDecision, readSwissCutoffDecision, saveSwissCutoffDecision, type StoredSwissCutoffDecision } from '@/services/mockSwissCutoffStore';
 import { isValidSportSet } from '@/domain/sportScoring';
@@ -360,9 +361,13 @@ function swissRoundPairings(
   return generateScoreGroupedSwissPairings(players);
 }
 
+export function getTotalSwissRoundCount(tournament: DemoTournament, stage: TournamentStage): number {
+  return Math.max(1, Number(stage.settings.rounds) || 4) + getSwissExtraRoundCount(tournament.id, stage.id);
+}
+
 function swissMatches(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]): BaseStageMatch[] {
   const participants = getSwissOrder(tournament, stage);
-  const totalRounds = Math.max(1, Number(stage.settings.rounds) || 4);
+  const totalRounds = getTotalSwissRoundCount(tournament, stage);
   const matches: BaseStageMatch[] = [];
 
   for (let round = 1; round <= totalRounds; round += 1) {
@@ -826,7 +831,7 @@ function swissCutoffStatus(tournament: DemoTournament, stage: TournamentStage, r
   const nextStage = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) + 1];
   if (!nextStage) return null;
   const base = baseStageMatches(tournament, stage, results);
-  const roundCount = Number(stage.settings.rounds) || 4;
+  const roundCount = getTotalSwissRoundCount(tournament, stage);
   if (!base.some((match) => match.round === `Runde ${roundCount}`)) return null;
   const scheduled = base.filter((match) => !match.autoWinner && match.sideA !== 'TBD' && match.sideB !== 'TBD');
   if (scheduled.length === 0 || scheduled.some((match) => results.find((result) => result.matchId === match.id)?.status !== 'FINISHED')) return null;
@@ -854,6 +859,12 @@ export function getPendingSwissCutoff(tournament: DemoTournament): SwissCutoffSt
   if (!active || active.type !== 'SWISS') return null;
   const current = swissCutoffStatus(tournament, active, readResults());
   return current && current.decision?.winners?.length === current.tie.slots ? null : current;
+}
+
+/** Round-robin tie-break history remains viewable in the tournament timeline
+ * after the Swiss phase was closed and the next phase has started. */
+export function getSwissCutoffHistory(tournament: DemoTournament, stage: TournamentStage): StoredSwissCutoffDecision | null {
+  return swissCutoffStatus(tournament, stage, readResults())?.decision ?? null;
 }
 
 /** Reflect the documented decision in the visible positions as well as qualification. */
@@ -919,6 +930,18 @@ export function beginSwissCutoffPlayoff(tournament: DemoTournament, kind: Playof
   if (!current) return 'Kein offener Stichentscheid vorhanden.';
   if (current.tie.players.length < 3) return 'Bei zwei Spielern genügt ein Entscheidungssatz.';
   if (current.decision?.mode === 'LOT' || current.decision?.sets.length) return 'Ein anderer Stichentscheid wurde bereits begonnen.';
+  if (kind === 'ROUND') {
+    // Unlike the separate qualifying playoff, a further Swiss round includes
+    // the *whole eligible field* and counts fully toward Swiss standings/BHZ.
+    const count = addSwissExtraRound(tournament.id, current.stageId);
+    if (!count) return 'Es können keine weiteren Schweizer Runden angesetzt werden.';
+    const stage = tournament.stages.find((item) => item.id === current.stageId)!;
+    const fixtures = getMockStageBaseMatches(tournament, stage);
+    const round = getTotalSwissRoundCount(tournament, stage);
+    recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'SWISS_TIE_SET',
+      description: `Zusätzliche Schweizer Runde ${round} mit allen verbleibenden Teilnehmenden eröffnet (${fixtures.filter((match) => match.round === `Runde ${round}`).length} Paarungen inklusive Freilosen).` });
+    return null;
+  }
   const previous = current.decision?.extraRounds ?? [];
   if (previous.some((round) => !playoffRoundFinished(round))) return 'Bitte zuerst alle angesetzten Entscheidungsspiele abschließen.';
   if (playoffQualified(current.tie.players, current.tie.slots, previous)) return 'Die Qualifikanten stehen bereits fest.';
@@ -1013,7 +1036,7 @@ function computeStageQualifiers(tournament: DemoTournament, stage: TournamentSta
 
   if (stage.type === 'ROUND_ROBIN' || stage.type === 'SWISS') {
     const ranked = rankParticipants(getStageEntrants(tournament, stage), matches, results, tournament.sport,
-      stage.type === 'SWISS', stage.type === 'SWISS' ? Number(stage.settings.rounds) || 4 : undefined);
+      stage.type === 'SWISS', stage.type === 'SWISS' ? getTotalSwissRoundCount(tournament, stage) : undefined);
     const cutoff = stage.type === 'SWISS' ? swissCutoffStatus(tournament, stage, results) : null;
     if (cutoff && cutoff.decision?.winners?.length !== cutoff.tie.slots) return [];
     const ordered = applySwissCutoffDecision(ranked, cutoff?.tie ?? null, cutoff?.decision?.winners ?? []);
