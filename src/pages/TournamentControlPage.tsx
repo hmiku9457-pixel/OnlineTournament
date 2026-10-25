@@ -1390,7 +1390,7 @@ export function TournamentControlPage() {
               {participantAddError && <p role="alert" className="field-error">{participantAddError}</p>}
             </form>
           )}
-          <div className="participant-control-list">
+          <div className="participant-control-list participant-control-grid">
             {participantProgress.map(({ name: participant, progress }, index) => {
               const isWithdrawn = progress.status === 'Zurückgezogen';
               const statusText = isWithdrawn ? getWithdrawalLabel(tournament, participant) ?? 'Zurückgezogen'
