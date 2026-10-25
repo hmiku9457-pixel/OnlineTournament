@@ -113,21 +113,29 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
   });
 
-  it('spielt mit drei Gleichplatzierten eine zusätzliche Runde und übernimmt deren Sieger', () => {
+  it('eröffnet eine echte zusätzliche Schweizer Runde für sämtliche verbleibenden Spieler', () => {
     const t = create(6, 2);
     completeRound(t);
-    const pending = getPendingSwissCutoff(t)!;
-    expect(pending.tie.players).toHaveLength(3);
+    const oldStandings = buildSwissStandings(t, t.stages[0]);
+    expect(getPendingSwissCutoff(t)?.tie.players).toHaveLength(3);
     expect(beginSwissCutoffPlayoff(t, 'ROUND')).toBeNull();
-    const running = getPendingSwissCutoff(t)!;
-    expect(running.decision?.extraRounds?.[0].matches).toHaveLength(1);
-    expect(running.decision?.extraRounds?.[0].bye).toBeDefined();
+    const round2 = getMockStageMatches(t, t.stages[0]).filter((match) => match.round === 'Runde 2');
+    expect(round2).toHaveLength(3);
+    expect(new Set(round2.flatMap((match) => [match.sideA, match.sideB]))).toEqual(
+      new Set(Array.from({ length: 6 }, (_, index) => `Spieler ${index + 1}`)),
+    );
+    expect(getPendingSwissCutoff(t)).toBeNull();
     expect(isStageCompleted(t, t.stages[0])).toBe(false);
-    expect(recordSwissCutoffPlayoffResult(t, 0, 3, 3)).toContain('Ungültiges Satzergebnis');
-    expect(recordSwissCutoffPlayoffResult(t, 0, 11, 7)).toBeNull();
-    expect(isStageCompleted(t, t.stages[0])).toBe(true);
-    expect(getStageEntrants(t, t.stages[1])).toHaveLength(2);
-    expect(buildSwissStandings(t, t.stages[0]).every((row) => row.wins === 1 || row.wins === 0)).toBe(true);
+    const first = round2[0];
+    completeMockMatch(first.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]);
+    expect(isStageCompleted(t, t.stages[0])).toBe(false);
+    const after = buildSwissStandings(t, t.stages[0]);
+    expect(after.find((row) => row.name === first.sideA)!.wins)
+      .toBe(oldStandings.find((row) => row.name === first.sideA)!.wins + 1);
+    expect(after.find((row) => row.name === first.sideA)!.played)
+      .toBe(oldStandings.find((row) => row.name === first.sideA)!.played + 1);
+    expect(after.find((row) => row.name === first.sideB)!.played)
+      .toBe(oldStandings.find((row) => row.name === first.sideB)!.played + 1);
   });
 
   it('spielt Jeder-gegen-Jeden und schließt erst nach sämtlichen Ergebnissen ab', () => {
@@ -147,19 +155,17 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(getStageEntrants(t, t.stages[1])).toHaveLength(2);
   });
 
-  it('fordert bei weiterem Gleichstand nach Zusatzrunde eine weitere Entscheidung', () => {
+  it('gibt keine weitere Schweizer Runde frei, bevor alle angesetzten Spiele fertig sind', () => {
     const t = create(8, 1);
     completeRound(t);
     expect(beginSwissCutoffPlayoff(t, 'ROUND')).toBeNull();
-    const first = getPendingSwissCutoff(t)!.decision!.extraRounds![0];
-    expect(first.matches).toHaveLength(2);
-    expect(recordSwissCutoffPlayoffResult(t, 0, 11, 7)).toBeNull();
-    expect(recordSwissCutoffPlayoffResult(t, 1, 11, 7)).toBeNull();
+    const round2 = getMockStageMatches(t, t.stages[0]).filter((match) => match.round === 'Runde 2');
+    expect(round2).toHaveLength(4);
+    expect(new Set(round2.flatMap((match) => [match.sideA, match.sideB])).size).toBe(8);
+    completeMockMatch(round2[0].id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]);
     expect(isStageCompleted(t, t.stages[0])).toBe(false);
-    const persisted = getPendingSwissCutoff(t)!;
-    expect(persisted.decision!.extraRounds).toHaveLength(1);
-    expect(beginSwissCutoffPlayoff(t, 'ROUND')).toBeNull();
-    expect(getPendingSwissCutoff(t)!.decision!.extraRounds).toHaveLength(2);
+    expect(getPendingSwissCutoff(t)).toBeNull();
+    expect(beginSwissCutoffPlayoff(t, 'ROUND')).toContain('Kein offener Stichentscheid');
   });
 
   it('fordert nach Ergebniskorrekturen einen neuen Entscheid, statt eine veraltete Auswahl zu übernehmen', () => {
