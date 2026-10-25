@@ -61,7 +61,7 @@ describe('Verbindliche Kontrollen der Turnierleitung', () => {
     const first = getMockStageMatches(t, t.stages[0]);
     first.forEach((match) => completeMockMatch(match.id, set));
     expect(approveMockProgress(t)?.kind).toBe('ROUND');
-    completeMockMatch(first[0].id, [{ number: 1, sideAScore: 7, sideBScore: 11 }]);
+    completeMockMatch(first[0].id, [{ number: 1, sideAScore: 7, sideBScore: 11 }], 'FINISHED', true);
     expect(getMockStageMatches(t, t.stages[0]).filter((m) => m.round === 'Runde 2')).toHaveLength(0);
     expect(getPendingMockApproval(t)).toMatchObject({ kind: 'ROUND', round: 1 });
   });
