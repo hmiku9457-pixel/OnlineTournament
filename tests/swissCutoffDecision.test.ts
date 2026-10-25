@@ -3,7 +3,7 @@ import { createMockTournament, updateMockTournamentStatus } from '@/services/moc
 import { getStageEntrants, isStageCompleted, isStageLockedWaiting, startFirstStage } from '@/services/mockPhaseLifecycle';
 import {
   completeMockMatch, getMockStageMatches, getPendingSwissCutoff,
-  recordSwissCutoffSet, recordSwissCutoffLot, resetSwissCutoffSets,
+  recordSwissCutoffSet, recordSwissCutoffLot, resetSwissCutoffSets, refreshCompletedStageQualifiers,
 } from '@/services/mockRuntime';
 import { buildSwissStandings } from '@/services/mockCompetitionViews';
 import { equalSwissSportingRank, findSwissCutoffTie } from '@/domain/swissCutoffTie';
@@ -109,6 +109,27 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     resetSwissCutoffSets(t);
     expect(getPendingSwissCutoff(t)?.decision).toBeNull();
     expect(recordSwissCutoffLot(t, [initial.tie.players[initial.tie.players.length - 1]])).toBeNull();
+    expect(isStageCompleted(t, t.stages[0])).toBe(true);
+  });
+
+  it('fordert nach Ergebniskorrekturen einen neuen Entscheid, statt eine veraltete Auswahl zu übernehmen', () => {
+    const t = create();
+    completeRound(t);
+    const old = getPendingSwissCutoff(t)!;
+    expect(recordSwissCutoffLot(t, [old.tie.players[0]])).toBeNull();
+    expect(isStageCompleted(t, t.stages[0])).toBe(true);
+    const fixtures = getMockStageMatches(t, t.stages[0]);
+    // Erst entsteht eine klare Rangfolge. Danach besteht wieder sportlicher
+    // Gleichstand, aber das ursprünglich dokumentierte Los ist nicht mehr gültig.
+    completeMockMatch(fixtures[0].id, [{ number: 1, sideAScore: 11, sideBScore: 6 }]);
+    expect(refreshCompletedStageQualifiers(t, t.stages[0])).toBe(true);
+    completeMockMatch(fixtures[1].id, [{ number: 1, sideAScore: 11, sideBScore: 6 }]);
+    expect(refreshCompletedStageQualifiers(t, t.stages[0])).toBe(false);
+    expect(isStageCompleted(t, t.stages[0])).toBe(false);
+    expect(isStageLockedWaiting(t, t.stages[1])).toBe(true);
+    expect(getPendingSwissCutoff(t)?.decision).toBeNull();
+    expect(getPendingSwissCutoff(t)?.signature).not.toBe(old.signature);
+    expect(recordSwissCutoffLot(t, [getPendingSwissCutoff(t)!.tie.players[1]])).toBeNull();
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
   });
 
