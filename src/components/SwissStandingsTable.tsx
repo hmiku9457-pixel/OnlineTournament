@@ -18,6 +18,8 @@ interface Props {
   readOnly?: boolean;
   lotWinners?: ReadonlySet<string>;
   lotParticipants?: ReadonlySet<string>;
+  /** Visible qualification outcome, independent of the normal Swiss ranking. */
+  decisionTags?: Record<string, { label: string; qualified: boolean }>;
 }
 
 function SwissRatio({ value }: { value: string }) {
@@ -42,7 +44,7 @@ function formatBuchholz(value: number) {
 export function SwissStandingsTable({
   standings, scoreSport, scoreUnit, unplayedWinners, previousFinishLabels, withdrawalLabel,
   qualifyingPlaces, cutoffIndex, finalized, onSelectPlayer, onShowBuchholz, highlightPlayers, readOnly = false,
-  lotWinners, lotParticipants,
+  lotWinners, lotParticipants, decisionTags,
 }: Props) {
   return (
     <div className="card table-wrap swiss-standings-card">
@@ -98,6 +100,11 @@ export function SwissStandingsTable({
                       {withdrawn && <span className="standing-withdrawn" title="Zeitpunkt des Rückzugs">{withdrawn}</span>}
                       {lotParticipants?.has(row.name) && <span className={lotWinners?.has(row.name) ? 'swiss-lot-tag is-qualified' : 'swiss-lot-tag is-eliminated'} title="Qualifikation nach physischem Losentscheid">
                         {lotWinners?.has(row.name) ? 'Losentscheid · weiter' : 'Losentscheid · raus'}
+                      </span>}
+                      {decisionTags?.[row.name] && <span
+                        className={decisionTags[row.name].qualified ? 'swiss-lot-tag is-qualified' : 'swiss-lot-tag is-eliminated'}
+                        title="Qualifikation durch zusätzliches Entscheidungsspiel">
+                        {decisionTags[row.name].label} · {decisionTags[row.name].qualified ? 'weiter' : 'raus'}
                       </span>}
                     </span>
                   </td>
