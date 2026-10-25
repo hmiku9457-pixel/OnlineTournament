@@ -48,7 +48,7 @@ export function SwissCutoffDecisionModal({ status, sport, onSet, onLot, onReset 
         <div className="swiss-cutoff-heading">
           <span className="badge">ENTSCHEIDUNG ERFORDERLICH</span>
           <h2 id="swiss-cutoff-title">Gleichstand an der Qualifikationsgrenze</h2>
-          <p id="swiss-cutoff-description">Die letzte Schweizer Runde ist abgeschlossen. Für die nächste Phase sind noch <strong>{status.tie.slots}</strong> {status.tie.slots === 1 ? 'Platz' : 'Plätze'} offen. Die folgenden {status.tie.players.length} Teilnehmenden liegen nach <strong>allen sportlichen Tie-Breakern gleichauf</strong>.</p>
+          <p id="swiss-cutoff-description">Die letzte Schweizer Runde ist abgeschlossen. Für die nächste Phase {status.tie.slots === 1 ? 'ist' : 'sind'} noch <strong>{status.tie.slots}</strong> {status.tie.slots === 1 ? 'Platz' : 'Plätze'} offen. Die folgenden {status.tie.players.length} Teilnehmenden liegen nach <strong>allen sportlichen Tie-Breakern gleichauf</strong>.</p>
           <p className="muted">Die Phase bleibt gesperrt, bis die Turnierleitung einen Stichentscheid dokumentiert. Die alphabetische Reihenfolge entscheidet nicht über die Qualifikation.</p>
         </div>
 
@@ -65,7 +65,7 @@ export function SwissCutoffDecisionModal({ status, sport, onSet, onLot, onReset 
           <div className="swiss-cutoff-choice">
             <strong>Wie soll entschieden werden?</strong>
             <div className="actions">
-              <button type="button" className="btn primary" onClick={() => { setChosenMode('SET'); setError(''); }}>{outcomeType} spielen</button>
+              <button type="button" className="btn primary" autoFocus onClick={() => { setChosenMode('SET'); setError(''); }}>{outcomeType} spielen</button>
               <button type="button" className="btn" onClick={() => { setChosenMode('LOT'); setError(''); }}>Physischer Losentscheid</button>
             </div>
           </div>
