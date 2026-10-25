@@ -52,6 +52,30 @@ describe('Modal für Schweizer Qualifikationsgleichstand', () => {
     expect((html.match(/class="swiss-cutoff-method"/g) ?? [])).toHaveLength(3);
   });
 
+  it('fordert bei drei identischen 1:1-Spielern zwingend den physischen Losentscheid', () => {
+    const players = ['Spieler 12', 'Spieler 13', 'Spieler 14'];
+    const cycle: SwissCutoffStatus = {
+      ...status,
+      tie: { players, slots: 1, firstRank: 1 },
+      decision: {
+        signature: 'test', mode: 'ROUND_ROBIN', eliminated: [], sets: [],
+        extraRounds: [{ kind: 'ROUND_ROBIN', matches: [
+          { sideA: players[0], sideB: players[1], pointsA: 11, pointsB: 7, matchDay: 1 },
+          { sideA: players[1], sideB: players[2], pointsA: 11, pointsB: 7, matchDay: 2 },
+          { sideA: players[2], sideB: players[0], pointsA: 11, pointsB: 7, matchDay: 3 },
+        ] }],
+      },
+    };
+    const html = renderToStaticMarkup(createElement(SwissCutoffDecisionModal, { ...props, status: cycle }));
+    expect(html).toContain('direkte Vergleich');
+    expect(html).toContain('physischer Losentscheid zwingend erforderlich');
+    expect(html).toContain('Losentscheid verbindlich bestätigen');
+    expect(html).toContain('1 offenen Losplätzen ausgewählt');
+    expect(html).not.toContain('Weitere Runde ausspielen');
+    expect(html).not.toContain('Zurück zur Auswahl');
+    expect(html).not.toContain('Jeder gegen Jeden</strong>');
+  });
+
   it('leitet für eine begonnene Phase 1.5 zur regulären Turnierleitung statt einer Satzeingabe im Modal', () => {
     const large: SwissCutoffStatus = { ...status,
       tie: { players: ['Spieler 12', 'Spieler 13', 'Spieler 14'], slots: 1, firstRank: 1 },
