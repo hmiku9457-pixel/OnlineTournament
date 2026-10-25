@@ -73,27 +73,41 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
     setError(null);
     // Best-of-1 is unambiguous and finishes after its single confirmed set.
     if (nextFinalization === 'AUTO_FINISH' && !swissAdminEntry) {
-      completeMockMatch(match.id, nextSets, 'FINISHED');
-      setEditingFinished(false);
-      onSaved?.();
-      onCompleted?.(nextSets);
+      try {
+        completeMockMatch(match.id, nextSets, 'FINISHED');
+        setEditingFinished(false);
+        onSaved?.();
+        onCompleted?.(nextSets);
+      } catch (cause) {
+        setPlayedSets(playedSets);
+        setError(cause instanceof Error ? cause.message : 'Ergebnis konnte nicht gespeichert werden.');
+      }
       return;
     }
     // With BO3/BO5/BO7 the winning set is saved only as a *live draft*.
     // The table stays occupied until the separate final result confirmation.
     if (!editingFinished) {
-      saveMockMatchSets(match.id, nextSets, 'LIVE');
-      onSaved?.();
+      try {
+        saveMockMatchSets(match.id, nextSets, 'LIVE');
+        onSaved?.();
+      } catch (cause) {
+        setPlayedSets(playedSets);
+        setError(cause instanceof Error ? cause.message : 'Satz konnte nicht gespeichert werden.');
+      }
     }
   }
 
   function finalizeResult() {
     if (!needsFinalApproval) return;
-    completeMockMatch(match.id, playedSets, 'FINISHED', swissAdminEntry);
-    setEditingFinished(false);
-    setError(null);
-    onSaved?.();
-    onCompleted?.(playedSets);
+    try {
+      completeMockMatch(match.id, playedSets, 'FINISHED', swissAdminEntry);
+      setEditingFinished(false);
+      setError(null);
+      onSaved?.();
+      onCompleted?.(playedSets);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Ergebnis konnte nicht gespeichert werden.');
+    }
   }
 
   function openCorrection() {
@@ -133,8 +147,12 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
     // Während einer abgeschlossenen Ergebniskorrektur bleibt das Original
     // unverändert, bis das vollständige neue Endergebnis bestätigt wird.
     if (!editingFinished) {
-      saveMockMatchSets(match.id, validSets, 'LIVE');
-      onSaved?.();
+      try {
+        saveMockMatchSets(match.id, validSets, 'LIVE');
+        onSaved?.();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Sätze konnten nicht gespeichert werden.');
+      }
     }
   }
 

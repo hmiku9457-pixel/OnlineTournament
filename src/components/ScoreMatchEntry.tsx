@@ -85,18 +85,25 @@ export function ScoreMatchEntry({ match, onSaved, onCompleted, allowEditFinished
   function saveProgress() {
     if (!scoreValid || finished || editingFinished) return;
     if (!validExtraTime) { setError('Tore aus der regulären Spielzeit dürfen in der Verlängerung nicht abgezogen werden.'); return; }
-    const saved = saveMockMatchSets(match.id, draft, 'LIVE', regulationScore ? { regulationScore } : undefined);
-    if (!saved?.sets.length || saved.status !== 'LIVE' || formatted(saved.sets[0]) !== formatted(draft[0])) {
-      setError('Zwischenstand konnte nicht gespeichert werden.');
-      return;
+    try {
+      const saved = saveMockMatchSets(match.id, draft, 'LIVE', regulationScore ? { regulationScore } : undefined);
+      if (!saved?.sets.length || saved.status !== 'LIVE' || formatted(saved.sets[0]) !== formatted(draft[0])) {
+        setError('Zwischenstand konnte nicht gespeichert werden.');
+        return;
+      }
+      flashSaved();
+      setError('');
+      onSaved?.();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Zwischenstand konnte nicht gespeichert werden.');
     }
-    flashSaved();
-    setError('');
-    onSaved?.();
   }
   function finishWith(sets: MatchSet[], winner?: WinnerSide, decision?: ScoreDecision) {
     try {
-      completeMockMatch(match.id, sets, 'FINISHED', false, winner, decision);
+      const saved = completeMockMatch(match.id, sets, 'FINISHED', true, winner, decision);
+      if (!saved || saved.status !== 'FINISHED' || JSON.stringify(saved.sets) !== JSON.stringify(sets)) {
+        throw new Error('Ergebnis wurde nicht gespeichert.');
+      }
       setEditingFinished(false);
       setDecisionStep(null);
       clearSaved();

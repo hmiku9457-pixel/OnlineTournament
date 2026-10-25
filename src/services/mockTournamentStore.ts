@@ -165,6 +165,7 @@ export function updateMockTournamentStatus(tournamentId: string, status: Tournam
   const local = readLocalTournaments();
   const localTournament = local.find((item) => item.id === tournamentId);
   if (localTournament) {
+    if (localTournament.status === 'ABORTED' && status !== 'ABORTED') return localTournament;
     const updated = {
       ...localTournament,
       status,

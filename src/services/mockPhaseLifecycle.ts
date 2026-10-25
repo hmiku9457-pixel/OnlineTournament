@@ -109,7 +109,7 @@ export function isStageLockedWaiting(tournament: DemoTournament, stage: Tourname
 }
 
 export function startStage(tournament: DemoTournament, stage: TournamentStage) {
-  if (!isStageEditable(tournament, stage)) return false;
+  if (tournament.status === 'ABORTED' || tournament.status === 'FINISHED' || !isStageEditable(tournament, stage)) return false;
   const entrants = getStageEntrants(tournament, stage);
   if (entrants.length < 2) return false;
   const state = getPhaseLifecycle(tournament);
