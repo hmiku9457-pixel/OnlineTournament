@@ -40,8 +40,8 @@ describe('Schweizer Entscheidung dokumentieren', () => {
       qualificationSlots: 1,
       extraRounds: [{ kind: 'ROUND_ROBIN', matches: [
         { sideA: 'FC A', sideB: 'FC B', pointsA: 1, pointsB: 1, matchDay: 1 },
-        { sideA: 'FC B', sideB: 'FC C', pointsA: 0, pointsB: 0, matchDay: 2 },
-        { sideA: 'FC A', sideB: 'FC C', pointsA: 2, pointsB: 2, matchDay: 3 },
+        { sideA: 'FC B', sideB: 'FC C', pointsA: 1, pointsB: 1, matchDay: 2 },
+        { sideA: 'FC A', sideB: 'FC C', pointsA: 1, pointsB: 1, matchDay: 3 },
       ] }],
     };
     const html = renderToStaticMarkup(createElement(SwissRoundRobinHistory, {
