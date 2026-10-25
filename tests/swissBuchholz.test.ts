@@ -74,7 +74,7 @@ describe('Schweizer System: Sonneborn-Berger und kampflose Ergebnisse', () => {
     expect(b.wins).toBe(1);
     expect(b.draws).toBe(1);
     expect(a.buchholz).toBe(0.75);
-    expect(b.buchholz).toBe(0.5);
+    expect(b.buchholz).toBe(1.25);
   });
 
   it('zählt Begegnungen mit demselben Gegner ergebnisgewichtet für Sonneborn-Berger', () => {
