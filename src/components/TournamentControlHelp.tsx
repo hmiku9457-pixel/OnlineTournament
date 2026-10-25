@@ -57,7 +57,8 @@ function getTopics(sport: string): Array<{ id: ControlHelpTopic; label: string; 
     steps: [
       { title: 'Phase auswählen', description: 'Die Phasenleiste zeigt „Bearbeitbar“, „Läuft“, „Beendet“ oder „Gesperrt“. Durch Anklicken die jeweilige Phase öffnen.' },
       { title: 'Vor dem Start bearbeiten', description: 'Solange „Bearbeitbar“ angezeigt wird, lassen sich Gruppen oder K.-o.-Startplätze verändern. Änderungen werden unmittelbar gespeichert.' },
-      { title: 'Automatischer Abschluss', description: 'Sobald alle Spiele einer Phase beendet sind, wird sie automatisch abgeschlossen. Die Qualifizierten werden für die nächste Phase übernommen.' },
+      { title: 'Automatischer Abschluss', description: 'Nach dem letzten regulären Spiel wird die Phase abgeschlossen und die Qualifizierten werden für die nächste Phase übernommen – sofern kein Stichentscheid nötig ist.' },
+      { title: 'Schweizer Gleichstand am Cut-off', description: 'Sind alle sportlichen Tie-Breaker an der Qualifikationsgrenze identisch, bleibt die Phase offen. Die Turnierleitung dokumentiert dann einen zusätzlich gespielten Entscheidungssatz oder wählt nach einem physischen Losentscheid die qualifizierte Person aus.' },
       { title: 'Nächste Phase bewusst starten', description: 'Erst die neue Auslosung prüfen, dann „Nächste Phase starten“ wählen. Danach ist ihre Setzung gesperrt.' },
     ],
   },
