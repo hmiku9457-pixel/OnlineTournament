@@ -326,6 +326,7 @@ export function removeLocalPrototypeTournaments() {
   window.localStorage.removeItem('online-tournament:withdrawal-timing:v1');
   window.localStorage.removeItem('online-tournament:swiss-round-fixtures:v1');
   window.localStorage.removeItem('online-tournament:swiss-cutoff-decisions:v1');
+  window.localStorage.removeItem('online-tournament:swiss-extra-rounds:v1');
 }
 
 export function countActiveMockTournaments() {
