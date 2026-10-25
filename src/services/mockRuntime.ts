@@ -530,12 +530,60 @@ export function getSwissRoundRobinMatches(tournament: DemoTournament, stage: Tou
   });
 }
 
+/** A Swiss qualification tiebreak is a real table fixture, not an editable
+ * score in the warning dialog. Completed tiebreaks remain available as history. */
+export function getSwissCutoffSetMatches(tournament: DemoTournament, stage: TournamentStage): MockRuntimeMatch[] {
+  const decision = getSwissCutoffHistory(tournament, stage);
+  if (!decision || decision.mode !== 'SET') return [];
+  const current = getPendingSwissCutoff(tournament);
+  const savedResults = readResults();
+  const savedRuntime = readRuntime();
+  const times = getLatestFinishedTimes(tournament, savedResults);
+  const complete = decision.sets.map((set) => [set.sideA, set.sideB] as const);
+  const next = current?.stageId === stage.id ? getSwissCutoffPair(current) : null;
+  const pairs = [...complete, ...(next?.[0] && next?.[1] ? [[next[0], next[1]] as const] : [])];
+  return pairs.map(([sideA, sideB], index) => applyStoredState({
+    id: `${stage.id}-sw-cutoff-set-m${index + 1}`,
+    table: 'Noch offen',
+    sideA, sideB,
+    score: '–',
+    status: 'WAITING',
+    phase: `Phase ${tournament.stages.indexOf(stage) + 1} · Stichentscheid`,
+    stageId: stage.id,
+    round: `Entscheidungssatz ${index + 1}`,
+    bestOf: 1,
+    sport: tournament.sport,
+    requiresWinner: true,
+    pauseA: getElapsedRestMinutes(times.get(sideA)),
+    pauseB: getElapsedRestMinutes(times.get(sideB)),
+    note: 'Wartet auf Tischzuweisung',
+  }, savedResults, savedRuntime));
+}
+
+/** Schedule the deciding set. The standard tournament overview assigns the
+ * free table and displays the normal, compact game-entry card. */
+export function beginSwissCutoffSetMatch(tournament: DemoTournament): string | null {
+  const current = getPendingSwissCutoff(tournament);
+  if (!current) return 'Kein offener Stichentscheid vorhanden.';
+  if (current.decision?.mode && current.decision.mode !== 'SET') return 'Ein anderes Entscheidungsverfahren wurde bereits begonnen.';
+  if (current.decision?.mode === 'SET') return null;
+  const [sideA, sideB] = getSwissCutoffPair(current);
+  if (!sideA || !sideB) return 'Für den Stichentscheid fehlen Teilnehmer.';
+  saveSwissCutoffDecision(tournament.id, current.stageId, {
+    signature: current.signature, mode: 'SET', eliminated: [], sets: [],
+  });
+  recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'SWISS_TIE_SET',
+    description: `Entscheidungssatz ${sideA} gegen ${sideB} zur Tischzuweisung freigegeben.` });
+  return null;
+}
+
 export function getMockRuntimeMatches(tournament: DemoTournament): MockRuntimeMatch[] {
   const currentStage = getActiveStage(tournament);
   if (!currentStage) return [];
   if (currentStage.type === 'SWISS') {
     const pending = getPendingSwissCutoff(tournament);
     const decision = pending?.decision;
+    if (decision?.mode === 'SET') return getSwissCutoffSetMatches(tournament, currentStage);
     if (decision?.extraRounds?.some((round) => round.kind === 'ROUND_ROBIN' && !playoffRoundFinished(round))) {
       return getSwissRoundRobinMatches(tournament, currentStage);
     }
@@ -1200,7 +1248,8 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
   }
   const stage = tournament?.stages.find((item) => matchId.startsWith(`${item.id}-`));
   if (tournament && stage && status === 'FINISHED') {
-    const bestOf = matchId.includes('-sw-playoff-') ? 1 : getMockStageMatches(tournament, stage).find((match) => match.id === matchId)?.bestOf ?? stage.bestOf;
+    const bestOf = matchId.includes('-sw-playoff-') || matchId.includes('-sw-cutoff-set-') ? 1
+      : getMockStageMatches(tournament, stage).find((match) => match.id === matchId)?.bestOf ?? stage.bestOf;
     const isKnockout = ['KNOCKOUT', 'DOUBLE_ELIMINATION', 'PLACEMENT', 'SWISS'].includes(stage.type);
     const validationError = validateCompleteResult(tournament.sport, bestOf, sets, isKnockout, decisionSide);
     if (validationError) throw new Error(validationError);
@@ -1232,7 +1281,18 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
   if (status === 'FINISHED') {
     const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
     if (tournament) settleWithdrawnMatches(tournament);
-    if (tournament && matchId.includes('-sw-playoff-')) {
+    if (tournament && matchId.includes('-sw-cutoff-set-')) {
+      // The standard table card has completed the deciding BO1 game. Only
+      // its winner advances; the regular Swiss/BHZ results remain untouched.
+      const match = matchId.match(/-sw-cutoff-set-m(\d+)$/);
+      const stage = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`));
+      const pending = getPendingSwissCutoff(tournament);
+      if (stage && match && pending?.stageId === stage.id
+        && pending.decision?.mode === 'SET'
+        && Number(match[1]) === pending.decision.sets.length + 1 && sets[0]) {
+        recordSwissCutoffSet(tournament, sets[0].sideAScore, sets[0].sideBScore);
+      }
+    } else if (tournament && matchId.includes('-sw-playoff-')) {
       // Regular match controls have completed an intermediate-phase fixture.
       // Synchronize the independent qualification table and let it release the
       // next phase only after every fixture is finished.
@@ -1320,7 +1380,10 @@ export function confirmMockMatchSide(matchId: string, side: 'A' | 'B', playerCod
 export function adminConfirmMockMatch(tournament: DemoTournament, matchId: string) {
   const stage = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`)) ?? tournament.stages[0];
   const found = getMockStageMatches(tournament, stage).find((item) => item.id === matchId)
-    ?? (stage.type === 'SWISS' ? getSwissRoundRobinMatches(tournament, stage).find((item) => item.id === matchId) : undefined);
+    ?? (stage.type === 'SWISS' ? [
+      ...getSwissRoundRobinMatches(tournament, stage),
+      ...getSwissCutoffSetMatches(tournament, stage),
+    ].find((item) => item.id === matchId) : undefined);
   if (!found || found.status !== 'FINISHED') return false;
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
@@ -1390,7 +1453,10 @@ export function findMockRuntimeMatch(matchId?: string) {
   for (const tournament of getAllMockTournaments()) {
     for (const stage of tournament.stages) {
       const match = getMockStageMatches(tournament, stage).find((item) => item.id === matchId)
-        ?? (stage.type === 'SWISS' ? getSwissRoundRobinMatches(tournament, stage).find((item) => item.id === matchId) : undefined);
+        ?? (stage.type === 'SWISS' ? [
+          ...getSwissRoundRobinMatches(tournament, stage),
+          ...getSwissCutoffSetMatches(tournament, stage),
+        ].find((item) => item.id === matchId) : undefined);
       if (match) return { tournament, match };
     }
   }
