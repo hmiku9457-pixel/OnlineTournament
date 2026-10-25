@@ -12,7 +12,7 @@ import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
 import { rankStandings, type RankedParticipant } from '@/domain/standingRankings';
 import { compareRankingRows, resultScore, resultWinnerSide, scoreWithDecision, sportScoring, validateCompleteResult, validateScoreDecision, type ExtraTimeProgress, type ScoreDecision, type WinnerSide } from '@/domain/sportScoring';
 import { getWithdrawalAwardSets } from '@/domain/withdrawalScoring';
-import { newPlayoffRound, playoffQualified, playoffRoundFinished, type PlayoffMode } from '@/domain/swissCutoffPlayoff';
+import { newPlayoffRound, playoffBoundaryTie, playoffQualified, playoffRoundFinished, type PlayoffMode } from '@/domain/swissCutoffPlayoff';
 import { addSwissExtraRound, getSwissExtraRoundCount } from '@/services/mockSwissExtendedRounds';
 import { applySwissCutoffDecision, findSwissCutoffTie, type SwissCutoffTie } from '@/domain/swissCutoffTie';
 import { clearSwissCutoffDecision, readSwissCutoffDecision, readSwissRoundRobinHistory, saveSwissCutoffDecision, type StoredSwissCutoffDecision } from '@/services/mockSwissCutoffStore';
@@ -519,7 +519,8 @@ export function getSwissRoundRobinMatches(tournament: DemoTournament, stage: Tou
         status: 'WAITING',
         phase: `Phase ${tournament.stages.indexOf(stage) + 1}.5 · Jeder gegen Jeden`,
         stageId: stage.id,
-        round: `Entscheidung · Spiel ${sequence}`,
+        round: `Spieltag ${match.matchDay ?? (roundIndex + 1)}`,
+        matchDay: match.matchDay,
         bestOf: 1,
         sport: tournament.sport,
         requiresWinner: true,
@@ -993,12 +994,15 @@ export function beginSwissCutoffPlayoff(tournament: DemoTournament, kind: Playof
   }
   const previous = current.decision?.extraRounds ?? [];
   if (previous.some((round) => !playoffRoundFinished(round))) return 'Bitte zuerst alle angesetzten Entscheidungsspiele abschließen.';
-  if (playoffQualified(current.tie.players, current.tie.slots, previous)) return 'Die Qualifikanten stehen bereits fest.';
+  if (previous.some((round) => round.kind === 'ROUND_ROBIN')) {
+    return 'Nach abgeschlossenem Jeder gegen Jeden und ergebnislosem direkten Vergleich ist ein physischer Losentscheid erforderlich.';
+  }
+  if (playoffQualified(current.tie.players, current.tie.slots, previous, tournament.sport)) return 'Die Qualifikanten stehen bereits fest.';
   const round = newPlayoffRound(current.tie.players, kind, previous);
   if (!round.matches.length) return 'Es konnten keine zusätzlichen Paarungen gebildet werden.';
   saveSwissCutoffDecision(tournament.id, current.stageId, {
     signature: current.signature, mode: kind, eliminated: [], sets: [],
-    extraRounds: [...previous, round],
+    extraRounds: [...previous, round], qualificationSlots: current.tie.slots,
   });
   recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'SWISS_TIE_SET',
     description: 'Jeder-gegen-Jeden-Entscheidung angesetzt' });
@@ -1025,7 +1029,7 @@ export function recordSwissCutoffPlayoffResult(
     ...round,
     matches: round.matches.map((item, index) => index === matchIndex ? { ...item, pointsA, pointsB } : item),
   }];
-  const winners = playoffQualified(current.tie.players, current.tie.slots, nextRounds) ?? undefined;
+  const winners = playoffQualified(current.tie.players, current.tie.slots, nextRounds, tournament.sport) ?? undefined;
   saveSwissCutoffDecision(tournament.id, current.stageId, {
     signature: current.signature, mode: round.kind, eliminated: [], sets: [],
     extraRounds: nextRounds, winners,
@@ -1051,7 +1055,7 @@ function syncSwissPlayoffFromStoredMatch(
     matches: round.matches.map((match, position) => position === matchIndex
       ? { ...match, pointsA, pointsB } : match),
   } : round);
-  const winners = playoffQualified(current.tie.players, current.tie.slots, rounds) ?? undefined;
+  const winners = playoffQualified(current.tie.players, current.tie.slots, rounds, tournament.sport) ?? undefined;
   saveSwissCutoffDecision(tournament.id, stage.id, {
     ...decision, signature: current.signature, extraRounds: rounds, winners,
   });
@@ -1070,16 +1074,27 @@ export function recordSwissCutoffLot(tournament: DemoTournament, winners: string
   if (current.decision?.extraRounds?.some((round) => !playoffRoundFinished(round))) {
     return 'Bitte zuerst alle begonnenen Entscheidungsspiele abschließen oder den Stichentscheid zurücksetzen.';
   }
+  const previous = current.decision?.extraRounds ?? [];
+  const hasRoundRobin = previous.some((round) => round.kind === 'ROUND_ROBIN');
+  const boundary = hasRoundRobin
+    ? playoffBoundaryTie(current.tie.players, current.tie.slots, previous, tournament.sport)
+    : null;
+  if (hasRoundRobin && !boundary) return 'Der direkte Vergleich hat die Qualifikationsplätze bereits eindeutig entschieden.';
+  const candidates = boundary?.players ?? current.tie.players;
+  const required = boundary?.slots ?? current.tie.slots;
   const selected = new Set(winners);
-  if (selected.size !== current.tie.slots || winners.some((name) => !current.tie.players.includes(name))) {
-    return `Bitte genau ${current.tie.slots} ausgeloste Person(en) auswählen.`;
+  if (selected.size !== required || winners.some((name) => !candidates.includes(name))) {
+    return `Bitte genau ${required} ausgeloste Person(en) auswählen.`;
   }
+  const qualifying = [...(boundary?.alreadyQualified ?? []), ...winners];
   saveSwissCutoffDecision(tournament.id, current.stageId, {
-    signature: current.signature, mode: 'LOT', eliminated: current.tie.players.filter((name) => !selected.has(name)), sets: [],
-    extraRounds: current.decision?.extraRounds, winners,
+    signature: current.signature, mode: 'LOT',
+    eliminated: current.tie.players.filter((name) => !qualifying.includes(name)), sets: [],
+    extraRounds: current.decision?.extraRounds, qualificationSlots: current.tie.slots,
+    lotPlayers: candidates, lotWinners: winners, winners: qualifying,
   });
   recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'SWISS_TIE_LOT',
-    description: `Physischer Losentscheid. Qualifiziert: ${winners.join(', ')}` });
+    description: `Physischer Losentscheid. Qualifiziert: ${qualifying.join(', ')}` });
   reconcileCompletedPhase(`${current.stageId}-sw-cutoff-decision`);
   return null;
 }
