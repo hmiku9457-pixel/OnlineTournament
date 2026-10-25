@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { DemoTournament } from '@/data/demoTournaments';
 import { SwissStandingsTable } from '@/components/SwissStandingsTable';
 import { SwissBuchholzHelpModal } from '@/components/SwissBuchholzHelpModal';
-import type { SwissCutoffStatus } from '@/services/mockRuntime';
+import { getTotalSwissRoundCount, type SwissCutoffStatus } from '@/services/mockRuntime';
 import { buildSwissStandings, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
 import { getSwissCutoffRowIndex } from '@/components/SwissQualificationCutoff';
 import { getStageWithdrawalLabel } from '@/services/mockWithdrawals';
