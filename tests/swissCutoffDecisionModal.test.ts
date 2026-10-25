@@ -19,7 +19,7 @@ const status: SwissCutoffStatus = {
   decision: null,
 };
 const ignore = () => null;
-const props = { status, tournament, onSet: ignore, onLot: ignore, onBegin: ignore, onReset: () => {} };
+const props = { status, tournament, onBeginSet: ignore, onLot: ignore, onBegin: ignore, onReset: () => {} };
 
 describe('Modal für Schweizer Qualifikationsgleichstand', () => {
   it('blockiert die Phase sichtbar und bietet Entscheidungssatz oder physischen Losentscheid an', () => {
@@ -76,7 +76,7 @@ describe('Modal für Schweizer Qualifikationsgleichstand', () => {
     expect(html).not.toContain('Jeder gegen Jeden</strong>');
   });
 
-  it('verwendet für einen laufenden Entscheidungssatz dieselbe kompakte Eingabemaske wie die Tischkarte', () => {
+  it('zeigt nach der Tischfreigabe keine zweite Ergebniseingabe im Warnungsmodal', () => {
     const inProgress: SwissCutoffStatus = {
       ...status,
       tie: { players: ['Spieler 12', 'Spieler 13', 'Spieler 14'], slots: 1, firstRank: 1 },
@@ -91,14 +91,11 @@ describe('Modal für Schweizer Qualifikationsgleichstand', () => {
     const html = renderToStaticMarkup(createElement(SwissCutoffDecisionModal, {
       ...props, status: inProgress,
     }));
-    expect(html).toContain('set-by-set-entry compact swiss-cutoff-game-entry');
-    expect(html).toContain('current-set-entry-row has-entry-help');
-    expect(html).toContain('set-entry-scoreline');
-    expect(html).toContain('Satz 1 bestätigen');
-    expect(html).toContain('aria-label="Hilfe zur Satzeingabe"');
-    expect(html).toContain('aria-label="Satz 1"');
-    expect(html).toContain('Spieler 12');
-    expect(html).toContain('Spieler 14');
+    expect(html).toContain('Entscheidungssatz an einem Tisch');
+    expect(html).toContain('reguläre Tischverwaltung');
+    expect(html).toContain('Stichentscheid zurücksetzen');
+    expect(html).not.toContain('Satz 1 bestätigen');
+    expect(html).not.toContain('current-set-entry-row has-entry-help');
   });
 
   it('leitet für eine begonnene Phase 1.5 zur regulären Turnierleitung statt einer Satzeingabe im Modal', () => {
