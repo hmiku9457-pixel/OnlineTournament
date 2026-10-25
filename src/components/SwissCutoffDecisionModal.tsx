@@ -85,7 +85,7 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
   }
 
   const entry = (onConfirm: () => void, sideA: string, sideB: string) => (
-    <div className="swiss-cutoff-game-entry">
+    <div className="set-by-set-entry compact swiss-cutoff-game-entry">
       <div className="set-entry-scoreline"><span>{sideA}</span><strong>{scoreSport ? `${scoreA || '0'}:${scoreB || '0'}` : '0:0'}</strong><span>{sideB}</span></div>
       {scoreSport ? (
         <>
