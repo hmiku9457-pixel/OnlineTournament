@@ -12,6 +12,9 @@ import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
 import { rankStandings, type RankedParticipant } from '@/domain/standingRankings';
 import { compareRankingRows, resultScore, resultWinnerSide, scoreWithDecision, sportScoring, validateCompleteResult, validateScoreDecision, type ExtraTimeProgress, type ScoreDecision, type WinnerSide } from '@/domain/sportScoring';
 import { getWithdrawalAwardSets } from '@/domain/withdrawalScoring';
+import { applySwissCutoffDecision, findSwissCutoffTie, type SwissCutoffTie } from '@/domain/swissCutoffTie';
+import { clearSwissCutoffDecision, readSwissCutoffDecision, saveSwissCutoffDecision, type StoredSwissCutoffDecision } from '@/services/mockSwissCutoffStore';
+import { isValidSportSet } from '@/domain/sportScoring';
 
 export { getRuntimeParticipantNames } from '@/services/mockParticipants';
 
@@ -808,6 +811,128 @@ function stageQualifierCount(tournament: DemoTournament, stage: TournamentStage)
   return Math.max(1, Number(nextStage.settings.entrants) || 1);
 }
 
+/** Pending/recorded manual decision at the Swiss qualifying boundary. A regular Swiss
+ *  fixture is never fabricated for this: its result must not affect Swiss/Buchholz scores. */
+export interface SwissCutoffStatus {
+  stageId: string;
+  tie: SwissCutoffTie;
+  signature: string;
+  decision: StoredSwissCutoffDecision | null;
+}
+
+function swissCutoffStatus(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]): SwissCutoffStatus | null {
+  if (stage.type !== 'SWISS' || !isStageStarted(tournament, stage)) return null;
+  const nextStage = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) + 1];
+  if (!nextStage || isStageStarted(tournament, nextStage)) return null;
+  const base = baseStageMatches(tournament, stage, results);
+  const roundCount = Number(stage.settings.rounds) || 4;
+  if (!base.some((match) => match.round === `Runde ${roundCount}`)) return null;
+  const scheduled = base.filter((match) => !match.autoWinner && match.sideA !== 'TBD' && match.sideB !== 'TBD');
+  if (scheduled.length === 0 || scheduled.some((match) => results.find((result) => result.matchId === match.id)?.status !== 'FINISHED')) return null;
+  const participants = getStageEntrants(tournament, stage);
+  const ranked = rankParticipants(participants, base, results, tournament.sport, true, roundCount);
+  const withdrawn = new Set(ranked.filter((row) => isMockParticipantWithdrawn(tournament, row.name)).map((row) => row.name));
+  const tie = findSwissCutoffTie(ranked, tournament.sport, stageQualifierCount(tournament, stage), withdrawn);
+  if (!tie) return null;
+  // Invalidate old decisions after corrections / withdrawals / changed pairings.
+  const signature = JSON.stringify({
+    tie, ranked: ranked.map((row) => [row.name, row.played, row.wins, row.losses, row.draws,
+      row.buchholz, row.setsWon, row.setsLost, row.ballsWon, row.ballsLost]),
+    games: base.map((match) => {
+      const result = results.find((item) => item.matchId === match.id);
+      return [match.id, match.sideA, match.sideB, match.autoWinner, result?.status, result?.sets, result?.forcedWinner, result?.decisionSide];
+    }),
+  });
+  return { stageId: stage.id, tie, signature,
+    decision: readSwissCutoffDecision(tournament.id, stage.id, signature) };
+}
+
+/** Available immediately after the last regular round; restored after page reload. */
+export function getPendingSwissCutoff(tournament: DemoTournament): SwissCutoffStatus | null {
+  const active = getActiveStage(tournament);
+  if (!active || active.type !== 'SWISS') return null;
+  const current = swissCutoffStatus(tournament, active, readResults());
+  return current && current.decision?.winners?.length === current.tie.slots ? null : current;
+}
+
+/** Reflect the documented decision in the visible positions as well as qualification. */
+export function applyResolvedSwissCutoffOrder<T extends { name: string }>(
+  tournament: DemoTournament, stage: TournamentStage, rows: readonly T[],
+): T[] {
+  const current = swissCutoffStatus(tournament, stage, readResults());
+  return applySwissCutoffDecision(rows, current?.tie ?? null, current?.decision?.winners ?? []);
+}
+
+function nextSwissCutoffPair(status: SwissCutoffStatus): [string, string] {
+  const eliminated = new Set(status.decision?.eliminated ?? []);
+  const played = new Map(status.tie.players.map((name) => [name, 0]));
+  status.decision?.sets.forEach((match) => {
+    played.set(match.sideA, (played.get(match.sideA) ?? 0) + 1);
+    played.set(match.sideB, (played.get(match.sideB) ?? 0) + 1);
+  });
+  const remaining = status.tie.players.filter((name) => !eliminated.has(name));
+  const ordered = remaining.sort((a, b) => (played.get(a) ?? 0) - (played.get(b) ?? 0)
+    || status.tie.players.indexOf(a) - status.tie.players.indexOf(b));
+  return [ordered[0], ordered[1]];
+}
+
+export function getSwissCutoffPair(status: SwissCutoffStatus): [string, string] {
+  return nextSwissCutoffPair(status);
+}
+
+export function recordSwissCutoffSet(tournament: DemoTournament, sideAScore: number, sideBScore: number): string | null {
+  const current = getPendingSwissCutoff(tournament);
+  if (!current) return 'Kein offener Stichentscheid vorhanden.';
+  if (current.decision?.mode === 'LOT') return 'Ein Losentscheid wurde bereits festgelegt.';
+  const remaining = current.tie.players.filter((name) => !current.decision?.eliminated.includes(name));
+  if (remaining.length <= current.tie.slots) return 'Alle Qualifikationsplätze sind bereits entschieden.';
+  if (![sideAScore, sideBScore].every((value) => Number.isSafeInteger(value) && value >= 0) || sideAScore === sideBScore) {
+    return 'Bitte ein eindeutiges, gültiges Satzergebnis eintragen.';
+  }
+  if (sportScoring(tournament.sport).mode === 'sets'
+    && !isValidSportSet(tournament.sport, 1, 0, { number: 1, sideAScore, sideBScore })) {
+    return 'Ungültiges Satzergebnis für diese Sportart.';
+  }
+  const [sideA, sideB] = nextSwissCutoffPair(current);
+  if (!sideA || !sideB) return 'Für diesen Stichentscheid fehlen Teilnehmer.';
+  const winner = sideAScore > sideBScore ? sideA : sideB;
+  const loser = winner === sideA ? sideB : sideA;
+  const eliminated = [...(current.decision?.eliminated ?? []), loser];
+  const sets = [...(current.decision?.sets ?? []), { sideA, sideB, pointsA: sideAScore, pointsB: sideBScore, winner }];
+  const winners = current.tie.players.filter((name) => !eliminated.includes(name));
+  const done = winners.length === current.tie.slots;
+  saveSwissCutoffDecision(tournament.id, current.stageId, {
+    signature: current.signature, mode: 'SET', eliminated, sets, winners: done ? winners : undefined,
+  });
+  recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'SWISS_TIE_SET',
+    description: `Stichentscheid: ${sideA} gegen ${sideB} ${sideAScore}:${sideBScore} – ${winner} gewinnt.` });
+  if (done) reconcileCompletedPhase(`${current.stageId}-sw-cutoff-decision`);
+  return null;
+}
+
+export function recordSwissCutoffLot(tournament: DemoTournament, winners: string[]): string | null {
+  const current = getPendingSwissCutoff(tournament);
+  if (!current) return 'Kein offener Losentscheid vorhanden.';
+  if (current.decision?.sets.length) return 'Bereits erfasste Entscheidungssätze müssen zuerst zurückgesetzt werden.';
+  const selected = new Set(winners);
+  if (selected.size !== current.tie.slots || winners.some((name) => !current.tie.players.includes(name))) {
+    return `Bitte genau ${current.tie.slots} ausgeloste Person(en) auswählen.`;
+  }
+  saveSwissCutoffDecision(tournament.id, current.stageId, {
+    signature: current.signature, mode: 'LOT', eliminated: current.tie.players.filter((name) => !selected.has(name)), sets: [], winners,
+  });
+  recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'SWISS_TIE_LOT',
+    description: `Physischer Losentscheid. Qualifiziert: ${winners.join(', ')}` });
+  reconcileCompletedPhase(`${current.stageId}-sw-cutoff-decision`);
+  return null;
+}
+
+export function resetSwissCutoffSets(tournament: DemoTournament): void {
+  const current = getPendingSwissCutoff(tournament);
+  if (!current || !current.decision?.sets.length) return;
+  clearSwissCutoffDecision(tournament.id, current.stageId);
+}
+
 function computeStageQualifiers(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]) {
   const targetCount = stageQualifierCount(tournament, stage);
   if (targetCount <= 0) return [];
@@ -829,9 +954,12 @@ function computeStageQualifiers(tournament: DemoTournament, stage: TournamentSta
   }
 
   if (stage.type === 'ROUND_ROBIN' || stage.type === 'SWISS') {
-    return rankParticipants(getStageEntrants(tournament, stage), matches, results, tournament.sport,
-      stage.type === 'SWISS', stage.type === 'SWISS' ? Number(stage.settings.rounds) || 4 : undefined)
-      .filter((row) => !isMockParticipantWithdrawn(tournament, row.name)).slice(0, targetCount).map((row) => row.name);
+    const ranked = rankParticipants(getStageEntrants(tournament, stage), matches, results, tournament.sport,
+      stage.type === 'SWISS', stage.type === 'SWISS' ? Number(stage.settings.rounds) || 4 : undefined);
+    const cutoff = stage.type === 'SWISS' ? swissCutoffStatus(tournament, stage, results) : null;
+    if (cutoff && cutoff.decision?.winners?.length !== cutoff.tie.slots) return [];
+    const ordered = applySwissCutoffDecision(ranked, cutoff?.tie ?? null, cutoff?.decision?.winners ?? []);
+    return ordered.filter((row) => !isMockParticipantWithdrawn(tournament, row.name)).slice(0, targetCount).map((row) => row.name);
   }
 
   return getStageEntrants(tournament, stage).filter((name) => !isMockParticipantWithdrawn(tournament, name)).slice(0, targetCount);
@@ -843,6 +971,7 @@ export function refreshCompletedStageQualifiers(tournament: DemoTournament, stag
   const nextStage = tournament.stages[stageIndex + 1];
   if (!nextStage || isStageStarted(tournament, nextStage)) return false;
   const qualified = computeStageQualifiers(tournament, stage, readResults());
+  if (stage.type === 'SWISS' && swissCutoffStatus(tournament, stage, readResults()) && !qualified.length) return false;
   setStageEntrants(tournament, nextStage, qualified);
   return true;
 }
@@ -864,6 +993,10 @@ function reconcileCompletedPhase(matchId: string) {
     const baseMatches = getMockStageBaseMatches(tournament, activeStage).filter((match) => !match.autoWinner && match.sideA !== 'TBD' && match.sideB !== 'TBD' && match.sideA !== 'Freilos' && match.sideB !== 'Freilos');
     if (baseMatches.some((match) => readResults().find((result) => result.matchId === match.id)?.status !== 'FINISHED')) return;
 
+    // Suspend phase completion until the tournament director resolves a perfect
+    // sporting tie at the cut. No alphabetic auto-qualification is permitted.
+    const cutoff = swissCutoffStatus(tournament, activeStage, readResults());
+    if (cutoff && cutoff.decision?.winners?.length !== cutoff.tie.slots) return;
     const qualifiedForNext = computeStageQualifiers(tournament, activeStage, readResults());
     completeStage(tournament, activeStage, qualifiedForNext);
     const isLastStage = tournament.stages[tournament.stages.length - 1]?.id === activeStage.id;
