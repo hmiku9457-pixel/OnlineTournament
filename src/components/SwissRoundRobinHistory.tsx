@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import type { StoredSwissCutoffDecision } from '@/services/mockSwissCutoffStore';
 import type { MockRuntimeMatch } from '@/services/mockRuntime';
 import { SwissStandingsTable } from '@/components/SwissStandingsTable';
