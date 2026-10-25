@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockTournament, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
@@ -39,11 +40,13 @@ function finish(t: ReturnType<typeof tournament>, index: number) {
         completeMockMatch(match.id, result);
       }
     }
+    approveMockProgress(t);
   }
   // A fully level Swiss qualification cutoff now requires the director's decision.
   const pending = getPendingSwissCutoff(t);
   if (pending?.stageId === stage.id) {
     expect(recordSwissCutoffLot(t, pending.tie.players.slice(0, pending.tie.slots))).toBeNull();
+    approveMockProgress(t);
   }
   expect(isStageCompleted(t, stage)).toBe(true);
 }
