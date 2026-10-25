@@ -21,7 +21,7 @@ import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
-import { isMockParticipantWithdrawn, canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
+import { canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getStageWithdrawalLabel, getWithdrawalLabel } from '@/services/mockWithdrawals';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { FinalStandingsList } from '@/components/FinalStandingsList';
