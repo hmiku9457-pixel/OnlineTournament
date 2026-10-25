@@ -495,9 +495,52 @@ export function getMockStageMatches(tournament: DemoTournament, stage: Tournamen
     }, results, runtime));
 }
 
+/** Phase 1.5 fixtures share the regular table-assignment and result-entry
+ * runtime. Their IDs live under the parent Swiss stage but never enter its
+ * ranking matches, so Buchholz and original Swiss results are unaffected. */
+export function getSwissRoundRobinMatches(tournament: DemoTournament, stage: TournamentStage): MockRuntimeMatch[] {
+  const history = getSwissCutoffHistory(tournament, stage);
+  if (!history) return [];
+  const results = readResults();
+  const runtime = readRuntime();
+  const times = getLatestFinishedTimes(tournament, results);
+  const rounds = history.extraRounds ?? [];
+  let sequence = 0;
+  return rounds.flatMap((round, roundIndex) => {
+    if (round.kind !== 'ROUND_ROBIN') return [];
+    return round.matches.map((match) => {
+      sequence += 1;
+      return applyStoredState({
+        id: `${stage.id}-sw-playoff-r${roundIndex + 1}-m${round.matches.indexOf(match) + 1}`,
+        table: 'Noch offen',
+        sideA: match.sideA,
+        sideB: match.sideB,
+        score: '–',
+        status: 'WAITING',
+        phase: `Phase ${tournament.stages.indexOf(stage) + 1}.5 · Jeder gegen Jeden`,
+        stageId: stage.id,
+        round: `Entscheidung · Spiel ${sequence}`,
+        bestOf: 1,
+        sport: tournament.sport,
+        requiresWinner: true,
+        pauseA: getElapsedRestMinutes(times.get(match.sideA)),
+        pauseB: getElapsedRestMinutes(times.get(match.sideB)),
+        note: 'Wartet auf Tischzuweisung',
+      }, results, runtime);
+    });
+  });
+}
+
 export function getMockRuntimeMatches(tournament: DemoTournament): MockRuntimeMatch[] {
   const currentStage = getActiveStage(tournament);
   if (!currentStage) return [];
+  if (currentStage.type === 'SWISS') {
+    const pending = getPendingSwissCutoff(tournament);
+    const decision = pending?.decision;
+    if (decision?.extraRounds?.some((round) => round.kind === 'ROUND_ROBIN' && !playoffRoundFinished(round))) {
+      return getSwissRoundRobinMatches(tournament, currentStage);
+    }
+  }
   return getMockStageMatches(tournament, currentStage);
 }
 
@@ -1110,7 +1153,7 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
   }
   const stage = tournament?.stages.find((item) => matchId.startsWith(`${item.id}-`));
   if (tournament && stage && status === 'FINISHED') {
-    const bestOf = getMockStageMatches(tournament, stage).find((match) => match.id === matchId)?.bestOf ?? stage.bestOf;
+    const bestOf = matchId.includes('-sw-playoff-') ? 1 : getMockStageMatches(tournament, stage).find((match) => match.id === matchId)?.bestOf ?? stage.bestOf;
     const isKnockout = ['KNOCKOUT', 'DOUBLE_ELIMINATION', 'PLACEMENT', 'SWISS'].includes(stage.type);
     const validationError = validateCompleteResult(tournament.sport, bestOf, sets, isKnockout, decisionSide);
     if (validationError) throw new Error(validationError);
@@ -1142,7 +1185,22 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
   if (status === 'FINISHED') {
     const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
     if (tournament) settleWithdrawnMatches(tournament);
-    reconcileCompletedPhase(matchId);
+    if (tournament && matchId.includes('-sw-playoff-')) {
+      // Regular match controls have completed an intermediate-phase fixture.
+      // Synchronize the independent qualification table and let it release the
+      // next phase only after every fixture is finished.
+      const stage = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`));
+      const roundMatch = matchId.match(/-sw-playoff-r(\d+)-m(\d+)$/);
+      const decision = stage ? getPendingSwissCutoff(tournament)?.decision : null;
+      if (stage && roundMatch && decision) {
+        const roundIndex = Number(roundMatch[1]) - 1;
+        const fixtureIndex = Number(roundMatch[2]) - 1;
+        const round = decision.extraRounds?.[roundIndex];
+        if (round?.kind === 'ROUND_ROBIN' && round.matches[fixtureIndex] && sets[0]) {
+          recordSwissCutoffPlayoffResult(tournament, fixtureIndex, sets[0].sideAScore, sets[0].sideBScore);
+        }
+      }
+    } else reconcileCompletedPhase(matchId);
   }
   return next;
 }
@@ -1217,7 +1275,9 @@ export function confirmMockMatchSide(matchId: string, side: 'A' | 'B', playerCod
 }
 
 export function adminConfirmMockMatch(tournament: DemoTournament, matchId: string) {
-  const found = getMockStageMatches(tournament, tournament.stages.find((stage) => matchId.startsWith(`${stage.id}-`)) ?? tournament.stages[0]).find((item) => item.id === matchId);
+  const stage = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`)) ?? tournament.stages[0];
+  const found = getMockStageMatches(tournament, stage).find((item) => item.id === matchId)
+    ?? (stage.type === 'SWISS' ? getSwissRoundRobinMatches(tournament, stage).find((item) => item.id === matchId) : undefined);
   if (!found || found.status !== 'FINISHED') return false;
   const current = readResults();
   const previous = current.find((item) => item.matchId === matchId);
@@ -1286,7 +1346,8 @@ export function findMockRuntimeMatch(matchId?: string) {
   if (!matchId) return undefined;
   for (const tournament of getAllMockTournaments()) {
     for (const stage of tournament.stages) {
-      const match = getMockStageMatches(tournament, stage).find((item) => item.id === matchId);
+      const match = getMockStageMatches(tournament, stage).find((item) => item.id === matchId)
+        ?? (stage.type === 'SWISS' ? getSwissRoundRobinMatches(tournament, stage).find((item) => item.id === matchId) : undefined);
       if (match) return { tournament, match };
     }
   }
