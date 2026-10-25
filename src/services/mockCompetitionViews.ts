@@ -8,6 +8,7 @@ import {
   getMockStageBaseMatches,
   getMockStageMatches,
   getMockStoredResult,
+  applyResolvedSwissCutoffOrder,
 } from '@/services/mockRuntime';
 
 export interface MockStanding {
@@ -167,8 +168,9 @@ export function getSwissUnplayedWinWinners(tournament: DemoTournament, stage: To
 
 export function buildSwissStandings(tournament: DemoTournament, stage: TournamentStage): MockStanding[] {
   const order = getSwissOrder(tournament, stage);
-  return computeStandings(order, getMockStageMatches(tournament, stage), tournament.sport,
-    getSwissByeWinners(tournament, stage), true, Number(stage.settings.rounds) || 4);
+  return applyResolvedSwissCutoffOrder(tournament, stage, computeStandings(order, getMockStageMatches(tournament, stage), tournament.sport,
+    getSwissByeWinners(tournament, stage), true, Number(stage.settings.rounds) || 4))
+    .map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
 
