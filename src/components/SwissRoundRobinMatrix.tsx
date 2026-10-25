@@ -9,15 +9,16 @@ interface Props {
   sport: string;
   matches?: readonly MockRuntimeMatch[];
   onEditResult?: (id: string) => void;
+  matchAt?: (roundIndex: number, matchIndex: number) => MockRuntimeMatch | undefined;
 }
 
 /** Head-to-head matrix. Every cell shows the match from the perspective of
  * its row player; diagonal cells represent impossible self-matches. */
-export function SwissRoundRobinMatrix({ players, rounds, sport, matches = [], onEditResult }: Props) {
+export function SwissRoundRobinMatrix({ players, rounds, sport, matches = [], onEditResult, matchAt }: Props) {
   const [expanded, setExpanded] = useState(false);
   const fixtures = rounds.flatMap((round, roundIndex) => round.kind === 'ROUND_ROBIN'
     ? round.matches.map((match, index) => ({
-      ...match, game: matches.find((game) => game.id.endsWith(`-sw-playoff-r${roundIndex + 1}-m${index + 1}`)),
+      ...match, game: matchAt?.(roundIndex, index) ?? matches.find((game) => game.id.endsWith(`-sw-playoff-r${roundIndex + 1}-m${index + 1}`)),
     })) : []);
 
   // Use one table renderer for both the compact card and large modal.
