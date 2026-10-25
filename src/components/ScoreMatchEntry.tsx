@@ -8,6 +8,7 @@ interface Props {
   onSaved?: () => void;
   onCompleted?: (sets: MatchSet[]) => void;
   allowEditFinished?: boolean;
+  directorEntry?: boolean;
   compact?: boolean;
   sideARecord?: string;
   sideBRecord?: string;
@@ -18,7 +19,7 @@ const isInteger = (value: string) => /^\d+$/.test(value.trim()) && Number.isSafe
 const formatted = (score: MatchSet) => `${score.sideAScore}:${score.sideBScore}`;
 
 /** Live-Stände und vollständige Entscheidung (FT, Verlängerung, Elfmeterschießen, Los). */
-export function ScoreMatchEntry({ match, onSaved, onCompleted, allowEditFinished = false, compact = false, sideARecord, sideBRecord }: Props) {
+export function ScoreMatchEntry({ match, onSaved, onCompleted, allowEditFinished = false, directorEntry = false, compact = false, sideARecord, sideBRecord }: Props) {
   const [a, setA] = useState(String(match.sets?.[0]?.sideAScore ?? 0));
   const [b, setB] = useState(String(match.sets?.[0]?.sideBScore ?? 0));
   const [regulationScore, setRegulationScore] = useState<MatchSet | undefined>(match.extraTimeProgress?.regulationScore ?? match.decision?.regulationScore);
@@ -100,7 +101,7 @@ export function ScoreMatchEntry({ match, onSaved, onCompleted, allowEditFinished
   }
   function finishWith(sets: MatchSet[], winner?: WinnerSide, decision?: ScoreDecision) {
     try {
-      const saved = completeMockMatch(match.id, sets, 'FINISHED', true, winner, decision);
+      const saved = completeMockMatch(match.id, sets, 'FINISHED', directorEntry, winner, decision);
       if (!saved || saved.status !== 'FINISHED' || JSON.stringify(saved.sets) !== JSON.stringify(sets)) {
         throw new Error('Ergebnis wurde nicht gespeichert.');
       }
