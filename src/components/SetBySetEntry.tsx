@@ -3,6 +3,7 @@ import type { KeyboardEvent } from 'react';
 import type { MatchSet } from '@/domain/types';
 import { getMatchFinalization, requiresFinalApproval } from '@/domain/matchFinalization';
 import { applySetCorrections } from '@/domain/shortSetNotation';
+import { storedResultSnapshot } from '@/domain/storedResultSnapshot';
 import { parseSportSet, sportScoring, setTarget } from '@/domain/sportScoring';
 import { completeMockMatch, saveMockMatchSets, type MockRuntimeMatch } from '@/services/mockRuntime';
 
@@ -49,7 +50,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
 
   // Runtime/clock updates create a fresh match.sets array even when its contents
   // have not changed. Only a real change of game or score may reset the editor.
-  const storedSetsKey = JSON.stringify(match.sets ?? []);
+  const storedSetsKey = storedResultSnapshot(match.sets);
   useEffect(() => {
     setPlayedSets(JSON.parse(storedSetsKey) as MatchSet[]);
     setCurrentValue('');
@@ -237,8 +238,8 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
       )}
 
       {correctionOpen && (
-        <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setCorrectionOpen(false)}>
-          <section className="prototype-modal result-correction-modal" role="dialog" aria-modal="true" aria-labelledby={`result-correction-${match.id}`} onMouseDown={(event) => event.stopPropagation()} onKeyDown={(event) => {
+        <div className="prototype-modal-backdrop" role="presentation">
+          <section className="prototype-modal result-correction-modal" role="dialog" aria-modal="true" aria-labelledby={`result-correction-${match.id}`} onKeyDown={(event) => {
             if (event.key === 'Escape') setCorrectionOpen(false);
           }}>
             <div className="result-correction-heading">
