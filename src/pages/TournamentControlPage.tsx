@@ -228,6 +228,17 @@ function StageCompetitionView({
     const cutoffHistory = getSwissCutoffHistory(tournament, stage);
     const lotPlayers = cutoffHistory?.mode === 'LOT' ? new Set(cutoffHistory.eliminated.concat(cutoffHistory.winners ?? [])) : undefined;
     const lotWinners = cutoffHistory?.mode === 'LOT' ? new Set(cutoffHistory.winners ?? []) : undefined;
+    const decisionTags: Record<string, { label: string; qualified: boolean }> = {};
+    if (cutoffHistory?.winners?.length && cutoffHistory.mode !== 'LOT') {
+      const chosen = new Set(cutoffHistory.winners);
+      const isRoundRobin = cutoffHistory.mode === 'ROUND_ROBIN';
+      const affected = isRoundRobin
+        ? [...new Set(cutoffHistory.extraRounds?.flatMap((round) => round.matches.flatMap((match) => [match.sideA, match.sideB])) ?? [])]
+        : [...new Set([...cutoffHistory.eliminated, ...cutoffHistory.winners])];
+      affected.forEach((name) => {
+        decisionTags[name] = { label: isRoundRobin ? 'Jeder gegen Jeden' : 'Entscheidungsspiel', qualified: chosen.has(name) };
+      });
+    }
     return (
       <section className="competition-stage-section">
         <div className="competition-stage-head"><div><span className="badge">SCHWEIZER SYSTEM</span><h3>{stage.name}</h3></div><div className="actions"><span className="muted">{getTotalSwissRoundCount(tournament, stage)} Runden</span>{swissEditable && <button className="btn small" type="button" onClick={() => {
@@ -254,6 +265,7 @@ function StageCompetitionView({
             onShowBuchholz={() => setShowSwissBuchholzHelp(true)}
             lotParticipants={lotPlayers}
             lotWinners={lotWinners}
+            decisionTags={decisionTags}
           />
           <SwissRoundCard
             fixtures={swissRoundFixtures}
