@@ -79,7 +79,7 @@ export function SwissRoundRobinHistory({
         <span className="badge">{completed ? 'Partien abgeschlossen' : 'Entscheidung läuft'}</span>
       </div>
       <p className="muted">Die gleichplatzierten Spieler spielen nach einem regulären Jeder-gegen-jeden-Spielplan.
-        Tischzuweisung und Ergebniseingabe erfolgen in der normalen Turnierleitung. Die separate Wertung verändert die Schweizer Tabelle und die Buchholzzahl nicht.</p>
+        Tischzuweisung und Ergebniseingabe erfolgen in der normalen Turnierleitung. Die separate Wertung verändert die Schweizer Tabelle und die Sonneborn-Berger-Wertung nicht.</p>
       {!completed && onOpenControl && <div className="actions swiss-intermediate-control-link">
         <button type="button" className="btn primary" onClick={onOpenControl}>Zur Tischzuweisung und Ergebniseingabe</button>
       </div>}
