@@ -2152,7 +2152,7 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .swiss-standings-table .swiss-col-ratio { width: 62px; }
 .swiss-standings-table .swiss-col-difference { width: 52px; }
 .swiss-standings-table .swiss-col-points { width: 45px; }
-/* Zähler und BHZ werden zentriert; die Differenz gehört optisch zum folgenden Verhältnis. */
+/* Zähler und BHZ werden zentriert; die Trennlinie steht vor jedem Verhältnis/Differenz-Paar. */
 .swiss-standings-table th:nth-child(3),
 .swiss-standings-table th:nth-child(4),
 .swiss-standings-table th:nth-child(5),
@@ -2184,6 +2184,8 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .swiss-progress-layout .swiss-standings-table td.swiss-stat-difference { text-align: right; padding-right: 2px; }
 .swiss-progress-layout .swiss-standings-table th.swiss-stat-ratio,
 .swiss-progress-layout .swiss-standings-table td.swiss-stat-ratio { text-align: left; padding-left: 3px; }
+.swiss-progress-layout .swiss-standings-table th.swiss-stat-ratio.swiss-stat-group-start,
+.swiss-progress-layout .swiss-standings-table td.swiss-stat-ratio.swiss-stat-group-start { padding-left: 7px; }
 .swiss-standings-table .swiss-stat-ratio .standing-ratio {
   display: inline-grid; grid-template-columns: auto auto auto;
   gap: 1px; width: auto; white-space: nowrap;
