@@ -2,7 +2,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { rankStandings } from '@/domain/standingRankings';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { isStageCompleted, getStageEntrants, startFirstStage } from '@/services/mockPhaseLifecycle';
-import { buildSwissStandings } from '@/services/mockCompetitionViews';
+import { buildSwissStandings, getSwissByeWinners } from '@/services/mockCompetitionViews';
 import { completeMockMatch, getMockStageBaseMatches, getMockStageMatches } from '@/services/mockRuntime';
 
 const storage = new Map<string, string>();
@@ -70,8 +70,27 @@ describe('Schweizer Qualifikation folgt exakt der sichtbaren Tabelle', () => {
     expect(isStageCompleted(tournament, swiss)).toBe(true);
     const allByes = getMockStageBaseMatches(tournament, swiss).filter((match) => match.sideB === 'Freilos');
     expect(allByes).toHaveLength(5);
+    const byeWinners = getSwissByeWinners(tournament, swiss);
+    expect(byeWinners).toEqual(allByes.map((match) => match.autoWinner));
     const ranked = buildSwissStandings(tournament, swiss);
+    for (const name of new Set(byeWinners)) {
+      expect(ranked.find((row) => row.name === name)?.wins).toBeGreaterThanOrEqual(1);
+    }
     expect(getStageEntrants(tournament, knockout)).toEqual(ranked.slice(0, 8).map((row) => row.name));
     expect(ranked.filter((row) => row.played === 5)).toHaveLength(19);
   });
+  it('weist bei gerader Spielerzahl keine Freilos-Sieger für die Tabellenmarkierung aus', () => {
+    const tournament = createMockTournament({
+      name: 'Schweizer Tabelle ohne Freilos', sport: 'table_tennis', discipline: 'SINGLES',
+      tables: 2, minimumMatches: 1,
+      participantNames: ['Anna', 'Ben', 'Clara', 'David'],
+      estimatedDurationMinutes: 60,
+      phases: [
+        { type: 'SWISS', label: 'Schweizer System', entrantCount: 4, groupCount: 1, swissRounds: 1, bestOf: 1, knockoutBestOf: [] },
+      ],
+    });
+    expect(startFirstStage(tournament)).toBe(true);
+    expect(getSwissByeWinners(tournament, tournament.stages[0])).toEqual([]);
+  });
+
 });
