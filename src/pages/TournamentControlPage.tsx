@@ -7,6 +7,7 @@ import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
+import { GroupMatchDayList } from '@/components/GroupMatchDayList';
 import { BracketLiveStatus, BracketScoreCells, BracketSetScores, BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
 import { BracketRoundViewport } from '@/components/BracketRoundViewport';
 import { SwissRoundCard } from '@/components/SwissRoundCard';
@@ -159,19 +160,13 @@ function StageCompetitionView({
                   );
                 })}
               </div>
-              <div className="group-match-list">
-                {[...new Set(group.matches.map((match) => match.matchDay ?? 0))].map((matchDay) => (
-                  <div className="group-match-day" key={`${group.id}-day-${matchDay}`}>
-                    <strong className="group-match-day-label">Spieltag {matchDay}</strong>
-                    {group.matches.filter((match) => (match.matchDay ?? 0) === matchDay).map((match) => (
-                      <div className={match.status === 'live' ? 'group-match-row live' : 'group-match-row'} key={match.id}>
-                        {match.status === 'live' && <span className="group-match-live-dot" role="img" aria-label="Laufendes Spiel" title="Läuft gerade" />}
-                        <span className="group-match-side" title={match.sideA}>{match.score === 'W.O.' && getStageWithdrawalLabel(tournament, match.sideA, stage.id) ? `Rückzug (${match.sideA})` : match.sideA}</span><MatchResultDetails score={match.score} sets={match.sets} sport={tournament.sport} onOpenResult={match.status !== 'open' && onEditResult ? () => onEditResult(match.id) : undefined} /><span className="group-match-side" title={match.sideB}>{match.score === 'W.O.' && getStageWithdrawalLabel(tournament, match.sideB, stage.id) ? `Rückzug (${match.sideB})` : match.sideB}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+              <GroupMatchDayList
+                matches={group.matches}
+                sport={tournament.sport}
+                onEditResult={onEditResult}
+                sideLabel={(name, match) => match.score === 'W.O.' && getStageWithdrawalLabel(tournament, name, stage.id)
+                  ? `Rückzug (${name})` : name}
+              />
             </article>
           ))}
         </div>
