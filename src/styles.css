@@ -2509,3 +2509,44 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 @media (max-width: 780px) {
   .swiss-intermediate-grid { grid-template-columns: 1fr; }
 }
+
+/* Stichentscheid: einheitliche Methodenkarten mit klarer Erklärung. */
+.swiss-cutoff-intro { margin-top: 9px; font-size: .9rem; line-height: 1.5; }
+.swiss-cutoff-summary {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px; margin: 12px 0;
+}
+.swiss-cutoff-summary > div {
+  display: flex; flex-direction: column; gap: 3px; padding: 10px 12px;
+  border: 1px solid #d0d5dd; border-radius: 9px; background: #f9fafb;
+}
+.swiss-cutoff-summary > div > span { font-size: .73rem; color: #667085; }
+.swiss-cutoff-summary > div > strong { font-size: 1.4rem; color: #101828; font-variant-numeric: tabular-nums; }
+.swiss-cutoff-heading .swiss-cutoff-help-text { color: #475467; font-size: .82rem; line-height: 1.5; margin-bottom: 14px; }
+.swiss-cutoff-choice > h3 { margin: 0 0 5px; font-size: 1rem; }
+.swiss-cutoff-choice > .muted { font-size: .82rem; margin: 0 0 12px; }
+.swiss-cutoff-choice-actions {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: stretch; gap: 10px;
+}
+.swiss-cutoff-method {
+  display: flex; flex-direction: column; justify-content: flex-start; gap: 8px;
+  min-width: 0; min-height: 116px; padding: 13px; text-align: left;
+  border: 1px solid #d0d5dd; border-radius: 10px;
+  background: #fff; color: #344054; cursor: pointer;
+  font: inherit; transition: border-color .15s ease, background-color .15s ease;
+}
+.swiss-cutoff-method > strong { color: #101828; font-size: .88rem; line-height: 1.3; }
+.swiss-cutoff-method > span { color: #667085; font-size: .76rem; line-height: 1.45; }
+.swiss-cutoff-method:hover { background: #f5faff; border-color: #84caff; }
+.swiss-cutoff-method:focus-visible { outline: 2px solid #175cd3; outline-offset: 2px; }
+.swiss-cutoff-redirect { padding-bottom: 5px; }
+.swiss-intermediate-control-link { margin: 12px 0; }
+.swiss-intermediate-game-result { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 7px; text-align: center; }
+.swiss-intermediate-game-result .muted { font-size: .68rem; }
+.swiss-intermediate-game-result .btn { font-size: .7rem; }
+@media (max-width: 560px) {
+  .swiss-cutoff-method { min-height: auto; }
+  .swiss-cutoff-choice-actions { grid-template-columns: 1fr; }
+  .swiss-cutoff-summary { gap: 6px; }
+}
