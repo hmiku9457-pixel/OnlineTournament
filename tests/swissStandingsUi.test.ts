@@ -34,8 +34,10 @@ describe('Schweizer Tabelle: Spalten und BHZ-Hilfe', () => {
     expect(head).toContain('Buchholzzahl (BHZ) erklären');
     const body = html.split('<tbody>')[1].split('</tbody>')[0];
     expect(body).toContain('class="swiss-buchholz-cell">12,5</td>');
-    expect(body.indexOf('>+4</td>')).toBeGreaterThan(body.indexOf('>8</span><span>:</span><span>4</span>'));
-    expect(body.indexOf('>+16</td>')).toBeGreaterThan(body.indexOf('>110</span><span>:</span><span>94</span>'));
+    expect(body).toContain('<span class="swiss-difference-sign">+</span><span class="swiss-difference-digits">4</span>');
+    expect(body).toContain('<span class="swiss-difference-sign">+</span><span class="swiss-difference-digits">16</span>');
+    expect(body.indexOf('class="swiss-difference-digits">4')).toBeGreaterThan(body.indexOf('>8</span><span>:</span><span>4</span>'));
+    expect(body.indexOf('class="swiss-difference-digits">16')).toBeGreaterThan(body.indexOf('>110</span><span>:</span><span>94</span>'));
     expect(html).toContain('class="swiss-legend-symbol"');
     expect(html).toContain('Mindestens ein Sieg durch Freilos oder kampflose Wertung');
     expect(html).toContain('Rangfolge');
@@ -50,8 +52,19 @@ describe('Schweizer Tabelle: Spalten und BHZ-Hilfe', () => {
     expect(headers).toEqual(['#', 'Teilnehmer', 'Sp.', 'S', 'U', 'N', 'BHZ', 'Tore', '±', 'Pkt.']);
     expect(head.match(/swiss-stat-ratio swiss-stat-group-start/g)).toHaveLength(1);
     expect(html).toContain('class="swiss-buchholz-cell">12,5</td>');
-    expect(html).toContain('>+16</td>');
-    expect(html.indexOf('>+16</td>')).toBeGreaterThan(html.indexOf('>110</span><span>:</span><span>94</span>'));
+    expect(html).toContain('<span class="swiss-difference-sign">+</span><span class="swiss-difference-digits">16</span>');
+    expect(html.indexOf('class="swiss-difference-digits">16')).toBeGreaterThan(html.indexOf('>110</span><span>:</span><span>94</span>'));
+  });
+
+  it('reserviert dieselbe Vorzeichenposition bei negativen und neutralen Differenzen', () => {
+    const html = renderToStaticMarkup(createElement(SwissStandingsTable, {
+      ...common,
+      standings: [{ ...row, setDifference: -4, ballDifference: 0 }],
+      scoreSport: false,
+      scoreUnit: 'Bälle',
+    }));
+    expect(html).toContain('<span class="swiss-difference-sign">-</span><span class="swiss-difference-digits">4</span>');
+    expect(html).toContain('<span class="swiss-difference-sign"></span><span class="swiss-difference-digits">0</span>');
   });
 
   it('zeigt im Modal die Formel, ein Rechenbeispiel und die zur Phase passende Freilos-Obergrenze', () => {
