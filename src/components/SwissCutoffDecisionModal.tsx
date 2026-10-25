@@ -108,7 +108,7 @@ export function SwissCutoffDecisionModal({ status, tournament, onBeginSet, onLot
                   {multiPlayer ? (
                     <button type="button" className="swiss-cutoff-method" autoFocus onClick={() => begin('ROUND')}>
                       <strong>Weitere Runde ausspielen</strong>
-                      <span>Eine reguläre Schweizer Runde für alle verbleibenden Spieler, inklusive Tabellen- und BHZ-Wertung.</span>
+                      <span>Eine reguläre Schweizer Runde für alle verbleibenden Spieler, inklusive Tabellen- und SB-Wertung.</span>
                     </button>
                   ) : (
                     <button type="button" className="swiss-cutoff-method" autoFocus onClick={startSetMatch}>
@@ -227,7 +227,7 @@ export function SwissCutoffDecisionModal({ status, tournament, onBeginSet, onLot
           </aside>
         </div>
       </section>
-      {showBuchholz && stage && <div className="swiss-cutoff-nested-help"><SwissBuchholzHelpModal rounds={Number(stage.settings.rounds) || 4} onClose={() => setShowBuchholz(false)} /></div>}
+      {showBuchholz && stage && <div className="swiss-cutoff-nested-help"><SwissBuchholzHelpModal rounds={getTotalSwissRoundCount(tournament, stage)} onClose={() => setShowBuchholz(false)} /></div>}
     </div>
   );
 }
