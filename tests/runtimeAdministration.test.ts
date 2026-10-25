@@ -168,7 +168,7 @@ describe('Turnierleitung - Regressionen', () => {
     const saved = getMockStoredResult(matches[0].id);
     expect(startStage(tournament, tournament.stages[1])).toBe(true);
     expect(canEditFinishedResults(tournament, first)).toBe(false);
-    expect(() => completeMockMatch(matches[0].id, [{ number: 1, sideAScore: 7, sideBScore: 11 }])).toThrow('gesperrt');
+    expect(() => completeMockMatch(matches[0].id, [{ number: 1, sideAScore: 7, sideBScore: 11 }], 'FINISHED', true)).toThrow('gesperrt');
     expect(getMockStoredResult(matches[0].id)).toEqual(saved);
   });
   it('besetzt nach einem Rückzug zwischen zwei Phasen die Qualifikation neu', () => {
