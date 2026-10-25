@@ -12,6 +12,7 @@ import { BracketRoundViewport } from '@/components/BracketRoundViewport';
 import { SwissRoundCard } from '@/components/SwissRoundCard';
 import { SwissStandingsTable } from '@/components/SwissStandingsTable';
 import { SwissBuchholzHelpModal } from '@/components/SwissBuchholzHelpModal';
+import { SwissCutoffDecisionModal } from '@/components/SwissCutoffDecisionModal';
 import { getSwissCutoffRowIndex } from '@/components/SwissQualificationCutoff';
 import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
@@ -22,7 +23,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getRuntimeParticipantNames, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, recordSwissCutoffSet, recordSwissCutoffLot, resetSwissCutoffSets } from '@/services/mockRuntime';
 import { canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getStageWithdrawalLabel, getWithdrawalLabel } from '@/services/mockWithdrawals';
 import { getMockFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
@@ -536,6 +537,7 @@ export function TournamentControlPage() {
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table) && !blockedTables.has(table));
   const activeStage = useMemo(() => getActiveStage(phaseSource.tournament), [phaseSource]);
+  const pendingSwissCutoff = useMemo(() => getPendingSwissCutoff(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   const swissSource = useMemo(() => ({ ...runtimeSource, activeStage }), [runtimeSource, activeStage]);
   const swissRecordFor = useMemo(() => getActiveSwissRecordLookup(swissSource.tournament), [swissSource]);
   const nextStartableStage = useMemo(() => getNextStartableStage(phaseSource.tournament), [phaseSource]);
@@ -1421,6 +1423,13 @@ export function TournamentControlPage() {
           </section>
         </div>
       )}
+      {pendingSwissCutoff && <SwissCutoffDecisionModal
+        status={pendingSwissCutoff}
+        sport={tournament.sport}
+        onSet={(a, b) => { const error = recordSwissCutoffSet(tournament, a, b); if (!error) refreshRuntime(); return error; }}
+        onLot={(winners) => { const error = recordSwissCutoffLot(tournament, winners); if (!error) refreshRuntime(); return error; }}
+        onReset={() => { resetSwissCutoffSets(tournament); refreshRuntime(); }}
+      />}
       {phaseCompletedModal && (
         <div className="prototype-modal-backdrop">
           <section className="prototype-modal" role="dialog" aria-modal="true" aria-labelledby="phase-complete-title">
