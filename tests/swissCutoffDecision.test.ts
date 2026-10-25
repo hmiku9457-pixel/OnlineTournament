@@ -4,6 +4,7 @@ import { getStageEntrants, isStageCompleted, isStageLockedWaiting, startFirstSta
 import {
   completeMockMatch, getMockStageMatches, getPendingSwissCutoff,
   recordSwissCutoffSet, recordSwissCutoffLot, resetSwissCutoffSets, refreshCompletedStageQualifiers,
+  beginSwissCutoffPlayoff, recordSwissCutoffPlayoffResult,
 } from '@/services/mockRuntime';
 import { buildSwissStandings } from '@/services/mockCompetitionViews';
 import { equalSwissSportingRank, findSwissCutoffTie } from '@/domain/swissCutoffTie';
@@ -110,6 +111,55 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(getPendingSwissCutoff(t)?.decision).toBeNull();
     expect(recordSwissCutoffLot(t, [initial.tie.players[initial.tie.players.length - 1]])).toBeNull();
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
+  });
+
+  it('spielt mit drei Gleichplatzierten eine zusätzliche Runde und übernimmt deren Sieger', () => {
+    const t = create(6, 2);
+    completeRound(t);
+    const pending = getPendingSwissCutoff(t)!;
+    expect(pending.tie.players).toHaveLength(3);
+    expect(beginSwissCutoffPlayoff(t, 'ROUND')).toBeNull();
+    const running = getPendingSwissCutoff(t)!;
+    expect(running.decision?.extraRounds?.[0].matches).toHaveLength(1);
+    expect(running.decision?.extraRounds?.[0].bye).toBeDefined();
+    expect(isStageCompleted(t, t.stages[0])).toBe(false);
+    expect(recordSwissCutoffPlayoffResult(t, 0, 3, 3)).toContain('Ungültiges Satzergebnis');
+    expect(recordSwissCutoffPlayoffResult(t, 0, 11, 7)).toBeNull();
+    expect(isStageCompleted(t, t.stages[0])).toBe(true);
+    expect(getStageEntrants(t, t.stages[1])).toHaveLength(2);
+    expect(buildSwissStandings(t, t.stages[0]).every((row) => row.wins === 1 || row.wins === 0)).toBe(true);
+  });
+
+  it('spielt Jeder-gegen-Jeden und schließt erst nach sämtlichen Ergebnissen ab', () => {
+    const t = create(6, 2);
+    completeRound(t);
+    expect(beginSwissCutoffPlayoff(t, 'ROUND_ROBIN')).toBeNull();
+    let current = getPendingSwissCutoff(t)!;
+    expect(current.decision?.extraRounds?.[0].matches).toHaveLength(3);
+    expect(recordSwissCutoffPlayoffResult(t, 0, 11, 7)).toBeNull();
+    expect(isStageCompleted(t, t.stages[0])).toBe(false);
+    expect(recordSwissCutoffPlayoffResult(t, 0, 11, 7)).toContain('bereits');
+    expect(recordSwissCutoffPlayoffResult(t, 1, 11, 7)).toBeNull();
+    expect(recordSwissCutoffPlayoffResult(t, 2, 11, 7)).toBeNull();
+    expect(isStageCompleted(t, t.stages[0])).toBe(true);
+    current = getPendingSwissCutoff(t)!;
+    expect(current).toBeNull();
+    expect(getStageEntrants(t, t.stages[1])).toHaveLength(2);
+  });
+
+  it('fordert bei weiterem Gleichstand nach Zusatzrunde eine weitere Entscheidung', () => {
+    const t = create(8, 1);
+    completeRound(t);
+    expect(beginSwissCutoffPlayoff(t, 'ROUND')).toBeNull();
+    const first = getPendingSwissCutoff(t)!.decision!.extraRounds![0];
+    expect(first.matches).toHaveLength(2);
+    expect(recordSwissCutoffPlayoffResult(t, 0, 11, 7)).toBeNull();
+    expect(recordSwissCutoffPlayoffResult(t, 1, 11, 7)).toBeNull();
+    expect(isStageCompleted(t, t.stages[0])).toBe(false);
+    const persisted = getPendingSwissCutoff(t)!;
+    expect(persisted.decision!.extraRounds).toHaveLength(1);
+    expect(beginSwissCutoffPlayoff(t, 'ROUND')).toBeNull();
+    expect(getPendingSwissCutoff(t)!.decision!.extraRounds).toHaveLength(2);
   });
 
   it('fordert nach Ergebniskorrekturen einen neuen Entscheid, statt eine veraltete Auswahl zu übernehmen', () => {
