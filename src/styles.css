@@ -1810,22 +1810,7 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .hall-table-modal-assign-controls .btn { flex-shrink: 0; }
 
 /* Go-live copy pass: compact guidance with contextual help, never obscuring the table overview. */
-.control-guide-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-  margin: -3px 0 13px;
-  padding: 8px 12px;
-  border: 1px solid #dbeafe;
-  border-radius: 10px;
-  background: #eff6ff;
-  color: #1e3a8a;
-}
-.control-guide-strip > .control-guide-copy { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; min-width: 0; font-size: .79rem; }
-.control-guide-strip strong { white-space: nowrap; }
-.control-guide-strip span { color: #344054; }
+/* Kontext-Hinweise bleiben dynamisch; ihre Darstellung sitzt nun innerhalb des Headers. */
 .control-guide-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px; flex-shrink: 0; }
 .control-guide-action { white-space: nowrap; color: #1d4ed8; border-color: #bfdbfe; background: white; }
 .control-guide-action:hover { border-color: #93c5fd; background: #dbeafe; }
@@ -1885,8 +1870,8 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .control-help-steps li span { color: #475467; line-height: 1.45; }
 .control-help-body .control-help-notice { margin: 14px 0 0; padding: 10px 12px; border: 1px solid #fedf89; border-radius: 9px; background: #fffaeb; color: #7a2e0e; line-height: 1.45; }
 @media (max-width: 640px) {
-  .control-guide-strip { align-items: flex-start; }
-  .control-guide-strip > .control-guide-copy { display: grid; gap: 2px; }
+  .control-header-guide { align-items: flex-start; }
+  .control-header-guide > .control-guide-copy { flex-wrap: wrap; }
   .control-guide-actions { justify-content: flex-start; }
   .control-help-backdrop { padding: 9px; }
   .control-help-dialog { max-height: 95dvh; padding: 14px; gap: 10px; }
@@ -1895,16 +1880,17 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   .control-help-heading p { display: none; }
 }
 @media print {
-  .control-guide-strip, .control-help-button, .control-help-main-button, .control-help-backdrop { display: none !important; }
+  .control-header-guide, .control-help-button, .control-help-main-button, .control-help-backdrop { display: none !important; }
 }
 
 /* Einheitlicher, flacher Turnierkopf: Informationen und alle Aktionen in einer Karte. */
 .control-head { display: block; width: 100%; margin-bottom: 10px; }
 .control-hero-bar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px 20px;
+  column-gap: 20px;
+  row-gap: 8px;
   width: 100%;
   padding: 11px 16px;
   border: 1px solid #e4e7ec;
@@ -1912,18 +1898,47 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
   background: linear-gradient(120deg, #fff 58%, #f8fafc);
   box-shadow: 0 1px 3px rgb(16 24 40 / 4%);
 }
-.control-identity { flex: 1 1 340px; min-width: 0; }
+.control-identity { min-width: 0; }
 .control-hero-bar .control-kicker { font-size: .68rem; line-height: 1.2; }
 .control-hero-bar .tournament-page-status-row { gap: 9px; margin-top: 3px; flex-wrap: wrap; }
 .control-hero-bar h1 { font-size: clamp(1.4rem, 2.1vw, 1.75rem); line-height: 1.12; overflow-wrap: anywhere; }
 .control-hero-bar p { margin: 4px 0 0; font-size: .78rem; line-height: 1.3; }
-.control-header-tools { display: grid; flex: 0 1 auto; justify-items: end; gap: 7px; min-width: 0; }
+.control-header-tools { display: grid; justify-items: end; gap: 7px; min-width: 0; }
 .control-primary-actions { align-items: center; justify-content: flex-end; gap: 7px; }
 .control-primary-actions .btn { padding: 8px 11px; font-size: .8rem; line-height: 1.2; white-space: nowrap; }
 .control-utility-bar { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
 .control-utility-bar .control-back-button { margin: 0; }
 .control-utility-links { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
 .control-utility-bar .btn { padding: 4px 8px; font-size: .72rem; line-height: 1.2; white-space: nowrap; }
+/* Dezente Infozeile nutzt die bisherige freie Höhe im Turnierkopf. */
+.control-header-guide {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px 18px;
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid #eaecf0;
+}
+.control-header-guide > .control-guide-copy {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 9px;
+  min-width: 0;
+  padding-left: 9px;
+  border-left: 3px solid #93c5fd;
+  font-size: .75rem;
+  line-height: 1.35;
+}
+.control-header-guide .control-guide-copy strong { color: #1d4ed8; font-size: .75rem; white-space: normal; }
+.control-header-guide .control-guide-copy span { color: #475467; }
+.control-header-guide .control-guide-actions { gap: 6px; }
+.control-header-guide .control-guide-action,
+.control-header-guide .control-help-button { padding: 4px 7px; font-size: .7rem; line-height: 1.2; white-space: nowrap; }
+.control-header-guide .control-help-button { border: 1px solid #dbeafe; border-radius: 7px; background: #fff; color: #1d4ed8; }
+.control-header-guide .control-help-button:hover { background: #eff6ff; }
 /* Markiert den Turnierverlauf im Header als aktiven Bearbeitungsbereich. */
 .control-primary-actions .btn.control-edit-phase-active { color: #fff; background: #1d4ed8; border-color: #1d4ed8; }
 .control-primary-actions .btn.control-edit-phase-active:hover { color: #fff; background: #1e40af; border-color: #1e40af; }
@@ -1953,10 +1968,10 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .control-tournament-status.status-registration { border-color: #b2ddff; background: #eff8ff; color: #175cd3; }
 .control-tournament-status.status-finished { border-color: #d6bbfb; background: #f4f3ff; color: #6941c6; }
 @media (max-width: 960px) {
-  .control-hero-bar { flex-direction: column; align-items: stretch; gap: 9px; }
-  .control-identity { flex-basis: auto; }
+  .control-hero-bar { grid-template-columns: minmax(0, 1fr); gap: 9px; }
   .control-header-tools { justify-items: start; }
   .control-primary-actions, .control-utility-bar, .control-utility-links { justify-content: flex-start; }
+  .control-header-guide { flex-wrap: wrap; }
 }
 
 /* Sämtliche Gruppenspiele gleich groß und einzeilig; live bleibt grün hervorgehoben. */
@@ -2162,8 +2177,8 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 
 @media (max-width: 760px) { .control-match-filter-fields, .control-queue-filters .control-match-filter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .control-match-filter-fields label:first-child { grid-column: 1 / -1; } }
 @media (max-width: 500px) {
-  .control-guide-strip { flex-wrap: wrap; }
-  .control-guide-actions { width: 100%; }
+  .control-header-guide { flex-wrap: wrap; }
+  .control-header-guide .control-guide-actions { width: 100%; }
   .control-match-filter-fields, .control-queue-filters .control-match-filter-fields { grid-template-columns: 1fr; }
   .control-match-filter-fields label:first-child { grid-column: auto; }
   .control-correction-toast { left: 16px; right: 16px; bottom: 16px; width: auto; flex-wrap: wrap; }
