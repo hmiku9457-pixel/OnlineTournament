@@ -15,6 +15,7 @@ interface Props {
   onSelectPlayer: (name: string) => void;
   onShowBuchholz: () => void;
   highlightPlayers?: ReadonlySet<string>;
+  readOnly?: boolean;
 }
 
 function SwissRatio({ value }: { value: string }) {
@@ -38,7 +39,7 @@ function formatBuchholz(value: number) {
 
 export function SwissStandingsTable({
   standings, scoreSport, scoreUnit, unplayedWinners, previousFinishLabels, withdrawalLabel,
-  qualifyingPlaces, cutoffIndex, finalized, onSelectPlayer, onShowBuchholz, highlightPlayers,
+  qualifyingPlaces, cutoffIndex, finalized, onSelectPlayer, onShowBuchholz, highlightPlayers, readOnly = false,
 }: Props) {
   return (
     <div className="card table-wrap swiss-standings-card">
@@ -89,7 +90,7 @@ export function SwissStandingsTable({
                   <td>{row.rank}</td>
                   <td>
                     <span className="swiss-standing-identity">
-                      <button className="standing-player-button" type="button" onClick={() => onSelectPlayer(row.name)}><strong>{row.name}</strong></button>
+                      {readOnly ? <strong>{row.name}</strong> : <button className="standing-player-button" type="button" onClick={() => onSelectPlayer(row.name)}><strong>{row.name}</strong></button>}
                       {previousFinishLabels[row.name] && <small className="participant-origin swiss-standing-origin">{previousFinishLabels[row.name]}</small>}
                       {withdrawn && <span className="standing-withdrawn" title="Zeitpunkt des Rückzugs">{withdrawn}</span>}
                     </span>
