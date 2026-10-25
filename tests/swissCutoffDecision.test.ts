@@ -3,6 +3,7 @@ import { createMockTournament, updateMockTournamentStatus } from '@/services/moc
 import { getStageEntrants, isStageCompleted, isStageLockedWaiting, startFirstStage } from '@/services/mockPhaseLifecycle';
 import {
   completeMockMatch, getMockStageMatches, getPendingSwissCutoff, getSwissCutoffHistory,
+  getMockRuntimeMatches, getSwissRoundRobinMatches, assignMockMatchToTable, findMockRuntimeMatch,
   recordSwissCutoffSet, recordSwissCutoffLot, resetSwissCutoffSets, refreshCompletedStageQualifiers,
   beginSwissCutoffPlayoff, recordSwissCutoffPlayoffResult,
 } from '@/services/mockRuntime';
@@ -158,6 +159,34 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     const history = getSwissCutoffHistory(t, t.stages[0]);
     expect(history?.extraRounds?.filter((round) => round.kind === 'ROUND_ROBIN')).toHaveLength(1);
     expect(history?.winners).toHaveLength(2);
+  });
+
+  it('führt Phase 1.5 über normale Warteschlange, Tischzuweisung und Ergebniserfassung aus', () => {
+    const t = create(6, 2);
+    completeRound(t);
+    expect(beginSwissCutoffPlayoff(t, 'ROUND_ROBIN')).toBeNull();
+    const active = getMockRuntimeMatches(t);
+    expect(active).toHaveLength(3);
+    expect(active.every((match) => match.status === 'WAITING' && match.bestOf === 1
+      && match.phase.includes('Phase 1.5'))).toBe(true);
+    const first = active[0];
+    expect(findMockRuntimeMatch(first.id)?.match.id).toBe(first.id);
+    expect(assignMockMatchToTable(t, first.id, 'Tisch 1')).toBe(true);
+    expect(getMockRuntimeMatches(t).find((match) => match.id === first.id)).toMatchObject({
+      table: 'Tisch 1', status: 'LIVE',
+    });
+    expect(getMockStageMatches(t, t.stages[0]).some((match) => match.id === first.id)).toBe(false);
+    completeMockMatch(first.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]);
+    expect(getPendingSwissCutoff(t)?.decision?.extraRounds?.[0].matches[0].pointsA).toBe(11);
+    expect(getMockRuntimeMatches(t).find((match) => match.id === first.id)?.status).toBe('FINISHED');
+    expect(isStageCompleted(t, t.stages[0])).toBe(false);
+    active.slice(1).forEach((game) => {
+      completeMockMatch(game.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]);
+    });
+    expect(isStageCompleted(t, t.stages[0])).toBe(true);
+    expect(getSwissRoundRobinMatches(t, t.stages[0])).toHaveLength(3);
+    expect(getStageEntrants(t, t.stages[1])).toHaveLength(2);
+    expect(buildSwissStandings(t, t.stages[0]).reduce((sum, row) => sum + row.played, 0)).toBe(6);
   });
 
   it('gibt keine weitere Schweizer Runde frei, bevor alle angesetzten Spiele fertig sind', () => {
