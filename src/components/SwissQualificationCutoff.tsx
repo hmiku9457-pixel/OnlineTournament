@@ -10,11 +10,11 @@ export function getSwissCutoffRowIndex(
   return eligibleIndices[qualifyingPlaces - 1];
 }
 
-export function SwissQualificationCutoffRow({ qualifyingPlaces, finalized }: { qualifyingPlaces: number; finalized: boolean }) {
+export function SwissQualificationCutoffRow({ qualifyingPlaces, finalized, colSpan = 10 }: { qualifyingPlaces: number; finalized: boolean; colSpan?: number }) {
   const label = `Cut-off · ${qualifyingPlaces} Qualifikationsplätze${finalized ? '' : ' · vorläufig'}`;
   return (
     <tr className="swiss-qualification-cutoff" aria-label={label}>
-      <td colSpan={10}>
+      <td colSpan={colSpan}>
         <div className="swiss-qualification-cutoff-line">
           <span>{label}</span>
         </div>
