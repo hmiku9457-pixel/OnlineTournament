@@ -85,6 +85,9 @@ describe('Verbindliche Kontrollen der Turnierleitung', () => {
     expect(adminConfirmMockMatch(t, match.id)).toBe(true);
     expect(getMockStoredResult(match.id)).toMatchObject({ adminConfirmed: true });
     expect(getMockStoredResult(match.id)?.confirmedB).toBeUndefined();
+    expect(() => completeMockMatch(match.id, [{ number: 1, sideAScore: 7, sideBScore: 11 }]))
+      .toThrow('Turnierleitung');
+    expect(getMockStoredResult(match.id)?.sets).toEqual(set);
   });
 
   it('bricht ein Turnier ohne kuenstlichen Sieger ab und erhaelt Resultate', () => {
