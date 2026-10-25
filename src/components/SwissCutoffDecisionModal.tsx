@@ -1,19 +1,18 @@
 import { useState } from 'react';
 import type { DemoTournament } from '@/data/demoTournaments';
-import { MatchSetInput } from '@/components/MatchSetInput';
 import { SwissStandingsTable } from '@/components/SwissStandingsTable';
 import { SwissBuchholzHelpModal } from '@/components/SwissBuchholzHelpModal';
 import { getSwissCutoffPair, type SwissCutoffStatus } from '@/services/mockRuntime';
 import { buildSwissStandings, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
 import { getSwissCutoffRowIndex } from '@/components/SwissQualificationCutoff';
 import { getStageWithdrawalLabel } from '@/services/mockWithdrawals';
-import { parseSportSet, sportScoring } from '@/domain/sportScoring';
+import { sportScoring } from '@/domain/sportScoring';
 import { playoffBoundaryTie, playoffRoundFinished, playoffScores, type PlayoffMode } from '@/domain/swissCutoffPlayoff';
 
 interface Props {
   status: SwissCutoffStatus;
   tournament: DemoTournament;
-  onSet: (pointsA: number, pointsB: number) => string | null;
+  onBeginSet: () => string | null;
   onLot: (winners: string[]) => string | null;
   onBegin: (kind: PlayoffMode) => string | null;
   onOpenControl?: () => void;
@@ -21,11 +20,8 @@ interface Props {
 }
 
 /** Mandatory manual qualification decision with the unchanged Swiss table as context. */
-export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onBegin, onReset, onOpenControl }: Props) {
+export function SwissCutoffDecisionModal({ status, tournament, onBeginSet, onLot, onBegin, onReset, onOpenControl }: Props) {
   const [chosenMode, setChosenMode] = useState<'SET' | 'LOT' | null>(null);
-  const [setValue, setSetValue] = useState('');
-  const [scoreA, setScoreA] = useState('');
-  const [scoreB, setScoreB] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [showBuchholz, setShowBuchholz] = useState(false);
@@ -44,7 +40,7 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
   const requiredDraw = lastRound?.kind === 'ROUND_ROBIN' && roundFinishedButTied
     ? playoffBoundaryTie(status.tie.players, status.tie.slots, extraRounds, tournament.sport)
     : null;
-  const mode = requiredDraw ? 'LOT' : isRoundRunning ? lastRound!.kind : played.length ? 'SET' : chosenMode;
+  const mode = requiredDraw ? 'LOT' : isRoundRunning ? lastRound!.kind : status.decision?.mode === 'SET' ? 'SET' : chosenMode;
   const drawPlayers = requiredDraw?.players ?? status.tie.players;
   const drawSlots = requiredDraw?.slots ?? status.tie.slots;
   const multiPlayer = status.tie.players.length > 2;
@@ -53,25 +49,15 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
   const remaining = status.tie.players.filter((name) => !eliminated.has(name));
   const outcomeType = scoreSport ? 'Entscheidungsspiel' : 'Entscheidungssatz';
 
-  const validNumber = (value: string) => /^\d+$/.test(value.trim()) && Number.isSafeInteger(Number(value));
-  const scored = validNumber(scoreA) && validNumber(scoreB);
-  const parsedSet = !scoreSport ? parseSportSet(tournament.sport, 1, 0, setValue) : null;
-
-  function clearInputs() { setSetValue(''); setScoreA(''); setScoreB(''); setError(''); }
-  function submitSet() {
-    if (!scoreSport && !parsedSet) { setError('Bitte ein gültiges Satzergebnis eintragen.'); return; }
-    if (scoreSport && (!scored || Number(scoreA) === Number(scoreB))) {
-      setError('Bitte einen eindeutigen Sieger mit gültigen Punktzahlen eintragen.'); return;
-    }
-    const a = scoreSport ? Number(scoreA) : parsedSet!.sideAScore;
-    const b = scoreSport ? Number(scoreB) : parsedSet!.sideBScore;
-    const problem = onSet(a, b);
-    if (problem) setError(problem); else clearInputs();
+  function startSetMatch() {
+    const problem = onBeginSet();
+    if (problem) setError(problem);
+    else onOpenControl?.();
   }
   function begin(kind: PlayoffMode) {
     const problem = onBegin(kind);
     if (problem) setError(problem);
-    else { setChosenMode(null); clearInputs(); }
+    else { setChosenMode(null); setError(''); }
   }
   function submitLot() {
     const problem = onLot(selected);
@@ -81,27 +67,9 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
     onReset();
     setChosenMode(null);
     setSelected([]);
-    clearInputs();
+    setError('');
   }
 
-  const entry = (onConfirm: () => void, sideA: string, sideB: string) => (
-    <div className="set-by-set-entry compact swiss-cutoff-game-entry">
-      <div className="set-entry-scoreline"><span>{sideA}</span><strong>{scoreSport ? `${scoreA || '0'}:${scoreB || '0'}` : '0:0'}</strong><span>{sideB}</span></div>
-      {scoreSport ? (
-        <>
-          <div className="sport-score-fields">
-            <label className="current-set-field"><span>{rules.plural} · {sideA}</span><input type="number" min="0" step="1" inputMode="numeric" value={scoreA} onChange={(event) => setScoreA(event.target.value)} /></label>
-            <span className="sport-score-colon">:</span>
-            <label className="current-set-field"><span>{rules.plural} · {sideB}</span><input type="number" min="0" step="1" inputMode="numeric" value={scoreB} onChange={(event) => setScoreB(event.target.value)} /></label>
-          </div>
-          <button className="btn small primary" type="button" disabled={!scored} onClick={onConfirm}>Ergebnis bestätigen</button>
-        </>
-      ) : (
-        <MatchSetInput sport={tournament.sport} bestOf={1} setIndex={0} value={setValue}
-          onChange={(value) => { setSetValue(value); setError(''); }} onConfirm={onConfirm} compact />
-      )}
-    </div>
-  );
 
   return (
     <div className="prototype-modal-backdrop swiss-cutoff-backdrop">
@@ -145,9 +113,9 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
                       <span>Eine reguläre Schweizer Runde für alle verbleibenden Spieler, inklusive Tabellen- und BHZ-Wertung.</span>
                     </button>
                   ) : (
-                    <button type="button" className="swiss-cutoff-method" autoFocus onClick={() => { setChosenMode('SET'); clearInputs(); }}>
+                    <button type="button" className="swiss-cutoff-method" autoFocus onClick={startSetMatch}>
                       <strong>{outcomeType} spielen</strong>
-                      <span>Ein zusätzlicher Satz mit der gewohnten Ergebniseingabe entscheidet direkt.</span>
+                      <span>Den Entscheidungssatz einem freien Tisch zuweisen und dort wie ein normales Spiel erfassen.</span>
                     </button>
                   )}
                   <button type="button" className="swiss-cutoff-method" onClick={() => { setChosenMode('LOT'); setError(''); }}>
@@ -164,20 +132,19 @@ export function SwissCutoffDecisionModal({ status, tournament, onSet, onLot, onB
 
             {mode === 'SET' && (
               <div className="swiss-cutoff-mode">
-                <h3>{outcomeType} erfassen</h3>
-                <p className="muted">Spielt einen Satz nach den üblichen Regeln und tragt ihn wie bei einem normalen Spiel ein. Das Ergebnis entscheidet ausschließlich über die Qualifikation; die Schweizer Tabellenwerte bleiben erhalten.</p>
+                <h3>{outcomeType} an einem Tisch</h3>
+                <p>Der Entscheidungssatz ist für die reguläre Tischverwaltung vorgemerkt.
+                  Weist einen freien Tisch zu und erfasst den Satz über die gewohnte Spielkarte.
+                  Das Ergebnis zählt ausschließlich für die Qualifikation, nicht für die Schweizer Wertung.</p>
                 {played.length > 0 && (
                   <div className="swiss-cutoff-history">
                     <strong>Bereits entschieden</strong>
                     {played.map((set, index) => <div key={index}>{set.sideA} – {set.sideB}: {set.pointsA}:{set.pointsB} · Sieger: <strong>{set.winner}</strong></div>)}
                   </div>
                 )}
-                <p><strong>Noch {remaining.length - status.tie.slots} {remaining.length - status.tie.slots === 1 ? 'Entscheidung' : 'Entscheidungen'} erforderlich</strong></p>
-                {pair[0] && pair[1] && entry(submitSet, pair[0], pair[1])}
                 <div className="actions">
-                  {played.length === 0
-                    ? <button type="button" className="btn" onClick={() => { setChosenMode(null); clearInputs(); }}>Zurück zur Auswahl</button>
-                    : <button type="button" className="btn" onClick={reset}>Stichentscheid neu beginnen</button>}
+                  {onOpenControl && <button type="button" className="btn primary" onClick={onOpenControl}>Zur Tischzuweisung</button>}
+                  <button type="button" className="btn" onClick={reset}>Stichentscheid zurücksetzen</button>
                 </div>
               </div>
             )}
