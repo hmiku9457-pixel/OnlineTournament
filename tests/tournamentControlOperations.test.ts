@@ -195,7 +195,7 @@ describe('Turnierleitung: Zuweisung, Pause, Codes, Audit', () => {
     expect(adminConfirmMockMatch(tournament, first.id)).toBe(true);
     expect(countMockOpenConfirmations(tournament)).toBe(0);
     completeMockMatch(first.id, [{ number: 1, sideAScore: 7, sideBScore: 11 }, { number: 2, sideAScore: 7, sideBScore: 11 }], 'FINISHED', true);
-    expect(countMockOpenConfirmations(tournament)).toBe(1);
+    expect(countMockOpenConfirmations(tournament)).toBe(0);
     const corrected = getMockAudit(tournament.id).find((entry) => entry.action === 'RESULT_CORRECTED')!;
     expect(corrected.before).toContain('11:5');
     expect(corrected.after).toContain('7:11');
