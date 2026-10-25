@@ -38,8 +38,8 @@ function SwissDifference({ value }: { value: number }) {
   );
 }
 
-function formatBuchholz(value: number) {
-  return value.toLocaleString('de-DE', { maximumFractionDigits: 1 });
+function formatSonnebornBerger(value: number) {
+  return value.toLocaleString('de-DE', { maximumFractionDigits: 2 });
 }
 
 export function SwissStandingsTable({
@@ -73,10 +73,10 @@ export function SwissStandingsTable({
             <th title="Siege">S</th>
             <th title={scoreSport ? 'Unentschieden' : 'Niederlagen'}>{scoreSport ? 'U' : 'N'}</th>
             {scoreSport && <th title="Niederlagen">N</th>}
-            {!hideBuchholz && <th className="swiss-bhz-header" title="Buchholzzahl">
+            {!hideBuchholz && <th className="swiss-bhz-header" title="Sonneborn-Berger-Wertung">
               <span className="swiss-bhz-header-inner">
-                <span>BHZ</span>
-                <button type="button" className="swiss-bhz-help-trigger" aria-label="Buchholzzahl (BHZ) erklären" aria-haspopup="dialog" title="Was ist die BHZ?" onClick={onShowBuchholz}>?</button>
+                <span>SB</span>
+                <button type="button" className="swiss-bhz-help-trigger" aria-label="Sonneborn-Berger-Wertung (SB) erklären" aria-haspopup="dialog" title="Was ist die SB-Wertung?" onClick={onShowBuchholz}>?</button>
               </span>
             </th>}
             <th className="swiss-stat-ratio swiss-stat-group-start" title={scoreSport ? scoreUnit : 'Satzverhältnis'}>{scoreSport ? scoreUnit : 'Sätze'}</th>
@@ -113,7 +113,7 @@ export function SwissStandingsTable({
                   <td>{row.wins}{unplayedWinners.has(row.name) && <sup className="swiss-bye-marker" title="Mindestens ein Sieg durch Freilos oder kampflose Wertung" aria-label="Mindestens ein Sieg durch Freilos oder kampflose Wertung">*</sup>}</td>
                   <td>{scoreSport ? row.draws : row.losses}</td>
                   {scoreSport && <td>{row.losses}</td>}
-                  {!hideBuchholz && <td className="swiss-buchholz-cell">{formatBuchholz(row.buchholz)}</td>}
+                  {!hideBuchholz && <td className="swiss-buchholz-cell">{formatSonnebornBerger(row.buchholz)}</td>}
                   <td className="swiss-stat-ratio swiss-stat-group-start"><SwissRatio value={scoreSport ? row.balls : row.sets} /></td>
                   <td className="swiss-stat-difference"><SwissDifference value={scoreSport ? row.ballDifference : row.setDifference} /></td>
                   {scoreSport ? <td className="swiss-points-cell">{row.points}</td> : <>
@@ -139,7 +139,7 @@ export function SwissStandingsTable({
           <span>{hideBuchholz
             ? scoreSport ? 'Wertungspunkte → Punktedifferenz → erzielte Punkte → direkter Vergleich'
               : 'Siege → Satzdifferenz → gewonnene Sätze → Balldifferenz → direkter Vergleich'
-            : scoreSport ? 'Siege/Remis → BHZ → Punktedifferenz' : 'Siege → BHZ → Satzdifferenz → Balldifferenz'}</span>
+            : scoreSport ? 'Siege/Remis → SB → Punktedifferenz' : 'Siege → SB → Satzdifferenz → Balldifferenz'}</span>
         </div>
       </div>
     </div>
