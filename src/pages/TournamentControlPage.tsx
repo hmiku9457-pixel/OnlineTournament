@@ -35,7 +35,7 @@ import { VenueLayoutMini } from '@/components/VenueLayout';
 import { displayVenueMessage, displayVenueName, getVenueTerminology } from '@/domain/venueTerminology';
 import { TableStateLegend, TournamentHallView } from '@/components/TournamentHallView';
 import { ControlHelpButton, TournamentControlHelp } from '@/components/TournamentControlHelp';
-import { getControlGuide, type ControlHelpTopic } from '@/domain/controlGuide';
+import type { ControlHelpTopic } from '@/domain/controlGuide';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getStageEntrants, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
@@ -598,17 +598,6 @@ export function TournamentControlPage() {
     activeStage?.id ?? null,
     activeStage ? getMockStageMatches(phaseRuntimeSource.tournament, activeStage) : [],
   ), [phaseRuntimeSource, activeStage]);
-  const guide = getControlGuide({
-    status: tournament.status,
-    sport: tournament.sport,
-    hasStarted: Boolean(tournament.hasStarted),
-    hasActiveStage: Boolean(activeStage),
-    hasNextStage: Boolean(nextStartableStage),
-    waitingMatches: assignableWaitingMatches.length,
-    freeTables: freeTables.length,
-    activeMatches: tableMatches.length,
-  });
-
   const refreshRuntime = useCallback(() => {
     setTournament(getMockTournament(tournament.id));
     setRuntimeVersion((value) => value + 1);
@@ -696,16 +685,10 @@ export function TournamentControlPage() {
     refreshRuntime();
   }
 
-  function openWaitingQueue(onlyAssignable = false) {
-    setQueueFilters({ ...emptyQueueFilters, status: onlyAssignable ? 'assignable' : 'all' });
+  function openWaitingQueue() {
+    setQueueFilters(emptyQueueFilters);
     setTab('overview');
     window.requestAnimationFrame(() => document.getElementById('control-next-matches')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  }
-
-  function openNextStagePreparation() {
-    if (!nextStartableStage) return;
-    setSelectedStageId(nextStartableStage.id);
-    setTab('flow');
   }
 
   function undoCorrection(auditId: string) {
@@ -1006,14 +989,6 @@ export function TournamentControlPage() {
                 <Link className="btn small" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
                 <button className="btn small control-help-main-button" type="button" onClick={() => setHelpTopic('start')}>Anleitung & Hilfe</button>
               </div>
-            </div>
-          </div>
-          <div className="control-header-guide no-print">
-            <div className="control-guide-copy"><strong>{guide.title}</strong><span>{guide.text}</span></div>
-            <div className="control-guide-actions">
-              {assignableWaitingMatches.length > 0 && <button type="button" className="btn small control-guide-action" onClick={() => openWaitingQueue(true)}>{assignableWaitingMatches.length} {assignableWaitingMatches.length === 1 ? 'Spiel' : 'Spiele'} anzeigen →</button>}
-              {nextStartableStage && !activeStage && <button type="button" className="btn small control-guide-action" onClick={openNextStagePreparation}>Phase vorbereiten →</button>}
-              <ControlHelpButton topic={guide.topic} onOpen={setHelpTopic} label="So geht's →" />
             </div>
           </div>
         </div>
