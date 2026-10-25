@@ -14,7 +14,7 @@ export function SwissQualificationCutoffRow({ qualifyingPlaces, finalized }: { q
   const label = `Cut-off · ${qualifyingPlaces} Qualifikationsplätze${finalized ? '' : ' · vorläufig'}`;
   return (
     <tr className="swiss-qualification-cutoff" aria-label={label}>
-      <td colSpan={9}>
+      <td colSpan={10}>
         <div className="swiss-qualification-cutoff-line">
           <span>{label}</span>
         </div>
