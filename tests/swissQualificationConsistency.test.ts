@@ -1,3 +1,4 @@
+import { approveMockProgress } from '@/services/mockRuntime';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { rankStandings } from '@/domain/standingRankings';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
@@ -65,6 +66,7 @@ describe('Schweizer Qualifikation folgt exakt der sichtbaren Tabelle', () => {
           number: 1, sideAScore: homeWins ? 11 : 7, sideBScore: homeWins ? 7 : 11,
         }]);
       });
+      expect(approveMockProgress(tournament)?.round).toBe(round);
     }
 
     expect(isStageCompleted(tournament, swiss)).toBe(true);
