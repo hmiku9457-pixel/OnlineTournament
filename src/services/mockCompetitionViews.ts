@@ -1,6 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
-import { resultScore, resultWinnerSide, type ExtraTimeProgress, type ScoreDecision } from '@/domain/sportScoring';
+import { compareRankingRows, resultScore, resultWinnerSide, type ExtraTimeProgress, type ScoreDecision } from '@/domain/sportScoring';
 import { rankStandings } from '@/domain/standingRankings';
 import { getStageEntrants } from '@/services/mockPhaseLifecycle';
 import { getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
@@ -8,7 +8,7 @@ import {
   getMockStageBaseMatches,
   getMockStageMatches,
   getMockStoredResult,
-  applyResolvedSwissCutoffOrder, getTotalSwissRoundCount,
+  applyResolvedSwissCutoffOrder, getSwissCutoffHistory, getTotalSwissRoundCount,
 } from '@/services/mockRuntime';
 
 export interface MockStanding {
@@ -24,6 +24,20 @@ export interface MockStanding {
   setDifference: number;
   balls: string;
   ballDifference: number;
+}
+
+/** Compare only the sporting criteria, never the alphabetical fallback.
+ * Displayed places are shared for truly identical results. */
+export function sameSportingStanding(a: MockStanding, b: MockStanding, sport: string, swiss = false): boolean {
+  const asRanked = (row: MockStanding) => {
+    const [setsWon, setsLost] = row.sets.split(':').map(Number);
+    const [ballsWon, ballsLost] = row.balls.split(':').map(Number);
+    return {
+      name: '', wins: row.wins, draws: row.draws, setsWon, setsLost,
+      ballsWon, ballsLost, buchholz: row.buchholz,
+    };
+  };
+  return compareRankingRows(sport, asRanked(a), asRanked(b), swiss) === 0;
 }
 
 export interface MockGroupMatch {
@@ -69,9 +83,15 @@ function computeStandings(members: string[], matches: ReturnType<typeof getMockS
       sets: match.sets, forcedWinner: result?.forcedWinner, decisionSide: result?.decisionSide,
     };
   });
-  return rankStandings(members, rankingMatches, sport, automaticWins, swiss, plannedRounds)
-    .map((row, index) => ({
-      rank: index + 1,
+  const ranked = rankStandings(members, rankingMatches, sport, automaticWins, swiss, plannedRounds);
+  const places: number[] = [];
+  return ranked.map((row, index) => {
+    const previous = ranked[index - 1];
+    const sameRank = previous && compareRankingRows(sport, { ...row, name: '' }, { ...previous, name: '' }, swiss) === 0;
+    const rank = sameRank ? places[index - 1] : index + 1;
+    places.push(rank);
+    return {
+      rank,
       name: row.name,
       played: row.played,
       wins: row.wins,
@@ -83,7 +103,8 @@ function computeStandings(members: string[], matches: ReturnType<typeof getMockS
       setDifference: row.setsWon - row.setsLost,
       balls: `${row.ballsWon}:${row.ballsLost}`,
       ballDifference: row.ballsWon - row.ballsLost,
-    }));
+    };
+  });
 }
 
 /** The regular all-player round-robin uses the same sport-specific standings
@@ -176,7 +197,15 @@ export function buildSwissStandings(tournament: DemoTournament, stage: Tournamen
   const order = getSwissOrder(tournament, stage);
   return applyResolvedSwissCutoffOrder(tournament, stage, computeStandings(order, getMockStageMatches(tournament, stage), tournament.sport,
     getSwissByeWinners(tournament, stage), true, getTotalSwissRoundCount(tournament, stage)))
-    .map((row, index) => ({ ...row, rank: index + 1 }));
+    .map((row, index, sorted) => {
+      const previous = sorted[index - 1];
+      // Manual decisions at the qualification cutoff remain distinct.
+      const priorIsSame = previous && sameSportingStanding(previous, row, tournament.sport, true);
+      const decision = getSwissCutoffHistory(tournament, stage);
+      const winners = new Set(decision?.winners ?? []);
+      const acrossDecision = previous && winners.has(previous.name) !== winners.has(row.name);
+      return { ...row, rank: priorIsSame && !acrossDecision ? previous.rank : index + 1 };
+    });
 }
 
 
