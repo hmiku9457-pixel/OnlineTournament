@@ -7,7 +7,7 @@ import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
-import { BracketScoreCells, BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
+import { BracketLiveStatus, BracketScoreCells, BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
 import { BracketRoundViewport } from '@/components/BracketRoundViewport';
 import { SwissRoundCard } from '@/components/SwissRoundCard';
 import { getSwissCutoffRowIndex, SwissQualificationCutoffRow } from '@/components/SwissQualificationCutoff';
@@ -343,7 +343,8 @@ function StageCompetitionView({
                     const openBracketResult = onEditResult && (match.live || (match.score && match.score !== 'Freilos' && match.score !== 'Beide Platz 3'))
                       ? () => onEditResult(match.id) : undefined;
                     return (
-                      <article className="bracket-match" key={match.id}>
+                      <article className={match.live ? 'bracket-match is-live' : 'bracket-match'} key={match.id}>
+                        <BracketLiveStatus live={match.live} />
                         {match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover, z. B. bei Rückzug)">Kampflos</span>}
                         {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz · nicht ausgetragen</span>}
                         <BracketStageHeader stages={scoreStages} />
@@ -397,7 +398,8 @@ function StageCompetitionView({
                       const openBracketResult = onEditResult && (match.live || (match.score && match.score !== 'Freilos' && match.score !== 'Beide Platz 3'))
                         ? () => onEditResult(match.id) : undefined;
                       return (
-                        <article className="bracket-match" key={match.id}>
+                        <article className={match.live ? 'bracket-match is-live' : 'bracket-match'} key={match.id}>
+                          <BracketLiveStatus live={match.live} />
                           {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz · nicht ausgetragen</span>}
                           <BracketStageHeader stages={scoreStages} />
                           {[match.sideA, match.sideB].map((side, sideIndex) => (

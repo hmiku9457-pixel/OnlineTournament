@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
-import { BracketScoreCells, BracketStageValues } from '@/components/BracketScoreStages';
+import { BracketLiveStatus, BracketScoreCells, BracketStageValues } from '@/components/BracketScoreStages';
 import { SwissRoundCard } from '@/components/SwissRoundCard';
 
 const ignoreClick = () => {};
@@ -27,6 +27,18 @@ describe('Ergebnisse im Turnierverlauf direkt öffnen', () => {
     const fallback = renderToStaticMarkup(createElement(BracketScoreCells, { onOpenResult: ignoreClick, children: '3' }));
     expect(fallback).toContain('bracket-result-action');
     expect(fallback).toContain('>3</button>');
+  });
+
+  it('zeigt nur bei laufenden K.-o.-Spielen die grüne Live-Kennzeichnung', () => {
+    const active = renderToStaticMarkup(createElement(BracketLiveStatus, { live: true }));
+    const waiting = renderToStaticMarkup(createElement(BracketLiveStatus, { live: false }));
+    const missing = renderToStaticMarkup(createElement(BracketLiveStatus, {}));
+    expect(active).toContain('bracket-live-status');
+    expect(active).toContain('bracket-live-dot');
+    expect(active).toContain('Läuft');
+    expect(active).toContain('Spiel läuft');
+    expect(waiting).toBe('');
+    expect(missing).toBe('');
   });
 
   it('stellt laufende Schweizer Ergebnisse als direkte Aktionen dar', () => {

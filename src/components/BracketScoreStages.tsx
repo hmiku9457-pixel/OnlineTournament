@@ -31,3 +31,14 @@ export function BracketScoreCells({ children, onOpenResult }: { children: ReactN
     ? <button className="bracket-score-cells bracket-result-action" type="button" onClick={onOpenResult} title="Ergebnis öffnen">{children}</button>
     : <span className="bracket-score-cells">{children}</span>;
 }
+
+/** Einheitliche Live-Markierung für laufende K.-o.-Spiele, auch beim Spiel um Platz 3. */
+export function BracketLiveStatus({ live }: { live?: boolean }) {
+  if (!live) return null;
+  return (
+    <div className="bracket-live-status" role="status" aria-label="Spiel läuft">
+      <span className="bracket-live-dot" aria-hidden="true" />
+      <span>Läuft</span>
+    </div>
+  );
+}
