@@ -659,7 +659,7 @@ export function CreateTournamentPage() {
       estimatedDurationMinutes: estimatedTournamentDurationMinutes,
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
     });
-    navigate(`/tournaments/${tournament.id}`);
+    navigate(`/tournaments/${tournament.id}/control`, { replace: true });
   }
 
   const estimatedTournamentDurationMinutes = useMemo(
