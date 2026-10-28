@@ -1027,7 +1027,12 @@ export function CreateTournamentPage() {
               </aside>
 
             {incompleteSavedParticipants > 0 && (
-              <div className="callout">{incompleteSavedParticipants} gespeicherte Einträge müssen nach der Änderung der Disziplin noch ergänzt werden.</div>
+              <div className="wizard-invalid-participants" role="status">
+                <span><strong>{incompleteSavedParticipants} unvollständige {incompleteSavedParticipants === 1 ? 'Eintragung' : 'Eintragungen'}</strong> · Du kannst sie ergänzen oder gesammelt entfernen.</span>
+                <button type="button" className="btn small danger-outline" onClick={removeIncompleteParticipants}>
+                  Alle fehlerhaften Einträge entfernen
+                </button>
+              </div>
             )}
           </section>
         )}
@@ -1357,9 +1362,7 @@ export function CreateTournamentPage() {
           </section>
         )}
 
-        <footer className="wizard-actions wizard-back-actions">
-          <button className="btn" type="button" onClick={goBack} disabled={step === 1}>← Zurück</button>
-        </footer>
+
       </div>
 
       <div className="wizard-sidebar-column">
@@ -1375,7 +1378,7 @@ export function CreateTournamentPage() {
           <button type="button" className="wizard-side-fact" onClick={() => navigateToStep(1)}>
             <span>Grunddaten <span aria-hidden="true">↗</span></span>
             <strong>{name.trim() || 'Noch kein Name'}</strong>
-            <small>{sportOptions.find((item) => item.id === sport)?.label ?? 'Sportart auswählen'} · {sport ? disciplineLabel(discipline) : 'Disziplin offen'} · {tables} {venue.plural}</small>
+            <small>{sportOptions.find((item) => item.id === sport)?.label ?? 'Sportart auswählen'} · {sport ? disciplineLabel(discipline) : 'Disziplin offen'} · {tables} {venue.plural} · mindestens {minimumMatches} Spiele</small>
           </button>
           <button type="button" className="wizard-side-fact" disabled={maxReachedStep < 2} onClick={() => navigateToStep(2)}>
             <span>Teilnehmer {maxReachedStep >= 2 && <span aria-hidden="true">↗</span>}</span>
@@ -1383,12 +1386,7 @@ export function CreateTournamentPage() {
             <small>{participantsValid ? 'Teilnehmerliste vollständig' : 'Mindestens 2 vollständige Einträge erforderlich'}</small>
           </button>
           <button type="button" className="wizard-side-fact" disabled={maxReachedStep < 3} onClick={() => navigateToStep(3)}>
-            <span>Spieldaten {maxReachedStep >= 3 && <span aria-hidden="true">↗</span>}</span>
-            <strong>Mindestens {minimumMatches} Spiele</strong>
-            <small>{timedSport ? `${matchDurationMinutes} Minuten Spielzeit` : '15 Minuten pro Satz (Planung)'}</small>
-          </button>
-          <button type="button" className="wizard-side-fact" disabled={maxReachedStep < 4} onClick={() => navigateToStep(4)}>
-            <span>Turnierform {maxReachedStep >= 4 && <span aria-hidden="true">↗</span>}</span>
+            <span>Turnierform {maxReachedStep >= 3 && <span aria-hidden="true">↗</span>}</span>
             <strong>{phaseDrafts.length ? `${phaseDrafts.length} ${phaseDrafts.length === 1 ? 'Phase' : 'Phasen'} konfiguriert` : 'Noch keine Form gewählt'}</strong>
             <small>{selectedRecommendation ? 'Empfehlung übernommen – frei anpassbar' : 'Individuelle Phasenauswahl'}</small>
           </button>
@@ -1396,7 +1394,7 @@ export function CreateTournamentPage() {
         <div className="wizard-side-phase-summary">
           <div className="wizard-side-phase-heading">
             <strong>Phasenplan</strong>
-            {maxReachedStep >= 5 && <button className="wizard-side-link" type="button" onClick={() => navigateToStep(5)}>Bearbeiten</button>}
+            {maxReachedStep >= 4 && <button className="wizard-side-link" type="button" onClick={() => navigateToStep(4)}>Bearbeiten</button>}
           </div>
           {phaseDrafts.length === 0
             ? <p className="muted">Noch keine Phasen eingestellt.</p>
@@ -1417,13 +1415,13 @@ export function CreateTournamentPage() {
           <strong>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : 'Noch offen'}</strong>
           {phaseDrafts.length > 0 && <small>Schätzung · verändert sich mit den Phasen und {venue.dativePlural}.</small>}
         </div>
-        {maxReachedStep >= 5 && !canCreate && (
+        {maxReachedStep >= 4 && !canCreate && (
           <div className="wizard-side-validation" role="status">
             <strong>Noch nicht bereit zur Erstellung</strong>
             {!basicsValid && <button type="button" onClick={() => navigateToStep(1)}>Grunddaten vervollständigen</button>}
             {!participantsValid && <button type="button" onClick={() => navigateToStep(2)}>Teilnehmer überprüfen</button>}
-            {!gameSettingsValid && <button type="button" onClick={() => navigateToStep(3)}>Spieldaten korrigieren</button>}
-            {(!phaseConfigurationValid || !phaseEntrantsValid) && <button type="button" onClick={() => navigateToStep(5)}>Phasen prüfen</button>}
+            
+            {(!phaseConfigurationValid || !phaseEntrantsValid) && <button type="button" onClick={() => navigateToStep(4)}>Phasen prüfen</button>}
           </div>
         )}
         <p className="wizard-side-footnote">Klicke auf eine bereits erreichte Einstellung, um sie direkt zu ändern.</p>
@@ -1436,12 +1434,15 @@ export function CreateTournamentPage() {
               : `Mindestens 2 ${discipline === 'TEAMS' ? 'Mannschaften' : discipline === 'SINGLES' ? 'Spieler' : 'Doppel'} für ein Turnier.`}
           </span>
         )}
-        {step === 4 && <span className="muted wizard-optional-note">Eine Empfehlung ist optional.</span>}
-        {step < 5 ? (
+        {step === 3 && <span className="muted wizard-optional-note">Eine Empfehlung ist optional.</span>}
+        <div className="wizard-side-navigation">
+          <button className="btn" type="button" onClick={goBack} disabled={step === 1}>← Zurück</button>
+        {step < 4 ? (
           <button className="btn primary wizard-continue-button" type="button" onClick={goNext} disabled={!canContinue}>Weiter →</button>
         ) : (
           <button className="btn primary wizard-continue-button" type="button" onClick={submitTournament} disabled={!canCreate}>Turnier erstellen</button>
         )}
+        </div>
       </div>
       </div>
       </div>
