@@ -13,6 +13,7 @@ import {
   estimateTournamentDurationMinutes,
   formatGroupDistribution,
   hasValidTerminalStageOrder,
+  hasValidBreakStageOrder,
   isTerminalStage,
   knockoutEntrantPresets,
   knockoutRoundLabels,
@@ -399,9 +400,7 @@ export function CreateTournamentPage() {
   }, [selectedRecommendationId, selectedRecommendation]);
 
   const phaseOrderValid = hasValidTerminalStageOrder(phaseDrafts.map((phase) => phase.type))
-    && phaseDrafts.every((phase, index) => phase.type !== 'BREAK'
-      || (index > 0 && index < phaseDrafts.length - 1
-        && phaseDrafts[index - 1].type !== 'BREAK' && phaseDrafts[index + 1].type !== 'BREAK'));
+    && hasValidBreakStageOrder(phaseDrafts.map((phase) => phase.type));
   const phaseConfigurationValid = phaseDrafts.some((phase) => phase.type !== 'BREAK') && phaseOrderValid
     && phaseDrafts.every((phase) => phase.type !== 'BREAK'
       || (phase.label.trim().length > 0 && phase.note.length <= 600
@@ -511,7 +510,7 @@ export function CreateTournamentPage() {
     setEnabledSystems((current) => ({ ...current, [systemId]: !current[systemId] }));
     if (disabling) {
       setSelectedRecommendationId(null);
-      setPhaseDrafts((current) => current.filter((phase) => systemIdForStage(phase.type) !== systemId));
+      setPhaseDrafts((current) => current.filter((phase) => phase.type === 'BREAK' || systemIdForStage(phase.type) !== systemId));
     }
   }
 
@@ -588,7 +587,7 @@ export function CreateTournamentPage() {
       phase.swissRounds = recommendedSwissRounds(phase.entrantCount, minimumMatches);
     }
     const candidate = [...phaseDrafts.slice(0, insertIndex), phase, ...phaseDrafts.slice(insertIndex)];
-    if (!hasValidTerminalStageOrder(candidate.map((item) => item.type))) return;
+    if (!hasValidTerminalStageOrder(candidate.map((item) => item.type)) || !hasValidBreakStageOrder(candidate.map((item) => item.type))) return;
     setPhaseDrafts(normalizePhaseEntrants(candidate));
     setSelectedRecommendationId(null);
     setPhaseInsertIndex(null);
@@ -608,7 +607,7 @@ export function CreateTournamentPage() {
     const candidate = [...phaseDrafts];
     const [moved] = candidate.splice(fromIndex, 1);
     candidate.splice(toIndex, 0, moved);
-    return hasValidTerminalStageOrder(candidate.map((phase) => phase.type)) ? candidate : null;
+    return hasValidTerminalStageOrder(candidate.map((phase) => phase.type)) && hasValidBreakStageOrder(candidate.map((phase) => phase.type)) ? candidate : null;
   }
 
   function canMovePhase(index: number, direction: -1 | 1): boolean {
