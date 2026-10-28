@@ -11,6 +11,7 @@ import {
   defaultBestOfForStage,
   estimatePhaseMetrics,
   estimateTournamentDurationMinutes,
+  formatGroupDistribution,
   hasValidTerminalStageOrder,
   isTerminalStage,
   knockoutEntrantPresets,
@@ -1323,7 +1324,7 @@ export function CreateTournamentPage() {
                                 <>
                                   <div>
                                     <strong>Empfehlung: {recommendedGroups} Gruppen</strong>
-                                    <span>Je {Math.floor(phase.entrantCount / recommendedGroups)}–{Math.ceil(phase.entrantCount / recommendedGroups)} Teilnehmer
+                                    <span>{formatGroupDistribution(phase.entrantCount, recommendedGroups)}
                                       {groupQualifiers !== null && ` · ${groupQualifiers} weiter in ${nextPhase?.label ?? 'die nächste Phase'}`}
                                       {groupQualifiers !== null && groupQualifiers % recommendedGroups === 0
                                         ? ` · ${groupQualifiers / recommendedGroups} pro Gruppe`
@@ -1341,7 +1342,7 @@ export function CreateTournamentPage() {
                                 <>
                                   <div>
                                     <strong>Empfehlung: {recommendedRounds} Schweizer Runden</strong>
-                                    <span>Berücksichtigt {phase.entrantCount} Teilnehmer und mindestens {minimumMatches} gewünschte Spiele (begrenzt auf 30 Runden und höchstens Teilnehmerzahl minus eins).</span>
+                                    <span>Berücksichtigt {phase.entrantCount} Teilnehmer und mindestens {minimumMatches} gewünschte Spiele.</span>
                                   </div>
                                   <button type="button" className="btn small"
                                     disabled={phase.swissRounds === recommendedRounds}
