@@ -13,11 +13,8 @@ import {
   estimateTournamentDurationMinutes,
   hasValidTerminalStageOrder,
   isTerminalStage,
-  knockoutByeCount,
   knockoutEntrantPresets,
   knockoutRoundLabels,
-  projectSwissTopScores,
-  recommendedSwissRounds,
   stageLabel,
   systemIdForStage,
   tournamentSystemOptions,
@@ -214,12 +211,6 @@ function formatCompactDuration(minutes: number): string {
   return `${hours}h ${remainder}min`;
 }
 
-function formatSwissProjection(entrantCount: number, rounds: number): string {
-  return projectSwissTopScores(entrantCount, rounds)
-    .map((projection) => `${projection.approximatePlayers}× ${projection.wins}:${projection.losses}`)
-    .join(' · ');
-}
-
 function phaseBestOfForSport(sport: string, type: StageType) {
   const rules = sportScoring(sport);
   return rules.mode === 'score' ? 1 : rules.shortSetEntry ? defaultBestOfForStage(type) : rules.recommendedBestOf;
@@ -395,10 +386,9 @@ export function CreateTournamentPage() {
   }, [selectedRecommendationId, selectedRecommendation]);
 
   const phaseOrderValid = hasValidTerminalStageOrder(phaseDrafts.map((phase) => phase.type));
-  const hasTerminalPhase = phaseDrafts.some((phase) => isTerminalStage(phase.type));
   const phaseConfigurationValid = phaseDrafts.length > 0 && phaseOrderValid;
-  const basicsValid = Boolean(name.trim()) && Boolean(sport) && selectedDisciplineValid && tables >= 1 && gameSettingsValid;
   const gameSettingsValid = minimumMatches >= 1 && validMatchDuration && validTurnover;
+  const basicsValid = Boolean(name.trim()) && Boolean(sport) && selectedDisciplineValid && tables >= 1 && gameSettingsValid;
   const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
     const maximum = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
     return phase.entrantCount >= 2 && phase.entrantCount <= maximum
@@ -573,10 +563,6 @@ export function CreateTournamentPage() {
     setSelectedRecommendationId(null);
     setPhaseInsertIndex(null);
     setExpandedPhaseId(phase.id);
-  }
-
-  function addPhase(type: StageType) {
-    insertPhase(phaseDrafts.length, type);
   }
 
   function removePhase(id: string) {
