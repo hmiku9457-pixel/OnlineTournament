@@ -17,6 +17,10 @@ export interface MockPhaseInput {
   groupCount: number;
   swissRounds: number;
   knockoutBestOf: number[];
+  breakKind?: 'minutes' | 'overnight';
+  breakMinutes?: number;
+  nextDayStart?: string;
+  note?: string;
 }
 
 export interface CreateMockTournamentInput {
@@ -66,6 +70,12 @@ function phaseLabel(phases: MockPhaseInput[]) {
 function toStage(tournamentId: string, phase: MockPhaseInput, index: number, nextEntrants?: number): TournamentStage {
   const settings: Record<string, string | number | boolean> = { entrants: phase.entrantCount };
   if (phase.type === 'GROUPS') settings.groups = phase.groupCount;
+  if (phase.type === 'BREAK') {
+    settings.breakKind = phase.breakKind ?? 'minutes';
+    settings.breakMinutes = phase.breakMinutes ?? 15;
+    settings.nextDayStart = phase.nextDayStart ?? '09:00';
+    settings.note = phase.note ?? '';
+  }
   if (phase.type === 'SWISS') settings.rounds = phase.swissRounds;
   if (phase.type === 'KNOCKOUT') {
     settings.avoidPriorOpponents = true;
@@ -95,7 +105,10 @@ function createId() {
 
 export function createMockTournament(input: CreateMockTournamentInput): DemoTournament {
   const id = createId();
-  const stages = input.phases.map((phase, index) => toStage(id, phase, index, input.phases[index + 1]?.entrantCount));
+  const stages = input.phases.map((phase, index) => {
+    const nextCompetition = input.phases.slice(index + 1).find((next) => next.type !== 'BREAK');
+    return toStage(id, phase, index, nextCompetition?.entrantCount);
+  });
   const tournament: DemoTournament = {
     id,
     name: input.name.trim(),
