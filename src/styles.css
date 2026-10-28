@@ -3525,3 +3525,217 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .wizard-workspace .participant-roster-list { max-height: 320px; }
   .wizard-workspace .participant-entry-layout { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Erstellungsnavigation: Blau = aktuell, Grün = erledigt, Orange = noch prüfen. */
+.wizard-steps .wizard-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 58px;
+  padding: 9px 10px;
+  color: #667085;
+  background: #f9fafb;
+  border-color: #e4e7ec;
+  border-bottom-color: #d0d5dd;
+  text-align: left;
+}
+.wizard-step-content { display: grid; gap: 2px; min-width: 0; }
+.wizard-step-content strong { font-size: .83rem; line-height: 1.15; }
+.wizard-step-content small { font-size: .67rem; font-weight: 650; line-height: 1.2; }
+.wizard-steps .wizard-step-number {
+  display: grid;
+  flex: 0 0 27px;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #eaecf0;
+  color: #475467;
+  font-size: .84rem;
+  font-weight: 800;
+}
+.wizard-steps .wizard-step.active {
+  background: #eff6ff;
+  color: #175cd3;
+  border: 1px solid #93c5fd;
+  border-bottom: 3px solid #2563eb;
+}
+.wizard-steps .wizard-step.active .wizard-step-number { background: #1d4ed8; color: #fff; }
+.wizard-steps .wizard-step.completed {
+  background: #ecfdf3;
+  color: #067647;
+  border: 1px solid #abefc6;
+  border-bottom: 3px solid #12b76a;
+}
+.wizard-steps .wizard-step.completed .wizard-step-number { background: #067647; color: #fff; }
+.wizard-steps .wizard-step.needs-attention {
+  background: #fffaeb;
+  color: #b54708;
+  border: 1px solid #fedf89;
+  border-bottom: 3px solid #f79009;
+}
+.wizard-steps .wizard-step.needs-attention .wizard-step-number { background: #f79009; color: #101828; }
+.wizard-steps .wizard-step.upcoming { border-bottom: 3px solid #d0d5dd; }
+.wizard-steps .wizard-step:disabled { opacity: .82; }
+.wizard-steps .wizard-step:not(:disabled):hover { filter: brightness(.975); }
+.wizard-steps .wizard-step:focus-visible { outline: 3px solid #84caff; outline-offset: 2px; }
+
+/* Die rechte Zusammenfassung hat ihren eigenen, dauerhaft sichtbaren Weiter-Button. */
+.wizard-sidebar-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 12px;
+  min-width: 0;
+  max-height: calc(100dvh - 24px);
+}
+.wizard-sidebar-column .wizard-side-summary {
+  position: static;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc(100dvh - 112px);
+  overflow-y: auto;
+}
+.wizard-side-actions {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #dbe4f0;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(16 24 40 / 4%);
+}
+.wizard-side-actions .wizard-continue-button {
+  width: 100%;
+  min-height: 41px;
+  text-align: center;
+  font-size: .86rem;
+}
+.wizard-side-actions .wizard-validation-message,
+.wizard-side-actions .wizard-optional-note {
+  display: block;
+  text-align: left;
+  font-size: .74rem;
+  line-height: 1.4;
+}
+.wizard-back-actions { justify-content: flex-start; }
+
+/* Teilnehmer: Formular + einzelne Testdaten-Aktion oben, vollständige Kartenliste unten. */
+.wizard-workspace .participant-entry-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 205px;
+  align-items: stretch;
+  gap: 11px;
+}
+.wizard-test-tools {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e4e7ec;
+  border-radius: 11px;
+  background: #f9fafb;
+}
+.wizard-test-player-button {
+  width: 100%;
+  min-height: 45px;
+  padding: 8px 10px;
+  white-space: normal;
+  text-align: center;
+  font-size: .8rem;
+}
+.wizard-workspace .participant-roster-grid-card {
+  margin-top: 13px;
+  border-radius: 11px;
+  overflow: hidden;
+}
+.wizard-workspace .participant-roster-grid-card .participant-roster-head { padding: 11px 14px; }
+.wizard-workspace .participant-roster-multi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 8px;
+  max-height: none;
+  overflow: visible;
+  padding: 10px;
+}
+.wizard-workspace .participant-roster-multi .participant-roster-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 6px 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #e4e7ec;
+  border-radius: 9px;
+  background: #fff;
+}
+.wizard-workspace .participant-roster-multi .participant-roster-row.editing { border-color: #93c5fd; background: #eff6ff; }
+.wizard-workspace .participant-roster-multi .participant-list-number { width: 23px; height: 23px; font-size: .72rem; }
+.wizard-workspace .participant-roster-multi .participant-list-name strong { font-size: .81rem; }
+.wizard-workspace .participant-roster-multi .participant-list-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.wizard-workspace .participant-roster-multi .participant-list-actions .btn { padding: 5px 7px; font-size: .73rem; }
+.wizard-workspace .participant-roster-multi .participant-empty { grid-column: 1 / -1; }
+.wizard-workspace .participant-roster-multi .participant-roster-row:last-child { border: 1px solid #e4e7ec; }
+
+/* Raster: kompakte, sofort sichtbare Plus-/Minus-Schalter. */
+.hall-editor-grid-controls {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px 17px;
+  padding: 11px 12px;
+  border: 1px solid #dce6f2;
+  border-radius: 10px;
+  background: #fff;
+}
+.hall-editor-stepper { display: grid; gap: 5px; }
+.hall-editor-stepper-label { color: #475467; font-size: .76rem; font-weight: 750; }
+.hall-editor-stepper-actions { display: grid; grid-template-columns: 35px 44px 35px; align-items: stretch; gap: 5px; }
+.hall-editor-stepper-actions button,
+.hall-editor-stepper-actions output {
+  display: grid;
+  place-items: center;
+  min-height: 35px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: #101828;
+  font-weight: 800;
+  font-size: 1rem;
+}
+.hall-editor-stepper-actions output { background: #f9fafb; font-size: .9rem; font-variant-numeric: tabular-nums; }
+.hall-editor-stepper-actions button:disabled { opacity: .42; cursor: not-allowed; }
+.hall-editor-stepper-actions button:not(:disabled):hover { border-color: #60a5fa; background: #eff6ff; color: #175cd3; }
+.hall-editor-stepper-actions button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.hall-editor-grid-controls .hall-editor-grid-size { margin-left: auto; margin-bottom: 7px; }
+
+@media (max-width: 980px) {
+  .wizard-sidebar-column { position: static; max-height: none; }
+  .wizard-sidebar-column .wizard-side-summary { max-height: none; overflow-y: visible; }
+}
+@media (max-width: 700px) {
+  .wizard-steps .wizard-step { display: flex !important; flex-direction: column; gap: 5px; padding: 7px 2px; min-height: 67px; text-align: center; }
+  .wizard-step-content { gap: 2px; }
+  .wizard-step-content strong { font-size: .62rem; }
+  .wizard-step-content small { font-size: .58rem; }
+  .wizard-steps .wizard-step-number { width: 22px; height: 22px; flex-basis: 22px; font-size: .7rem; }
+  .wizard-workspace .participant-entry-layout { grid-template-columns: minmax(0, 1fr); }
+  .wizard-test-tools { padding: 10px; }
+  .wizard-workspace .participant-roster-multi { grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); }
+}
+@media (max-width: 420px) {
+  .wizard-steps .wizard-step { padding-inline: 1px; }
+  .wizard-step-content strong { font-size: .56rem; }
+  .wizard-step-content small { font-size: .53rem; }
+  .hall-editor-grid-controls .hall-editor-grid-size { margin-left: 0; }
+}
