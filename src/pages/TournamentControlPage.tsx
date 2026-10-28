@@ -514,7 +514,7 @@ export function TournamentControlPage() {
   const venue = getVenueTerminology(tournament.sport);
   const venueName = (name: string) => displayVenueName(tournament.sport, name);
   const venueMessage = (message: string) => displayVenueMessage(tournament.sport, message);
-  const [tab, setTab] = useState<ControlTab>('overview');
+  const [tab, setTab] = useState<ControlTab>('summary');
   const [tableView, setTableView] = useState<'cards' | 'hall'>('cards');
   const [selectedHallTable, setSelectedHallTable] = useState<string | null>(null);
   const [helpTopic, setHelpTopic] = useState<ControlHelpTopic | null>(null);
