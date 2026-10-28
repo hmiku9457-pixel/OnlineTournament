@@ -99,6 +99,39 @@ export function recommendedSwissRounds(entrantCount: number): number {
   return Math.max(1, Math.min(entrants - 1, Math.ceil(Math.log2(entrants))));
 }
 
+/** A practical group count balances short groups with fair, per-group qualification.
+ * When a following phase has a smaller field, prefer a count that allows
+ * the same number of qualifiers from every group whenever possible.
+ */
+export function recommendGroupCount(entrants: number, followingEntrants?: number): number {
+  const count = Math.max(2, Math.trunc(entrants));
+  const maximumGroups = Math.max(2, Math.floor(count / 2));
+  const qualifying = followingEntrants === undefined
+    ? null
+    : Math.max(2, Math.min(count, Math.trunc(followingEntrants)));
+  let best = 2;
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (let groups = 2; groups <= maximumGroups; groups += 1) {
+    const averageSize = count / groups;
+    // 4–5 per group generally keeps the round-robin stage manageable.
+    let score = Math.abs(averageSize - 4.5) * 2;
+    if (averageSize > 6) score += (averageSize - 6) * 4;
+    if (averageSize < 3) score += (3 - averageSize) * 5;
+    if (qualifying !== null && qualifying < count) {
+      // Avoid a format where some groups cannot qualify anyone.
+      if (groups > qualifying) score += (groups - qualifying) * 25;
+      if (qualifying % groups !== 0) score += 7;
+      // Do not reward qualifying more players from a group than it contains.
+      if (Math.ceil(qualifying / groups) > Math.floor(count / groups)) score += 8;
+    }
+    if (score < bestScore) {
+      best = groups;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 function combination(n: number, k: number): number {
   if (k < 0 || k > n) return 0;
   const effectiveK = Math.min(k, n - k);
