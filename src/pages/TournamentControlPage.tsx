@@ -41,7 +41,7 @@ import type { ControlHelpTopic } from '@/domain/controlGuide';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { generateUniquePlayerCode } from '@/services/mockPlayerCodes';
-import { getStageEntrants, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
+import { getStageEntrants, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage, completeStage, canFinishBreak, getBreakResumeAt } from '@/services/mockPhaseLifecycle';
 import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
 import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration } from '@/services/mockDuration';
 import { getMockAudit } from '@/services/mockAudit';
@@ -656,6 +656,9 @@ export function TournamentControlPage() {
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table) && !blockedTables.has(table));
   const activeStage = useMemo(() => getActiveStage(phaseSource.tournament), [phaseSource]);
   const pendingApproval = useMemo(() => getPendingMockApproval(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
+  const activeBreak = activeStage?.type === 'BREAK' ? activeStage : null;
+  const breakResumeAt = activeBreak ? getBreakResumeAt(tournament, activeBreak) : null;
+  const breakReady = activeBreak ? canFinishBreak(tournament, activeBreak, new Date()) : false;
   const reviewMatches = pendingApproval && activeStage
     ? getMockStageMatches(tournament, activeStage).filter((match) => pendingApproval.kind === 'STAGE'
       || Number(match.id.match(/-sw-r(\d+)-m\d+$/)?.[1] ?? 0) === pendingApproval.round)
@@ -838,7 +841,7 @@ export function TournamentControlPage() {
     reconcileWithdrawalsForTournament(tournament);
     refreshRuntime();
     setSelectedStageId(startedId);
-    setTab('overview');
+    setTab(nextStartableStage.type === 'BREAK' ? 'flow' : 'overview');
   }
 
   function requestStartTournament() {
@@ -846,6 +849,15 @@ export function TournamentControlPage() {
     if (firstStage && getStageEntrants(tournament, firstStage).length >= 2) {
       setStartModal({ kind: 'tournament', stageName: firstStage.name });
     }
+  }
+
+  function finishCurrentBreak() {
+    if (!activeBreak || !canFinishBreak(tournament, activeBreak)) return;
+    const preservedEntrants = getStageEntrants(tournament, activeBreak);
+    if (!completeStage(tournament, activeBreak, preservedEntrants)) return;
+    refreshRuntime();
+    setSelectedStageId(activeBreak.id);
+    setTab('flow');
   }
 
   function requestStartNextPhase() {
@@ -1049,7 +1061,7 @@ export function TournamentControlPage() {
                 disabled={!tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
                 title={tournament.stages[0] && getStageEntrants(tournament, tournament.stages[0]).length < 2 ? 'Mindestens zwei aktive Teilnehmer erforderlich' : undefined}>Turnier starten</button>
             )}
-            {tournament.hasStarted && activeStage && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
+            {tournament.hasStarted && activeStage && activeStage.type !== 'BREAK' && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
               <>
                 {tournament.status === 'RUNNING' ? (
                   <button className="btn" type="button" onClick={() => setStatus('PAUSED')}>Turnier pausieren</button>
@@ -1058,8 +1070,9 @@ export function TournamentControlPage() {
                 )}
               </>
             )}
+            {activeBreak && <button className="btn primary" type="button" onClick={finishCurrentBreak} disabled={!breakReady} title={breakReady ? undefined : 'Die geplante Pausenzeit ist noch nicht erreicht.'}>{activeBreak.settings.breakKind === 'overnight' ? 'Folgetag freigeben' : 'Pause beenden'}</button>}
             {tournament.hasStarted && !activeStage && nextStartableStage && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
-              <button className="btn primary" type="button" onClick={requestStartNextPhase}>Nächste Phase starten</button>
+              <button className="btn primary" type="button" onClick={requestStartNextPhase}>{nextStartableStage.type === 'BREAK' ? 'Pause starten' : 'Nächste Phase starten'}</button>
             )}
             {pendingApproval && <button className="btn primary" type="button" onClick={() => setApprovalModalOpen(true)}>
               {pendingApproval.kind === 'ROUND' ? `Runde ${pendingApproval.round} prüfen` : 'Phase freigeben'}
@@ -1374,7 +1387,28 @@ export function TournamentControlPage() {
               onOpenControl={() => setTab('overview')}
             />
           )}
-          {selectedStage && (
+          {selectedStage?.type === 'BREAK' && (
+            <section className="card tournament-break-panel" aria-label="Turnierunterbrechung">
+              <span className="badge">{selectedStage.settings.breakKind === 'overnight' ? 'Spieltagsende' : 'Turnierpause'}</span>
+              <h3>{selectedStage.name}</h3>
+              <p>{selectedStage.settings.breakKind === 'overnight'
+                ? `Geplante Fortsetzung am Folgetag um ${selectedStage.settings.nextDayStart} Uhr`
+                : `Dauer: ${selectedStage.settings.breakMinutes} Minuten`}</p>
+              {Boolean(selectedStage.settings.note) && <p className="tournament-break-note">{String(selectedStage.settings.note)}</p>}
+              {isStageCompleted(tournament, selectedStage) ? (
+                <strong className="tournament-break-finished">Pause abgeschlossen</strong>
+              ) : isStageStarted(tournament, selectedStage) ? (
+                <>
+                  <p className="muted">Früheste Fortsetzung: {getBreakResumeAt(tournament, selectedStage)?.toLocaleString('de-DE') ?? 'Noch nicht bekannt'}</p>
+                  <button className="btn primary" type="button" disabled={!breakReady} onClick={finishCurrentBreak}>
+                    {selectedStage.settings.breakKind === 'overnight' ? 'Folgetag freigeben' : 'Pause beenden'}
+                  </button>
+                  {!breakReady && <p className="muted">Die Turnierleitung kann nach Ablauf der geplanten Unterbrechung fortsetzen.</p>}
+                </>
+              ) : <p className="muted">{isStageEditable(tournament, selectedStage) ? 'Die Pause ist bereit. Starte sie über den Header.' : 'Diese Pause beginnt nach dem Abschluss der vorherigen Phase.'}</p>}
+            </section>
+          )}
+          {selectedStage && selectedStage.type !== 'BREAK' && (
             <div className="prestart-stage-block" key={selectedStage.id}>
               <PrestartDrawEditor
                 tournament={tournament}
