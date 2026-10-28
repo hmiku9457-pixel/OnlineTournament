@@ -59,7 +59,7 @@ export function DashboardPage() {
                       <td>{tournament.discipline === 'DOUBLES' ? 'Doppel' : 'Einzel'}</td>
                       <td>{tournament.participants}</td>
                       <td>{tournament.phasesLabel}</td>
-                      <td><Link to={`/tournaments/${tournament.id}`}>Öffnen</Link></td>
+                      <td><Link to={`/tournaments/${tournament.id}/control`}>Öffnen</Link></td>
                     </tr>
                   ))}
                 </tbody>
