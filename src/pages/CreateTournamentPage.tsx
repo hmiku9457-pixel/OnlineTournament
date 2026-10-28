@@ -1138,7 +1138,7 @@ export function CreateTournamentPage() {
         {step === 4 && (
           <section>
             <h2>Phasen konfigurieren</h2>
-            <p className="muted">Die Empfehlung ist nur eine Vorlage. Phasen können ergänzt, entfernt, verschoben und unabhängig konfiguriert werden.</p>
+            <p className="muted">Phasen sind kompakt zusammengefasst. Öffne die Einstellungen nur bei Bedarf und füge neue Phasen direkt an der gewünschten Stelle ein.</p>
 
             <div className="phase-step-layout">
               <div className="phase-step-main">
@@ -1150,23 +1150,25 @@ export function CreateTournamentPage() {
                   </div>
                 )}
 
-                <div className="phase-add-panel">
+                <div className="phase-add-panel phase-add-compact">
                   <div>
-                    <strong>Phase hinzufügen</strong>
-                    <span className="muted">Nur in Schritt 4 erlaubte Systeme werden angeboten.</span>
+                    <strong>{phaseDrafts.length ? 'Phasenreihenfolge' : 'Erste Phase hinzufügen'}</strong>
+                    <span className="muted">{phaseDrafts.length ? 'Klicke zwischen zwei Phasen auf „+ Phase“, um dort eine neue Phase einzufügen.' : 'Wähle ein Turniersystem für die erste Phase.'}</span>
                   </div>
-                  <div className="phase-add-buttons">
-                    {hasTerminalPhase ? (
-                      <span className="muted terminal-phase-note">Nach einer K.-o.-Phase kann keine weitere Phase folgen.</span>
-                    ) : tournamentSystemOptions
-                      .filter((system) => enabledSystems[system.id])
-                      .map((system) => (
-                        <button className="btn small" key={system.id} type="button" onClick={() => addPhase(system.stageType)}>
-                          + {system.label}
-                        </button>
-                      ))}
-                  </div>
+                  {phaseDrafts.length > 0 && <button className="btn small" type="button"
+                    aria-expanded={phaseInsertIndex === 0}
+                    onClick={() => setPhaseInsertIndex((current) => current === 0 ? null : 0)}>+ Phase am Anfang</button>}
                 </div>
+                {(phaseDrafts.length === 0 || phaseInsertIndex === 0) && (
+                  <div className="phase-insert-options" role="group" aria-label={phaseDrafts.length ? 'Phase am Anfang auswählen' : 'Erste Phase auswählen'}>
+                    {tournamentSystemOptions.filter((system) => enabledSystems[system.id]).map((system) => (
+                      <button className="btn small" type="button" key={system.id}
+                        disabled={phaseDrafts.length > 0 && isTerminalStage(system.stageType)}
+                        onClick={() => insertPhase(0, system.stageType)}>+ {system.label}</button>
+                    ))}
+                    {phaseInsertIndex === 0 && phaseDrafts.length > 0 && <button className="btn small" type="button" onClick={() => setPhaseInsertIndex(null)}>Abbrechen</button>}
+                  </div>
+                )}
 
                 {phaseDrafts.length === 0 ? (
                   <div className="callout phase-empty">Noch keine Phase festgelegt. Wähle oben mindestens eine Phase aus.</div>
@@ -1177,40 +1179,37 @@ export function CreateTournamentPage() {
                       const knockoutEntrants = knockoutEntrantPresets(maximumPhaseEntrants);
                       const knockoutRounds = phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount) : [];
                       const editingPhaseType = editingPhaseTypeId === phase.id;
-                      const swissRoundRecommendation = phase.type === 'SWISS' ? recommendedSwissRounds(phase.entrantCount) : null;
-                      const swissProjection = phase.type === 'SWISS' ? formatSwissProjection(phase.entrantCount, phase.swissRounds) : '';
-                      const knockoutByes = phase.type === 'KNOCKOUT' ? knockoutByeCount(phase.entrantCount) : 0;
+                      const isExpanded = expandedPhaseId === phase.id;
                       return (
-                        <article className="phase-config phase-config-expanded" key={phase.id}>
+                        <div className="phase-sequence-item" key={phase.id}>
+                        <article className={`phase-config phase-config-expanded ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}>
                           <div className="phase-config-head">
                             <div>
                               <span className="badge">Phase {index + 1}</span>
                               <h3>{phase.label}</h3>
-                              {phase.type === 'SWISS' ? (
-                                <div className="phase-description phase-insight">
-                                  <span>Empfehlung für {phase.entrantCount} Teilnehmer: <strong>{swissRoundRecommendation} Runden</strong>.</span>
-                                  <span className="muted">Grobe Score-Verteilung nach {phase.swissRounds} Runden: ca. {swissProjection}</span>
-                                </div>
-                              ) : phase.type === 'KNOCKOUT' ? (
-                                <div className="phase-description phase-insight">
-                                  <span>Startfeld: <strong>{phase.entrantCount} Teilnehmer</strong>.</span>
-                                  <span className="muted">
-                                    {knockoutByes > 0
-                                      ? `${knockoutByes} Spieler ${knockoutByes === 1 ? 'hat' : 'haben'} in der ersten Runde ein Freilos.`
-                                      : 'Keine Freilose in der ersten Runde.'}
-                                  </span>
-                                </div>
-                              ) : (
-                                <p className="muted">{stageLabel(phase.type)}</p>
-                              )}
+                              <p className="phase-quick-facts">
+                                {phase.entrantCount} Teilnehmer · {phase.type === 'GROUPS' ? `${phase.groupCount} Gruppen · ` : ''}
+                                {phase.type === 'SWISS' ? `${phase.swissRounds} Runden · ` : ''}
+                                {phase.type === 'KNOCKOUT' ? `${knockoutRoundLabels(phase.entrantCount).length} Runden · ` : ''}
+                                {timedSport ? `${matchDurationMinutes} Min. pro Spiel` : `Best-of-${phase.bestOf}`}
+                                {phaseEstimates[index] && ` · ca. ${formatCompactDuration(phaseEstimates[index].estimatedDurationMinutes)}`}
+                              </p>
                             </div>
                             <div className="phase-order-actions">
+                              <button className="btn small phase-expand-toggle" type="button"
+                                aria-expanded={isExpanded}
+                                onClick={() => { setExpandedPhaseId(isExpanded ? null : phase.id); setEditingPhaseTypeId(null); }}>
+                                {isExpanded ? 'Einstellungen schließen' : 'Einstellungen'}
+                              </button>
                               <button
                                 className="btn small"
                                 type="button"
-                                onClick={() => setEditingPhaseTypeId(editingPhaseType ? null : phase.id)}
+                                onClick={() => {
+                                  setExpandedPhaseId(phase.id);
+                                  setEditingPhaseTypeId(editingPhaseType ? null : phase.id);
+                                }}
                               >
-                                {editingPhaseType ? 'Abbrechen' : 'Ändern'}
+                                {editingPhaseType ? 'Typ schließen' : 'Typ ändern'}
                               </button>
                               <button className="btn small" type="button" disabled={!canMovePhase(index, -1)} onClick={() => movePhase(index, -1)} aria-label="Phase nach oben">↑</button>
                               <button className="btn small" type="button" disabled={!canMovePhase(index, 1)} onClick={() => movePhase(index, 1)} aria-label="Phase nach unten">↓</button>
@@ -1218,6 +1217,7 @@ export function CreateTournamentPage() {
                             </div>
                           </div>
 
+                          {isExpanded && <div className="phase-config-body">
                           {editingPhaseType && (
                             <div className="phase-type-editor">
                               <strong>Phasentyp ändern</strong>
@@ -1350,7 +1350,28 @@ export function CreateTournamentPage() {
                               </div>
                             </div>
                           )}
+                          </div>}
                         </article>
+                        {(index < phaseDrafts.length - 1 || !isTerminalStage(phase.type)) && (
+                          <div className="phase-insert-bar">
+                            <button type="button" className="phase-insert-trigger"
+                              aria-expanded={phaseInsertIndex === index + 1}
+                              onClick={() => setPhaseInsertIndex((current) => current === index + 1 ? null : index + 1)}>
+                              + Phase {index < phaseDrafts.length - 1 ? 'hier einfügen' : 'anhängen'}
+                            </button>
+                            {phaseInsertIndex === index + 1 && (
+                              <div className="phase-insert-options" role="group" aria-label={`Phase nach Phase ${index + 1} hinzufügen`}>
+                                {tournamentSystemOptions.filter((system) => enabledSystems[system.id]).map((system) => (
+                                  <button key={system.id} className="btn small" type="button"
+                                    disabled={isTerminalStage(system.stageType) && index + 1 !== phaseDrafts.length}
+                                    onClick={() => insertPhase(index + 1, system.stageType)}>+ {system.label}</button>
+                                ))}
+                                <button className="btn small" type="button" onClick={() => setPhaseInsertIndex(null)}>Abbrechen</button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        </div>
                       );
                     })}
                   </div>
