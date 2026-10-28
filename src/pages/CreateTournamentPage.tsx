@@ -1,7 +1,7 @@
 import { VenueLayoutEditor } from '@/components/VenueLayout';
 import { createVenueLayout, resizeVenueLayout } from '@/domain/venueLayout';
 import { getVenueTerminology } from '@/domain/venueTerminology';
-import { sportOptions } from '@/domain/sports';
+import { disciplineLabel, disciplineOptionsForSport, sportOptions } from '@/domain/sports';
 import { sportScoring } from '@/domain/sportScoring';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -79,6 +79,7 @@ function newParticipant(fields: ParticipantFields): ParticipantDraft {
 }
 
 function participantIsComplete(participant: ParticipantFields, discipline: Discipline): boolean {
+  if (discipline === 'TEAMS') return Boolean(participant.firstName.trim());
   if (!participant.firstName.trim() || !participant.lastName.trim()) return false;
   if (discipline === 'DOUBLES') {
     return Boolean(participant.partnerFirstName.trim() && participant.partnerLastName.trim());
@@ -95,6 +96,7 @@ function displayPersonName(firstName: string, lastName: string): string {
 }
 
 function participantDisplayName(participant: ParticipantFields, discipline: Discipline): string {
+  if (discipline === 'TEAMS') return participant.firstName.trim();
   const firstPlayer = displayPersonName(participant.firstName, participant.lastName);
   if (discipline === 'SINGLES') return firstPlayer;
   const secondPlayer = displayPersonName(participant.partnerFirstName, participant.partnerLastName);
@@ -109,6 +111,10 @@ function collectSavedPersonNames(
   const names = new Set<string>();
   for (const participant of participants) {
     if (participant.id === excludedParticipantId) continue;
+    if (discipline === 'TEAMS') {
+      if (participant.firstName.trim()) names.add(participant.firstName.trim().toLocaleLowerCase('de-DE'));
+      continue;
+    }
     if (participant.firstName.trim() && participant.lastName.trim()) {
       names.add(normalizePersonName(participant.firstName, participant.lastName));
     }
@@ -130,6 +136,13 @@ function validateParticipant(
   editingParticipantId: string | null,
 ): ParticipantErrors {
   const errors: ParticipantErrors = {};
+  if (discipline === 'TEAMS') {
+    const teamName = participant.firstName.trim();
+    if (!teamName) return { firstName: 'Bitte einen Mannschaftsnamen eingeben.' };
+    const occupied = collectSavedPersonNames(participants, discipline, editingParticipantId);
+    return occupied.has(teamName.toLocaleLowerCase('de-DE'))
+      ? { firstName: 'Diese Mannschaft ist bereits eingetragen.' } : errors;
+  }
   if (!participant.firstName.trim()) errors.firstName = 'Vorname fehlt.';
   if (!participant.lastName.trim()) errors.lastName = 'Nachname fehlt.';
   if (discipline === 'DOUBLES') {
@@ -298,7 +311,8 @@ export function CreateTournamentPage() {
   const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>(1);
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(false);
   const [name, setName] = useState('');
-  const [sport, setSport] = useState('table_tennis');
+  const [sport, setSport] = useState('');
+  const availableDisciplines = disciplineOptionsForSport(sport);
   const venue = getVenueTerminology(sport);
   const timedSport = sportScoring(sport).mode === 'score';
   const [timedMatchMinutes, setTimedMatchMinutes] = useState('');
@@ -308,6 +322,7 @@ export function CreateTournamentPage() {
   const matchDurationMinutes = timedSport ? Number(timedMatchMinutes) || 15 : 15;
   const breakMinutes = timedSport ? Number(venueTurnoverMinutes) || 0 : 0;
   const [discipline, setDiscipline] = useState<Discipline>('SINGLES');
+  const selectedDisciplineValid = availableDisciplines.some((option) => option.value === discipline);
   const [tables, setTables] = useState(8);
   const [customTables, setCustomTables] = useState(false);
   const [venueLayoutEnabled, setVenueLayoutEnabled] = useState(false);
@@ -380,7 +395,7 @@ export function CreateTournamentPage() {
   const phaseOrderValid = hasValidTerminalStageOrder(phaseDrafts.map((phase) => phase.type));
   const hasTerminalPhase = phaseDrafts.some((phase) => isTerminalStage(phase.type));
   const phaseConfigurationValid = phaseDrafts.length > 0 && phaseOrderValid;
-  const basicsValid = Boolean(name.trim()) && tables >= 1;
+  const basicsValid = Boolean(name.trim()) && Boolean(sport) && selectedDisciplineValid && tables >= 1;
   const gameSettingsValid = minimumMatches >= 1 && validMatchDuration && validTurnover;
   const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
     const maximum = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
@@ -392,7 +407,7 @@ export function CreateTournamentPage() {
     && phaseConfigurationValid && phaseEntrantsValid && hasVisitedPhaseStep;
 
   const canContinue =
-    (step === 1 && Boolean(name.trim()) && tables >= 1) ||
+    (step === 1 && basicsValid) ||
     (step === 2 && participantsValid) ||
     (step === 3 && minimumMatches >= 1 && validMatchDuration && validTurnover) ||
     step === 4 ||
@@ -457,8 +472,8 @@ export function CreateTournamentPage() {
       let sequence = 1;
       while (next.length < targetCount) {
         const suffix = String(sequence).padStart(2, '0');
-        const firstName = 'Test';
-        const lastName = `Spieler ${suffix}`;
+        const firstName = discipline === 'TEAMS' ? `Test Mannschaft ${suffix}` : 'Test';
+        const lastName = discipline === 'TEAMS' ? '' : `Spieler ${suffix}`;
         const partnerFirstName = discipline === 'DOUBLES' ? 'Test' : '';
         const partnerLastName = discipline === 'DOUBLES' ? `Partner ${suffix}` : '';
         const candidate: ParticipantFields = { firstName, lastName, partnerFirstName, partnerLastName };
@@ -764,20 +779,46 @@ export function CreateTournamentPage() {
                 <label htmlFor="sport">Sportart</label>
                 <select id="sport" value={sport} onChange={(event) => {
                   const selectedSport = event.target.value;
+                  const allowed = disciplineOptionsForSport(selectedSport);
+                  const nextDiscipline = allowed.some((option) => option.value === discipline)
+                    ? discipline : allowed[0]?.value ?? 'SINGLES';
+                  if (nextDiscipline !== discipline) {
+                    setDiscipline(nextDiscipline);
+                    resetParticipantEditor();
+                    // Bei Mannschaftssportarten ist der Name des Teams ein eigener Eintrag.
+                    // Vorhandene Spieler werden nicht gelöscht, sondern müssen bei Bedarf
+                    // in der Teilnehmerliste überprüft werden.
+                    if (nextDiscipline === 'TEAMS') {
+                      setParticipants((current) => current.map((participant) => ({
+                        ...participant,
+                        firstName: displayPersonName(participant.firstName, participant.lastName),
+                        lastName: '',
+                      })));
+                    }
+                  }
                   setSport(selectedSport);
                   setPhaseDrafts((current) => current.map((phase) => ({ ...phase,
                     bestOf: phaseBestOfForSport(selectedSport, phase.type),
                     knockoutBestOf: phase.knockoutBestOf.map(() => phaseBestOfForSport(selectedSport, phase.type)),
                   })));
                 }}>
+                  <option value="" disabled>Sportart auswählen</option>
                   {sportOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
               </div>
               <div className="field">
                 <label htmlFor="discipline">Disziplin</label>
-                <select id="discipline" value={discipline} onChange={(event) => setDiscipline(event.target.value as Discipline)}>
-                  <option value="SINGLES">Einzel</option>
-                  <option value="DOUBLES">Doppel</option>
+                <select id="discipline" value={sport ? discipline : ''} disabled={!sport}
+                  onChange={(event) => {
+                    const nextDiscipline = event.target.value as Discipline;
+                    if (nextDiscipline === discipline) return;
+                    setDiscipline(nextDiscipline);
+                    resetParticipantEditor();
+                  }}>
+                  {!sport && <option value="">Zuerst Sportart auswählen</option>}
+                  {availableDisciplines.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
               </div>
               <div className="field full">
