@@ -28,7 +28,7 @@ import type { Discipline, StageType } from '@/domain/types';
 import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/recommendations';
 import { createMockTournament } from '@/services/mockTournamentStore';
 
-type WizardStep = 1 | 2 | 3 | 4 | 5;
+type WizardStep = 1 | 2 | 3 | 4;
 
 type ParticipantFields = {
   firstName: string;
@@ -56,7 +56,7 @@ type PhaseDraft = {
   customEntrants: boolean;
 };
 
-const stepLabels = ['Grunddaten', 'Teilnehmer', 'Spieldaten', 'Turnierform', 'Phasen'];
+const stepLabels = ['Grunddaten', 'Teilnehmer', 'Turnierform', 'Phasen'];
 const initialEnabledSystems = Object.fromEntries(
   tournamentSystemOptions.map((option) => [option.id, true]),
 ) as Record<TournamentSystemId, boolean>;
@@ -338,6 +338,8 @@ export function CreateTournamentPage() {
   const [selectedRecommendationId, setSelectedRecommendationId] = useState<string | null>(null);
   const [phaseDrafts, setPhaseDrafts] = useState<PhaseDraft[]>([]);
   const [editingPhaseTypeId, setEditingPhaseTypeId] = useState<string | null>(null);
+  const [expandedPhaseId, setExpandedPhaseId] = useState<string | null>(null);
+  const [phaseInsertIndex, setPhaseInsertIndex] = useState<number | null>(null);
   const [enabledSystems, setEnabledSystems] = useState<Record<TournamentSystemId, boolean>>(initialEnabledSystems);
   const [maxGroups, setMaxGroups] = useState<number | null>(null);
   const [maxSwissRounds, setMaxSwissRounds] = useState<number | null>(null);
@@ -395,7 +397,7 @@ export function CreateTournamentPage() {
   const phaseOrderValid = hasValidTerminalStageOrder(phaseDrafts.map((phase) => phase.type));
   const hasTerminalPhase = phaseDrafts.some((phase) => isTerminalStage(phase.type));
   const phaseConfigurationValid = phaseDrafts.length > 0 && phaseOrderValid;
-  const basicsValid = Boolean(name.trim()) && Boolean(sport) && selectedDisciplineValid && tables >= 1;
+  const basicsValid = Boolean(name.trim()) && Boolean(sport) && selectedDisciplineValid && tables >= 1 && gameSettingsValid;
   const gameSettingsValid = minimumMatches >= 1 && validMatchDuration && validTurnover;
   const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
     const maximum = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
@@ -409,9 +411,8 @@ export function CreateTournamentPage() {
   const canContinue =
     (step === 1 && basicsValid) ||
     (step === 2 && participantsValid) ||
-    (step === 3 && minimumMatches >= 1 && validMatchDuration && validTurnover) ||
-    step === 4 ||
-    step === 5;
+    step === 3 ||
+    step === 4;
 
   function updateParticipantForm(field: ParticipantField, value: string) {
     setParticipantForm((current) => ({ ...current, [field]: value }));
@@ -465,6 +466,14 @@ export function CreateTournamentPage() {
     if (editingParticipantId === id) resetParticipantEditor();
   }
 
+  function removeIncompleteParticipants() {
+    setParticipants((current) => current.filter((participant) => participantIsComplete(participant, discipline)));
+    if (editingParticipantId && participants.some((participant) =>
+      participant.id === editingParticipantId && !participantIsComplete(participant, discipline))) {
+      resetParticipantEditor();
+    }
+  }
+
   function generateTestParticipants() {
     const targetCount = 19;
     setParticipants((current) => {
@@ -503,6 +512,8 @@ export function CreateTournamentPage() {
     }
     setSelectedRecommendationId(recommendation.id);
     setPhaseDrafts(recommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
+    setExpandedPhaseId(null);
+    setPhaseInsertIndex(null);
   }
 
   function normalizePhaseEntrants(phases: PhaseDraft[]): PhaseDraft[] {
@@ -544,31 +555,34 @@ export function CreateTournamentPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participantCount]);
 
-  function addPhase(type: StageType) {
-    if (phaseDrafts.some((phase) => isTerminalStage(phase.type))) return;
-    const availableEntrants = phaseDrafts.length === 0
-      ? participantCount
-      : phaseDrafts[phaseDrafts.length - 1].entrantCount;
-    const entrantCount = phaseDrafts.length === 0
-      ? participantCount
-      : isTerminalStage(type)
-        ? highestKnockoutPreset(availableEntrants)
-        : availableEntrants;
-    const template = createPhaseTemplate(type, phaseDrafts.length + 1, {
-      entrantCount,
+  function insertPhase(insertIndex: number, type: StageType) {
+    if (insertIndex < 0 || insertIndex > phaseDrafts.length) return;
+    if (isTerminalStage(type) && insertIndex !== phaseDrafts.length) return;
+    if (insertIndex === phaseDrafts.length && phaseDrafts.some((phase) => isTerminalStage(phase.type))) return;
+    const previousEntrants = insertIndex === 0 ? participantCount : phaseDrafts[insertIndex - 1].entrantCount;
+    const entrants = isTerminalStage(type) ? highestKnockoutPreset(previousEntrants) : previousEntrants;
+    const template = createPhaseTemplate(type, insertIndex + 1, {
+      entrantCount: entrants,
       groupCount: effectiveMaxGroups,
       swissRounds: effectiveMaxSwissRounds,
     });
+    const phase = phaseDraftFromTemplate(template, participantCount, sport);
+    const candidate = [...phaseDrafts.slice(0, insertIndex), phase, ...phaseDrafts.slice(insertIndex)];
+    if (!hasValidTerminalStageOrder(candidate.map((item) => item.type))) return;
+    setPhaseDrafts(normalizePhaseEntrants(candidate));
     setSelectedRecommendationId(null);
-    setPhaseDrafts((current) => normalizePhaseEntrants([
-      ...current,
-      phaseDraftFromTemplate(template, participantCount, sport),
-    ]));
+    setPhaseInsertIndex(null);
+    setExpandedPhaseId(phase.id);
+  }
+
+  function addPhase(type: StageType) {
+    insertPhase(phaseDrafts.length, type);
   }
 
   function removePhase(id: string) {
     setSelectedRecommendationId(null);
     if (editingPhaseTypeId === id) setEditingPhaseTypeId(null);
+    if (expandedPhaseId === id) setExpandedPhaseId(null);
     setPhaseDrafts((current) => normalizePhaseEntrants(current.filter((phase) => phase.id !== id)));
   }
 
