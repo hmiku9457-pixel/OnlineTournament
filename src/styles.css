@@ -3509,3 +3509,19 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .wizard-venue-choice-head { flex-direction: column; align-items: stretch; }
   .hall-editor-presets { width: 100%; }
 }
+
+/* Das Teilnehmerformular bleibt kompakt, auch bei langen Testlisten. */
+.wizard-workspace .participant-entry-layout { gap: 12px; }
+.wizard-workspace .participant-editor { padding: 14px; background: #fff; }
+.wizard-workspace .participant-roster-list { max-height: min(45vh, 350px); }
+.wizard-workspace .participant-roster-row { padding: 8px 10px; gap: 8px; }
+.wizard-workspace .participant-roster-head { padding: 11px 12px; }
+/* Empfehlungen und Phasen nutzen die verfügbare Arbeitsbreite, ohne eine zweite Summary-Spalte. */
+.wizard-workspace .recommendation-list { gap: 9px; }
+.wizard-workspace .phase-step-layout { margin-top: 12px; }
+.wizard-workspace .phase-config.phase-config-expanded { padding: 14px; }
+.wizard-workspace .format-settings-panel { background: #fcfcfd; }
+@media (max-width: 700px) {
+  .wizard-workspace .participant-roster-list { max-height: 320px; }
+  .wizard-workspace .participant-entry-layout { grid-template-columns: minmax(0, 1fr); }
+}
