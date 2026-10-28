@@ -9,6 +9,7 @@ import {
   knockoutEntrantPresets,
   knockoutRoundLabels,
   projectSwissTopScores,
+  recommendGroupCount,
   recommendedSwissRounds,
   tournamentSystemOptions,
 } from '@/domain/tournamentCreation';
@@ -82,6 +83,15 @@ describe('tournament creation phase model', () => {
       estimatedMatches: 11,
       approximate: false,
     });
+  });
+
+  it('suggests compact groups and accounts for the following qualification cutoff', () => {
+    expect(recommendGroupCount(19)).toBe(4);
+    expect(recommendGroupCount(19, 8)).toBe(4); // two qualify from each group
+    expect(recommendGroupCount(19, 12)).toBe(4); // three qualify from each group
+    expect(recommendGroupCount(19, 15)).toBe(5); // three qualify from each group
+    expect(recommendGroupCount(10, 3)).toBe(3); // one from each group
+    expect(recommendGroupCount(6, 2)).toBe(2);
   });
 
   it('recommends Swiss rounds and projects the leading score groups', () => {
