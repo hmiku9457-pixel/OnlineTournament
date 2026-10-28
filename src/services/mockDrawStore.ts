@@ -373,6 +373,12 @@ export function reconcilePrestartDraws(tournament: DemoTournament) {
   if (configs.some((config) => config.tournamentId === tournament.id)) writeAll(next);
 }
 
+/** A changed pre-start format invalidates every existing group draw, Swiss
+ * seeding and bracket allocation for this tournament, never for others. */
+export function clearPrestartTournamentDraws(tournamentId: string): void {
+  writeAll(readAll().filter((config) => config.tournamentId !== tournamentId));
+}
+
 export function clearMockDraws() {
   if (typeof window === 'undefined') return;
   window.localStorage.removeItem(DRAW_KEY);
