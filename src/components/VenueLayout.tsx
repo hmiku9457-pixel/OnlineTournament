@@ -86,6 +86,20 @@ export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
 }) {
   const [selected, setSelected] = useState<VenueCell | null>(null);
   const venue = getVenueTerminology(sport);
+  const MIN_SIZE = 1;
+  const MAX_COLUMNS = 100;
+  const MAX_ROWS = 40;
+  // Beim Verkleinern müssen alle Tische und ggf. die Turnierleitung im Raster Platz behalten.
+  const requiredCells = tableCount + (layout.cells.includes('desk') ? 1 : 0);
+  const canRemoveColumn = layout.columns > MIN_SIZE && (layout.columns - 1) * layout.rows >= requiredCells;
+  const canRemoveRow = layout.rows > MIN_SIZE && layout.columns * (layout.rows - 1) >= requiredCells;
+
+  function adjustGrid(columns: number, rows: number) {
+    if (columns < MIN_SIZE || columns > MAX_COLUMNS || rows < MIN_SIZE || rows > MAX_ROWS) return;
+    if (columns * rows < requiredCells) return;
+    onChange(resizeVenueLayout(layout, columns, rows, tableCount));
+  }
+
   function place(target: number, source?: VenueCell) {
     const token = source ?? selected;
     if (!token) return;
@@ -111,7 +125,29 @@ export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
           <button type="button" className={`btn small ${selected === 'desk' ? 'primary' : ''}`} aria-pressed={selected === 'desk'} onClick={() => setSelected((old) => old === 'desk' ? null : 'desk')}>Turnierleitung platzieren</button>
           {selected !== null && <button type="button" className="btn small" onClick={() => setSelected(null)}>Auswahl aufheben</button>}
         </div>
-        <span className="hall-editor-grid-size">{layout.columns} Spalten × {layout.rows} Reihen</span>
+      </div>
+      <div className="hall-editor-grid-controls" role="group" aria-label="Rastergröße ändern">
+        <div className="hall-editor-stepper">
+          <span className="hall-editor-stepper-label">Spalten</span>
+          <div className="hall-editor-stepper-actions">
+            <button type="button" aria-label="Spalte entfernen" title="Spalte entfernen"
+              disabled={!canRemoveColumn} onClick={() => adjustGrid(layout.columns - 1, layout.rows)}>−</button>
+            <output aria-label="Anzahl Spalten">{layout.columns}</output>
+            <button type="button" aria-label="Spalte hinzufügen" title="Spalte hinzufügen"
+              disabled={layout.columns >= MAX_COLUMNS} onClick={() => adjustGrid(layout.columns + 1, layout.rows)}>+</button>
+          </div>
+        </div>
+        <div className="hall-editor-stepper">
+          <span className="hall-editor-stepper-label">Reihen</span>
+          <div className="hall-editor-stepper-actions">
+            <button type="button" aria-label="Reihe entfernen" title="Reihe entfernen"
+              disabled={!canRemoveRow} onClick={() => adjustGrid(layout.columns, layout.rows - 1)}>−</button>
+            <output aria-label="Anzahl Reihen">{layout.rows}</output>
+            <button type="button" aria-label="Reihe hinzufügen" title="Reihe hinzufügen"
+              disabled={layout.rows >= MAX_ROWS} onClick={() => adjustGrid(layout.columns, layout.rows + 1)}>+</button>
+          </div>
+        </div>
+        <span className="hall-editor-grid-size">Raster: {layout.columns} × {layout.rows}</span>
       </div>
       <div className="hall-editor-canvas">
         <HallGrid layout={layout} sport={sport} compact={false} selected={selected} onPlace={place} onSelect={setSelected} />
@@ -123,16 +159,8 @@ export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
         {' '}Belegte Felder werden getauscht.
       </p>
       <details className="hall-editor-advanced">
-        <summary>Rastergröße und Position der Turnierleitung anpassen</summary>
+        <summary>Position der Turnierleitung anpassen</summary>
         <div className="hall-editor-dimensions">
-          <label className="field">Spalten
-            <input type="number" min="1" max="100" value={layout.columns}
-              onChange={(event) => onChange(resizeVenueLayout(layout, Number(event.target.value), layout.rows, tableCount))} />
-          </label>
-          <label className="field">Reihen
-            <input type="number" min="1" max="40" value={layout.rows}
-              onChange={(event) => onChange(resizeVenueLayout(layout, layout.columns, Number(event.target.value), tableCount))} />
-          </label>
           <label className="field hall-dock-field">Turnierleitung außerhalb
             <select value={layout.deskDock} onChange={(event) => { onChange(dockVenueDesk(layout, event.target.value as DeskDock)); setSelected(null); }}>
               {Object.entries(dockNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
