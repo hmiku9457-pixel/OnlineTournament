@@ -27,6 +27,10 @@ interface TournamentSummaryProps {
   onParticipants: () => void;
   onStage: (stage: TournamentStage) => void;
   onFinalStandings: () => void;
+  onEditPhases?: () => void;
+  activeParticipants?: number;
+  withdrawnParticipants?: number;
+  phasesNeedReview?: boolean;
 }
 
 function stageDetails(stage: TournamentStage): string {
@@ -76,6 +80,7 @@ export function TournamentSummaryPanel({
   tournament, participants, activeMatches, waitingMatches, blockedTables, restTimeLabel,
   progress, activeStage, nextStage, pendingApproval,
   onControl, onParticipants, onStage, onFinalStandings,
+  onEditPhases, activeParticipants, withdrawnParticipants, phasesNeedReview,
 }: TournamentSummaryProps) {
   const venue = getVenueTerminology(tournament.sport);
   const ended = tournament.status === 'FINISHED' || tournament.status === 'ARCHIVED';
@@ -141,11 +146,20 @@ export function TournamentSummaryPanel({
           <p className="muted">Turnierstand, nächste Schritte und Phasenplan – ohne zusätzliche Zwischenstation.</p>
         </div>
         <div className="tournament-summary-heading-actions">
+          {beforeStart && onEditPhases && <button type="button" className="btn small" onClick={onEditPhases}>Phasen vor Start bearbeiten</button>}
           <span className="tournament-summary-stage-count">{progress.completedPhases} von {progress.totalPhases} Phasen abgeschlossen</span>
           <button className="btn small no-print" type="button" onClick={() => window.print()}>Übersicht drucken</button>
         </div>
       </div>
 
+      {beforeStart && phasesNeedReview && onEditPhases && (
+        <div className="tournament-summary-prestart-warning" role="status">
+          <div><strong>Phasenplanung nach Teilnehmeränderung prüfen</strong>
+            <p>{activeParticipants ?? 0} aktive Teilnehmer · {withdrawnParticipants ?? 0} zurückgezogen. Die bestehende Gruppen- oder Rundenplanung passt möglicherweise nicht mehr.</p>
+          </div>
+          <button type="button" className="btn small" onClick={onEditPhases}>Phasen anpassen</button>
+        </div>
+      )}
       <div className="tournament-summary-top">
         <div className="tournament-summary-next">
           <span className="tournament-summary-eyebrow">Nächster Schritt</span>
