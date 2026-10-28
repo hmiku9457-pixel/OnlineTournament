@@ -822,9 +822,9 @@ export function CreateTournamentPage() {
                 </select>
               </div>
               <div className="field full">
-                <label>Anzahl {venue.plural}</label>
+                <label>Anzahl {sport ? venue.plural : 'Spielflächen'}</label>
                 <NumberChoice
-                  ariaLabel={`Anzahl ${venue.plural}`}
+                  ariaLabel={`Anzahl ${sport ? venue.plural : 'Spielflächen'}`}
                   value={tables}
                   presets={Array.from({ length: 12 }, (_, index) => index + 1)}
                   custom={customTables}
