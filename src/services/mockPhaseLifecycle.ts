@@ -11,6 +11,7 @@ interface PhaseLifecycleState {
   completedStageIds: string[];
   approvedSwissRounds?: Record<string, number[]>;
   stageEntrants?: Record<string, string[]>;
+  stageStartedAt?: Record<string, string>;
 }
 
 function readAll(): PhaseLifecycleState[] {
@@ -37,6 +38,7 @@ function baseState(tournament: DemoTournament): PhaseLifecycleState {
     completedStageIds: [],
     approvedSwissRounds: {},
     stageEntrants: {},
+    stageStartedAt: {},
   };
 }
 
@@ -120,6 +122,7 @@ export function startStage(tournament: DemoTournament, stage: TournamentStage) {
     ...state,
     startedStageIds: [...new Set([...state.startedStageIds, stage.id])],
     stageEntrants: { ...(state.stageEntrants ?? {}), [stage.id]: entrants },
+    stageStartedAt: { ...(state.stageStartedAt ?? {}), [stage.id]: new Date().toISOString() },
   });
   return true;
 }
@@ -134,6 +137,7 @@ export function startFirstStage(tournament: DemoTournament) {
 export function completeStage(tournament: DemoTournament, stage: TournamentStage, qualifiedForNext: string[] = []) {
   const state = getPhaseLifecycle(tournament);
   if (!state.startedStageIds.includes(stage.id)) return false;
+  if (stage.type === 'BREAK' && !canFinishBreak(tournament, stage)) return false;
   const stageIndex = getStageIndex(tournament, stage);
   const nextStage = tournament.stages[stageIndex + 1];
   const stageEntrants = { ...(state.stageEntrants ?? {}) };
@@ -151,6 +155,34 @@ export function completeStage(tournament: DemoTournament, stage: TournamentStage
     }));
   }
   return true;
+}
+
+/** Planned resumption in the local timezone of the tournament computer.
+ * For a day-end break, the target is the following calendar day at the
+ * specified wall-clock time; UTC offsets are handled by the Date object.
+ */
+export function getBreakResumeAt(tournament: DemoTournament, stage: TournamentStage): Date | null {
+  if (stage.type !== 'BREAK') return null;
+  const startedAt = getPhaseLifecycle(tournament).stageStartedAt?.[stage.id];
+  if (!startedAt) return null;
+  const start = new Date(startedAt);
+  if (Number.isNaN(start.getTime())) return null;
+  if (stage.settings.breakKind === 'overnight') {
+    const startTime = String(stage.settings.nextDayStart ?? '09:00');
+    if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(startTime)) return null;
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const resume = new Date(start);
+    resume.setDate(resume.getDate() + 1);
+    resume.setHours(hours, minutes, 0, 0);
+    return resume;
+  }
+  return new Date(start.getTime() + Math.max(1, Number(stage.settings.breakMinutes) || 15) * 60000);
+}
+
+export function canFinishBreak(tournament: DemoTournament, stage: TournamentStage, at = new Date()): boolean {
+  if (stage.type !== 'BREAK' || !isStageStarted(tournament, stage) || isStageCompleted(tournament, stage)) return false;
+  const resume = getBreakResumeAt(tournament, stage);
+  return Boolean(resume && at.getTime() >= resume.getTime());
 }
 
 /** Reopen a completed stage if a correction invalidates a previously resolved
