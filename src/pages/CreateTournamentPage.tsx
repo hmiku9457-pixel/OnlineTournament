@@ -1,7 +1,7 @@
 import { VenueLayoutEditor } from '@/components/VenueLayout';
 import { createVenueLayout, resizeVenueLayout } from '@/domain/venueLayout';
 import { getVenueTerminology } from '@/domain/venueTerminology';
-import { disciplineLabel, disciplineOptionsForSport, sportOptions } from '@/domain/sports';
+import { disciplineLabel, disciplineOptionsForSport, planningMinutesPerSet, sportOptions } from '@/domain/sports';
 import { sportScoring } from '@/domain/sportScoring';
 import { useEffect, useMemo, useState, type DragEvent, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -313,7 +313,7 @@ export function CreateTournamentPage() {
   const [venueTurnoverMinutes, setVenueTurnoverMinutes] = useState('');
   const validMatchDuration = !timedSport || (timedMatchMinutes.trim() !== '' && Number.isInteger(Number(timedMatchMinutes)) && Number(timedMatchMinutes) > 0);
   const validTurnover = venueTurnoverMinutes.trim() === '' || (Number.isInteger(Number(venueTurnoverMinutes)) && Number(venueTurnoverMinutes) >= 0);
-  const matchDurationMinutes = timedSport ? Number(timedMatchMinutes) || 15 : 15;
+  const matchDurationMinutes = timedSport ? Number(timedMatchMinutes) || 15 : planningMinutesPerSet(sport);
   const breakMinutes = timedSport ? Number(venueTurnoverMinutes) || 0 : 0;
   const [discipline, setDiscipline] = useState<Discipline>('SINGLES');
   const selectedDisciplineValid = availableDisciplines.some((option) => option.value === discipline);
@@ -769,7 +769,7 @@ export function CreateTournamentPage() {
         knockoutBestOf: phase.knockoutBestOf,
       })),
       tables,
-      timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : undefined,
+      timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : { minutesPerSet: planningMinutesPerSet(sport) },
     ),
     [phaseDrafts, tables, timedSport, matchDurationMinutes, breakMinutes],
   );
@@ -935,8 +935,8 @@ export function CreateTournamentPage() {
               </div>
               <div className="field match-timing-fields">
                 <label htmlFor="match-duration">{timedSport ? 'Spieldauer (Minuten) *' : 'Satzdauer (Minuten)'}</label>
-                <input id="match-duration" type="number" min="1" step="1" required={timedSport} value={timedSport ? timedMatchMinutes : '15'} disabled={!timedSport} placeholder={timedSport ? 'Pflichtfeld – z. B. 12' : undefined} onChange={(event) => setTimedMatchMinutes(event.target.value)} />
-                {!timedSport && <span className="field-hint">Planungswert: derzeit 15 Minuten je Satz.</span>}
+                <input id="match-duration" type="number" min="1" step="1" required={timedSport} value={timedSport ? timedMatchMinutes : planningMinutesPerSet(sport)} disabled={!timedSport} placeholder={timedSport ? 'Pflichtfeld – z. B. 12' : undefined} onChange={(event) => setTimedMatchMinutes(event.target.value)} />
+                {!timedSport && <span className="field-hint">Planungswert: {planningMinutesPerSet(sport)} Minuten pro Satz (oberer Wert der üblichen Dauer).</span>}
                 {timedSport && <>
                   <label htmlFor="venue-turnover">Pause zwischen Spielen auf derselben Spielfläche (Minuten)</label>
                   <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => setVenueTurnoverMinutes(event.target.value)} />
