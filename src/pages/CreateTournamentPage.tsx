@@ -905,7 +905,7 @@ export function CreateTournamentPage() {
                       onChange={(event) => updateParticipantForm('lastName', event.target.value)}
                       aria-invalid={Boolean(participantErrors.lastName)}
                     />
-                  </div>}}
+                  </div>}
                   {discipline === 'DOUBLES' && (
                     <>
                       <div className="field">
