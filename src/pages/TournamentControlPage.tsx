@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { DrawActionButton } from '@/components/DrawActionButton';
 import { StageCard } from '@/components/StageCard';
+import { TournamentSummaryPanel } from '@/components/TournamentSummaryPanel';
 import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
@@ -45,9 +46,10 @@ import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration }
 import { getMockAudit } from '@/services/mockAudit';
 import type { MockAuditEntry } from '@/services/mockAudit';
 
-type ControlTab = 'overview' | 'flow' | 'matches' | 'participants' | 'final' | 'audit';
+type ControlTab = 'summary' | 'overview' | 'flow' | 'matches' | 'participants' | 'final' | 'audit';
 
 const tabs: Array<{ id: ControlTab; label: string }> = [
+  { id: 'summary', label: 'Übersicht' },
   { id: 'overview', label: 'Turnierleitung' },
   { id: 'flow', label: 'Turnierverlauf' },
   { id: 'participants', label: 'Teilnehmer' },
@@ -1090,6 +1092,25 @@ export function TournamentControlPage() {
         </div>
         <button type="button" className="btn primary" onClick={() => setApprovalModalOpen(true)}>Ergebnisse prüfen und freigeben</button>
       </div>}
+
+      {tab === 'summary' && (
+        <TournamentSummaryPanel
+          tournament={tournament}
+          participants={participants.length}
+          activeMatches={tableMatches.length}
+          waitingMatches={nextMatches.length}
+          blockedTables={blockedTables.size}
+          restTimeLabel={restTimeLabel}
+          progress={tournamentProgress}
+          activeStage={activeStage}
+          nextStage={nextStartableStage}
+          pendingApproval={Boolean(pendingApproval)}
+          onControl={() => setTab('overview')}
+          onParticipants={() => setTab('participants')}
+          onStage={(stage) => { setSelectedStageId(stage.id); setTab('flow'); }}
+          onFinalStandings={() => setTab('final')}
+        />
+      )}
 
       {tab === 'overview' && (
         <section className="control-overview-stack">
