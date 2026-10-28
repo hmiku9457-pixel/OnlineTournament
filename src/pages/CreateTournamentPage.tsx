@@ -1196,7 +1196,7 @@ export function CreateTournamentPage() {
                 <div className="phase-add-panel phase-add-compact">
                   <div>
                     <strong>{phaseDrafts.length ? 'Phasenreihenfolge' : 'Erste Phase hinzufügen'}</strong>
-                    <span className="muted">{phaseDrafts.length ? 'Klicke zwischen zwei Phasen auf „+ Phase“, um dort eine neue Phase einzufügen.' : 'Wähle ein Turniersystem für die erste Phase.'}</span>
+                    <span className="muted">{phaseDrafts.length ? 'Klicke zwischen den Phasen auf „+ weitere Phase hier einfügen“, um dort eine Phase hinzuzufügen.' : 'Wähle ein Turniersystem für die erste Phase.'}</span>
                   </div>
                   {phaseDrafts.length > 0 && <button className="btn small" type="button"
                     aria-expanded={phaseInsertIndex === 0}
@@ -1223,9 +1223,44 @@ export function CreateTournamentPage() {
                       const knockoutRounds = phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount) : [];
                       const editingPhaseType = editingPhaseTypeId === phase.id;
                       const isExpanded = expandedPhaseId === phase.id;
+                      const nextPhase = phaseDrafts[index + 1];
+                      const recommendedGroups = phase.type === 'GROUPS'
+                        ? recommendGroupCount(phase.entrantCount, nextPhase?.entrantCount) : null;
+                      const recommendedRounds = phase.type === 'SWISS'
+                        ? recommendedSwissRounds(phase.entrantCount) : null;
+                      const minGroupSize = Math.floor(phase.entrantCount / Math.max(2, phase.groupCount));
+                      const maxGroupSize = Math.ceil(phase.entrantCount / Math.max(2, phase.groupCount));
+                      const groupQualifiers = nextPhase && nextPhase.entrantCount < phase.entrantCount
+                        ? nextPhase.entrantCount : null;
                       return (
-                        <div className="phase-sequence-item" key={phase.id}>
-                        <article className={`phase-config phase-config-expanded ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}>
+                        <div className={`phase-sequence-item${dropTargetPhaseId === phase.id ? ' is-drop-target' : ''}${draggingPhaseId === phase.id ? ' is-being-dragged' : ''}`}
+                          key={phase.id}
+                          onDragOver={(event) => onPhaseDragOver(event, index)}
+                          onDrop={(event) => onPhaseDrop(event, index)}>
+                        <div className="phase-sequence-row">
+                          <button type="button" draggable className="phase-drag-handle"
+                            title="Phase hier greifen und per Drag & Drop verschieben"
+                            aria-label={`Phase ${index + 1}: ${phase.label} ziehen, um sie zu verschieben`}
+                            onDragStart={(event) => onPhaseDragStart(event, phase.id)}
+                            onDragEnd={onPhaseDragEnd}>
+                            <span aria-hidden="true">⠿</span>
+                          </button>
+                        <article className={`phase-config phase-config-expanded ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
+                          role="group" tabIndex={0} aria-label={`Phase ${index + 1}: ${phase.label}. Klicken oder Enter drücken, um Einstellungen ${isExpanded ? 'zu schließen' : 'zu öffnen'}.`}
+                          onClick={(event) => {
+                            const target = event.target as HTMLElement;
+                            if (target.closest('button, input, select, textarea, label, a, .phase-config-body')) return;
+                            setExpandedPhaseId(isExpanded ? null : phase.id);
+                            setEditingPhaseTypeId(null);
+                          }}
+                          onKeyDown={(event: KeyboardEvent<HTMLElement>) => {
+                            if (event.target !== event.currentTarget) return;
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              setExpandedPhaseId(isExpanded ? null : phase.id);
+                              setEditingPhaseTypeId(null);
+                            }
+                          }}>
                           <div className="phase-config-head">
                             <div>
                               <span className="badge">Phase {index + 1}</span>
@@ -1239,11 +1274,6 @@ export function CreateTournamentPage() {
                               </p>
                             </div>
                             <div className="phase-order-actions">
-                              <button className="btn small phase-expand-toggle" type="button"
-                                aria-expanded={isExpanded}
-                                onClick={() => { setExpandedPhaseId(isExpanded ? null : phase.id); setEditingPhaseTypeId(null); }}>
-                                {isExpanded ? 'Einstellungen schließen' : 'Einstellungen'}
-                              </button>
                               <button
                                 className="btn small"
                                 type="button"
@@ -1289,6 +1319,41 @@ export function CreateTournamentPage() {
                             </div>
                           )}
 
+                          {(recommendedGroups !== null || recommendedRounds !== null) && (
+                            <div className="phase-configuration-recommendation">
+                              {recommendedGroups !== null && (
+                                <>
+                                  <div>
+                                    <strong>Empfehlung: {recommendedGroups} Gruppen</strong>
+                                    <span>Je {Math.floor(phase.entrantCount / recommendedGroups)}–{Math.ceil(phase.entrantCount / recommendedGroups)} Teilnehmer
+                                      {groupQualifiers !== null && ` · ${groupQualifiers} weiter in ${nextPhase?.name ?? nextPhase?.label ?? 'die nächste Phase'}`}
+                                      {groupQualifiers !== null && groupQualifiers % recommendedGroups === 0
+                                        ? ` · ${groupQualifiers / recommendedGroups} pro Gruppe`
+                                        : groupQualifiers !== null ? ' · Weiterkommen nach Platzierung/Quote' : ''}
+                                    </span>
+                                  </div>
+                                  <button type="button" className="btn small"
+                                    disabled={phase.groupCount === recommendedGroups}
+                                    onClick={() => updatePhase(phase.id, { groupCount: recommendedGroups })}>
+                                    {phase.groupCount === recommendedGroups ? 'Bereits übernommen' : 'Empfehlung übernehmen'}
+                                  </button>
+                                </>
+                              )}
+                              {recommendedRounds !== null && (
+                                <>
+                                  <div>
+                                    <strong>Empfehlung: {recommendedRounds} Schweizer Runden</strong>
+                                    <span>Berechnet aus {phase.entrantCount} Teilnehmern (≈ log₂). Für die meisten Felder ein sinnvoller Ausgangspunkt.</span>
+                                  </div>
+                                  <button type="button" className="btn small"
+                                    disabled={phase.swissRounds === recommendedRounds}
+                                    onClick={() => updatePhase(phase.id, { swissRounds: recommendedRounds })}>
+                                    {phase.swissRounds === recommendedRounds ? 'Bereits übernommen' : 'Empfehlung übernehmen'}
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
                           <div className="phase-settings-grid">
                             {index > 0 && isTerminalStage(phase.type) && (
                               <div className="field phase-entrant-choice field-wide">
@@ -1395,12 +1460,13 @@ export function CreateTournamentPage() {
                           )}
                           </div>}
                         </article>
+                        </div>
                         {(index < phaseDrafts.length - 1 || !isTerminalStage(phase.type)) && (
                           <div className="phase-insert-bar">
                             <button type="button" className="phase-insert-trigger"
                               aria-expanded={phaseInsertIndex === index + 1}
                               onClick={() => setPhaseInsertIndex((current) => current === index + 1 ? null : index + 1)}>
-                              + Phase {index < phaseDrafts.length - 1 ? 'hier einfügen' : 'anhängen'}
+                              + {index < phaseDrafts.length - 1 ? 'weitere Phase hier einfügen' : 'nächste Phase hinzufügen'}
                             </button>
                             {phaseInsertIndex === index + 1 && (
                               <div className="phase-insert-options" role="group" aria-label={`Phase nach Phase ${index + 1} hinzufügen`}>
