@@ -111,6 +111,13 @@ export function TournamentSummaryPanel({
     actionText = 'Teilnehmer und Auslosung prüfen. Anschließend das Turnier mit dem grünen Button im Header starten.';
     actionLabel = 'Teilnehmer prüfen';
     action = onParticipants;
+  } else if (activeStage?.type === 'BREAK') {
+    actionTitle = activeStage.name;
+    actionText = activeStage.settings.breakKind === 'overnight'
+      ? `Spieltagsende. Fortsetzung am Folgetag um ${activeStage.settings.nextDayStart} Uhr.`
+      : `Geplante Pause von ${activeStage.settings.breakMinutes} Minuten.`;
+    actionLabel = 'Pausenstatus ansehen';
+    action = () => onStage(activeStage);
   } else if (paused) {
     actionTitle = 'Turnier pausiert';
     actionText = 'Laufende Partien können beendet werden. Neue Spielzuweisungen sind bis zur Fortsetzung gesperrt.';
