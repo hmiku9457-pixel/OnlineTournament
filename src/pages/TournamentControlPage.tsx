@@ -836,7 +836,7 @@ export function TournamentControlPage() {
     const startedId = nextStartableStage.id;
     setStartModal(null);
     setPhaseVersion((value) => value + 1);
-    setStatus('RUNNING');
+    setStatus(nextStartableStage.type === 'BREAK' ? 'PAUSED' : 'RUNNING');
     reconcileWithdrawalsForTournament(tournament);
     refreshRuntime();
     setSelectedStageId(startedId);
