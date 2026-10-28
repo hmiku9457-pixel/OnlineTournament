@@ -9,7 +9,7 @@ import {
   applySeededGroupAssignments,
   setParticipantGroup,
 } from '@/services/mockDrawStore';
-import { getStageEntrants, isStageCompleted, isStageLockedWaiting, isStageStarted } from '@/services/mockPhaseLifecycle';
+import { getStageEntrants, getPreviousCompetitionStage, isStageCompleted, isStageLockedWaiting, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 
 interface Props {
@@ -37,8 +37,7 @@ export function PrestartDrawEditor({ tournament, stage, onChanged }: Props) {
   const editable = canEditDraw(tournament, stage);
   const participants = getStageEntrants(tournament, stage);
   const started = isStageStarted(tournament, stage);
-  const stageIndex = tournament.stages.findIndex((item) => item.id === stage.id);
-  const precededBySwiss = tournament.stages[stageIndex - 1]?.type === 'SWISS';
+  const precededBySwiss = getPreviousCompetitionStage(tournament, stage)?.type === 'SWISS';
   const previousFinishLabels = getPreviousStageFinishLabels(tournament, stage);
   const completed = isStageCompleted(tournament, stage);
   const waitingForPrevious = isStageLockedWaiting(tournament, stage);
