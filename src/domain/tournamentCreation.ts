@@ -43,6 +43,8 @@ export interface TournamentDurationPhaseInput {
   groupCount?: number;
   swissRounds?: number;
   knockoutBestOf?: number[];
+  breakMinutes?: number;
+  breakKind?: 'minutes' | 'overnight';
 }
 
 const MINUTES_PER_SET = 15;
@@ -72,10 +74,10 @@ function groupMatchCount(entrantCount: number, groupCount: number): number {
   return total;
 }
 
-function waveMinutes(matchCount: number, tableCount: number, bestOf: number): number {
+function waveMinutes(matchCount: number, tableCount: number, bestOf: number, minutesPerSet = MINUTES_PER_SET): number {
   if (matchCount <= 0) return 0;
   const waves = Math.ceil(matchCount / Math.max(1, Math.trunc(tableCount)));
-  return waves * averageSetsForBestOf(bestOf) * MINUTES_PER_SET;
+  return waves * averageSetsForBestOf(bestOf) * minutesPerSet;
 }
 
 function knockoutRoundMatchCounts(entrantCount: number): number[] {
@@ -188,7 +190,7 @@ export function knockoutByeCount(entrantCount: number): number {
   return bracketSize - entrants;
 }
 
-export interface TimedMatchSettings { matchDurationMinutes: number; venueTurnoverMinutes?: number }
+export interface TimedMatchSettings { matchDurationMinutes: number; venueTurnoverMinutes?: number; minutesPerSet?: number }
 
 export function estimatePhaseMetrics(
   phase: TournamentDurationPhaseInput,
@@ -197,11 +199,12 @@ export function estimatePhaseMetrics(
 ): PhaseEstimate {
   const tables = Math.max(1, Math.trunc(tableCount));
   const entrants = Math.max(2, Math.trunc(phase.entrantCount));
+  if (phase.type === 'BREAK') return { estimatedMatches: 0, estimatedDurationMinutes: phase.breakKind === 'overnight' ? 0 : Math.max(0, Math.round(phase.breakMinutes ?? 0)), approximate: false };
   // Timed sports use one match duration per fixture, plus a preparation break between slots.
   const gameMinutes = timing ? Math.max(1, timing.matchDurationMinutes) + Math.max(0, timing.venueTurnoverMinutes ?? 0) : 0;
   const waveDurationForPhase = (count: number, bo: number) => timing
     ? Math.ceil(count / tables) * gameMinutes
-    : waveMinutes(count, tables, bo);
+    : waveMinutes(count, tables, bo, timing?.minutesPerSet ?? MINUTES_PER_SET);
 
   switch (phase.type) {
     case 'ROUND_ROBIN': {
@@ -238,7 +241,7 @@ export function estimatePhaseMetrics(
       const approximateMatches = Math.ceil(Math.max(1, entrants * 2 - 2) * 1.25);
       return {
         estimatedMatches: approximateMatches,
-        estimatedDurationMinutes: Math.round(waveMinutes(approximateMatches, tables, phase.bestOf)),
+        estimatedDurationMinutes: Math.round(waveMinutes(approximateMatches, tables, phase.bestOf, timing?.minutesPerSet ?? MINUTES_PER_SET)),
         approximate: true,
       };
     }
@@ -278,6 +281,7 @@ export function defaultBestOfForStage(type: StageType): number {
 
 export function stageLabel(type: StageType): string {
   switch (type) {
+    case 'BREAK': return 'Pause';
     case 'ROUND_ROBIN': return 'Jeder gegen jeden';
     case 'GROUPS': return 'Gruppenphase';
     case 'SWISS': return 'Schweizer System';
@@ -289,6 +293,7 @@ export function stageLabel(type: StageType): string {
 
 export function systemIdForStage(type: StageType): TournamentSystemId {
   switch (type) {
+    case 'BREAK': return 'groups';
     case 'ROUND_ROBIN': return 'round-robin';
     case 'GROUPS': return 'groups';
     case 'SWISS': return 'swiss';
