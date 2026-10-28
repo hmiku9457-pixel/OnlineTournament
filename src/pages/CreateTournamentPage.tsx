@@ -1228,8 +1228,6 @@ export function CreateTournamentPage() {
                         ? recommendGroupCount(phase.entrantCount, nextPhase?.entrantCount) : null;
                       const recommendedRounds = phase.type === 'SWISS'
                         ? recommendedSwissRounds(phase.entrantCount) : null;
-                      const minGroupSize = Math.floor(phase.entrantCount / Math.max(2, phase.groupCount));
-                      const maxGroupSize = Math.ceil(phase.entrantCount / Math.max(2, phase.groupCount));
                       const groupQualifiers = nextPhase && nextPhase.entrantCount < phase.entrantCount
                         ? nextPhase.entrantCount : null;
                       return (
@@ -1326,7 +1324,7 @@ export function CreateTournamentPage() {
                                   <div>
                                     <strong>Empfehlung: {recommendedGroups} Gruppen</strong>
                                     <span>Je {Math.floor(phase.entrantCount / recommendedGroups)}–{Math.ceil(phase.entrantCount / recommendedGroups)} Teilnehmer
-                                      {groupQualifiers !== null && ` · ${groupQualifiers} weiter in ${nextPhase?.name ?? nextPhase?.label ?? 'die nächste Phase'}`}
+                                      {groupQualifiers !== null && ` · ${groupQualifiers} weiter in ${nextPhase?.label ?? 'die nächste Phase'}`}
                                       {groupQualifiers !== null && groupQualifiers % recommendedGroups === 0
                                         ? ` · ${groupQualifiers / recommendedGroups} pro Gruppe`
                                         : groupQualifiers !== null ? ' · Weiterkommen nach Platzierung/Quote' : ''}
