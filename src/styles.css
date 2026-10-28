@@ -3227,6 +3227,8 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 }
 .tournament-summary-heading p, .tournament-summary-section-head p { margin: 3px 0 0; font-size: .8rem; }
 .tournament-summary-stage-count { font-size: .77rem; color: #475467; font-variant-numeric: tabular-nums; }
+.tournament-summary-heading-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 12px; }
+.tournament-summary-heading-actions .btn { padding: 6px 9px; font-size: .74rem; }
 .tournament-summary-top {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(340px, 1.05fr);
