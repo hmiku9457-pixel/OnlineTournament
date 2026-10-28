@@ -1224,6 +1224,7 @@ export function CreateTournamentPage() {
                   <div>
                     <strong>{phaseDrafts.length ? 'Phasenreihenfolge' : 'Erste Phase hinzufügen'}</strong>
                     <span className="muted">{phaseDrafts.length ? 'Klicke zwischen den Phasen auf „+ weitere Phase hier einfügen“, um dort eine Phase hinzuzufügen.' : 'Wähle ein Turniersystem für die erste Phase.'}</span>
+                    <span className="phase-ko-rule"><span aria-hidden="true">🔒</span> Eine K.-o.-Phase steht immer am Ende und kann nicht verschoben werden.</span>
                   </div>
                   {phaseDrafts.length > 0 && <button className="btn small" type="button"
                     aria-expanded={phaseInsertIndex === 0}
@@ -1263,13 +1264,19 @@ export function CreateTournamentPage() {
                           onDragOver={(event) => onPhaseDragOver(event, index)}
                           onDrop={(event) => onPhaseDrop(event, index)}>
                         <div className="phase-sequence-row">
-                          <button type="button" draggable className="phase-drag-handle"
-                            title="Phase hier greifen und per Drag & Drop verschieben"
-                            aria-label={`Phase ${index + 1}: ${phase.label} ziehen, um sie zu verschieben`}
-                            onDragStart={(event) => onPhaseDragStart(event, phase.id)}
-                            onDragEnd={onPhaseDragEnd}>
-                            <span aria-hidden="true">⠿</span>
-                          </button>
+                          {isTerminalStage(phase.type) ? (
+                            <span className="phase-drag-fixed" role="img"
+                              aria-label="K.-o.-Phase ist am Ende fixiert und nicht verschiebbar"
+                              title="K.-o.-Phase ist am Ende fixiert und nicht verschiebbar">🔒</span>
+                          ) : (
+                            <button type="button" draggable className="phase-drag-handle"
+                              title="Phase hier greifen und per Drag & Drop verschieben"
+                              aria-label={`Phase ${index + 1}: ${phase.label} ziehen, um sie zu verschieben`}
+                              onDragStart={(event) => onPhaseDragStart(event, phase.id)}
+                              onDragEnd={onPhaseDragEnd}>
+                              <span aria-hidden="true">⠿</span>
+                            </button>
+                          )}
                         <article className={`phase-config phase-config-expanded ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
                           role="group" tabIndex={0} aria-label={`Phase ${index + 1}: ${phase.label}. Klicken oder Enter drücken, um Einstellungen ${isExpanded ? 'zu schließen' : 'zu öffnen'}.`}
                           onClick={(event) => {
@@ -1311,8 +1318,12 @@ export function CreateTournamentPage() {
                               >
                                 {editingPhaseType ? 'Typ schließen' : 'Typ ändern'}
                               </button>
-                              <button className="btn small" type="button" disabled={!canMovePhase(index, -1)} onClick={() => movePhase(index, -1)} aria-label="Phase nach oben">↑</button>
-                              <button className="btn small" type="button" disabled={!canMovePhase(index, 1)} onClick={() => movePhase(index, 1)} aria-label="Phase nach unten">↓</button>
+                              {!isTerminalStage(phase.type) && (
+                                <>
+                                  <button className="btn small" type="button" disabled={!canMovePhase(index, -1)} onClick={() => movePhase(index, -1)} aria-label="Phase nach oben">↑</button>
+                                  <button className="btn small" type="button" disabled={!canMovePhase(index, 1)} onClick={() => movePhase(index, 1)} aria-label="Phase nach unten">↓</button>
+                                </>
+                              )}
                               <button className="btn small" type="button" onClick={() => removePhase(phase.id)}>Entfernen</button>
                             </div>
                           </div>
@@ -1390,9 +1401,9 @@ export function CreateTournamentPage() {
                               </label>
                               <fieldset className="break-phase-choice">
                                 <legend>Art der Unterbrechung</legend>
-                                <label><input type="radio" checked={phase.breakKind === 'minutes'}
+                                <label><input type="radio" name={`break-kind-${phase.id}`} checked={phase.breakKind === 'minutes'}
                                   onChange={() => updatePhase(phase.id, { breakKind: 'minutes' })} /> Pause in Minuten</label>
-                                <label><input type="radio" checked={phase.breakKind === 'overnight'}
+                                <label><input type="radio" name={`break-kind-${phase.id}`} checked={phase.breakKind === 'overnight'}
                                   onChange={() => updatePhase(phase.id, { breakKind: 'overnight' })} /> Spieltagsende</label>
                               </fieldset>
                               {phase.breakKind === 'minutes' ? (
