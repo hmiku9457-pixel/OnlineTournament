@@ -1944,6 +1944,33 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .control-header-tools { display: grid; justify-items: end; gap: 7px; min-width: 0; }
 .control-primary-actions { align-items: center; justify-content: flex-end; gap: 7px; }
 .control-primary-actions .btn { padding: 8px 11px; font-size: .8rem; line-height: 1.2; white-space: nowrap; }
+/* Turnierstart ist eine positive Aktion; Abbruch bleibt bewusst rot hervorgehoben. */
+.control-primary-actions .btn.control-start-tournament {
+  background: #067647;
+  border-color: #067647;
+  color: #fff;
+}
+.control-primary-actions .btn.control-start-tournament:hover:not(:disabled) {
+  background: #05603a;
+  border-color: #05603a;
+}
+.control-primary-actions .btn.control-start-tournament:focus-visible {
+  outline: 3px solid #75e0a7;
+  outline-offset: 2px;
+}
+.control-primary-actions .btn.control-abort-tournament {
+  background: #b42318;
+  border-color: #b42318;
+  color: #fff;
+}
+.control-primary-actions .btn.control-abort-tournament:hover:not(:disabled) {
+  background: #912018;
+  border-color: #912018;
+}
+.control-primary-actions .btn.control-abort-tournament:focus-visible {
+  outline: 3px solid #fda29b;
+  outline-offset: 2px;
+}
 .control-utility-bar { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
 .control-utility-bar .control-back-button { margin: 0; }
 .control-utility-links { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
