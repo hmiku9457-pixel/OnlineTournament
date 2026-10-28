@@ -579,7 +579,7 @@ export function CreateTournamentPage() {
     });
     const phase = phaseDraftFromTemplate(template, participantCount, sport);
     if (type === 'BREAK') phase.label = 'Pause';
-    const following = phaseDrafts[insertIndex];
+    const following = phaseDrafts.slice(insertIndex).find((candidate) => candidate.type !== 'BREAK');
     if (type === 'GROUPS') {
       phase.groupCount = recommendGroupCount(phase.entrantCount, following?.entrantCount);
     }
@@ -682,7 +682,7 @@ export function CreateTournamentPage() {
       phase.label = stageLabel(type);
       phase.bestOf = bestOf;
       if (type === 'GROUPS') {
-        phase.groupCount = recommendGroupCount(phase.entrantCount, next[index + 1]?.entrantCount);
+        phase.groupCount = recommendGroupCount(phase.entrantCount, next.slice(index + 1).find((candidate) => candidate.type !== 'BREAK')?.entrantCount);
       }
       if (type === 'SWISS') {
         phase.swissRounds = recommendedSwissRounds(phase.entrantCount, minimumMatches);
@@ -1250,7 +1250,7 @@ export function CreateTournamentPage() {
                       const knockoutRounds = phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount) : [];
                       const editingPhaseType = editingPhaseTypeId === phase.id;
                       const isExpanded = expandedPhaseId === phase.id;
-                      const nextPhase = phaseDrafts[index + 1];
+                      const nextPhase = phaseDrafts.slice(index + 1).find((candidate) => candidate.type !== 'BREAK');
                       const recommendedGroups = phase.type === 'GROUPS'
                         ? recommendGroupCount(phase.entrantCount, nextPhase?.entrantCount) : null;
                       const recommendedRounds = phase.type === 'SWISS'
