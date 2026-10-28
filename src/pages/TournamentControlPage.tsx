@@ -1374,6 +1374,12 @@ export function TournamentControlPage() {
               <div className="control-help-title"><h2>Turnierverlauf</h2><ControlHelpButton topic="phases" onOpen={setHelpTopic} /></div>
               <p className="muted">Nach jeder Schweizer Runde und jeder Phase prüft die Turnierleitung die Ergebnisse und gibt den nächsten Schritt ausdrücklich frei. Mit dem Start einer Phase wird die Auslosung eingefroren.</p>
             </div>
+            {!tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status) && (
+              <button type="button" className="btn small no-print"
+                onClick={() => { setTab('summary'); setShowPrestartPhaseEditor(true); }}>
+                Phasen vor Start bearbeiten
+              </button>
+            )}
           </div>
           <div className="phase-lifecycle-strip phase-navigation-strip">
             {tournament.stages.map((stage, index) => {
