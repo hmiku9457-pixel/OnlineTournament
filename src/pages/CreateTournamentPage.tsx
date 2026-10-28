@@ -54,6 +54,10 @@ type PhaseDraft = {
   entrantCount: number;
   knockoutBestOf: number[];
   customEntrants: boolean;
+  breakKind: 'minutes' | 'overnight';
+  breakMinutes: number;
+  nextDayStart: string;
+  note: string;
 };
 
 const stepLabels = ['Grunddaten', 'Teilnehmer', 'Turnierform', 'Phasen'];
@@ -233,6 +237,10 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
     entrantCount,
     knockoutBestOf: Array.from({ length: knockoutRounds }, () => phaseBestOfForSport(sport, template.type)),
     customEntrants: isTerminalStage(template.type) && !knockoutEntrantPresets(participantCount).includes(entrantCount),
+    breakKind: 'minutes',
+    breakMinutes: 15,
+    nextDayStart: '09:00',
+    note: '',
   };
 }
 
@@ -390,8 +398,16 @@ export function CreateTournamentPage() {
     if (selectedRecommendationId && !selectedRecommendation) setSelectedRecommendationId(null);
   }, [selectedRecommendationId, selectedRecommendation]);
 
-  const phaseOrderValid = hasValidTerminalStageOrder(phaseDrafts.map((phase) => phase.type));
-  const phaseConfigurationValid = phaseDrafts.length > 0 && phaseOrderValid;
+  const phaseOrderValid = hasValidTerminalStageOrder(phaseDrafts.map((phase) => phase.type))
+    && phaseDrafts.every((phase, index) => phase.type !== 'BREAK'
+      || (index > 0 && index < phaseDrafts.length - 1
+        && phaseDrafts[index - 1].type !== 'BREAK' && phaseDrafts[index + 1].type !== 'BREAK'));
+  const phaseConfigurationValid = phaseDrafts.some((phase) => phase.type !== 'BREAK') && phaseOrderValid
+    && phaseDrafts.every((phase) => phase.type !== 'BREAK'
+      || (phase.label.trim().length > 0 && phase.note.length <= 600
+        && (phase.breakKind === 'minutes'
+          ? Number.isInteger(phase.breakMinutes) && phase.breakMinutes >= 1 && phase.breakMinutes <= 1440
+          : /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.nextDayStart))));
   const gameSettingsValid = minimumMatches >= 1 && validMatchDuration && validTurnover;
   const basicsValid = Boolean(name.trim()) && Boolean(sport) && selectedDisciplineValid && tables >= 1 && gameSettingsValid;
   const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
@@ -519,7 +535,7 @@ export function CreateTournamentPage() {
       const entrants = index === 0
         ? participantCount
         : Math.max(minimum, Math.min(maximum, next[index].entrantCount));
-      next[index].entrantCount = entrants;
+      next[index].entrantCount = next[index].type === 'BREAK' ? maximum : entrants;
       if (next[index].type === 'GROUPS') {
         next[index].groupCount = Math.max(2, Math.min(next[index].groupCount, Math.floor(entrants / 2)));
       }
@@ -552,6 +568,7 @@ export function CreateTournamentPage() {
 
   function insertPhase(insertIndex: number, type: StageType) {
     if (insertIndex < 0 || insertIndex > phaseDrafts.length) return;
+    if (type === 'BREAK' && (insertIndex === 0 || insertIndex === phaseDrafts.length || phaseDrafts[insertIndex - 1]?.type === 'BREAK' || phaseDrafts[insertIndex]?.type === 'BREAK')) return;
     if (isTerminalStage(type) && insertIndex !== phaseDrafts.length) return;
     if (insertIndex === phaseDrafts.length && phaseDrafts.some((phase) => isTerminalStage(phase.type))) return;
     const previousEntrants = insertIndex === 0 ? participantCount : phaseDrafts[insertIndex - 1].entrantCount;
@@ -562,6 +579,7 @@ export function CreateTournamentPage() {
       swissRounds: effectiveMaxSwissRounds,
     });
     const phase = phaseDraftFromTemplate(template, participantCount, sport);
+    if (type === 'BREAK') phase.label = 'Pause';
     const following = phaseDrafts[insertIndex];
     if (type === 'GROUPS') {
       phase.groupCount = recommendGroupCount(phase.entrantCount, following?.entrantCount);
@@ -656,6 +674,7 @@ export function CreateTournamentPage() {
       if (!current[index]) return current;
       if (current[index].type === type) return current;
       if (isTerminalStage(type) && index !== current.length - 1) return current;
+      if (type === 'BREAK' && (index === 0 || index === current.length - 1 || current[index - 1]?.type === 'BREAK' || current[index + 1]?.type === 'BREAK')) return current;
 
       const next = current.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
       const phase = next[index];
@@ -751,6 +770,10 @@ export function CreateTournamentPage() {
         groupCount: phase.groupCount,
         swissRounds: phase.swissRounds,
         knockoutBestOf: timedSport ? phase.knockoutBestOf.map(() => 1) : phase.knockoutBestOf,
+        breakKind: phase.breakKind,
+        breakMinutes: phase.breakMinutes,
+        nextDayStart: phase.nextDayStart,
+        note: phase.note,
       })),
       estimatedDurationMinutes: estimatedTournamentDurationMinutes,
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
@@ -767,6 +790,8 @@ export function CreateTournamentPage() {
         groupCount: phase.groupCount,
         swissRounds: phase.swissRounds,
         knockoutBestOf: phase.knockoutBestOf,
+        breakKind: phase.breakKind,
+        breakMinutes: phase.breakMinutes,
       })),
       tables,
       timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : { minutesPerSet: planningMinutesPerSet(sport) },
@@ -782,6 +807,8 @@ export function CreateTournamentPage() {
       groupCount: phase.groupCount,
       swissRounds: phase.swissRounds,
       knockoutBestOf: phase.knockoutBestOf,
+      breakKind: phase.breakKind,
+      breakMinutes: phase.breakMinutes,
     }, tables, timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : undefined)),
     [phaseDrafts, tables, timedSport, matchDurationMinutes, breakMinutes],
   );
