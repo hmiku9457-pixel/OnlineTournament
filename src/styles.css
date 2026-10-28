@@ -3931,6 +3931,29 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .phase-drag-handle:hover { background: #e4e7ec; color: #344054; border-color: #98a2b3; }
 .phase-drag-handle:active { cursor: grabbing; }
 .phase-drag-handle:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.phase-drag-fixed {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  min-height: 50px;
+  align-self: stretch;
+  border: 1px solid #e4e7ec;
+  border-radius: 9px;
+  background: #f9fafb;
+  color: #667085;
+  font-size: .85rem;
+  cursor: default;
+  user-select: none;
+}
+.phase-ko-rule {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 4px;
+  color: #475467;
+  font-size: .72rem;
+  line-height: 1.45;
+}
 .phase-sequence-item.is-being-dragged > .phase-sequence-row { opacity: .52; }
 .phase-sequence-item.is-drop-target > .phase-sequence-row > .phase-config {
   border-color: #2563eb;
@@ -3957,6 +3980,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 @media (max-width: 520px) {
   .phase-sequence-row { grid-template-columns: 27px minmax(0, 1fr); gap: 5px; }
   .phase-drag-handle { width: 27px; min-height: 43px; font-size: 1.1rem; }
+  .phase-drag-fixed { width: 27px; min-height: 43px; }
   .phase-configuration-recommendation .btn { width: 100%; }
 }
 
@@ -3968,7 +3992,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   align-items: start;
 }
 .break-phase-fields .field { display: grid; gap: 5px; min-width: 0; font-size: .77rem; }
-.break-phase-fields input,
+.break-phase-fields input:not([type="radio"]),
 .break-phase-fields textarea {
   width: 100%;
   min-width: 0;
@@ -3993,7 +4017,21 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   background: #f9fafb;
 }
 .break-phase-choice legend { font-size: .73rem; color: #475467; font-weight: 750; }
-.break-phase-choice label { display: inline-flex; align-items: center; gap: 6px; font-size: .76rem; cursor: pointer; }
+.break-phase-choice label { display: inline-flex; align-items: center; gap: 8px; font-size: .76rem; cursor: pointer; white-space: nowrap; }
+.break-phase-choice input[type="radio"] {
+  appearance: auto;
+  box-sizing: border-box;
+  display: inline-block;
+  flex: 0 0 17px;
+  width: 17px;
+  min-width: 17px;
+  height: 17px;
+  min-height: 17px;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  accent-color: #155eef;
+}
 .break-phase-fields .break-phase-notes { grid-column: 1 / -1; }
 .tournament-break-panel { display: grid; justify-items: start; gap: 9px; margin-top: 12px; }
 .tournament-break-panel h3 { margin: 0; font-size: 1.15rem; }
