@@ -1,6 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { planningMinutesPerSet } from '@/domain/sports';
+import { getBreakResumeAt, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getMockStageBaseMatches, getMockStoredResult } from '@/services/mockRuntime';
 import { getStageEntrants, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getBlockedMockTables } from '@/services/mockTableLocks';
@@ -96,13 +97,21 @@ function remainingStageJobs(tournament: DemoTournament, stage: TournamentStage):
 }
 
 export function estimateRemainingTournamentMinutes(tournament: DemoTournament): number | null {
+  const pauseMinutes = tournament.stages
+    .filter((stage) => stage.type === 'BREAK' && !isStageCompleted(tournament, stage) && stage.settings.breakKind !== 'overnight')
+    .reduce((sum, stage) => {
+      const configured = Math.max(0, Number(stage.settings.breakMinutes) || 0);
+      if (!isStageStarted(tournament, stage)) return sum + configured;
+      const resume = getBreakResumeAt(tournament, stage);
+      return sum + (resume ? Math.max(0, Math.ceil((resume.getTime() - Date.now()) / 60000)) : configured);
+    }, 0);
   const availableTables = tournament.tables - getBlockedMockTables(tournament).length;
   const timedSport = sportScoring(tournament.sport).mode === 'score';
   const gameMinutes = Math.max(1, tournament.matchDurationMinutes ?? 15) + Math.max(0, tournament.venueTurnoverMinutes ?? 0);
   const stageJobs = tournament.stages.map((stage) => ({ stage, jobs: remainingStageJobs(tournament, stage).map((job) => ({
     ...job, remainingMinutes: timedSport ? gameMinutes : job.remainingMinutes,
   })) }));
-  if (stageJobs.every(({ jobs }) => jobs.length === 0)) return 0;
+  if (stageJobs.every(({ jobs }) => jobs.length === 0)) return pauseMinutes;
   if (availableTables <= 0) return null;
 
   // Round dependencies in Swiss and knockout phases prevent using every
@@ -114,7 +123,7 @@ export function estimateRemainingTournamentMinutes(tournament: DemoTournament): 
       duration.set(key, [...(duration.get(key) ?? []), job.remainingMinutes]);
     }
   }
-  return [...duration.values()].reduce((total, round) => total + estimateRoundRemainingMinutes(round, availableTables), 0);
+  return pauseMinutes + [...duration.values()].reduce((total, round) => total + estimateRoundRemainingMinutes(round, availableTables), 0);
 }
 
 export function formatRemainingTournamentDuration(minutes: number | null, venuePlural = 'Tische') {
