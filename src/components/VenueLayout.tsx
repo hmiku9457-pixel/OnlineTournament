@@ -63,6 +63,22 @@ function HallGrid({ layout, compact, selected, onPlace, onSelect, sport }: {
   );
 }
 
+type VenuePreset = 'rows' | 'line' | 'aisle';
+
+/** Simple layouts are easier to start with than an oversized empty raster. */
+function makeVenuePreset(tableCount: number, deskDock: DeskDock, preset: VenuePreset): VenueLayout {
+  const count = Math.max(1, Math.trunc(tableCount));
+  const columns = preset === 'line' ? count : Math.max(2, Math.ceil(count / 2));
+  const rows = preset === 'line' ? 1 : preset === 'aisle' ? 3 : 2;
+  const cells: VenueCell[] = Array.from({ length: columns * rows }, () => '');
+  for (let index = 0; index < count; index += 1) {
+    const row = preset === 'line' || index < columns ? 0 : (preset === 'aisle' ? 2 : 1);
+    const column = preset === 'line' ? index : index % columns;
+    cells[row * columns + column] = `table:${index + 1}`;
+  }
+  return { columns, rows, cells, deskDock };
+}
+
 export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
   layout: VenueLayout;
   tableCount: number;
@@ -79,29 +95,52 @@ export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
   }
   return (
     <div className="hall-editor">
-      <div className="hall-editor-controls">
+      <div className="hall-editor-intro">
+        <div>
+          <strong>Aufbau auswählen</strong>
+          <p>Wähle einen Ausgangspunkt oder verschiebe die {venue.plural} anschließend direkt im Plan.</p>
+        </div>
+        <div className="hall-editor-presets" role="group" aria-label="Vorlage für die Spielflächenanordnung">
+          <button type="button" className="btn small" onClick={() => { onChange(makeVenuePreset(tableCount, layout.deskDock, 'rows')); setSelected(null); }}>Zwei Reihen</button>
+          <button type="button" className="btn small" onClick={() => { onChange(makeVenuePreset(tableCount, layout.deskDock, 'aisle')); setSelected(null); }}>Mit Mittelgang</button>
+          <button type="button" className="btn small" onClick={() => { onChange(makeVenuePreset(tableCount, layout.deskDock, 'line')); setSelected(null); }}>Eine Reihe</button>
+        </div>
+      </div>
+      <div className="hall-editor-toolrow">
+        <div className="hall-editor-tools">
+          <button type="button" className={`btn small ${selected === 'space' ? 'primary' : ''}`} aria-pressed={selected === 'space'} onClick={() => setSelected((old) => old === 'space' ? null : 'space')}>Freifläche markieren</button>
+          <button type="button" className={`btn small ${selected === 'desk' ? 'primary' : ''}`} aria-pressed={selected === 'desk'} onClick={() => setSelected((old) => old === 'desk' ? null : 'desk')}>Turnierleitung platzieren</button>
+          {selected !== null && <button type="button" className="btn small" onClick={() => setSelected(null)}>Auswahl aufheben</button>}
+        </div>
+        <span className="hall-editor-grid-size">{layout.columns} Spalten × {layout.rows} Reihen</span>
+      </div>
+      <div className="hall-editor-canvas">
+        <HallGrid layout={layout} sport={sport} compact={false} selected={selected} onPlace={place} onSelect={setSelected} />
+      </div>
+      <p className="hall-editor-hint">
+        {selected === 'space' ? 'Klicke auf ein freies Feld, um eine Freifläche zu markieren oder zu entfernen.' :
+          selected === 'desk' ? 'Klicke auf ein leeres Feld, um die Turnierleitung zu platzieren.' :
+          `Klicke zuerst auf ${venue.singular === 'Spielfeld' ? 'ein Spielfeld' : `einen ${venue.singular}`} und dann auf das Zielfeld – oder ziehe es mit der Maus.`}
+        {' '}Belegte Felder werden getauscht.
+      </p>
+      <details className="hall-editor-advanced">
+        <summary>Rastergröße und Position der Turnierleitung anpassen</summary>
         <div className="hall-editor-dimensions">
           <label className="field">Spalten
-            <input type="number" min="1" max="100" value={layout.columns} onChange={(e) => onChange(resizeVenueLayout(layout, Number(e.target.value), layout.rows, tableCount))} />
+            <input type="number" min="1" max="100" value={layout.columns}
+              onChange={(event) => onChange(resizeVenueLayout(layout, Number(event.target.value), layout.rows, tableCount))} />
           </label>
           <label className="field">Reihen
-            <input type="number" min="1" max="40" value={layout.rows} onChange={(e) => onChange(resizeVenueLayout(layout, layout.columns, Number(e.target.value), tableCount))} />
+            <input type="number" min="1" max="40" value={layout.rows}
+              onChange={(event) => onChange(resizeVenueLayout(layout, layout.columns, Number(event.target.value), tableCount))} />
           </label>
           <label className="field hall-dock-field">Turnierleitung außerhalb
-            <select value={layout.deskDock} onChange={(e) => { onChange(dockVenueDesk(layout, e.target.value as DeskDock)); setSelected(null); }}>
+            <select value={layout.deskDock} onChange={(event) => { onChange(dockVenueDesk(layout, event.target.value as DeskDock)); setSelected(null); }}>
               {Object.entries(dockNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
         </div>
-      </div>
-      <p className="field-hint">Wähle {venue.singular === 'Spielfeld' ? 'ein Spielfeld' : `einen ${venue.singular}`} oder ziehe es auf ein anderes Rasterfeld. Belegte Felder werden getauscht. Freiflächen bleiben absichtlich leer.</p>
-      <div className="hall-editor-tools">
-        <button type="button" className={`btn small ${selected === 'space' ? 'primary' : ''}`} onClick={() => setSelected('space')}>Freifläche setzen</button>
-        <button type="button" className={`btn small ${selected === 'desk' ? 'primary' : ''}`} onClick={() => setSelected('desk')}>Turnierleitung im Raster</button>
-        <button type="button" className="btn small" onClick={() => onChange({ ...resizeVenueLayout(createVenueLayout(tableCount), tableCount, 1, tableCount), deskDock: layout.deskDock })}>{venue.plural} in eine Reihe</button>
-        {selected !== null && <button type="button" className="btn small" onClick={() => setSelected(null)}>Auswahl aufheben</button>}
-      </div>
-      <HallGrid layout={layout} sport={sport} compact={false} selected={selected} onPlace={place} onSelect={setSelected} />
+      </details>
     </div>
   );
 }
