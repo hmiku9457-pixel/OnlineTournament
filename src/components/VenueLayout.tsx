@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { getVenueTerminology } from '@/domain/venueTerminology';
 import {
-  createVenueLayout,
   dockVenueDesk,
   placeVenueCell,
   resizeVenueLayout,
