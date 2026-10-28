@@ -1,5 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
+import { planningMinutesPerSet } from '@/domain/sports';
 import { getMockStageBaseMatches, getMockStoredResult } from '@/services/mockRuntime';
 import { getStageEntrants, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getBlockedMockTables } from '@/services/mockTableLocks';
@@ -17,8 +18,8 @@ function expectedSetCount(bestOf: number) {
   return (needed + bestOf) / 2;
 }
 
-function remainingMinutesForMatch(bestOf: number, playedSets: number) {
-  return MINUTES_PER_SET * Math.max(1, expectedSetCount(bestOf) - playedSets);
+function remainingMinutesForMatch(bestOf: number, playedSets: number, minutesPerSet = MINUTES_PER_SET) {
+  return minutesPerSet * Math.max(1, expectedSetCount(bestOf) - playedSets);
 }
 
 // Even when many games can run in parallel, a round has preparation/turnover
@@ -57,7 +58,7 @@ function remainingStageJobs(tournament: DemoTournament, stage: TournamentStage):
       for (let game = 1; game <= perRound; game += 1) {
         const result = started ? getMockStoredResult(`${stage.id}-sw-r${round}-m${game}`) : undefined;
         if (result?.status === 'FINISHED') continue;
-        jobs.push({ round, remainingMinutes: remainingMinutesForMatch(stage.bestOf, result?.sets.length ?? 0) });
+        jobs.push({ round, remainingMinutes: remainingMinutesForMatch(stage.bestOf, result?.sets.length ?? 0, planningMinutesPerSet(tournament.sport)) });
       }
     }
     return jobs;
@@ -69,13 +70,13 @@ function remainingStageJobs(tournament: DemoTournament, stage: TournamentStage):
     let matches = Math.max(0, entrants - bracket / 2);
     for (let round = 1; matches >= 1; round += 1) {
       for (let index = 0; index < matches; index += 1) {
-        jobs.push({ round, remainingMinutes: remainingMinutesForMatch(knockoutRoundBestOf(stage, round), 0) });
+        jobs.push({ round, remainingMinutes: remainingMinutesForMatch(knockoutRoundBestOf(stage, round), 0, planningMinutesPerSet(tournament.sport)) });
       }
       matches = round === 1 ? bracket / 4 : matches / 2;
     }
     if (stage.type === 'KNOCKOUT' && entrants >= 4) {
       // Bronze kann parallel zum Finale stattfinden, zählt aber als zusätzliche Partie.
-      jobs.push({ round: Math.ceil(Math.log2(bracket)), remainingMinutes: remainingMinutesForMatch(stage.bestOf, 0) });
+      jobs.push({ round: Math.ceil(Math.log2(bracket)), remainingMinutes: remainingMinutesForMatch(stage.bestOf, 0, planningMinutesPerSet(tournament.sport)) });
     }
     return jobs;
   }
@@ -90,7 +91,7 @@ function remainingStageJobs(tournament: DemoTournament, stage: TournamentStage):
       const round = (stage.type === 'KNOCKOUT' || stage.type === 'DOUBLE_ELIMINATION' || stage.type === 'PLACEMENT')
         ? Number(/-r(\d+)-/.exec(match.id)?.[1] ?? 1)
         : 1;
-      return [{ round, remainingMinutes: remainingMinutesForMatch(match.bestOf ?? stage.bestOf, result?.sets.length ?? 0) }];
+      return [{ round, remainingMinutes: remainingMinutesForMatch(match.bestOf ?? stage.bestOf, result?.sets.length ?? 0, planningMinutesPerSet(tournament.sport)) }];
     });
 }
 
