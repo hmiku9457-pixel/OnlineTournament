@@ -3771,3 +3771,8 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .wizard-step-content small { font-size: .53rem; }
   .hall-editor-grid-controls .hall-editor-grid-size { margin-left: 0; }
 }
+
+/* Mannschaftssportarten benötigen nur einen Teamnamen. */
+.wizard-workspace .participant-mask > .field:only-child { grid-column: 1 / -1; }
+.participant-management-modal .participant-team-name-field { grid-column: 1 / -1; }
+.participant-add-panel.is-teams .participant-add-fields { grid-template-columns: minmax(0, 1fr); max-width: 480px; }
