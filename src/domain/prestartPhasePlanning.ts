@@ -1,5 +1,5 @@
 import type { DemoTournament } from '@/data/demoTournaments';
-import type { StageType, TournamentStage } from '@/domain/types';
+import type { StageType } from '@/domain/types';
 import {
   estimateTournamentDurationMinutes, hasValidBreakStageOrder,
   hasValidTerminalStageOrder, knockoutRoundLabels, recommendGroupCount,
@@ -152,16 +152,6 @@ export function createPrestartPhase(type: StageType, participants: number, next?
     knockoutBestOf: Array.from({ length: knockoutRoundLabels(entrants).length }, () => bestOf),
     breakKind: 'minutes', breakMinutes: 15, nextDayStart: '09:00', note: '',
   };
-}
-
-/** No mutation of the old stage objects; advancement skips nonplaying breaks. */
-export function draftStagesAsInputs(phases: PrestartPhaseDraft[]) {
-  return phases.map((phase) => ({
-    type: phase.type, label: phase.label.trim(), bestOf: phase.bestOf, entrantCount: phase.entrantCount,
-    groupCount: phase.groupCount, swissRounds: phase.swissRounds, knockoutBestOf: [...phase.knockoutBestOf],
-    breakKind: phase.breakKind, breakMinutes: phase.breakMinutes, nextDayStart: phase.nextDayStart,
-    note: phase.note,
-  }));
 }
 
 export function hasStartedAnyStage(tournament: DemoTournament, startedIds: string[]): boolean {
