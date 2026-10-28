@@ -126,7 +126,10 @@ export function TournamentSummaryPanel({
           <h2>Übersicht</h2>
           <p className="muted">Turnierstand, nächste Schritte und Phasenplan – ohne zusätzliche Zwischenstation.</p>
         </div>
-        <span className="tournament-summary-stage-count">{progress.completedPhases} von {progress.totalPhases} Phasen abgeschlossen</span>
+        <div className="tournament-summary-heading-actions">
+          <span className="tournament-summary-stage-count">{progress.completedPhases} von {progress.totalPhases} Phasen abgeschlossen</span>
+          <button className="btn small no-print" type="button" onClick={() => window.print()}>Übersicht drucken</button>
+        </div>
       </div>
 
       <div className="tournament-summary-top">
