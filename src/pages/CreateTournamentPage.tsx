@@ -651,7 +651,7 @@ export function CreateTournamentPage() {
     }
     setMaxReachedStep((current) => Math.max(current, next) as WizardStep);
     setStep(next);
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
   function goBack() {
