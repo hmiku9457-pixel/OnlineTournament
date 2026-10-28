@@ -3,7 +3,7 @@ import { createVenueLayout, resizeVenueLayout } from '@/domain/venueLayout';
 import { getVenueTerminology } from '@/domain/venueTerminology';
 import { disciplineLabel, disciplineOptionsForSport, sportOptions } from '@/domain/sports';
 import { sportScoring } from '@/domain/sportScoring';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type DragEvent, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   bestOfOptions,
@@ -15,6 +15,8 @@ import {
   isTerminalStage,
   knockoutEntrantPresets,
   knockoutRoundLabels,
+  recommendGroupCount,
+  recommendedSwissRounds,
   stageLabel,
   systemIdForStage,
   tournamentSystemOptions,
@@ -331,6 +333,8 @@ export function CreateTournamentPage() {
   const [editingPhaseTypeId, setEditingPhaseTypeId] = useState<string | null>(null);
   const [expandedPhaseId, setExpandedPhaseId] = useState<string | null>(null);
   const [phaseInsertIndex, setPhaseInsertIndex] = useState<number | null>(null);
+  const [draggingPhaseId, setDraggingPhaseId] = useState<string | null>(null);
+  const [dropTargetPhaseId, setDropTargetPhaseId] = useState<string | null>(null);
   const [enabledSystems, setEnabledSystems] = useState<Record<TournamentSystemId, boolean>>(initialEnabledSystems);
   const [maxGroups, setMaxGroups] = useState<number | null>(null);
   const [maxSwissRounds, setMaxSwissRounds] = useState<number | null>(null);
@@ -557,6 +561,13 @@ export function CreateTournamentPage() {
       swissRounds: effectiveMaxSwissRounds,
     });
     const phase = phaseDraftFromTemplate(template, participantCount, sport);
+    const following = phaseDrafts[insertIndex];
+    if (type === 'GROUPS') {
+      phase.groupCount = recommendGroupCount(phase.entrantCount, following?.entrantCount);
+    }
+    if (type === 'SWISS') {
+      phase.swissRounds = recommendedSwissRounds(phase.entrantCount);
+    }
     const candidate = [...phaseDrafts.slice(0, insertIndex), phase, ...phaseDrafts.slice(insertIndex)];
     if (!hasValidTerminalStageOrder(candidate.map((item) => item.type))) return;
     setPhaseDrafts(normalizePhaseEntrants(candidate));
@@ -572,24 +583,64 @@ export function CreateTournamentPage() {
     setPhaseDrafts((current) => normalizePhaseEntrants(current.filter((phase) => phase.id !== id)));
   }
 
-  function canMovePhase(index: number, direction: -1 | 1): boolean {
-    const target = index + direction;
-    if (target < 0 || target >= phaseDrafts.length) return false;
+  function reorderedPhases(fromIndex: number, toIndex: number): PhaseDraft[] | null {
+    if (fromIndex < 0 || fromIndex >= phaseDrafts.length || toIndex < 0 || toIndex >= phaseDrafts.length) return null;
+    if (fromIndex === toIndex) return null;
     const candidate = [...phaseDrafts];
-    [candidate[index], candidate[target]] = [candidate[target], candidate[index]];
-    return hasValidTerminalStageOrder(candidate.map((phase) => phase.type));
+    const [moved] = candidate.splice(fromIndex, 1);
+    candidate.splice(toIndex, 0, moved);
+    return hasValidTerminalStageOrder(candidate.map((phase) => phase.type)) ? candidate : null;
+  }
+
+  function canMovePhase(index: number, direction: -1 | 1): boolean {
+    return reorderedPhases(index, index + direction) !== null;
+  }
+
+  function reorderPhase(fromIndex: number, toIndex: number) {
+    const candidate = reorderedPhases(fromIndex, toIndex);
+    if (!candidate) return;
+    setSelectedRecommendationId(null);
+    setPhaseDrafts(normalizePhaseEntrants(candidate));
+    setPhaseInsertIndex(null);
   }
 
   function movePhase(index: number, direction: -1 | 1) {
-    if (!canMovePhase(index, direction)) return;
-    setSelectedRecommendationId(null);
-    setPhaseDrafts((current) => {
-      const next = [...current];
-      const target = index + direction;
-      [next[index], next[target]] = [next[target], next[index]];
-      return normalizePhaseEntrants(next);
-    });
+    reorderPhase(index, index + direction);
   }
+
+  function onPhaseDragStart(event: DragEvent<HTMLButtonElement>, id: string) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', id);
+    setDraggingPhaseId(id);
+    setDropTargetPhaseId(null);
+  }
+
+  function onPhaseDragOver(event: DragEvent<HTMLDivElement>, targetIndex: number) {
+    if (!draggingPhaseId) return;
+    const sourceIndex = phaseDrafts.findIndex((phase) => phase.id === draggingPhaseId);
+    if (reorderedPhases(sourceIndex, targetIndex)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      setDropTargetPhaseId(phaseDrafts[targetIndex].id);
+    } else {
+      setDropTargetPhaseId(null);
+    }
+  }
+
+  function onPhaseDrop(event: DragEvent<HTMLDivElement>, targetIndex: number) {
+    if (!draggingPhaseId) return;
+    event.preventDefault();
+    const sourceIndex = phaseDrafts.findIndex((phase) => phase.id === draggingPhaseId);
+    reorderPhase(sourceIndex, targetIndex);
+    setDraggingPhaseId(null);
+    setDropTargetPhaseId(null);
+  }
+
+  function onPhaseDragEnd() {
+    setDraggingPhaseId(null);
+    setDropTargetPhaseId(null);
+  }
+
 
   function updatePhase(id: string, patch: Partial<PhaseDraft>) {
     setSelectedRecommendationId(null);
@@ -611,6 +662,12 @@ export function CreateTournamentPage() {
       phase.type = type;
       phase.label = stageLabel(type);
       phase.bestOf = bestOf;
+      if (type === 'GROUPS') {
+        phase.groupCount = recommendGroupCount(phase.entrantCount, next[index + 1]?.entrantCount);
+      }
+      if (type === 'SWISS') {
+        phase.swissRounds = recommendedSwissRounds(phase.entrantCount);
+      }
       phase.customEntrants = isTerminalStage(type)
         ? phase.customEntrants || !knockoutEntrantPresets(index === 0 ? participantCount : next[index - 1].entrantCount).includes(phase.entrantCount)
         : false;
