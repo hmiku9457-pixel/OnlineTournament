@@ -4,6 +4,8 @@ import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { DrawActionButton } from '@/components/DrawActionButton';
 import { StageCard } from '@/components/StageCard';
 import { TournamentSummaryPanel } from '@/components/TournamentSummaryPanel';
+import { PrestartPhaseEditor } from '@/components/PrestartPhaseEditor';
+import { initialPrestartPhases, normalizePrestartPhases, validatePrestartPhases } from '@/domain/prestartPhasePlanning';
 import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
@@ -30,7 +32,7 @@ import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStag
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, getPendingMockApproval, approveMockProgress, abortMockTournament, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
 import { canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
-import { getStageWithdrawalLabel, getWithdrawalLabel } from '@/services/mockWithdrawals';
+import { getStageWithdrawalLabel, getWithdrawalLabel, isParticipantWithdrawn } from '@/services/mockWithdrawals';
 import { getMockConfirmedFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { FinalStandingsList } from '@/components/FinalStandingsList';
 import { VenueLayoutMini } from '@/components/VenueLayout';
@@ -517,6 +519,7 @@ export function TournamentControlPage() {
   const venueName = (name: string) => displayVenueName(tournament.sport, name);
   const venueMessage = (message: string) => displayVenueMessage(tournament.sport, message);
   const [tab, setTab] = useState<ControlTab>('summary');
+  const [showPrestartPhaseEditor, setShowPrestartPhaseEditor] = useState(false);
   const [tableView, setTableView] = useState<'cards' | 'hall'>('cards');
   const [selectedHallTable, setSelectedHallTable] = useState<string | null>(null);
   const [helpTopic, setHelpTopic] = useState<ControlHelpTopic | null>(null);
@@ -617,6 +620,11 @@ export function TournamentControlPage() {
   const matchFilterPhases = useMemo(() => [...new Set(allTournamentMatches.map((match) => match.phase))], [allTournamentMatches]);
   const matchFilterTables = useMemo(() => [...new Set(allTournamentMatches.map((match) => match.table).filter((table) => table.startsWith('Tisch ')))], [allTournamentMatches]);
   const participants = useMemo(() => getRuntimeParticipantNames(participantSource.tournament), [participantSource]);
+  const activePrestartParticipants = participants.filter((name) => !isParticipantWithdrawn(tournament, name)).length;
+  const prestartPlanNeedsReview = !tournament.hasStarted && validatePrestartPhases(
+    normalizePrestartPhases(initialPrestartPhases(tournament), activePrestartParticipants),
+    activePrestartParticipants,
+  ).length > 0;
   const participantProgress = useMemo(() => participants.map((name) => ({
     name,
     progress: getMockParticipantProgress(progressSource.tournament, name),
@@ -1057,7 +1065,7 @@ export function TournamentControlPage() {
             )}
             {!tournament.hasStarted && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
               <button className="btn primary control-start-tournament" type="button" onClick={requestStartTournament}
-                disabled={!tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
+                disabled={showPrestartPhaseEditor || !tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
                 title={tournament.stages[0] && getStageEntrants(tournament, tournament.stages[0]).length < 2 ? 'Mindestens zwei aktive Teilnehmer erforderlich' : undefined}>Turnier starten</button>
             )}
             {tournament.hasStarted && activeStage && activeStage.type !== 'BREAK' && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
@@ -1108,6 +1116,7 @@ export function TournamentControlPage() {
       </div>}
 
       {tab === 'summary' && (
+        <>
         <TournamentSummaryPanel
           tournament={tournament}
           participants={participants.length}
@@ -1123,7 +1132,28 @@ export function TournamentControlPage() {
           onParticipants={() => setTab('participants')}
           onStage={(stage) => { setSelectedStageId(stage.id); setTab('flow'); }}
           onFinalStandings={() => setTab('final')}
+          onEditPhases={!tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status)
+            ? () => setShowPrestartPhaseEditor((value) => !value) : undefined}
+          activeParticipants={activePrestartParticipants}
+          withdrawnParticipants={participants.length - activePrestartParticipants}
+          phasesNeedReview={prestartPlanNeedsReview}
         />
+        {showPrestartPhaseEditor && !tournament.hasStarted && (
+          <PrestartPhaseEditor
+            key={tournament.id}
+            tournament={tournament}
+            activeParticipants={activePrestartParticipants}
+            withdrawnParticipants={participants.length - activePrestartParticipants}
+            onSaved={() => {
+              setShowPrestartPhaseEditor(false);
+              setSelectedStageId(tournament.stages[0]?.id ?? '');
+              setDrawVersion((value) => value + 1);
+              refreshRuntime();
+            }}
+            onCancel={() => setShowPrestartPhaseEditor(false)}
+          />
+        )}
+        </>
       )}
 
       {tab === 'overview' && (
