@@ -193,7 +193,11 @@ export function recommendTournamentFormats(
   if (playerCount < 2 || tableCount < 1) return [];
 
   const recommendations: FormatRecommendation[] = [];
-  const maxDuration = settings.maxRecommendedDurationMinutes ?? DEFAULT_MAX_RECOMMENDED_DURATION_MINUTES;
+  // Preserve comparable format suggestions for sports with much longer sets.
+  // Explicitly configured duration limits remain absolute minutes.
+  const durationScale = Math.max(1, Math.max(1, input.matchDurationMinutes ?? MINUTES_PER_SET) / MINUTES_PER_SET);
+  const maxDuration = settings.maxRecommendedDurationMinutes
+    ?? Math.round(DEFAULT_MAX_RECOMMENDED_DURATION_MINUTES * durationScale);
   const group = calculateGroupPlan(playerCount, minimumMatches, settings.maxGroups);
   const swiss = calculateSwissPlan(playerCount, minimumMatches, settings.maxSwissRounds);
   const defaultQualifiers = playerCount >= 16 ? 8 : 4;
