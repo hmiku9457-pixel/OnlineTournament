@@ -621,10 +621,14 @@ export function TournamentControlPage() {
   const matchFilterTables = useMemo(() => [...new Set(allTournamentMatches.map((match) => match.table).filter((table) => table.startsWith('Tisch ')))], [allTournamentMatches]);
   const participants = useMemo(() => getRuntimeParticipantNames(participantSource.tournament), [participantSource]);
   const activePrestartParticipants = participants.filter((name) => !isParticipantWithdrawn(tournament, name)).length;
-  const prestartPlanNeedsReview = !tournament.hasStarted && validatePrestartPhases(
-    normalizePrestartPhases(initialPrestartPhases(tournament), activePrestartParticipants),
-    activePrestartParticipants,
-  ).length > 0;
+  const originalFirstField = tournament.stages.find((stage) => stage.type !== 'BREAK')?.settings.entrants;
+  const prestartPlanNeedsReview = !tournament.hasStarted && (
+    Number(originalFirstField) !== activePrestartParticipants
+    || validatePrestartPhases(
+      normalizePrestartPhases(initialPrestartPhases(tournament), activePrestartParticipants),
+      activePrestartParticipants,
+    ).length > 0
+  );
   const participantProgress = useMemo(() => participants.map((name) => ({
     name,
     progress: getMockParticipantProgress(progressSource.tournament, name),
@@ -1065,8 +1069,8 @@ export function TournamentControlPage() {
             )}
             {!tournament.hasStarted && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
               <button className="btn primary control-start-tournament" type="button" onClick={requestStartTournament}
-                disabled={showPrestartPhaseEditor || !tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
-                title={tournament.stages[0] && getStageEntrants(tournament, tournament.stages[0]).length < 2 ? 'Mindestens zwei aktive Teilnehmer erforderlich' : undefined}>Turnier starten</button>
+                disabled={prestartPlanNeedsReview || showPrestartPhaseEditor || !tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
+                title={prestartPlanNeedsReview ? 'Vor dem Start die Phasenplanung an die aktuelle Teilnehmerzahl anpassen.' : showPrestartPhaseEditor ? 'Bitte die Phasenbearbeitung zuerst abschließen.' : tournament.stages[0] && getStageEntrants(tournament, tournament.stages[0]).length < 2 ? 'Mindestens zwei aktive Teilnehmer erforderlich' : undefined}>Turnier starten</button>
             )}
             {tournament.hasStarted && activeStage && activeStage.type !== 'BREAK' && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
               <>
