@@ -48,7 +48,7 @@ import type { MockAuditEntry } from '@/services/mockAudit';
 type ControlTab = 'overview' | 'flow' | 'matches' | 'participants' | 'final' | 'audit';
 
 const tabs: Array<{ id: ControlTab; label: string }> = [
-  { id: 'overview', label: 'Übersicht' },
+  { id: 'overview', label: 'Turnierleitung' },
   { id: 'flow', label: 'Turnierverlauf' },
   { id: 'participants', label: 'Teilnehmer' },
   { id: 'matches', label: 'Spiele' },
