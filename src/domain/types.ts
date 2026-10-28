@@ -13,7 +13,7 @@ export type TournamentStatus =
 export type Visibility = 'PRIVATE' | 'UNLISTED' | 'PUBLIC';
 export type Discipline = 'SINGLES' | 'DOUBLES' | 'TEAMS';
 export type ParticipantStatus = 'ACTIVE' | 'WITHDRAWN' | 'DISQUALIFIED' | 'FINISHED';
-export type StageType = 'ROUND_ROBIN' | 'GROUPS' | 'SWISS' | 'KNOCKOUT' | 'DOUBLE_ELIMINATION' | 'PLACEMENT';
+export type StageType = 'ROUND_ROBIN' | 'GROUPS' | 'SWISS' | 'KNOCKOUT' | 'DOUBLE_ELIMINATION' | 'PLACEMENT' | 'BREAK';
 export type MatchStatus = 'DRAFT' | 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'CONFIRMED' | 'WALKOVER' | 'CANCELLED';
 
 export interface Tournament {
