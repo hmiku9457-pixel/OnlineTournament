@@ -128,6 +128,15 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
         Gruppen und Schweizer Runden werden geprüft und erhalten passende Empfehlungen.
       </p>
       <div className="prestart-editor-list">
+        {drafts.length === 0 && (
+          <div className="prestart-editor-insert-choices">
+            {types.filter((option) => option.type !== 'BREAK').map((option) => (
+              <button type="button" className="btn small" key={option.type}
+                disabled={option.type === 'GROUPS' && activeParticipants < 4}
+                onClick={() => insert(0, option.type)}>+ {option.name}</button>
+            ))}
+          </div>
+        )}
         {drafts.length > 0 && (
           <div className="prestart-editor-insert prestart-editor-before-first">
             <button className="prestart-editor-insert-trigger" type="button"
