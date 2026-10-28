@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { TournamentBreakNotice } from '@/components/TournamentBreakNotice';
 import { getMockPlayerSnapshot, getMockRuntimeMatches } from '@/services/mockRuntime';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import { getMockTournament } from '@/services/mockTournamentStore';
@@ -32,6 +33,8 @@ export function PlayerTournamentPage() {
           <Link className="btn" to={`/tournaments/${tournament.id}`}>Turnierinfo</Link>
         </div>
       </header>
+
+      <TournamentBreakNotice tournament={tournament} />
 
       <section className="player-dashboard">
         <main className="player-dashboard-main">
