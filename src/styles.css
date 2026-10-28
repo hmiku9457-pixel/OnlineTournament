@@ -3896,3 +3896,66 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .wizard-invalid-participants .btn { width: 100%; }
   .wizard-side-navigation { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
 }
+
+/* Phasen: Klickfläche und Griff bewusst voneinander getrennt. */
+.phase-sequence-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 7px;
+}
+.phase-sequence-row > .phase-config { min-width: 0; width: 100%; cursor: pointer; }
+.phase-sequence-row > .phase-config:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.phase-sequence-row > .phase-config.is-expanded { cursor: default; }
+.phase-sequence-row .phase-config-head { cursor: pointer; }
+.phase-sequence-row .phase-config-body, .phase-sequence-row .phase-config-body * { cursor: auto; }
+.phase-sequence-row .phase-config-body button { cursor: pointer; }
+.phase-sequence-row > .phase-config.is-collapsed:hover { background: #f5f9ff; border-color: #93c5fd; }
+.phase-drag-handle {
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  width: 32px;
+  min-height: 50px;
+  padding: 0;
+  border: 1px solid #d0d5dd;
+  border-radius: 9px;
+  background: #f2f4f7;
+  color: #667085;
+  font-size: 1.32rem;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.phase-drag-handle:hover { background: #e4e7ec; color: #344054; border-color: #98a2b3; }
+.phase-drag-handle:active { cursor: grabbing; }
+.phase-drag-handle:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.phase-sequence-item.is-being-dragged > .phase-sequence-row { opacity: .52; }
+.phase-sequence-item.is-drop-target > .phase-sequence-row > .phase-config {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px #bfdbfe;
+  background: #eff6ff;
+}
+.phase-configuration-recommendation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  border: 1px solid #bfdbfe;
+  background: #f5f9ff;
+  border-radius: 8px;
+  padding: 9px 11px;
+  margin-bottom: 10px;
+}
+.phase-configuration-recommendation > div { display: grid; gap: 4px; min-width: 0; flex: 1 1 230px; }
+.phase-configuration-recommendation strong { color: #175cd3; font-size: .78rem; }
+.phase-configuration-recommendation span { color: #475467; font-size: .73rem; line-height: 1.4; }
+.phase-configuration-recommendation .btn { flex: 0 0 auto; padding: 6px 9px; font-size: .72rem; }
+.phase-configuration-recommendation .btn:disabled { color: #067647; background: #ecfdf3; border-color: #abefc6; opacity: 1; }
+@media (max-width: 520px) {
+  .phase-sequence-row { grid-template-columns: 27px minmax(0, 1fr); gap: 5px; }
+  .phase-drag-handle { width: 27px; min-height: 43px; font-size: 1.1rem; }
+  .phase-configuration-recommendation .btn { width: 100%; }
+}
