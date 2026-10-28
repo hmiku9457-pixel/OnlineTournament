@@ -295,6 +295,7 @@ function NumberChoice({
 export function CreateTournamentPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<WizardStep>(1);
+  const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>(1);
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(false);
   const [name, setName] = useState('');
   const [sport, setSport] = useState('table_tennis');
@@ -309,7 +310,8 @@ export function CreateTournamentPage() {
   const [discipline, setDiscipline] = useState<Discipline>('SINGLES');
   const [tables, setTables] = useState(8);
   const [customTables, setCustomTables] = useState(false);
-  const [venueLayoutEnabled, setVenueLayoutEnabled] = useState(true);
+  const [venueLayoutEnabled, setVenueLayoutEnabled] = useState(false);
+  const [venueLayoutEditorOpen, setVenueLayoutEditorOpen] = useState(false);
   const [venueLayout, setVenueLayout] = useState(() => createVenueLayout(8));
   useEffect(() => { setVenueLayout((current) => resizeVenueLayout(current, current.columns, Math.max(current.rows, Math.ceil(tables / current.columns)), tables)); }, [tables]);
   const [participants, setParticipants] = useState<ParticipantDraft[]>([]);
@@ -369,21 +371,25 @@ export function CreateTournamentPage() {
     [recommendations, selectedRecommendationId],
   );
 
+  // Frühere Einstellungen dürfen vorhandene manuell angepasste Phasen nicht
+  // unbemerkt löschen oder eine Empfehlung erneut über die Änderungen legen.
   useEffect(() => {
-    if (selectedRecommendationId && !selectedRecommendation) {
-      setSelectedRecommendationId(null);
-      setPhaseDrafts([]);
-    }
+    if (selectedRecommendationId && !selectedRecommendation) setSelectedRecommendationId(null);
   }, [selectedRecommendationId, selectedRecommendation]);
-
-  useEffect(() => {
-    if (!selectedRecommendation) return;
-    setPhaseDrafts(selectedRecommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
-  }, [selectedRecommendation, participantCount, sport]);
 
   const phaseOrderValid = hasValidTerminalStageOrder(phaseDrafts.map((phase) => phase.type));
   const hasTerminalPhase = phaseDrafts.some((phase) => isTerminalStage(phase.type));
   const phaseConfigurationValid = phaseDrafts.length > 0 && phaseOrderValid;
+  const basicsValid = Boolean(name.trim()) && tables >= 1;
+  const gameSettingsValid = minimumMatches >= 1 && validMatchDuration && validTurnover;
+  const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
+    const maximum = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
+    return phase.entrantCount >= 2 && phase.entrantCount <= maximum
+      && (index !== 0 || phase.entrantCount === participantCount)
+      && (phase.type !== 'GROUPS' || (phase.groupCount >= 2 && phase.groupCount <= Math.floor(phase.entrantCount / 2)));
+  });
+  const canCreate = basicsValid && participantsValid && gameSettingsValid
+    && phaseConfigurationValid && phaseEntrantsValid && hasVisitedPhaseStep;
 
   const canContinue =
     (step === 1 && Boolean(name.trim()) && tables >= 1) ||
@@ -513,6 +519,16 @@ export function CreateTournamentPage() {
     return next;
   }
 
+  useEffect(() => {
+    setPhaseDrafts((current) => {
+      if (!current.length) return current;
+      const normalized = normalizePhaseEntrants(current);
+      return JSON.stringify(normalized) === JSON.stringify(current) ? current : normalized;
+    });
+  // Die Teilnehmerzahl ist die Quelle für das Startfeld aller Phasen.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [participantCount]);
+
   function addPhase(type: StageType) {
     if (phaseDrafts.some((phase) => isTerminalStage(phase.type))) return;
     const availableEntrants = phaseDrafts.length === 0
@@ -618,26 +634,33 @@ export function CreateTournamentPage() {
     updatePhase(phase.id, { knockoutBestOf: next });
   }
 
+  function navigateToStep(target: WizardStep) {
+    if (target > maxReachedStep) return;
+    setStep(target);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+
   function goNext() {
     if (!canContinue || step === 5) return;
+    const next = (step + 1) as WizardStep;
     if (step === 4) {
       if (phaseDrafts.length === 0 && selectedRecommendation) {
         setPhaseDrafts(selectedRecommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
       }
       setHasVisitedPhaseStep(true);
-      setStep(5);
-      return;
     }
-    setStep((step + 1) as WizardStep);
+    setMaxReachedStep((current) => Math.max(current, next) as WizardStep);
+    setStep(next);
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }
 
   function goBack() {
     if (step === 1) return;
-    setStep((step - 1) as WizardStep);
+    navigateToStep((step - 1) as WizardStep);
   }
 
   function submitTournament() {
-    if (step !== 5 || !hasVisitedPhaseStep || !phaseConfigurationValid || !participantsValid) return;
+    if (step !== 5 || !canCreate) return;
     const tournament = createMockTournament({
       name,
       sport,
@@ -695,7 +718,7 @@ export function CreateTournamentPage() {
       <header className="page-head">
         <div>
           <h1>Turnier erstellen</h1>
-          <p className="muted">Schritt {step} von 5 · Die Teilnehmerzahl ergibt sich automatisch aus den Einträgen.</p>
+          <p className="muted">Schritt {step} von 5 · Einstellungen bleiben erhalten und können jederzeit über die bereits erreichten Schritte geändert werden.</p>
         </div>
       </header>
 
@@ -704,10 +727,13 @@ export function CreateTournamentPage() {
           const stepNumber = (index + 1) as WizardStep;
           return (
             <button
-              className={`wizard-step ${step === stepNumber ? 'active' : ''} ${step > stepNumber ? 'done' : ''}`}
+              className={`wizard-step ${step === stepNumber ? 'active' : ''} ${maxReachedStep > stepNumber ? 'done' : ''}`}
               key={label}
               type="button"
-              onClick={() => stepNumber < step && setStep(stepNumber)}
+              aria-current={step === stepNumber ? 'step' : undefined}
+              disabled={stepNumber > maxReachedStep}
+              title={stepNumber > maxReachedStep ? 'Diesen Schritt erreichst du über Weiter.' : `Zu ${label} wechseln`}
+              onClick={() => navigateToStep(stepNumber)}
             >
               <span>{stepNumber}</span>
               {label}
@@ -716,6 +742,7 @@ export function CreateTournamentPage() {
         })}
       </nav>
 
+      <div className="wizard-workspace">
       <div className="card wizard-card">
         {step === 1 && (
           <section>
@@ -760,11 +787,26 @@ export function CreateTournamentPage() {
                 />
               </div>
             </div>
-            <div className="venue-optional">
-              <label className="format-toggle"><input type="checkbox" role="switch" checked={venueLayoutEnabled} onChange={(event) => setVenueLayoutEnabled(event.target.checked)} /> <strong>Spielflächenplan verwenden</strong></label>
-              <p className="field-hint">Der Plan kann eine Halle oder ein Außengelände darstellen und startet mit 10 Spalten × 3 Reihen. Mit dem Schalter legst du fest, ob die Anordnung ins Turnier übernommen wird.</p>
-              <VenueLayoutEditor layout={venueLayout} tableCount={tables} sport={sport} onChange={setVenueLayout} />
-              {!venueLayoutEnabled && <p className="field-hint">Layout deaktiviert – deine Anordnung bleibt im Editor erhalten, wird aber nicht ins Turnier übernommen.</p>}
+            <div className="venue-optional wizard-venue-choice">
+              <div className="wizard-venue-choice-head">
+                <div>
+                  <h3>Spielflächenplan <span className="wizard-optional-tag">Optional</span></h3>
+                  <p className="muted">Ohne Hallenplan werden die {venue.plural} automatisch nummeriert und zugewiesen. Einen individuellen Aufbau kannst du bei Bedarf aktivieren.</p>
+                </div>
+                <label className="format-toggle"><input type="checkbox" role="switch" checked={venueLayoutEnabled} onChange={(event) => { setVenueLayoutEnabled(event.target.checked); if (event.target.checked) setVenueLayoutEditorOpen(true); }} /> <strong>{venueLayoutEnabled ? 'Aktiv' : 'Aus'}</strong></label>
+              </div>
+              {venueLayoutEnabled && (
+                <>
+                  <div className="wizard-venue-choice-actions">
+                    <span className="muted">{venue.plural}: {tables} · Raster: {venueLayout.columns} × {venueLayout.rows}</span>
+                    <button className="btn small" type="button" aria-expanded={venueLayoutEditorOpen}
+                      onClick={() => setVenueLayoutEditorOpen((current) => !current)}>
+                      {venueLayoutEditorOpen ? 'Plan einklappen' : 'Plan bearbeiten'}
+                    </button>
+                  </div>
+                  {venueLayoutEditorOpen && <VenueLayoutEditor layout={venueLayout} tableCount={tables} sport={sport} onChange={setVenueLayout} />}
+                </>
+              )}
             </div>
           </section>
         )}
