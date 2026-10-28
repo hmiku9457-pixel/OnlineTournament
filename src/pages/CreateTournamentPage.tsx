@@ -637,7 +637,7 @@ export function CreateTournamentPage() {
   function navigateToStep(target: WizardStep) {
     if (target > maxReachedStep) return;
     setStep(target);
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
   function goNext() {
@@ -1294,66 +1294,7 @@ export function CreateTournamentPage() {
                 )}
               </div>
 
-              <aside className="creation-summary creation-summary-side">
-                <h3>Zusammenfassung</h3>
-                <dl>
-                  <div><dt>Turnier</dt><dd>{name}</dd></div>
-                  <div><dt>Disziplin</dt><dd>{discipline === 'SINGLES' ? 'Einzel' : 'Doppel'}</dd></div>
-                  <div><dt>Teilnehmer</dt><dd>{participantCount}</dd></div>
-                  <div><dt>{venue.plural}</dt><dd>{tables}</dd></div>
-                  <div><dt>Mindestspiele</dt><dd>{minimumMatches}</dd></div>
-                  <div><dt>Turnierdauer (grob)</dt><dd>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : '–'}</dd></div>
-                </dl>
 
-                <div className="phase-flow-summary">
-                  <strong>Phasen</strong>
-                  {phaseDrafts.length === 0 ? (
-                    <span className="muted">Noch keine Phasen festgelegt.</span>
-                  ) : (
-                    <div className="phase-flow">
-                      {phaseDrafts.map((phase, index) => {
-                        const estimate = phaseEstimates[index];
-                        return (
-                          <div className="phase-flow-item" key={`summary-${phase.id}`}>
-                            <div className="phase-flow-node">
-                              <div className="phase-flow-node-main">
-                                <span className="badge">Phase {index + 1}</span>
-                                <strong>{phase.label}</strong>
-                                <span className="muted phase-flow-detail">
-                                  {phase.type === 'GROUPS' && `${phase.groupCount} Gruppen${timedSport ? '' : ` · Best-of-${phase.bestOf}`}`}
-                                  {phase.type === 'SWISS' && `${phase.swissRounds} Runden${timedSport ? '' : ` · Best-of-${phase.bestOf}`}`}
-                                  {phase.type === 'KNOCKOUT' && `${phase.entrantCount} Teilnehmer${timedSport ? '' : ' · Best-of je Runde'}`}
-                                   
-                                  {phase.type === 'ROUND_ROBIN' && (timedSport ? 'Direkter Spielstand' : `Best-of-${phase.bestOf}`)}
-                                   
-                                </span>
-                              </div>
-                              {estimate && (
-                                <div className="phase-flow-metrics" aria-label={`Phase ${index + 1}: ${estimate.estimatedMatches} Spiele, etwa ${formatCompactDuration(estimate.estimatedDurationMinutes)}`}>
-                                  <strong>{estimate.approximate ? 'ca. ' : ''}{estimate.estimatedMatches} Spiele</strong>
-                                  <span>ca. {formatCompactDuration(estimate.estimatedDurationMinutes)}</span>
-                                </div>
-                              )}
-                            </div>
-                            {index < phaseDrafts.length - 1 && (
-                              <div className="phase-flow-arrow" aria-label={`${phaseDrafts[index + 1].entrantCount} Teilnehmer kommen weiter`}>
-                                <span aria-hidden="true">↓</span>
-                                <small>{phaseDrafts[index + 1].entrantCount} weiter</small>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {phaseDrafts.length > 0 && (
-                  <p className="muted creation-summary-note">
-                    {timedSport ? 'Schätzung mit eingestellter Spieldauer und möglicher Wechselzeit' : 'Schätzung mit 15 Min. pro Satz und durchschnittlicher Satzanzahl je Best-of'} bei paralleler Nutzung der verfügbaren {venue.dativePlural}.
-                  </p>
-                )}
-              </aside>
             </div>
           </section>
         )}
@@ -1372,10 +1313,77 @@ export function CreateTournamentPage() {
             {step < 5 ? (
               <button className="btn primary" type="button" onClick={goNext} disabled={!canContinue}>Weiter</button>
             ) : (
-              <button className="btn primary" type="button" onClick={submitTournament} disabled={!phaseConfigurationValid || !hasVisitedPhaseStep}>Turnier erstellen</button>
+              <button className="btn primary" type="button" onClick={submitTournament} disabled={!canCreate}>Turnier erstellen</button>
             )}
           </div>
         </footer>
+      </div>
+
+      <aside className="wizard-side-summary" aria-label="Aktuelle Einstellungen">
+        <div className="wizard-side-summary-heading">
+          <div>
+            <span className="wizard-side-kicker">Während der Erstellung</span>
+            <h2>Dein Turnier</h2>
+          </div>
+          <span className="wizard-side-step">{step}/5</span>
+        </div>
+        <div className="wizard-side-facts">
+          <button type="button" className="wizard-side-fact" onClick={() => navigateToStep(1)}>
+            <span>Grunddaten <span aria-hidden="true">↗</span></span>
+            <strong>{name.trim() || 'Noch kein Name'}</strong>
+            <small>{sportOptions.find((item) => item.id === sport)?.label ?? sport} · {discipline === 'SINGLES' ? 'Einzel' : 'Doppel'} · {tables} {venue.plural}</small>
+          </button>
+          <button type="button" className="wizard-side-fact" disabled={maxReachedStep < 2} onClick={() => navigateToStep(2)}>
+            <span>Teilnehmer {maxReachedStep >= 2 && <span aria-hidden="true">↗</span>}</span>
+            <strong>{participantCount} {discipline === 'SINGLES' ? 'Spieler' : 'Doppel'}</strong>
+            <small>{participantsValid ? 'Teilnehmerliste vollständig' : 'Mindestens 2 vollständige Einträge erforderlich'}</small>
+          </button>
+          <button type="button" className="wizard-side-fact" disabled={maxReachedStep < 3} onClick={() => navigateToStep(3)}>
+            <span>Spieldaten {maxReachedStep >= 3 && <span aria-hidden="true">↗</span>}</span>
+            <strong>Mindestens {minimumMatches} Spiele</strong>
+            <small>{timedSport ? `${matchDurationMinutes} Minuten Spielzeit` : '15 Minuten pro Satz (Planung)'}</small>
+          </button>
+          <button type="button" className="wizard-side-fact" disabled={maxReachedStep < 4} onClick={() => navigateToStep(4)}>
+            <span>Turnierform {maxReachedStep >= 4 && <span aria-hidden="true">↗</span>}</span>
+            <strong>{phaseDrafts.length ? `${phaseDrafts.length} ${phaseDrafts.length === 1 ? 'Phase' : 'Phasen'} konfiguriert` : 'Noch keine Form gewählt'}</strong>
+            <small>{selectedRecommendation ? 'Empfehlung übernommen – frei anpassbar' : 'Individuelle Phasenauswahl'}</small>
+          </button>
+        </div>
+        <div className="wizard-side-phase-summary">
+          <div className="wizard-side-phase-heading">
+            <strong>Phasenplan</strong>
+            {maxReachedStep >= 5 && <button className="wizard-side-link" type="button" onClick={() => navigateToStep(5)}>Bearbeiten</button>}
+          </div>
+          {phaseDrafts.length === 0
+            ? <p className="muted">Noch keine Phasen eingestellt.</p>
+            : <ol className="wizard-side-phase-list">
+              {phaseDrafts.map((phase, index) => (
+                <li key={phase.id}>
+                  <span className="wizard-side-phase-index">{index + 1}</span>
+                  <div>
+                    <strong>{phase.label}</strong>
+                    <small>{phase.type === 'GROUPS' ? `${phase.groupCount} Gruppen` : phase.type === 'SWISS' ? `${phase.swissRounds} Runden` : `${phase.entrantCount} Teilnehmer`} · {phaseEstimates[index] ? `${phaseEstimates[index].estimatedMatches} Spiele` : ''}</small>
+                  </div>
+                </li>
+              ))}
+            </ol>}
+        </div>
+        <div className="wizard-side-duration">
+          <span>Voraussichtliche Dauer</span>
+          <strong>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : 'Noch offen'}</strong>
+          {phaseDrafts.length > 0 && <small>Schätzung · verändert sich mit den Phasen und {venue.dativePlural}.</small>}
+        </div>
+        {maxReachedStep >= 5 && !canCreate && (
+          <div className="wizard-side-validation" role="status">
+            <strong>Noch nicht bereit zur Erstellung</strong>
+            {!basicsValid && <button type="button" onClick={() => navigateToStep(1)}>Grunddaten vervollständigen</button>}
+            {!participantsValid && <button type="button" onClick={() => navigateToStep(2)}>Teilnehmer überprüfen</button>}
+            {!gameSettingsValid && <button type="button" onClick={() => navigateToStep(3)}>Spieldaten korrigieren</button>}
+            {(!phaseConfigurationValid || !phaseEntrantsValid) && <button type="button" onClick={() => navigateToStep(5)}>Phasen prüfen</button>}
+          </div>
+        )}
+        <p className="wizard-side-footnote">Klicke auf eine bereits erreichte Einstellung, um sie direkt zu ändern.</p>
+      </aside>
       </div>
     </>
   );
