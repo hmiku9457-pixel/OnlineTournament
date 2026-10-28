@@ -657,7 +657,6 @@ export function TournamentControlPage() {
   const activeStage = useMemo(() => getActiveStage(phaseSource.tournament), [phaseSource]);
   const pendingApproval = useMemo(() => getPendingMockApproval(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   const activeBreak = activeStage?.type === 'BREAK' ? activeStage : null;
-  const breakResumeAt = activeBreak ? getBreakResumeAt(tournament, activeBreak) : null;
   const breakReady = activeBreak ? canFinishBreak(tournament, activeBreak, new Date()) : false;
   const reviewMatches = pendingApproval && activeStage
     ? getMockStageMatches(tournament, activeStage).filter((match) => pendingApproval.kind === 'STAGE'
