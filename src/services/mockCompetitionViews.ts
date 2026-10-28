@@ -2,7 +2,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { compareRankingRows, resultScore, resultWinnerSide, type ExtraTimeProgress, type ScoreDecision } from '@/domain/sportScoring';
 import { rankStandings } from '@/domain/standingRankings';
-import { getStageEntrants } from '@/services/mockPhaseLifecycle';
+import { getStageEntrants, getPreviousCompetitionStage } from '@/services/mockPhaseLifecycle';
 import { getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import {
   getMockStageBaseMatches,
@@ -215,7 +215,8 @@ export function buildSwissStandings(tournament: DemoTournament, stage: Tournamen
 export function getPreviousStageFinishLabels(tournament: DemoTournament, stage: TournamentStage) {
   const stageIndex = tournament.stages.findIndex((item) => item.id === stage.id);
   if (stageIndex <= 0) return {} as Record<string, string>;
-  const previous = tournament.stages[stageIndex - 1];
+  const previous = getPreviousCompetitionStage(tournament, stage);
+  if (!previous) return {} as Record<string, string>;
   const labels: Record<string, string> = {};
 
   if (previous.type === 'GROUPS') {
