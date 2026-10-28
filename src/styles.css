@@ -3959,3 +3959,69 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .phase-drag-handle { width: 27px; min-height: 43px; font-size: 1.1rem; }
   .phase-configuration-recommendation .btn { width: 100%; }
 }
+
+/* Pause / Spieltagsende: eigene Phase ohne Begegnungen oder Qualifikationswertung. */
+.break-phase-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+  align-items: start;
+}
+.break-phase-fields .field { display: grid; gap: 5px; min-width: 0; font-size: .77rem; }
+.break-phase-fields input,
+.break-phase-fields textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 35px;
+  padding: 8px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  color: #101828;
+  background: #fff;
+}
+.break-phase-fields textarea { resize: vertical; line-height: 1.45; }
+.break-phase-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+.break-phase-choice legend { font-size: .73rem; color: #475467; font-weight: 750; }
+.break-phase-choice label { display: inline-flex; align-items: center; gap: 6px; font-size: .76rem; cursor: pointer; }
+.break-phase-fields .break-phase-notes { grid-column: 1 / -1; }
+.tournament-break-panel { display: grid; justify-items: start; gap: 9px; margin-top: 12px; }
+.tournament-break-panel h3 { margin: 0; font-size: 1.15rem; }
+.tournament-break-panel p { margin: 0; line-height: 1.45; }
+.tournament-break-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  border-left: 3px solid #93c5fd;
+  border-radius: 5px;
+  background: #f5f9ff;
+  color: #344054;
+}
+.tournament-break-finished { color: #067647; font-size: .83rem; }
+.tournament-break-notice {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+  padding: 13px 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 11px;
+  background: #f5f9ff;
+}
+.tournament-break-notice-head { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
+.tournament-break-notice-head strong { font-size: .97rem; }
+.tournament-break-notice p { margin: 0; font-size: .83rem; line-height: 1.4; }
+.tournament-break-notice .tournament-break-note { background: #fff; font-size: .81rem; }
+@media (max-width: 650px) {
+  .break-phase-fields { grid-template-columns: minmax(0, 1fr); }
+  .break-phase-fields .break-phase-notes { grid-column: 1; }
+}
