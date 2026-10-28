@@ -261,6 +261,14 @@ export function getNextStartableStage(tournament: DemoTournament) {
   return tournament.stages.find((stage) => isStageEditable(tournament, stage) && getStageIndex(tournament, stage) > 0);
 }
 
+/** Clear stale stage entrant snapshots after a pre-start format change. */
+export function resetPrestartPhaseLifecycle(tournament: DemoTournament): void {
+  const state = getPhaseLifecycle(tournament);
+  if (tournament.hasStarted || state.startedStageIds.length > 0) return;
+  const all = readAll();
+  writeAll(all.filter((entry) => entry.tournamentId !== tournament.id));
+}
+
 export function clearMockPhaseLifecycle() {
   if (typeof window === 'undefined') return;
   window.localStorage.removeItem(PHASE_KEY);
