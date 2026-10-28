@@ -134,6 +134,23 @@ export function recommendGroupCount(entrants: number, followingEntrants?: number
   return best;
 }
 
+/** Describe the actual distribution of entrants across groups, without 4–4 ranges. */
+export function formatGroupDistribution(entrantCount: number, groupCount: number): string {
+  const groups = Math.max(1, Math.trunc(groupCount));
+  const entrants = Math.max(0, Math.trunc(entrantCount));
+  const smallerSize = Math.floor(entrants / groups);
+  const largerGroups = entrants % groups;
+
+  if (largerGroups === 0) {
+    return `${groups} ${groups === 1 ? 'Gruppe' : 'Gruppen'} mit je ${smallerSize} ${smallerSize === 1 ? 'Spieler' : 'Spielern'}`;
+  }
+
+  const smallerGroups = groups - largerGroups;
+  const describe = (count: number, size: number) =>
+    `${count} × ${size}er-${count === 1 ? 'Gruppe' : 'Gruppen'}`;
+  return [describe(largerGroups, smallerSize + 1), describe(smallerGroups, smallerSize)].join(' und ');
+}
+
 function combination(n: number, k: number): number {
   if (k < 0 || k > n) return 0;
   const effectiveK = Math.min(k, n - k);
