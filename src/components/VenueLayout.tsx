@@ -9,9 +9,13 @@ import {
   type DeskDock,
 } from '@/domain/venueLayout';
 
-const dockNames: Record<DeskDock, string> = {
-  none: 'Kein Außen-Dock', top: 'Oben', right: 'Rechts', bottom: 'Unten', left: 'Links',
-};
+const dockPositions: { value: DeskDock; label: string; description: string }[] = [
+  { value: 'top', label: 'TL oben', description: 'Turnierleitung oberhalb des Spielplans' },
+  { value: 'right', label: 'TL rechts', description: 'Turnierleitung rechts neben dem Spielplan' },
+  { value: 'bottom', label: 'TL unten', description: 'Turnierleitung unterhalb des Spielplans' },
+  { value: 'left', label: 'TL links', description: 'Turnierleitung links neben dem Spielplan' },
+  { value: 'none', label: 'Ohne TL-Dock', description: 'Keine Turnierleitung außerhalb des Spielplans' },
+];
 
 function tileLabel(token: VenueCell, compact: boolean, sport: string) {
   if (token === 'desk') return compact ? 'TL' : 'Turnierleitung';
@@ -122,9 +126,20 @@ export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
       <div className="hall-editor-toolrow">
         <div className="hall-editor-tools">
           <button type="button" className={`btn small ${selected === 'space' ? 'primary' : ''}`} aria-pressed={selected === 'space'} onClick={() => setSelected((old) => old === 'space' ? null : 'space')}>Freifläche markieren</button>
-          <button type="button" className={`btn small ${selected === 'desk' ? 'primary' : ''}`} aria-pressed={selected === 'desk'} onClick={() => setSelected((old) => old === 'desk' ? null : 'desk')}>Turnierleitung platzieren</button>
+          <button type="button" className={`btn small ${selected === 'desk' ? 'primary' : ''}`} aria-pressed={selected === 'desk'} onClick={() => setSelected((old) => old === 'desk' ? null : 'desk')}>TL in Spielplan setzen</button>
+          <div className="hall-editor-dock-actions" role="group" aria-label="TL-Docking außerhalb des Spielplans">
+            {dockPositions.map(({ value, label, description }) => (
+              <button key={value} type="button"
+                className={`btn small hall-editor-dock-button ${layout.deskDock === value ? 'is-active' : ''}`}
+                aria-label={description} title={description} aria-pressed={layout.deskDock === value}
+                onClick={() => { onChange(dockVenueDesk(layout, value)); setSelected(null); }}>
+                {label}
+              </button>
+            ))}
+          </div>
           {selected !== null && <button type="button" className="btn small" onClick={() => setSelected(null)}>Auswahl aufheben</button>}
         </div>
+        <span className="hall-editor-tl-hint">TL = Turnierleitung</span>
       </div>
       <div className="hall-editor-grid-controls" role="group" aria-label="Rastergröße ändern">
         <div className="hall-editor-stepper">
@@ -158,16 +173,6 @@ export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
           `Klicke zuerst auf ${venue.singular === 'Spielfeld' ? 'ein Spielfeld' : `einen ${venue.singular}`} und dann auf das Zielfeld – oder ziehe es mit der Maus.`}
         {' '}Belegte Felder werden getauscht.
       </p>
-      <details className="hall-editor-advanced">
-        <summary>Position der Turnierleitung anpassen</summary>
-        <div className="hall-editor-dimensions">
-          <label className="field hall-dock-field">Turnierleitung außerhalb
-            <select value={layout.deskDock} onChange={(event) => { onChange(dockVenueDesk(layout, event.target.value as DeskDock)); setSelected(null); }}>
-              {Object.entries(dockNames).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
-        </div>
-      </details>
     </div>
   );
 }
