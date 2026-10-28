@@ -82,6 +82,17 @@ export function getStageIndex(tournament: DemoTournament, stage: TournamentStage
   return tournament.stages.findIndex((item) => item.id === stage.id);
 }
 
+/** Skip schedule-only breaks when querying competitive phase neighbors. */
+export function getPreviousCompetitionStage(tournament: DemoTournament, stage: TournamentStage): TournamentStage | undefined {
+  const index = getStageIndex(tournament, stage);
+  return index <= 0 ? undefined : tournament.stages.slice(0, index).reverse().find((candidate) => candidate.type !== 'BREAK');
+}
+
+export function getNextCompetitionStage(tournament: DemoTournament, stage: TournamentStage): TournamentStage | undefined {
+  const index = getStageIndex(tournament, stage);
+  return index < 0 ? undefined : tournament.stages.slice(index + 1).find((candidate) => candidate.type !== 'BREAK');
+}
+
 export function getActiveStage(tournament: DemoTournament) {
   const state = getPhaseLifecycle(tournament);
   return tournament.stages.find((stage) => state.startedStageIds.includes(stage.id) && !state.completedStageIds.includes(stage.id));
