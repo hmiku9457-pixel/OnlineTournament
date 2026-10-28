@@ -350,3 +350,10 @@ export function hasValidTerminalStageOrder(types: StageType[]): boolean {
   const terminalIndex = types.findIndex(isTerminalStage);
   return terminalIndex === -1 || terminalIndex === types.length - 1;
 }
+
+/** A break needs a competition before and after it; two breaks cannot overlap. */
+export function hasValidBreakStageOrder(types: StageType[]): boolean {
+  return types.every((type, index) => type !== 'BREAK' ||
+    (index > 0 && index < types.length - 1 &&
+      types[index - 1] !== 'BREAK' && types[index + 1] !== 'BREAK'));
+}
