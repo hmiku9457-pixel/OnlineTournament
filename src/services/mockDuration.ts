@@ -1,9 +1,9 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { planningMinutesPerSet } from '@/domain/sports';
-import { getBreakResumeAt, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
+import { getBreakResumeAt, getStageEntrants, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getMockStageBaseMatches, getMockStoredResult } from '@/services/mockRuntime';
-import { getStageEntrants, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
+
 import { getBlockedMockTables } from '@/services/mockTableLocks';
 import { sportScoring } from '@/domain/sportScoring';
 
