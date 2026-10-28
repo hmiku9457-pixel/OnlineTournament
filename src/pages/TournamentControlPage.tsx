@@ -7,6 +7,7 @@ import { TournamentSummaryPanel } from '@/components/TournamentSummaryPanel';
 import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
+import { disciplineLabel } from '@/domain/sports';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { GroupMatchDayList } from '@/components/GroupMatchDayList';
 import { BracketLiveStatus, BracketScoreCells, BracketSetScores, BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
@@ -454,16 +455,17 @@ function StageCompetitionView({
   return <StageCard stage={stage} />;
 }
 
-function ParticipantEditFields({ name, code, usedCodes, onSave, onCancel }: {
+function ParticipantEditFields({ name, code, isTeam, usedCodes, onSave, onCancel }: {
   name: string;
   code: string;
+  isTeam: boolean;
   usedCodes: ReadonlySet<string>;
   onSave: (firstName: string, lastName: string, playerCode: string) => boolean;
   onCancel: () => void;
 }) {
   const nameParts = name.trim().split(/\s+/);
-  const [firstName, setFirstName] = useState(nameParts[0] ?? '');
-  const [lastName, setLastName] = useState(nameParts.slice(1).join(' '));
+  const [firstName, setFirstName] = useState(isTeam ? name : nameParts[0] ?? '');
+  const [lastName, setLastName] = useState(isTeam ? '' : nameParts.slice(1).join(' '));
   const [playerCode, setPlayerCode] = useState(code);
   const [error, setError] = useState('');
   function generateNewCode() {
@@ -488,8 +490,8 @@ function ParticipantEditFields({ name, code, usedCodes, onSave, onCancel }: {
       }
       if (!onSave(firstName, lastName, trimmedCode)) setError('Bitte vollständigen, eindeutigen Teilnehmernamen und einen gültigen Spielercode angeben.');
     }}>
-      <label className="field"><span>Vorname</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="off" /></label>
-      <label className="field"><span>Nachname</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="off" /></label>
+      <label className={`field${isTeam ? ' participant-team-name-field' : ''}`}><span>{isTeam ? 'Mannschaftsname' : 'Vorname'}</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="off" /></label>
+      {!isTeam && <label className="field"><span>Nachname</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="off" /></label>}
       <div className="field participant-code-field">
         <label htmlFor="participant-edit-code">Spielercode</label>
         <div className="participant-code-controls">
@@ -1035,7 +1037,7 @@ export function TournamentControlPage() {
               <h1>{tournament.name}</h1>
               <span className={`badge control-tournament-status status-${tournament.status.toLowerCase()}`}>Status: {statusLabel(tournament.status)}</span>
             </div>
-            <p className="muted">{tournament.discipline === 'DOUBLES' ? 'Doppel' : 'Einzel'} · {participants.length} Teilnehmer · {tournament.tables} {venue.plural} · {tournament.stages.length} Phasen</p>
+            <p className="muted">{disciplineLabel(tournament.discipline)} · {participants.length} Teilnehmer · {tournament.tables} {venue.plural} · {tournament.stages.length} Phasen</p>
           </div>
           <div className="control-header-tools no-print">
             <div className="actions control-primary-actions">
@@ -1486,13 +1488,13 @@ export function TournamentControlPage() {
           {showParticipantAdd && !tournament.hasStarted && (
             <form className={`participant-add-panel${tournament.discipline === 'DOUBLES' ? ' is-doubles' : ''}`} onSubmit={(event) => { event.preventDefault(); handleAddParticipant(); }}>
               <div className="participant-add-heading">
-                <strong>{tournament.discipline === 'DOUBLES' ? 'Doppelpaar nachtragen' : 'Spieler nachtragen'}</strong>
+                <strong>{tournament.discipline === 'TEAMS' ? 'Mannschaft nachtragen' : tournament.discipline === 'DOUBLES' ? 'Doppelpaar nachtragen' : 'Spieler nachtragen'}</strong>
                 <span className="field-hint">Neue Teilnehmer werden vor Turnierstart direkt in die Auslosung aufgenommen.</span>
               </div>
               <div className="participant-add-body">
                 <div className="participant-add-fields">
-                <label className="field">Vorname<input value={newParticipantFirst} onChange={(event) => setNewParticipantFirst(event.target.value)} /></label>
-                <label className="field">Nachname<input value={newParticipantLast} onChange={(event) => setNewParticipantLast(event.target.value)} /></label>
+                <label className="field">{tournament.discipline === 'TEAMS' ? 'Mannschaftsname' : 'Vorname'}<input value={newParticipantFirst} onChange={(event) => setNewParticipantFirst(event.target.value)} /></label>
+                {tournament.discipline !== 'TEAMS' && <label className="field">Nachname<input value={newParticipantLast} onChange={(event) => setNewParticipantLast(event.target.value)} /></label>}
                 {tournament.discipline === 'DOUBLES' && (
                   <>
                     <label className="field">Partner: Vorname<input value={newPartnerFirst} onChange={(event) => setNewPartnerFirst(event.target.value)} /></label>
@@ -1553,7 +1555,7 @@ export function TournamentControlPage() {
             </div>
             {participantPanel.mode === 'edit' ? (
               <>
-                <ParticipantEditFields key={participantPanel.name} name={participantPanel.name}
+                <ParticipantEditFields key={participantPanel.name} name={participantPanel.name} isTeam={tournament.discipline === 'TEAMS'}
                   code={tournament.participantCodes?.[participantPanel.name] ?? String(4100 + selectedParticipantIndex).slice(-4)}
                   usedCodes={new Set(Object.entries(tournament.participantCodes ?? {}).filter(([owner]) => owner !== participantPanel.name).map(([, code]) => code))}
                   onSave={(first, last, code) => {
