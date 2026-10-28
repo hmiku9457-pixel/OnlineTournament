@@ -1486,7 +1486,7 @@ export function TournamentControlPage() {
             </div>
           </div>
           {showParticipantAdd && !tournament.hasStarted && (
-            <form className={`participant-add-panel${tournament.discipline === 'DOUBLES' ? ' is-doubles' : ''}`} onSubmit={(event) => { event.preventDefault(); handleAddParticipant(); }}>
+            <form className={`participant-add-panel${tournament.discipline === 'DOUBLES' ? ' is-doubles' : tournament.discipline === 'TEAMS' ? ' is-teams' : ''}`} onSubmit={(event) => { event.preventDefault(); handleAddParticipant(); }}>
               <div className="participant-add-heading">
                 <strong>{tournament.discipline === 'TEAMS' ? 'Mannschaft nachtragen' : tournament.discipline === 'DOUBLES' ? 'Doppelpaar nachtragen' : 'Spieler nachtragen'}</strong>
                 <span className="field-hint">Neue Teilnehmer werden vor Turnierstart direkt in die Auslosung aufgenommen.</span>
