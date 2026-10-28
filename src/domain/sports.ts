@@ -1,3 +1,5 @@
+import type { Discipline } from '@/domain/types';
+
 /** Zentrale Sportartenliste für die Turniererstellung und ihre Anzeige. */
 export const sportOptions = [
   { id: 'table_tennis', label: 'Tischtennis', venueKind: 'table' },
@@ -23,4 +25,29 @@ export function findSportOption(value: string) {
 
 export function getSportLabel(value: string): string {
   return findSportOption(value)?.label ?? value;
+}
+
+export interface SportDisciplineOption {
+  value: Discipline;
+  label: string;
+}
+
+const singles: SportDisciplineOption = { value: 'SINGLES', label: 'Einzel' };
+const doubles: SportDisciplineOption = { value: 'DOUBLES', label: 'Doppel' };
+const teams: SportDisciplineOption = { value: 'TEAMS', label: 'Mannschaften' };
+
+/** Only offer disciplines the tournament creator can represent for this sport. */
+export function disciplineOptionsForSport(sport: string): SportDisciplineOption[] {
+  const id = findSportOption(sport)?.id;
+  if (!id) return [];
+  if (id === 'table_tennis' || id === 'tennis' || id === 'badminton') return [singles, doubles];
+  if (id === 'padel') return [doubles];
+  if (id === 'squash') return [singles];
+  return [teams];
+}
+
+export function disciplineLabel(discipline: Discipline): string {
+  if (discipline === 'DOUBLES') return 'Doppel';
+  if (discipline === 'TEAMS') return 'Mannschaften';
+  return 'Einzel';
 }
