@@ -1035,7 +1035,7 @@ export function TournamentControlPage() {
               <h1>{tournament.name}</h1>
               <span className={`badge control-tournament-status status-${tournament.status.toLowerCase()}`}>Status: {statusLabel(tournament.status)}</span>
             </div>
-            <p className="muted">{tournament.phasesLabel} · {tournament.participants} Teilnehmer · {tournament.tables} {venue.plural}</p>
+            <p className="muted">{tournament.discipline === 'DOUBLES' ? 'Doppel' : 'Einzel'} · {participants.length} Teilnehmer · {tournament.tables} {venue.plural} · {tournament.stages.length} Phasen</p>
           </div>
           <div className="control-header-tools no-print">
             <div className="actions control-primary-actions">
