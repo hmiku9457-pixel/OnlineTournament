@@ -180,7 +180,7 @@ export function getBreakResumeAt(tournament: DemoTournament, stage: TournamentSt
   if (Number.isNaN(start.getTime())) return null;
   if (stage.settings.breakKind === 'overnight') {
     const startTime = String(stage.settings.nextDayStart ?? '09:00');
-    if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(startTime)) return null;
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime)) return null;
     const [hours, minutes] = startTime.split(':').map(Number);
     const resume = new Date(start);
     resume.setDate(resume.getDate() + 1);
