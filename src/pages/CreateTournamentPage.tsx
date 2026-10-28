@@ -566,7 +566,7 @@ export function CreateTournamentPage() {
       phase.groupCount = recommendGroupCount(phase.entrantCount, following?.entrantCount);
     }
     if (type === 'SWISS') {
-      phase.swissRounds = recommendedSwissRounds(phase.entrantCount);
+      phase.swissRounds = recommendedSwissRounds(phase.entrantCount, minimumMatches);
     }
     const candidate = [...phaseDrafts.slice(0, insertIndex), phase, ...phaseDrafts.slice(insertIndex)];
     if (!hasValidTerminalStageOrder(candidate.map((item) => item.type))) return;
@@ -666,7 +666,7 @@ export function CreateTournamentPage() {
         phase.groupCount = recommendGroupCount(phase.entrantCount, next[index + 1]?.entrantCount);
       }
       if (type === 'SWISS') {
-        phase.swissRounds = recommendedSwissRounds(phase.entrantCount);
+        phase.swissRounds = recommendedSwissRounds(phase.entrantCount, minimumMatches);
       }
       phase.customEntrants = isTerminalStage(type)
         ? phase.customEntrants || !knockoutEntrantPresets(index === 0 ? participantCount : next[index - 1].entrantCount).includes(phase.entrantCount)
@@ -1227,7 +1227,7 @@ export function CreateTournamentPage() {
                       const recommendedGroups = phase.type === 'GROUPS'
                         ? recommendGroupCount(phase.entrantCount, nextPhase?.entrantCount) : null;
                       const recommendedRounds = phase.type === 'SWISS'
-                        ? recommendedSwissRounds(phase.entrantCount) : null;
+                        ? recommendedSwissRounds(phase.entrantCount, minimumMatches) : null;
                       const groupQualifiers = nextPhase && nextPhase.entrantCount < phase.entrantCount
                         ? nextPhase.entrantCount : null;
                       return (
@@ -1341,7 +1341,7 @@ export function CreateTournamentPage() {
                                 <>
                                   <div>
                                     <strong>Empfehlung: {recommendedRounds} Schweizer Runden</strong>
-                                    <span>Berechnet aus {phase.entrantCount} Teilnehmern (≈ log₂). Für die meisten Felder ein sinnvoller Ausgangspunkt.</span>
+                                    <span>Berücksichtigt {phase.entrantCount} Teilnehmer und mindestens {minimumMatches} gewünschte Spiele (höchstens 30 Runden und ohne zusätzliche Wiederholungspaarungen).</span>
                                   </div>
                                   <button type="button" className="btn small"
                                     disabled={phase.swissRounds === recommendedRounds}
