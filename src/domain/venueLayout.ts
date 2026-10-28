@@ -36,10 +36,10 @@ export function resizeVenueLayout(layout: VenueLayout, columns: number, rows: nu
   for (let r = 0; r < layout.rows; r++) {
     for (let c = 0; c < layout.columns; c++) {
       const token = layout.cells[r * layout.columns + c] ?? '';
-      if (!token || token === 'space') continue;
+      if (!token) continue;
       if (token.startsWith('table:') && Number(token.slice(6)) > count) continue;
       if (r < height && c < width) cells[r * width + c] = token;
-      else overflow.push(token);
+      else if (token !== 'space') overflow.push(token);
     }
   }
   const present = new Set(layoutTableNumbers({ ...layout, cells }));
@@ -47,7 +47,10 @@ export function resizeVenueLayout(layout: VenueLayout, columns: number, rows: nu
     if (!present.has(table) && !overflow.includes(`table:${table}`)) overflow.push(`table:${table}`);
   }
   for (const token of overflow) {
-    const slot = cells.findIndex((cell) => cell === '');
+    // Markierte Freiflächen behalten ihre Position, solange genug Raum bleibt.
+    // Fehlt beim Verkleinern Platz, haben Tische und Turnierleitung Vorrang.
+    const empty = cells.findIndex((cell) => cell === '');
+    const slot = empty >= 0 ? empty : cells.findIndex((cell) => cell === 'space');
     if (slot < 0) return layout;
     cells[slot] = token;
   }
