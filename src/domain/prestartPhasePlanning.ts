@@ -52,17 +52,19 @@ export function initialPrestartPhases(tournament: DemoTournament): PrestartPhase
  */
 export function normalizePrestartPhases(phases: PrestartPhaseDraft[], activeCount: number): PrestartPhaseDraft[] {
   let available = Math.max(0, Math.floor(activeCount));
+  let firstPlayingPhase = true;
   return phases.map((original) => {
     const phase = { ...original, knockoutBestOf: [...original.knockoutBestOf] };
     if (phase.type === 'BREAK') {
       phase.entrantCount = available;
       return phase;
     }
-    phase.entrantCount = phase === phases[0] ? available : Math.max(2, Math.min(available, phase.entrantCount));
-    // The first competitive stage always uses all currently active participants.
-    if (!phases.slice(0, phases.indexOf(original)).some((entry) => entry.type !== 'BREAK')) {
-      phase.entrantCount = available;
-    }
+    // The first playing phase takes everyone still registered. Later phases
+    // retain their configured cutoffs, bounded by the previous entrants.
+    phase.entrantCount = firstPlayingPhase
+      ? available
+      : Math.max(2, Math.min(available, phase.entrantCount));
+    firstPlayingPhase = false;
     available = phase.entrantCount;
     if (phase.type === 'KNOCKOUT') {
       const rounds = knockoutRoundLabels(Math.max(2, phase.entrantCount)).length;
