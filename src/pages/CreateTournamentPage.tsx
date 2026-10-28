@@ -670,9 +670,9 @@ export function CreateTournamentPage() {
   }
 
   function goNext() {
-    if (!canContinue || step === 5) return;
+    if (!canContinue || step === 4) return;
     const next = (step + 1) as WizardStep;
-    if (step === 4) {
+    if (step === 3) {
       if (phaseDrafts.length === 0 && selectedRecommendation) {
         setPhaseDrafts(selectedRecommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
       }
@@ -689,7 +689,7 @@ export function CreateTournamentPage() {
   }
 
   function submitTournament() {
-    if (step !== 5 || !canCreate) return;
+    if (step !== 4 || !canCreate) return;
     const tournament = createMockTournament({
       name,
       sport,
@@ -747,7 +747,7 @@ export function CreateTournamentPage() {
       <header className="page-head">
         <div>
           <h1>Turnier erstellen</h1>
-          <p className="muted">Schritt {step} von 5 · Einstellungen bleiben erhalten und können jederzeit über die bereits erreichten Schritte geändert werden.</p>
+          <p className="muted">Schritt {step} von 4 · Einstellungen bleiben erhalten und können jederzeit über die bereits erreichten Schritte geändert werden.</p>
         </div>
       </header>
 
@@ -755,7 +755,7 @@ export function CreateTournamentPage() {
         {stepLabels.map((label, index) => {
           const stepNumber = (index + 1) as WizardStep;
           const reached = stepNumber <= maxReachedStep;
-          const stepValid = [basicsValid, participantsValid, gameSettingsValid, maxReachedStep >= 5,
+          const stepValid = [basicsValid, participantsValid, maxReachedStep >= 4,
             phaseConfigurationValid && phaseEntrantsValid][index];
           const current = step === stepNumber;
           const complete = reached && !current && stepValid;
@@ -869,6 +869,38 @@ export function CreateTournamentPage() {
                   {venueLayoutEditorOpen && <VenueLayoutEditor layout={venueLayout} tableCount={tables} sport={sport} onChange={setVenueLayout} />}
                 </>
               )}
+            </div>
+            <div className="wizard-game-settings">
+              <div className="wizard-game-settings-heading">
+                <h3>Spieldaten</h3>
+                <p className="muted">Die Mindestspielzahl steuert die Turnierempfehlungen. Die Best-of-Werte stellst du später je Phase ein.</p>
+              </div>
+            <div className="spieldaten-layout">
+              <div className="field">
+                <label>Gewünschte Mindestspiele pro Teilnehmer</label>
+                <NumberChoice
+                  ariaLabel="Gewünschte Mindestspiele pro Teilnehmer"
+                  value={minimumMatches}
+                  presets={[1, 2, 3, 4, 5]}
+                  custom={customMinimumMatches}
+                  customMinimum={6}
+                  onPreset={(value) => { setMinimumMatches(value); setCustomMinimumMatches(false); }}
+                  onCustom={() => { setCustomMinimumMatches(true); setMinimumMatches((current) => current > 5 ? current : 6); }}
+                  onCustomValue={setMinimumMatches}
+                />
+              </div>
+              <div className="field match-timing-fields">
+                <label htmlFor="match-duration">{timedSport ? 'Spieldauer (Minuten) *' : 'Satzdauer (Minuten)'}</label>
+                <input id="match-duration" type="number" min="1" step="1" required={timedSport} value={timedSport ? timedMatchMinutes : '15'} disabled={!timedSport} placeholder={timedSport ? 'Pflichtfeld – z. B. 12' : undefined} onChange={(event) => setTimedMatchMinutes(event.target.value)} />
+                {!timedSport && <span className="field-hint">Planungswert: derzeit 15 Minuten je Satz.</span>}
+                {timedSport && <>
+                  <label htmlFor="venue-turnover">Pause zwischen Spielen auf derselben Spielfläche (Minuten)</label>
+                  <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => setVenueTurnoverMinutes(event.target.value)} />
+                  <span className="field-hint">Die Pause wird in der groben Spielplan-Dauer berücksichtigt; leer bedeutet 0 Minuten.</span>
+                  {(!validMatchDuration || !validTurnover) && <span className="field-error">Bitte gültige ganze Minutenwerte angeben. Die Spieldauer ist erforderlich.</span>}
+                </>}
+              </div>
+            </div>
             </div>
           </section>
         )}
@@ -1000,49 +1032,11 @@ export function CreateTournamentPage() {
           </section>
         )}
 
+
         {step === 3 && (
           <section>
-            <h2>Spieldaten</h2>
-            <p className="muted">Die gewünschte Mindestanzahl beeinflusst die Formatempfehlung. Best-of wird anschließend in den Phasen festgelegt.</p>
-            <div className="spieldaten-layout">
-              <div className="field">
-                <label>Gewünschte Mindestspiele pro Teilnehmer</label>
-                <NumberChoice
-                  ariaLabel="Gewünschte Mindestspiele pro Teilnehmer"
-                  value={minimumMatches}
-                  presets={[1, 2, 3, 4, 5]}
-                  custom={customMinimumMatches}
-                  customMinimum={6}
-                  onPreset={(value) => { setMinimumMatches(value); setCustomMinimumMatches(false); }}
-                  onCustom={() => { setCustomMinimumMatches(true); setMinimumMatches((current) => current > 5 ? current : 6); }}
-                  onCustomValue={setMinimumMatches}
-                />
-              </div>
-              <div className="field match-timing-fields">
-                <label htmlFor="match-duration">{timedSport ? 'Spieldauer (Minuten) *' : 'Satzdauer (Minuten)'}</label>
-                <input id="match-duration" type="number" min="1" step="1" required={timedSport} value={timedSport ? timedMatchMinutes : '15'} disabled={!timedSport} placeholder={timedSport ? 'Pflichtfeld – z. B. 12' : undefined} onChange={(event) => setTimedMatchMinutes(event.target.value)} />
-                {!timedSport && <span className="field-hint">Planungswert: derzeit 15 Minuten je Satz.</span>}
-                {timedSport && <>
-                  <label htmlFor="venue-turnover">Pause zwischen Spielen auf derselben Spielfläche (Minuten)</label>
-                  <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => setVenueTurnoverMinutes(event.target.value)} />
-                  <span className="field-hint">Die Pause wird in der groben Spielplan-Dauer berücksichtigt; leer bedeutet 0 Minuten.</span>
-                  {(!validMatchDuration || !validTurnover) && <span className="field-error">Bitte gültige ganze Minutenwerte angeben. Die Spieldauer ist erforderlich.</span>}
-                </>}
-              </div>
-              <div className="summary-box">
-                <strong>{participantCount}</strong>
-                <span>{discipline === 'TEAMS' ? 'Mannschaften' : discipline === 'SINGLES' ? 'Teilnehmer' : 'Doppel'}</span>
-                <strong>{tables}</strong>
-                <span>{venue.plural}</span>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {step === 4 && (
-          <section>
             <h2>Turnierform auswählen</h2>
-            <p className="muted">Vorschläge sind optional. Du kannst eine Vorlage übernehmen oder in Schritt 5 deine Phasen vollständig selbst zusammenstellen.</p>
+            <p className="muted">Vorschläge sind optional. Du kannst eine Vorlage übernehmen oder im nächsten Schritt deine Phasen vollständig selbst zusammenstellen.</p>
 
             <div className="format-step-layout">
               <div className="recommendation-list">
@@ -1071,7 +1065,7 @@ export function CreateTournamentPage() {
               <aside className="format-settings-panel">
                 <div className="format-settings-head">
                   <h3>Vorgaben für Vorschläge</h3>
-                  <p className="muted">Diese Grenzen beeinflussen nur die Empfehlung. Vorschläge werden zusätzlich auf eine Basisdauer von maximal ca. 3,5 Stunden begrenzt (15 Min. pro Satz, mindestens 1 Satz pro Spiel). In Schritt 5 kannst du alles frei ändern.</p>
+                  <p className="muted">Diese Grenzen beeinflussen nur die Empfehlung. Vorschläge werden zusätzlich auf eine Basisdauer von maximal ca. 3,5 Stunden begrenzt (15 Min. pro Satz, mindestens 1 Satz pro Spiel). Im nächsten Schritt kannst du alles frei ändern.</p>
                 </div>
 
                 <div className="format-setting-fields">
@@ -1136,7 +1130,7 @@ export function CreateTournamentPage() {
           </section>
         )}
 
-        {step === 5 && (
+        {step === 4 && (
           <section>
             <h2>Phasen konfigurieren</h2>
             <p className="muted">Die Empfehlung ist nur eine Vorlage. Phasen können ergänzt, entfernt, verschoben und unabhängig konfiguriert werden.</p>
@@ -1375,7 +1369,7 @@ export function CreateTournamentPage() {
             <span className="wizard-side-kicker">Während der Erstellung</span>
             <h2>Dein Turnier</h2>
           </div>
-          <span className="wizard-side-step">{step}/5</span>
+          <span className="wizard-side-step">{step}/4</span>
         </div>
         <div className="wizard-side-facts">
           <button type="button" className="wizard-side-fact" onClick={() => navigateToStep(1)}>
