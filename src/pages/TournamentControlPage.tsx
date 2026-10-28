@@ -1041,7 +1041,7 @@ export function TournamentControlPage() {
               <button className={tab === 'flow' ? 'btn control-edit-phase-active' : 'btn'} type="button" aria-current={tab === 'flow' ? 'page' : undefined} onClick={() => setTab('flow')}>Aktuelle Phase bearbeiten</button>
             )}
             {!tournament.hasStarted && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
-              <button className="btn primary" type="button" onClick={requestStartTournament}
+              <button className="btn primary control-start-tournament" type="button" onClick={requestStartTournament}
                 disabled={!tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
                 title={tournament.stages[0] && getStageEntrants(tournament, tournament.stages[0]).length < 2 ? 'Mindestens zwei aktive Teilnehmer erforderlich' : undefined}>Turnier starten</button>
             )}
@@ -1061,7 +1061,7 @@ export function TournamentControlPage() {
               {pendingApproval.kind === 'ROUND' ? `Runde ${pendingApproval.round} prüfen` : 'Phase freigeben'}
             </button>}
             {!['FINISHED', 'ABORTED'].includes(tournament.status) && (
-              <button className="btn small" type="button" onClick={() => setAbortModalOpen(true)}>Turnier abbrechen</button>
+              <button className="btn small danger control-abort-tournament" type="button" onClick={() => setAbortModalOpen(true)}>Turnier abbrechen</button>
             )}
             </div>
             <div className="control-utility-bar">
