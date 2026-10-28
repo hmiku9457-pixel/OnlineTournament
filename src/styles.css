@@ -3489,7 +3489,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 }
 @media (max-width: 980px) {
   .wizard-workspace { grid-template-columns: minmax(0, 1fr); }
-  .wizard-side-summary { position: static; max-height: none; grid-row: 1; }
+  .wizard-side-summary { position: static; max-height: none; }
   .wizard-side-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .wizard-side-summary-heading { padding-bottom: 8px; }
   .wizard-side-phase-summary { margin-top: 5px; }
