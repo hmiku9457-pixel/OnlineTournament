@@ -1,7 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { seededGroupAssignments, seededKnockoutSlots, seededKnockoutSlotsAvoidingGroups, snakeSeededGroupOrder } from '@/engine/seededDraws';
-import { isStageCompleted } from '@/services/mockPhaseLifecycle';
+import { isStageCompleted, getPreviousCompetitionStage } from '@/services/mockPhaseLifecycle';
 import { getPhaseLifecycle, getStageEntrants, isStageEditable } from '@/services/mockPhaseLifecycle';
 import { buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
 
@@ -195,7 +195,7 @@ export function randomizeSwissOrder(tournament: DemoTournament, stage: Tournamen
 
 /** Seed the Swiss opening order from the completed groups using snake ranks. */
 export function applySeededSwissOrder(tournament: DemoTournament, stage: TournamentStage, rankedGroups: string[][]) {
-  const previous = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) - 1];
+  const previous = getPreviousCompetitionStage(tournament, stage);
   if (stage.type !== 'SWISS' || previous?.type !== 'GROUPS' || !isStageCompleted(tournament, previous) || !canEditDraw(tournament, stage)) return false;
   const entrants = getStageEntrants(tournament, stage);
   const order = snakeSeededGroupOrder(rankedGroups, entrants);
@@ -206,7 +206,7 @@ export function applySeededSwissOrder(tournament: DemoTournament, stage: Tournam
 
 /** Group draw from previous completed Swiss ranking: A-B-C-D / D-C-B-A. */
 export function applySeededGroupAssignments(tournament: DemoTournament, stage: TournamentStage) {
-  const previous = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) - 1];
+  const previous = getPreviousCompetitionStage(tournament, stage);
   if (stage.type !== 'GROUPS' || previous?.type !== 'SWISS' || !isStageCompleted(tournament, previous) || !canEditDraw(tournament, stage)) return false;
   const entrants = getStageEntrants(tournament, stage);
   // Read the displayed Swiss table rather than relying on registration order
@@ -223,7 +223,7 @@ export function applySeededGroupAssignments(tournament: DemoTournament, stage: T
 
 /** Apply conventional ranking seeds from the preceding completed phase. */
 export function applySeededBracketSlots(tournament: DemoTournament, stage: TournamentStage) {
-  const previous = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) - 1];
+  const previous = getPreviousCompetitionStage(tournament, stage);
   if (stage.type !== 'KNOCKOUT' || !previous || !['GROUPS', 'SWISS'].includes(previous.type) || !isStageCompleted(tournament, previous) || !canEditDraw(tournament, stage)) return false;
   // Qualifier ordering is the ranking order of the completed prior stage.
   const entrants = getStageEntrants(tournament, stage);
