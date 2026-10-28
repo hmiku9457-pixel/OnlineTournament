@@ -865,9 +865,9 @@ export function CreateTournamentPage() {
               <div>
                 <h2>Teilnehmer eintragen</h2>
                 <p className="muted">
-                  {discipline === 'SINGLES'
-                    ? `${participantCount} Einzelspieler gespeichert.`
-                    : `${participantCount} Doppel gespeichert.`}
+                  {discipline === 'TEAMS' ? `${participantCount} Mannschaften gespeichert.`
+                    : discipline === 'SINGLES' ? `${participantCount} Einzelspieler gespeichert.`
+                      : `${participantCount} Doppel gespeichert.`}
                 </p>
               </div>
             </div>
@@ -877,7 +877,7 @@ export function CreateTournamentPage() {
                 <div className="participant-editor-head">
                   <div>
                     <span className="badge">{editingParticipantId ? 'Bearbeiten' : 'Neuer Eintrag'}</span>
-                    <h3>{discipline === 'SINGLES' ? 'Spieler' : 'Doppel'} erfassen</h3>
+                    <h3>{discipline === 'TEAMS' ? 'Mannschaft' : discipline === 'SINGLES' ? 'Spieler' : 'Doppel'} erfassen</h3>
                   </div>
                   {editingParticipantId && (
                     <button className="btn" type="button" onClick={resetParticipantEditor}>Abbrechen</button>
@@ -886,7 +886,7 @@ export function CreateTournamentPage() {
 
                 <div className="participant-mask">
                   <div className="field">
-                    <label htmlFor="participant-first">{discipline === 'DOUBLES' ? 'Spieler 1 · Vorname' : 'Vorname'}</label>
+                    <label htmlFor="participant-first">{discipline === 'TEAMS' ? 'Mannschaftsname' : discipline === 'DOUBLES' ? 'Spieler 1 · Vorname' : 'Vorname'}</label>
                     <input
                       id="participant-first"
                       className={participantErrors.firstName ? 'input-error' : ''}
@@ -896,7 +896,7 @@ export function CreateTournamentPage() {
                       autoFocus
                     />
                   </div>
-                  <div className="field">
+                  {discipline !== 'TEAMS' && <div className="field">
                     <label htmlFor="participant-last">{discipline === 'DOUBLES' ? 'Spieler 1 · Nachname' : 'Nachname'}</label>
                     <input
                       id="participant-last"
@@ -905,7 +905,7 @@ export function CreateTournamentPage() {
                       onChange={(event) => updateParticipantForm('lastName', event.target.value)}
                       aria-invalid={Boolean(participantErrors.lastName)}
                     />
-                  </div>
+                  </div>}}
                   {discipline === 'DOUBLES' && (
                     <>
                       <div className="field">
@@ -934,7 +934,7 @@ export function CreateTournamentPage() {
 
                 <div className="participant-editor-actions">
                   <button className="btn primary" type="button" onClick={saveParticipant}>
-                    {editingParticipantId ? 'Änderungen speichern' : discipline === 'SINGLES' ? 'Spieler hinzufügen' : 'Doppel hinzufügen'}
+                    {editingParticipantId ? 'Änderungen speichern' : discipline === 'TEAMS' ? 'Mannschaft hinzufügen' : discipline === 'SINGLES' ? 'Spieler hinzufügen' : 'Doppel hinzufügen'}
                   </button>
                   <div className="participant-validation" aria-live="polite">
                     {participantErrorMessages.map((message) => (
@@ -945,7 +945,7 @@ export function CreateTournamentPage() {
               </div>
               <aside className="wizard-test-tools" aria-label="Testdaten">
                 <button className="btn wizard-test-player-button" type="button" onClick={generateTestParticipants} disabled={participantCount >= 19}>
-                  {discipline === 'SINGLES' ? '19 Testspieler erzeugen' : '19 Testdoppel erzeugen'}
+                  {discipline === 'TEAMS' ? '19 Testmannschaften erzeugen' : discipline === 'SINGLES' ? '19 Testspieler erzeugen' : '19 Testdoppel erzeugen'}
                 </button>
               </aside>
             </div>
@@ -1017,7 +1017,7 @@ export function CreateTournamentPage() {
               </div>
               <div className="summary-box">
                 <strong>{participantCount}</strong>
-                <span>{discipline === 'SINGLES' ? 'Teilnehmer' : 'Doppel'}</span>
+                <span>{discipline === 'TEAMS' ? 'Mannschaften' : discipline === 'SINGLES' ? 'Teilnehmer' : 'Doppel'}</span>
                 <strong>{tables}</strong>
                 <span>{venue.plural}</span>
               </div>
@@ -1367,11 +1367,11 @@ export function CreateTournamentPage() {
           <button type="button" className="wizard-side-fact" onClick={() => navigateToStep(1)}>
             <span>Grunddaten <span aria-hidden="true">↗</span></span>
             <strong>{name.trim() || 'Noch kein Name'}</strong>
-            <small>{sportOptions.find((item) => item.id === sport)?.label ?? sport} · {discipline === 'SINGLES' ? 'Einzel' : 'Doppel'} · {tables} {venue.plural}</small>
+            <small>{sportOptions.find((item) => item.id === sport)?.label ?? 'Sportart auswählen'} · {sport ? disciplineLabel(discipline) : 'Disziplin offen'} · {tables} {venue.plural}</small>
           </button>
           <button type="button" className="wizard-side-fact" disabled={maxReachedStep < 2} onClick={() => navigateToStep(2)}>
             <span>Teilnehmer {maxReachedStep >= 2 && <span aria-hidden="true">↗</span>}</span>
-            <strong>{participantCount} {discipline === 'SINGLES' ? 'Spieler' : 'Doppel'}</strong>
+            <strong>{participantCount} {discipline === 'TEAMS' ? 'Mannschaften' : discipline === 'SINGLES' ? 'Spieler' : 'Doppel'}</strong>
             <small>{participantsValid ? 'Teilnehmerliste vollständig' : 'Mindestens 2 vollständige Einträge erforderlich'}</small>
           </button>
           <button type="button" className="wizard-side-fact" disabled={maxReachedStep < 3} onClick={() => navigateToStep(3)}>
@@ -1425,7 +1425,7 @@ export function CreateTournamentPage() {
           <span className="wizard-validation-message">
             {incompleteSavedParticipants > 0
               ? 'Alle gespeicherten Teilnehmer müssen vollständig sein.'
-              : `Mindestens 2 ${discipline === 'SINGLES' ? 'Spieler' : 'Doppel'} für ein Turnier.`}
+              : `Mindestens 2 ${discipline === 'TEAMS' ? 'Mannschaften' : discipline === 'SINGLES' ? 'Spieler' : 'Doppel'} für ein Turnier.`}
           </span>
         )}
         {step === 4 && <span className="muted wizard-optional-note">Eine Empfehlung ist optional.</span>}
