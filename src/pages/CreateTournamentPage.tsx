@@ -312,7 +312,7 @@ export function CreateTournamentPage() {
   const [customTables, setCustomTables] = useState(false);
   const [venueLayoutEnabled, setVenueLayoutEnabled] = useState(false);
   const [venueLayoutEditorOpen, setVenueLayoutEditorOpen] = useState(false);
-  const [venueLayout, setVenueLayout] = useState(() => createVenueLayout(8));
+  const [venueLayout, setVenueLayout] = useState(() => resizeVenueLayout(createVenueLayout(8), 4, 2, 8));
   useEffect(() => { setVenueLayout((current) => resizeVenueLayout(current, current.columns, Math.max(current.rows, Math.ceil(tables / current.columns)), tables)); }, [tables]);
   const [participants, setParticipants] = useState<ParticipantDraft[]>([]);
   const [participantForm, setParticipantForm] = useState<ParticipantFields>(emptyParticipantFields());
@@ -1362,7 +1362,7 @@ export function CreateTournamentPage() {
                   <span className="wizard-side-phase-index">{index + 1}</span>
                   <div>
                     <strong>{phase.label}</strong>
-                    <small>{phase.type === 'GROUPS' ? `${phase.groupCount} Gruppen` : phase.type === 'SWISS' ? `${phase.swissRounds} Runden` : `${phase.entrantCount} Teilnehmer`} · {phaseEstimates[index] ? `${phaseEstimates[index].estimatedMatches} Spiele` : ''}</small>
+                    <small>{phase.type === 'GROUPS' ? `${phase.groupCount} Gruppen` : phase.type === 'SWISS' ? `${phase.swissRounds} Runden` : `${phase.entrantCount} Teilnehmer`} · {phaseEstimates[index] ? `${phaseEstimates[index].estimatedMatches} Spiele · ca. ${formatCompactDuration(phaseEstimates[index].estimatedDurationMinutes)}` : ''}</small>
                   </div>
                 </li>
               ))}
