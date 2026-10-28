@@ -51,3 +51,19 @@ export function disciplineLabel(discipline: Discipline): string {
   if (discipline === 'TEAMS') return 'Mannschaften';
   return 'Einzel';
 }
+
+/** Upper end of the planning range supplied for a typical set (minutes).
+ * Sports decided by a timed match do not use this value.
+ */
+export function planningMinutesPerSet(sport: string): number {
+  switch (findSportOption(sport)?.id) {
+    case 'table_tennis': return 5;
+    case 'squash': return 12;
+    case 'badminton': return 15;
+    case 'beach_volleyball': return 22;
+    case 'volleyball': return 25;
+    case 'padel': return 45;
+    case 'tennis': return 50;
+    default: return 15;
+  }
+}
