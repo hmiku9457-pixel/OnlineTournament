@@ -4,6 +4,7 @@ import {
   createPhaseTemplate,
   estimatePhaseMetrics,
   estimateTournamentDurationMinutes,
+  formatGroupDistribution,
   hasValidTerminalStageOrder,
   knockoutByeCount,
   knockoutEntrantPresets,
@@ -92,6 +93,14 @@ describe('tournament creation phase model', () => {
     expect(recommendGroupCount(19, 15)).toBe(5); // three qualify from each group
     expect(recommendGroupCount(10, 3)).toBe(3); // one from each group
     expect(recommendGroupCount(6, 2)).toBe(2);
+  });
+
+  it('describes equal and uneven group sizes precisely', () => {
+    expect(formatGroupDistribution(16, 4)).toBe('4 Gruppen mit je 4 Spielern');
+    expect(formatGroupDistribution(12, 2)).toBe('2 Gruppen mit je 6 Spielern');
+    expect(formatGroupDistribution(15, 4)).toBe('3 × 4er-Gruppen und 1 × 3er-Gruppe');
+    expect(formatGroupDistribution(19, 4)).toBe('3 × 5er-Gruppen und 1 × 4er-Gruppe');
+    expect(formatGroupDistribution(19, 5)).toBe('4 × 4er-Gruppen und 1 × 3er-Gruppe');
   });
 
   it('recommends Swiss rounds and projects the leading score groups', () => {
