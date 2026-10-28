@@ -1,7 +1,10 @@
-import { getPhaseLifecycle } from '@/services/mockPhaseLifecycle';
+import { getPhaseLifecycle, resetPrestartPhaseLifecycle } from '@/services/mockPhaseLifecycle';
 import { generatePlayerCodes, generateUniquePlayerCode } from '@/services/mockPlayerCodes';
 import { recordMockAudit } from '@/services/mockAudit';
-import { reconcilePrestartDraws } from '@/services/mockDrawStore';
+import { hasStartedAnyStage, validatePrestartPhases, estimatePrestartDuration, type PrestartPhaseDraft } from '@/domain/prestartPhasePlanning';
+import { getRuntimeParticipantNames } from '@/services/mockParticipants';
+import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
+import { reconcilePrestartDraws, clearPrestartTournamentDraws } from '@/services/mockDrawStore';
 import type { VenueLayout } from '@/domain/venueLayout';
 import { disciplineLabel, getSportLabel } from '@/domain/sports';
 import { type DemoTournament } from '@/data/demoTournaments';
@@ -139,6 +142,64 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
   const existing = readLocalTournaments();
   writeLocalTournaments([tournament, ...existing.filter((item) => item.id !== id)]);
   return tournament;
+}
+
+/** Reconfigure a local tournament only until its very first start.
+ * Active participants are computed again at save-time to reject stale edits.
+ * Draws and lifecycle snapshots are discarded, but registration/codes/withdrawals
+ * and other tournaments are untouched.
+ */
+export function updatePrestartTournamentPhases(
+  tournamentId: string,
+  drafts: PrestartPhaseDraft[],
+): { ok: boolean; error?: string; tournament?: DemoTournament } {
+  const all = readLocalTournaments();
+  const previous = all.find((item) => item.id === tournamentId);
+  if (!previous) return { ok: false, error: 'Turnier nicht gefunden.' };
+  if (hasStartedAnyStage(previous, getPhaseLifecycle(previous).startedStageIds)) {
+    return { ok: false, error: 'Die Phasen lassen sich nur vor dem ersten Turnierstart ändern.' };
+  }
+
+  const active = getRuntimeParticipantNames(previous).filter((name) => !isParticipantWithdrawn(previous, name));
+  const errors = validatePrestartPhases(drafts, active.length);
+  if (errors.length) return { ok: false, error: errors[0] };
+
+  const phases: MockPhaseInput[] = drafts.map((phase) => ({
+    type: phase.type, label: phase.label.trim(), entrantCount: phase.entrantCount,
+    groupCount: phase.groupCount, swissRounds: phase.swissRounds,
+    bestOf: phase.bestOf, knockoutBestOf: [...phase.knockoutBestOf],
+    breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
+    nextDayStart: phase.nextDayStart, note: phase.note,
+  }));
+  const stages = phases.map((phase, index) => {
+    const nextPlaying = phases.slice(index + 1).find((item) => item.type !== 'BREAK');
+    return toStage(previous.id, phase, index, nextPlaying?.entrantCount);
+  });
+  const label = phaseLabel(phases);
+  const updated: DemoTournament = {
+    ...previous,
+    stages,
+    phasesLabel: label,
+    subtitle: `${disciplineLabel(previous.discipline)} · ${label}`,
+    estimatedDuration: durationLabel(estimatePrestartDuration(previous, drafts)),
+    lastUpdate: 'gerade eben',
+  };
+
+  // A failed storage write must not invalidate a previously saved draw.
+  try {
+    writeLocalTournaments(all.map((item) => item.id === tournamentId ? updated : item));
+    clearPrestartTournamentDraws(tournamentId);
+    resetPrestartPhaseLifecycle(previous);
+    recordMockAudit({
+      tournamentId, actor: 'Turnierleitung (lokal)', action: 'PRESTART_PHASES_CHANGED',
+      description: `Phasenplanung vor Turnierstart angepasst: ${active.length} aktive Teilnehmer; neue Auslosung erforderlich.`,
+      before: previous.phasesLabel, after: label,
+    });
+    window.dispatchEvent(new CustomEvent('mock-runtime-change'));
+    return { ok: true, tournament: updated };
+  } catch {
+    return { ok: false, error: 'Die Änderungen konnten im Browser nicht vollständig gespeichert werden. Bitte Seite neu laden und den Stand prüfen.' };
+  }
 }
 
 export function getAllMockTournaments(): DemoTournament[] {
