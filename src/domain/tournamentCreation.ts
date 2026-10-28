@@ -190,7 +190,7 @@ export function knockoutByeCount(entrantCount: number): number {
   return bracketSize - entrants;
 }
 
-export interface TimedMatchSettings { matchDurationMinutes: number; venueTurnoverMinutes?: number; minutesPerSet?: number }
+export interface TimedMatchSettings { matchDurationMinutes?: number; venueTurnoverMinutes?: number; minutesPerSet?: number }
 
 export function estimatePhaseMetrics(
   phase: TournamentDurationPhaseInput,
@@ -201,8 +201,8 @@ export function estimatePhaseMetrics(
   const entrants = Math.max(2, Math.trunc(phase.entrantCount));
   if (phase.type === 'BREAK') return { estimatedMatches: 0, estimatedDurationMinutes: phase.breakKind === 'overnight' ? 0 : Math.max(0, Math.round(phase.breakMinutes ?? 0)), approximate: false };
   // Timed sports use one match duration per fixture, plus a preparation break between slots.
-  const gameMinutes = timing ? Math.max(1, timing.matchDurationMinutes) + Math.max(0, timing.venueTurnoverMinutes ?? 0) : 0;
-  const waveDurationForPhase = (count: number, bo: number) => timing
+  const gameMinutes = timing?.matchDurationMinutes ? Math.max(1, timing.matchDurationMinutes) + Math.max(0, timing.venueTurnoverMinutes ?? 0) : 0;
+  const waveDurationForPhase = (count: number, bo: number) => timing?.matchDurationMinutes
     ? Math.ceil(count / tables) * gameMinutes
     : waveMinutes(count, tables, bo, timing?.minutesPerSet ?? MINUTES_PER_SET);
 
