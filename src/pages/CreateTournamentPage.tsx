@@ -1341,7 +1341,7 @@ export function CreateTournamentPage() {
                                 <>
                                   <div>
                                     <strong>Empfehlung: {recommendedRounds} Schweizer Runden</strong>
-                                    <span>Berücksichtigt {phase.entrantCount} Teilnehmer und mindestens {minimumMatches} gewünschte Spiele (höchstens 30 Runden und ohne zusätzliche Wiederholungspaarungen).</span>
+                                    <span>Berücksichtigt {phase.entrantCount} Teilnehmer und mindestens {minimumMatches} gewünschte Spiele (begrenzt auf 30 Runden und höchstens Teilnehmerzahl minus eins).</span>
                                   </div>
                                   <button type="button" className="btn small"
                                     disabled={phase.swissRounds === recommendedRounds}
