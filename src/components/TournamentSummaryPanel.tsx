@@ -1,4 +1,5 @@
 import type { DemoTournament } from '@/data/demoTournaments';
+import { disciplineLabel } from '@/domain/sports';
 import type { TournamentStage } from '@/domain/types';
 import { getVenueTerminology } from '@/domain/venueTerminology';
 import { isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
@@ -198,7 +199,7 @@ export function TournamentSummaryPanel({
         <h3>Turnierdaten</h3>
         <div className="tournament-summary-facts">
           <div><span>Sportart</span><strong>{tournament.sport}</strong></div>
-          <div><span>Disziplin</span><strong>{tournament.discipline === 'DOUBLES' ? 'Doppel' : 'Einzel'}</strong></div>
+          <div><span>Disziplin</span><strong>{disciplineLabel(tournament.discipline)}</strong></div>
           <div><span>Sichtbarkeit</span><strong>{tournament.visibility === 'PRIVATE' ? 'Privat' : tournament.visibility === 'PUBLIC' ? 'Öffentlich' : 'Über Link'}</strong></div>
           <div><span>{venue.plural}</span><strong>{tournament.tables}{blockedTables ? ` · ${blockedTables} gesperrt` : ''}</strong></div>
         </div>
