@@ -4,7 +4,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
 import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
-import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, isStageCompleted, isStageStarted, setStageEntrants, reopenStageForQualification, isSwissRoundApproved, approveSwissRound, revokeSwissRoundApprovals, reopenStageAfterCorrection } from '@/services/mockPhaseLifecycle';
+import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, getNextCompetitionStage, isStageCompleted, isStageStarted, setStageEntrants, reopenStageForQualification, isSwissRoundApproved, approveSwissRound, revokeSwissRoundApprovals, reopenStageAfterCorrection } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
@@ -99,7 +99,7 @@ export function isMockParticipantWithdrawn(tournament: DemoTournament, name: str
 }
 
 export function canEditFinishedResults(tournament: DemoTournament, stage: TournamentStage) {
-  const next = tournament.stages[tournament.stages.findIndex((item) => item.id === stage.id) + 1];
+  const next = getNextCompetitionStage(tournament, stage);
   return !next || !isStageStarted(tournament, next);
 }
 
@@ -966,8 +966,7 @@ function rankParticipants(participants: string[], matches: BaseStageMatch[], res
 }
 
 function stageQualifierCount(tournament: DemoTournament, stage: TournamentStage) {
-  const stageIndex = tournament.stages.findIndex((item) => item.id === stage.id);
-  const nextStage = tournament.stages[stageIndex + 1];
+  const nextStage = getNextCompetitionStage(tournament, stage);
   if (!nextStage) return 0;
   if (stage.advancement.type === 'top_n' && stage.advancement.value > 0) return stage.advancement.value;
   return Math.max(1, Number(nextStage.settings.entrants) || 1);
