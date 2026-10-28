@@ -3,7 +3,7 @@ import { generatePlayerCodes, generateUniquePlayerCode } from '@/services/mockPl
 import { recordMockAudit } from '@/services/mockAudit';
 import { reconcilePrestartDraws } from '@/services/mockDrawStore';
 import type { VenueLayout } from '@/domain/venueLayout';
-import { getSportLabel } from '@/domain/sports';
+import { disciplineLabel, getSportLabel } from '@/domain/sports';
 import { type DemoTournament } from '@/data/demoTournaments';
 import type { Discipline, StageType, TournamentStage, TournamentStatus } from '@/domain/types';
 
@@ -99,7 +99,7 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
   const tournament: DemoTournament = {
     id,
     name: input.name.trim(),
-    subtitle: `${input.discipline === 'DOUBLES' ? 'Doppel' : 'Einzel'} · ${phaseLabel(input.phases)}`,
+    subtitle: `${disciplineLabel(input.discipline)} · ${phaseLabel(input.phases)}`,
     status: 'READY',
     visibility: 'PRIVATE',
     sport: getSportLabel(input.sport),
@@ -186,11 +186,12 @@ export function updateMockTournamentStatus(tournamentId: string, status: Tournam
 export function updateMockParticipantName(tournamentId: string, oldName: string, firstName: string, lastName: string, code: string) {
   const first = firstName.trim();
   const last = lastName.trim();
-  const name = `${first} ${last}`;
-  if (!first || !last || !/^\d{4,8}$/.test(code.trim())) return false;
   const tournaments = readLocalTournaments();
   const tournament = tournaments.find((item) => item.id === tournamentId);
   if (!tournament || !tournament.participantNames?.includes(oldName)) return false;
+  const teamMode = tournament.discipline === 'TEAMS';
+  const name = teamMode ? first : `${first} ${last}`;
+  if (!first || (!teamMode && !last) || !/^\d{4,8}$/.test(code.trim())) return false;
   if (name !== oldName && tournament.participantNames.includes(name)) return false;
   // Ein Spielercode darf immer nur einem Teilnehmer des Turniers gehören.
   if (Object.entries(tournament.participantCodes ?? {}).some(([participant, existingCode]) =>
@@ -281,8 +282,11 @@ export function addMockParticipant(
   }
   const first = firstName.trim();
   const last = lastName.trim();
-  if (!first || !last) return { ok: false, error: 'Vorname und Nachname sind erforderlich.' };
-  const person = `${first} ${last}`;
+  const teamMode = tournament.discipline === 'TEAMS';
+  if (!first || (!teamMode && !last)) return {
+    ok: false, error: teamMode ? 'Ein Mannschaftsname ist erforderlich.' : 'Vorname und Nachname sind erforderlich.',
+  };
+  const person = teamMode ? first : `${first} ${last}`;
   let displayName = person;
   if (tournament.discipline === 'DOUBLES') {
     const partnerFirst = partnerFirstName.trim();
@@ -298,7 +302,7 @@ export function addMockParticipant(
     displayName = `${person} / ${partner}`;
   } else if ((tournament.participantNames ?? []).some((name) =>
     name.toLocaleLowerCase('de') === person.toLocaleLowerCase('de'))) {
-    return { ok: false, error: 'Dieser Spieler ist bereits angemeldet.' };
+    return { ok: false, error: teamMode ? 'Diese Mannschaft ist bereits angemeldet.' : 'Dieser Spieler ist bereits angemeldet.' };
   }
 
   const occupied = new Set(Object.values(tournament.participantCodes ?? {}));
