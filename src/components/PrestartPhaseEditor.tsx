@@ -128,6 +128,21 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
         Gruppen und Schweizer Runden werden geprüft und erhalten passende Empfehlungen.
       </p>
       <div className="prestart-editor-list">
+        {drafts.length > 0 && (
+          <div className="prestart-editor-insert prestart-editor-before-first">
+            <button className="prestart-editor-insert-trigger" type="button"
+              aria-expanded={insertAfter === -1}
+              onClick={() => setInsertAfter(insertAfter === -1 ? null : -1)}>+ Phase vor der ersten Phase hinzufügen</button>
+            {insertAfter === -1 && <div className="prestart-editor-insert-choices">
+              {types.filter((option) => option.type !== 'BREAK' && !isKnockoutPhase(option.type)).map((option) => (
+                <button className="btn small" type="button" key={option.type}
+                  disabled={option.type === 'GROUPS' && activeParticipants < 4}
+                  onClick={() => insert(0, option.type)}>{option.name}</button>
+              ))}
+              <button className="btn small" type="button" onClick={() => setInsertAfter(null)}>Abbrechen</button>
+            </div>}
+          </div>
+        )}
         {drafts.map((phase, index) => {
           const isOpen = expanded === phase.id;
           const available = index === 0 ? activeParticipants : drafts.slice(0, index).reverse().find((s) => s.type !== 'BREAK')?.entrantCount ?? activeParticipants;
