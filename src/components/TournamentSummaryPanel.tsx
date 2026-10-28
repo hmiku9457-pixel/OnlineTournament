@@ -32,6 +32,11 @@ interface TournamentSummaryProps {
 function stageDetails(stage: TournamentStage): string {
   const number = (key: string) => typeof stage.settings[key] === 'number' ? Number(stage.settings[key]) : 0;
   const parts: string[] = [];
+  if (stage.type === 'BREAK') {
+    return stage.settings.breakKind === 'overnight'
+      ? `Spieltagsende · Fortsetzung am Folgetag um ${stage.settings.nextDayStart} Uhr`
+      : `${stage.settings.breakMinutes} Minuten Pause`;
+  }
   switch (stage.type) {
     case 'ROUND_ROBIN':
       if (number('entrants')) parts.push(`${number('entrants')} Teilnehmer`);
@@ -60,6 +65,7 @@ function stageDetails(stage: TournamentStage): string {
 }
 
 function advancementLabel(stage: TournamentStage, isLast: boolean): string {
+  if (stage.type === 'BREAK') return 'Keine Spiele · keine Ausscheidung';
   if (isLast) return 'Abschlussphase';
   if (stage.advancement.type === 'top_n') return `${stage.advancement.value} qualifizieren sich`;
   if (stage.advancement.type === 'percentage') return `${stage.advancement.value} % qualifizieren sich`;
