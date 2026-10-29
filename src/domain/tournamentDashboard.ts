@@ -2,6 +2,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { disciplineLabel } from '@/domain/sports';
 import { summarizeControlProgress } from '@/domain/controlOverview';
+import { initialPrestartPhases, normalizePrestartPhases, validatePrestartPhases } from '@/domain/prestartPhasePlanning';
 import { getPhaseLifecycle, getActiveStage, getNextStartableStage } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
@@ -47,8 +48,8 @@ export function buildDashboardTournament(tournament: DemoTournament, originalInd
   const names = getRuntimeParticipantNames(tournament);
   const activePlayers = names.filter((name) => !isParticipantWithdrawn(tournament, name)).length;
   const lifecycle = getPhaseLifecycle(tournament);
-  const activeStage = getActiveStage(tournament) ?? null;
-  const nextStage = getNextStartableStage(tournament) ?? null;
+  const activeStage = status.group !== 'finished' ? getActiveStage(tournament) ?? null : null;
+  const nextStage = status.group !== 'finished' ? getNextStartableStage(tournament) ?? null : null;
   const matches = activeStage ? getMockRuntimeMatches(tournament) : [];
   const progress = summarizeControlProgress(
     tournament.stages.map((stage) => ({
@@ -62,6 +63,9 @@ export function buildDashboardTournament(tournament: DemoTournament, originalInd
   );
   const beforeStart = status.group === 'before' && !tournament.hasStarted;
   const configuredFirstField = Number(tournament.stages.find((stage) => stage.type !== 'BREAK')?.settings.entrants);
+  const planErrors = beforeStart ? validatePrestartPhases(
+    normalizePrestartPhases(initialPrestartPhases(tournament), activePlayers), activePlayers,
+  ) : [];
   return {
     tournament,
     originalIndex,
@@ -77,7 +81,7 @@ export function buildDashboardTournament(tournament: DemoTournament, originalInd
     waitingMatches: matches.filter((match) => match.status === 'WAITING').length,
     pendingApproval: Boolean(activeStage && getPendingMockApproval(tournament)),
     openConfirmations: tournament.hasStarted ? countMockOpenConfirmations(tournament) : 0,
-    needsPlanReview: beforeStart && (activePlayers < 2 || !Number.isFinite(configuredFirstField) || configuredFirstField !== activePlayers),
+    needsPlanReview: beforeStart && (!Number.isFinite(configuredFirstField) || configuredFirstField !== activePlayers || planErrors.length > 0),
   };
 }
 
