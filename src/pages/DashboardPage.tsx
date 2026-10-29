@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { disciplineLabel } from '@/domain/sports';
 import {
-  buildDashboardTournament, dashboardStatus, filterAndSortDashboard, summarizeDashboard,
+  buildDashboardTournament, filterAndSortDashboard, summarizeDashboard,
   type DashboardFilter, type DashboardSort, type DashboardTournament,
 } from '@/domain/tournamentDashboard';
 import { getAllMockTournaments, removeLocalPrototypeTournaments } from '@/services/mockTournamentStore';
