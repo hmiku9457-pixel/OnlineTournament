@@ -6,7 +6,7 @@ export function AppShell() {
       <aside className="sidebar no-print">
         <div className="brand">OnlineTournament</div>
         <nav className="nav" aria-label="Hauptnavigation">
-          <NavLink to="/">Übersicht</NavLink>
+          <NavLink to="/">Turniere</NavLink>
           <NavLink to="/tournaments/new">Turnier erstellen</NavLink>
           <NavLink to="/login">Anmelden</NavLink>
         </nav>
