@@ -77,7 +77,7 @@ export function buildDashboardTournament(tournament: DemoTournament, originalInd
     nextStage,
     completedStages: progress.completedPhases,
     percent: tournament.status === 'FINISHED' || tournament.status === 'ARCHIVED' ? 100 : progress.percent,
-    runningMatches: matches.filter((match) => ['READY', 'LIVE', 'CONFIRMATION'].includes(match.status)).length,
+    runningMatches: matches.filter((match) => match.status === 'LIVE').length,
     waitingMatches: matches.filter((match) => match.status === 'WAITING').length,
     pendingApproval: Boolean(activeStage && getPendingMockApproval(tournament)),
     openConfirmations: tournament.hasStarted ? countMockOpenConfirmations(tournament) : 0,
