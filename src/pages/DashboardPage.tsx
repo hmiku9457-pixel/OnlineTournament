@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { disciplineLabel } from '@/domain/sports';
 import {
@@ -106,6 +106,7 @@ export function DashboardPage() {
   const [filter, setFilter] = useState<DashboardFilter>('all');
   const [sort, setSort] = useState<DashboardSort>('recent');
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const resetDialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const refresh = () => {
@@ -128,6 +129,36 @@ export function DashboardPage() {
       window.removeEventListener('mock-audit-change', refresh);
     };
   }, []);
+
+  useEffect(() => {
+    if (!resetConfirmOpen) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    resetDialogRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    function handleDialogKeys(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setResetConfirmOpen(false);
+        return;
+      }
+      if (event.key !== 'Tab' || !resetDialogRef.current) return;
+      const buttons = Array.from(resetDialogRef.current.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+      if (!buttons.length) return;
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener('keydown', handleDialogKeys);
+    return () => {
+      window.removeEventListener('keydown', handleDialogKeys);
+      previousFocus?.focus();
+    };
+  }, [resetConfirmOpen]);
 
   const items = useMemo(() => tournaments.map(buildDashboardTournament), [tournaments, revision]);
   const summary = useMemo(() => summarizeDashboard(items), [items]);
@@ -229,7 +260,7 @@ export function DashboardPage() {
       )}
 
       {resetConfirmOpen && <div className="dashboard-reset-backdrop" role="presentation">
-        <div className="dashboard-reset-dialog" role="alertdialog" aria-modal="true"
+        <div className="dashboard-reset-dialog" ref={resetDialogRef} role="alertdialog" aria-modal="true"
           aria-labelledby="dashboard-reset-title" aria-describedby="dashboard-reset-description">
           <h2 id="dashboard-reset-title">Alle lokalen Testdaten löschen?</h2>
           <p id="dashboard-reset-description">Diese Aktion entfernt alle Turniere, Spieler, Auslosungen, Ergebnisse und Protokolle in diesem Browser. Sie kann nicht rückgängig gemacht werden.</p>
