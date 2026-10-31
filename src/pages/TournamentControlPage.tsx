@@ -747,8 +747,10 @@ export function TournamentControlPage() {
         setCorrectionNotice({ key: entry.id, message: 'Endergebnis korrigiert.', undoAuditId: entry.id });
       } else if (entry.action === 'RESULT_RESTORED') {
         setCorrectionNotice({ key: entry.id, message: 'Die Ergebniskorrektur wurde zurückgenommen.' });
-      } else if (entry.action === 'KNOCKOUT_DRAW_REBUILT') {
-        setCorrectionNotice({ key: entry.id, message: 'Die Qualifikanten haben sich geändert. Ungültige KO-Startplatz-Fixierungen wurden aufgehoben; bitte die neue Auslosung kontrollieren.' });
+      } else if (entry.action === 'KNOCKOUT_DRAW_REBUILT' || entry.action === 'FOLLOWUP_DRAW_ADJUSTED') {
+        setCorrectionNotice({ key: entry.id, message: entry.action === 'FOLLOWUP_DRAW_ADJUSTED'
+          ? entry.description
+          : 'Die Qualifikanten haben sich geändert. Ungültige KO-Startplatz-Fixierungen wurden aufgehoben; bitte die neue Auslosung kontrollieren.' });
       }
     };
     window.addEventListener('mock-audit-change', onAuditChange);

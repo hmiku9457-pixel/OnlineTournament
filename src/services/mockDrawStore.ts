@@ -4,6 +4,7 @@ import { seededGroupAssignments, seededKnockoutSlots, seededKnockoutSlotsAvoidin
 import { isStageCompleted, getPreviousCompetitionStage } from '@/services/mockPhaseLifecycle';
 import { getPhaseLifecycle, getStageEntrants, isStageEditable } from '@/services/mockPhaseLifecycle';
 import { buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
+import { recordMockAudit } from '@/services/mockAudit';
 
 const DRAW_KEY = 'online-tournament:mock-draw-config:v1';
 
@@ -39,6 +40,11 @@ function upsert(config: StageDrawConfig) {
 
 function findConfig(tournamentId: string, stageId: string) {
   return readAll().find((item) => item.tournamentId === tournamentId && item.stageId === stageId);
+}
+
+function auditDraw(tournament: DemoTournament, stage: TournamentStage, description: string, before?: string, after?: string) {
+  recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)',
+    action: 'DRAW_CHANGED', description: `${stage.name}: ${description}`, before, after });
 }
 
 function nextPowerOfTwo(value: number) {
@@ -140,8 +146,12 @@ export function setParticipantGroup(tournament: DemoTournament, stage: Tournamen
   const groupCount = Math.max(1, Number(stage.settings.groups) || 1);
   if (groupIndex < 0 || groupIndex >= groupCount) return false;
   const current = getGroupAssignments(tournament, stage);
+  if (!(participant in current)) return false;
+  const previous = current[participant];
+  if (previous === groupIndex) return true;
   current[participant] = groupIndex;
   upsert({ tournamentId: tournament.id, stageId: stage.id, groupAssignments: current });
+  auditDraw(tournament, stage, `${participant} von Gruppe ${String.fromCharCode(65 + previous)} in Gruppe ${String.fromCharCode(65 + groupIndex)} verschoben`);
   return true;
 }
 
@@ -157,6 +167,7 @@ export function resetGroupAssignments(tournament: DemoTournament, stage: Tournam
     ...(remainingConfig ? [remainingConfig] : []),
     ...current.filter((item) => !(item.tournamentId === tournament.id && item.stageId === stage.id)),
   ]);
+  auditDraw(tournament, stage, 'Gruppeneinteilung auf Ausgangsverteilung zurückgesetzt');
   return true;
 }
 
@@ -167,6 +178,7 @@ export function randomizeGroupAssignments(tournament: DemoTournament, stage: Tou
   const randomized = shuffled(participants);
   const assignments = Object.fromEntries(randomized.map((participant, index) => [participant, index % groupCount]));
   upsert({ tournamentId: tournament.id, stageId: stage.id, groupAssignments: assignments });
+  auditDraw(tournament, stage, 'Gruppen neu ausgelost');
   return true;
 }
 
@@ -190,6 +202,7 @@ export function randomizeSwissOrder(tournament: DemoTournament, stage: Tournamen
     bracketSlots: config?.bracketSlots,
     swissOrder: shuffled(participants),
   });
+  auditDraw(tournament, stage, 'Schweizer Startreihenfolge neu ausgelost');
   return true;
 }
 
@@ -201,6 +214,7 @@ export function applySeededSwissOrder(tournament: DemoTournament, stage: Tournam
   const order = snakeSeededGroupOrder(rankedGroups, entrants);
   if (order.length !== entrants.length || new Set(order).size !== entrants.length) return false;
   upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, swissOrder: order });
+  auditDraw(tournament, stage, 'Schweizer Startreihenfolge aus Gruppenrangliste gesetzt');
   return true;
 }
 
@@ -218,6 +232,7 @@ export function applySeededGroupAssignments(tournament: DemoTournament, stage: T
   const assignments = seededGroupAssignments([...ranked, ...missing], groupCount);
   if (Object.keys(assignments).length !== entrants.length) return false;
   upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, groupAssignments: assignments });
+  auditDraw(tournament, stage, 'Gruppen anhand der Schweizer Rangliste gesetzt');
   return true;
 }
 
@@ -239,6 +254,7 @@ export function applySeededBracketSlots(tournament: DemoTournament, stage: Tourn
   if (!validBracketConstraints(entrants, slots)) return false;
   // An explicit re-seeding supersedes old manual positions and pins.
   upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots, pinnedBracketSlots: [] });
+  auditDraw(tournament, stage, 'KO-Setzung aus den Qualifikationsrängen neu erstellt; Fixierungen zurückgesetzt');
   return true;
 }
 
@@ -259,8 +275,10 @@ export function toggleBracketPin(tournament: DemoTournament, stage: TournamentSt
   if (index < 0 || index >= slots.length || slots[index] === 'Freilos') return false;
   const old = findConfig(tournament.id, stage.id);
   const pinned = new Set(getPinnedBracketSlots(tournament, stage));
-  if (pinned.has(index)) pinned.delete(index); else pinned.add(index);
+  const wasPinned = pinned.has(index);
+  if (wasPinned) pinned.delete(index); else pinned.add(index);
   upsert({ ...old, tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots, pinnedBracketSlots: [...pinned] });
+  auditDraw(tournament, stage, `KO-Platz ${index + 1} für ${slots[index]} ${wasPinned ? 'freigegeben' : 'fixiert'}`);
   return true;
 }
 
@@ -275,6 +293,33 @@ export function reconcileQualifiedBracket(tournament: DemoTournament, stage: Tou
   if (config.bracketSlots.length === size && validBracketConstraints(entrants, config.bracketSlots)) return false;
   upsert({ ...config, bracketSlots: balancedBracketSlots(entrants), pinnedBracketSlots: [] });
   return true;
+}
+
+/** Return the type of a prepared follow-up draw that was adjusted due to
+ * a changed qualifying field; no edit is made if it was not customized. */
+export function reconcileQualifiedDraw(tournament: DemoTournament, stage: TournamentStage): 'KNOCKOUT' | 'GROUPS' | 'SWISS' | null {
+  if (stage.type === 'KNOCKOUT') return reconcileQualifiedBracket(tournament, stage) ? 'KNOCKOUT' : null;
+  if (isStageCompleted(tournament, stage)) return null;
+  const config = findConfig(tournament.id, stage.id);
+  if (!config) return null;
+  const entrants = getStageEntrants(tournament, stage);
+  const valid = new Set(entrants);
+  if (stage.type === 'GROUPS' && config.groupAssignments) {
+    const names = Object.keys(config.groupAssignments);
+    if (names.length === entrants.length && names.every((name) => valid.has(name))) return null;
+    const assignments = getGroupAssignments(tournament, stage);
+    upsert({ ...config, groupAssignments: assignments });
+    return 'GROUPS';
+  }
+  if (stage.type === 'SWISS' && config.swissOrder) {
+    const order = config.swissOrder;
+    if (order.length === entrants.length && order.every((name) => valid.has(name))) return null;
+    const filtered = order.filter((name) => valid.has(name));
+    const missing = entrants.filter((name) => !filtered.includes(name));
+    upsert({ ...config, swissOrder: [...filtered, ...missing] });
+    return 'SWISS';
+  }
+  return null;
 }
 
 export function getBracketSlots(tournament: DemoTournament, stage: TournamentStage) {
@@ -311,6 +356,7 @@ export function setBracketSlot(
   slots[sourceIndex] = previous;
   if (!validBracketConstraints(participants, slots)) return false;
   upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots });
+  auditDraw(tournament, stage, `KO-Plätze ${slotIndex + 1} und ${sourceIndex + 1} getauscht`, `${previous} / ${value}`, `${value} / ${previous}`);
   return true;
 }
 
@@ -340,6 +386,7 @@ export function randomizeBracketSlots(tournament: DemoTournament, stage: Tournam
     bracketSlots: next,
     pinnedBracketSlots: pinned,
   });
+  auditDraw(tournament, stage, 'Nicht fixierte KO-Plätze neu ausgelost');
   return true;
 }
 
@@ -355,6 +402,7 @@ export function resetBracketSlots(tournament: DemoTournament, stage: TournamentS
     ...(remainingConfig ? [remainingConfig] : []),
     ...current.filter((item) => !(item.tournamentId === tournament.id && item.stageId === stage.id)),
   ]);
+  auditDraw(tournament, stage, 'KO-Auslosung und Fixierungen auf Ausgangsverteilung zurückgesetzt');
   return true;
 }
 

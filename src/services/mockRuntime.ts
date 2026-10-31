@@ -1,5 +1,5 @@
 import { isParticipantWithdrawn, saveParticipantWithdrawal, removeParticipantWithdrawal, markWithdrawalRestoreEligibility, getWithdrawalRestoreEligibility, saveWithdrawalTiming, type WithdrawalTiming } from '@/services/mockWithdrawals';
-import { reconcilePrestartDraws, reconcileQualifiedBracket } from '@/services/mockDrawStore';
+import { reconcilePrestartDraws, reconcileQualifiedDraw } from '@/services/mockDrawStore';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
@@ -1326,10 +1326,14 @@ export function refreshCompletedStageQualifiers(tournament: DemoTournament, stag
   for (const following of tournament.stages.slice(start, end + 1)) {
     setStageEntrants(tournament, following, qualified);
   }
-  if (reconcileQualifiedBracket(tournament, nextStage)) {
+  const adjustedDraw = reconcileQualifiedDraw(tournament, nextStage);
+  if (adjustedDraw) {
     recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)',
-      action: 'KNOCKOUT_DRAW_REBUILT',
-      description: 'Nach geänderten Qualifikanten wurde die KO-Auslosung neu aufgebaut und ungültige Startplatz-Fixierungen wurden entfernt.' });
+      action: 'FOLLOWUP_DRAW_ADJUSTED',
+      description: `Teilnehmerfeld für ${nextStage.name} geändert: ${adjustedDraw === 'KNOCKOUT'
+        ? 'KO-Auslosung neu aufgebaut und ungültige Fixierungen entfernt'
+        : adjustedDraw === 'GROUPS' ? 'vorbereitete Gruppenauslosung an Nachrücker angepasst'
+        : 'Schweizer Startreihenfolge an Nachrücker angepasst'}. Bitte die Auslosung kontrollieren.` });
   }
   return true;
 }
@@ -1413,10 +1417,11 @@ export function approveMockProgress(tournament: DemoTournament): MockProgressApp
     // Reapproval after a corrected group/Swiss result may replace qualifiers
     // just as a withdrawal does. Never attach old pins to their replacements.
     const followingCompetition = getNextCompetitionStage(latest, stage);
-    if (followingCompetition && reconcileQualifiedBracket(latest, followingCompetition)) {
+    const adjustedDraw = followingCompetition && reconcileQualifiedDraw(latest, followingCompetition);
+    if (adjustedDraw) {
       recordMockAudit({ tournamentId: latest.id, actor: 'Turnierleitung (lokal)',
-        action: 'KNOCKOUT_DRAW_REBUILT',
-        description: 'Neue Qualifikanten nach Phasenkorrektur: KO-Auslosung neu aufgebaut und Startplatz-Fixierungen aufgehoben.' });
+        action: 'FOLLOWUP_DRAW_ADJUSTED',
+        description: `Qualifikanten nach Phasenfreigabe geändert: ${followingCompetition!.name} (${adjustedDraw}). Bitte die Auslosung kontrollieren.` });
     }
     updateMockTournamentStatus(latest.id, pending.isLastStage ? 'FINISHED' : 'PAUSED');
     recordMockAudit({ tournamentId: latest.id, actor: 'Turnierleitung', action: 'STAGE_APPROVED',
