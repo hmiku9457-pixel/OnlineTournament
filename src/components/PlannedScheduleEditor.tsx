@@ -26,7 +26,7 @@ export function PlannedScheduleEditor({
       <div className="planned-schedule-editor-intro">
         <div>
           <h3>Voraussichtlicher Ablauf</h3>
-          <p className="muted">Die Phasen werden automatisch aus deiner Turnierplanung und den geschätzten Spieldauern übernommen. Die Uhrzeiten sind unverbindlich.</p>
+          <p className="muted">Die Phasen werden automatisch aus deiner Turnierplanung und den geschätzten Spieldauern übernommen. Phasenbeginn und Pausendauern sind unverbindliche Richtwerte.</p>
         </div>
       </div>
       <ol className="planned-schedule-phase-list">

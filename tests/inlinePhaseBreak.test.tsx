@@ -55,12 +55,15 @@ describe('Zwischenpause innerhalb einer Wettkampfphase', () => {
     expect(timeline.estimatedEnd).toBe('2026-11-01T15:00');
     expect(plannedTimelineDurationMinutes('2026-11-01T10:00',timeline.estimatedEnd)).toBe(300);
     expect(timeline.warnings).toEqual([]);
+    expect(timeline.items[1]).toMatchObject({ durationMinutes: 60, durationApproximate: true });
     const markup=renderToStaticMarkup(createElement(PlannedScheduleEditor,{
       scheduledStart:'2026-11-01T10:00',timeline,awardsEnabled:false,awardsAt:timeline.estimatedEnd,
       onToggleAwards:()=>{},onAwardsAtChange:()=>{},
     }));
     expect(markup).toContain('Pause nach Runde 2 · Schweizer System');
     expect(markup).toContain('Fortsetzung Runde 3 · Schweizer System');
+    expect(markup).toContain('ca. 1 Std.');
+    expect(markup).not.toContain('Geplanter Pausenbeginn');
     expect(markup).toContain('Siegerehrung hinzufügen');
   });
 
@@ -72,6 +75,7 @@ describe('Zwischenpause innerhalb einer Wettkampfphase', () => {
     expect(timeline.warnings).toHaveLength(1);
     expect(timeline.warnings[0]).toMatchObject({phaseIndex:0});
     expect(timeline.warnings[0].message).toContain('12:00 Uhr');
+    expect(timeline.items[1].durationMinutes).toBeUndefined();
     expect(timeline.estimatedEnd).toBe('2026-11-01T14:00');
   });
 

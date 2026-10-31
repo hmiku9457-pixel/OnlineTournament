@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, formatPlannedBreakDuration, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
@@ -59,6 +59,10 @@ describe('optionaler vorläufiger Zeitplan', () => {
       ['2026-10-31T15:30', 'Finale', 'competition'],
     ]);
     expect(validatePlannedSchedule(suggestion)).toEqual([]);
+    expect(suggestion[1]).toMatchObject({ durationMinutes: 30, durationApproximate: false });
+    expect(formatPlannedBreakDuration(suggestion[1])).toBe('30 Min.');
+    expect(suggestion[3]).toMatchObject({ durationMinutes: 195, durationApproximate: true });
+    expect(formatPlannedBreakDuration(suggestion[3])).toBe('ca. 3 Std. 15 Min.');
     const edited = suggestion.map((row) => row.title === 'Finale' ? { ...row, at: '2026-10-31T16:00' } : row);
     expect(edited[4].at).toBe('2026-10-31T16:00');
     expect(suggestion[4].at).toBe('2026-10-31T15:30');
@@ -75,6 +79,9 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(dates.map((item) => item.at)).toEqual([
       '2026-10-31T17:00', '2026-10-31T18:00', '2026-11-01T09:00', '2026-11-01T10:10', '2026-11-01T10:10',
     ]);
+    expect(dates[1]).toMatchObject({ durationMinutes: 900, durationApproximate: true });
+    expect(formatPlannedBreakDuration(dates[1])).toBe('ca. 15 Std.');
+    expect(formatPlannedBreakDuration(dates[3])).toBe('Dauer noch offen');
   });
 
   it('bildet den konkreten Turnierplan automatisch ab und erkennt Pause bis vor dem theoretischen Ende', () => {
@@ -97,6 +104,8 @@ describe('optionaler vorläufiger Zeitplan', () => {
       phases[0], { ...phases[1], breakUntil: '13:30' }, phases[2],
     ]);
     expect(corrected.warnings).toEqual([]);
+    expect(corrected.items[1]).toMatchObject({ durationMinutes: 60, durationApproximate: true });
+    expect(formatPlannedBreakDuration(corrected.items[1])).toBe('ca. 1 Std.');
     expect(corrected.items.map((row) => [row.title, row.at])).toEqual([
       ['Schweizer System', '2026-11-01T10:00'],
       ['Pause', '2026-11-01T12:30'],
@@ -127,6 +136,10 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(ui).toContain('K.-o.-Phase');
     expect(ui).toContain('Voraussichtliches Turnierende');
     expect(ui).toContain('Siegerehrung hinzufügen');
+    expect(ui).toContain('ca. 1 Std.');
+    expect(ui).toContain('Geschätzte Pausendauer');
+    expect(ui).toContain('class="planned-schedule-duration"');
+    expect(ui).not.toContain('Geplanter Pausenbeginn');
     expect(ui).not.toContain('Programmpunkt');
     const withAwards = renderToStaticMarkup(createElement(PlannedScheduleEditor, {
       scheduledStart: '2026-11-01T10:00', timeline,
@@ -161,6 +174,26 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(time.estimatedEnd).toBe('2026-11-01T14:10');
     expect(plannedTimelineDurationMinutes('2026-11-01T10:00', time.estimatedEnd)).toBe(250);
     expect(time.warnings).toEqual([]);
+  });
+
+  it('zeigt in der öffentlichen Vorschau bei Pausen Dauer statt Pausenstart-Uhrzeit', () => {
+    const timeline = buildPlannedTimeline('2026-11-01T10:00', [
+      { label: 'Vorrunde', type: 'SWISS', estimatedMinutes: 60 },
+      { label: 'Mittagspause', type: 'BREAK', estimatedMinutes: 30, breakKind: 'minutes', breakMinutes: 30 },
+      { label: 'Hauptrunde', type: 'KNOCKOUT', estimatedMinutes: 50 },
+      { label: 'Pause bis', type: 'BREAK', estimatedMinutes: 0, breakKind: 'until', breakUntil: '13:30' },
+      { label: 'Finale', type: 'KNOCKOUT', estimatedMinutes: 20 },
+    ]);
+    const html = renderToStaticMarkup(createElement(TournamentPlannedSchedule, {
+      scheduledStart: '2026-11-01T10:00', items: timeline.items,
+    }));
+    expect(html).toContain('<span class="planned-schedule-duration">30 Min.</span>');
+    expect(html).toContain('<span class="planned-schedule-duration">ca. 1 Std. 10 Min.</span>');
+    expect(html).not.toContain('<time dateTime="2026-11-01T11:00"');
+    expect(html).not.toContain('<time dateTime="2026-11-01T12:20"');
+    expect(html).toContain('13:30 Uhr');
+    expect(html).toContain('Geplanter Turnierbeginn');
+    expect(html.indexOf('Mittagspause')).toBeLessThan(html.indexOf('Hauptrunde'));
   });
 
   it('lässt leere Pläne zu, prüft aber unvollständige Einträge und Duplikate', () => {
