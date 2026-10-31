@@ -6,7 +6,7 @@ import {
   recommendedSwissRounds, stageLabel, type TournamentDurationPhaseInput,
 } from '@/domain/tournamentCreation';
 import { planningMinutesPerSet } from '@/domain/sports';
-import { parseCalendarDate } from '@/components/CalendarDatePicker';
+import { isValidLocalDateTime } from '@/domain/tournamentSchedule';
 import { sportScoring } from '@/domain/sportScoring';
 
 /** In-memory pre-start draft. Existing stage identities are not reused on save:
@@ -24,7 +24,7 @@ export interface PrestartPhaseDraft {
   breakKind: 'minutes' | 'until' | 'overnight';
   breakMinutes: number;
   nextDayStart: string;
-  nextDayDate: string;
+  nextDayDate?: string;
   breakUntil: string;
   note: string;
   inlineBreakAfterRound: number;
@@ -109,7 +109,7 @@ export function validatePrestartPhases(phases: PrestartPhaseDraft[], activeCount
       if (phase.note.length > 600) errors.push(`${label}: Hinweistext darf maximal 600 Zeichen enthalten.`);
       if (phase.breakKind === 'overnight') {
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(phase.nextDayStart)) errors.push(`${label}: Gültige Startzeit (HH:MM) erforderlich.`);
-        if (phase.nextDayDate && !parseCalendarDate(phase.nextDayDate)) errors.push(`${label}: Ungültiges Fortsetzungsdatum.`);
+        if (phase.nextDayDate && !isValidLocalDateTime(phase.nextDayDate + 'T12:00')) errors.push(`${label}: Ungültiges Fortsetzungsdatum.`);
       } else if (phase.breakKind === 'until') {
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(phase.breakUntil)) errors.push(`${label}: Für „Pause bis“ ist eine gültige Uhrzeit (HH:MM) erforderlich.`);
       } else if (phase.breakKind === 'minutes') {
