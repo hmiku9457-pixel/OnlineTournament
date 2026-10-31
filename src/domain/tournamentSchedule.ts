@@ -5,6 +5,11 @@ export interface PlannedScheduleItem {
   title: string;
   type: 'competition' | 'break' | 'other';
   note?: string;
+  /** Estimated pause length; set only for breaks. Kept separate from 'at',
+   * which is still required internally to calculate later phase starts. */
+  durationMinutes?: number;
+  /** Clock-target breaks are only approximate because real rounds can end later. */
+  durationApproximate?: boolean;
 }
 
 /** The browser's local wall clock is used intentionally, not Date.toISOString(). */
@@ -42,6 +47,22 @@ export function formatPlannedDateTime(value: string, withDate = true): string {
   return date.toLocaleString('de-DE', withDate
     ? { dateStyle: 'medium', timeStyle: 'short' }
     : { timeStyle: 'short' }) + ' Uhr';
+}
+
+/** Display break length rather than a fictitious exact pause-start time.
+ * "Pause bis" and overnight pauses depend on when play actually finishes.
+ */
+export function formatPlannedBreakDuration(item: PlannedScheduleItem): string {
+  if (item.type !== 'break' || item.durationMinutes === undefined
+    || !Number.isFinite(item.durationMinutes) || item.durationMinutes < 0) {
+    return 'Dauer noch offen';
+  }
+  const minutes = Math.max(0, Math.round(item.durationMinutes));
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  const duration = hours === 0 ? `${rest} Min.`
+    : rest === 0 ? `${hours} Std.` : `${hours} Std. ${rest} Min.`;
+  return item.durationApproximate ? `ca. ${duration}` : duration;
 }
 
 export function validatePlannedSchedule(items: PlannedScheduleItem[]): string[] {
@@ -120,23 +141,34 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
         const before = Math.round(totalDuration * afterRound / roundCount);
         const after = Math.round(totalDuration) - before;
         const inlineStart = new Date(cursor.getTime() + before * 60000);
-        items.push({ id: `inline-break-${index + 1}`, at: toLocalDateTime(inlineStart),
-          title: `Pause nach Runde ${afterRound} · ${phase.label}`, type: 'break' });
+        const inlinePause: PlannedScheduleItem = { id: `inline-break-${index + 1}`, at: toLocalDateTime(inlineStart),
+          title: `Pause nach Runde ${afterRound} · ${phase.label}`, type: 'break',
+          durationApproximate: phase.inlineBreakKind === 'until' };
+        items.push(inlinePause);
         let resume = inlineStart;
+        let validDuration = true;
         if (phase.inlineBreakKind === 'until') {
           const target = clockAt(inlineStart, phase.inlineBreakUntil ?? '13:00');
           if (target < inlineStart) {
             warnings.push({ phaseIndex: index, message: `„${phase.label}“: Die Zwischenpause nach Runde ${afterRound} beginnt voraussichtlich um ${formatPlannedDateTime(toLocalDateTime(inlineStart), false)}. „Pause bis ${phase.inlineBreakUntil ?? '13:00'} Uhr“ liegt davor. Bitte eine spätere Uhrzeit wählen.` });
+            validDuration = false;
           } else resume = target;
         } else resume = new Date(inlineStart.getTime() + Math.max(1, phase.inlineBreakMinutes ?? 15) * 60000);
+        if (validDuration) inlinePause.durationMinutes = Math.max(0, Math.round((resume.getTime() - inlineStart.getTime()) / 60000));
         items.push({ id: `inline-resume-${index + 1}`, at: toLocalDateTime(resume),
           title: `Fortsetzung Runde ${afterRound + 1} · ${phase.label}`, type: 'competition' });
         cursor = new Date(resume.getTime() + after * 60000);
       } else cursor = new Date(cursor.getTime() + totalDuration * 60000);
     } else if (phase.breakKind === 'overnight') {
+      const pauseStart = cursor;
       cursor = clockAt(cursor, phase.nextDayStart ?? '09:00', true);
+      const pause = items[items.length - 1];
+      pause.durationMinutes = Math.max(0, Math.round((cursor.getTime() - pauseStart.getTime()) / 60000));
+      pause.durationApproximate = true;
     } else if (phase.breakKind === 'until') {
       const target = clockAt(cursor, phase.breakUntil ?? '12:00');
+      const pause = items[items.length - 1];
+      pause.durationApproximate = true;
       if (target.getTime() < cursor.getTime()) {
         const planned = String(phase.breakUntil ?? '12:00');
         const earliest = formatPlannedDateTime(toLocalDateTime(cursor), false);
@@ -145,10 +177,13 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
           message: `„${phase.label}“: Pause bis ${planned} Uhr liegt vor dem voraussichtlichen Pausenbeginn um ${earliest}. Bitte eine spätere Uhrzeit wählen. Für die Vorschau wird die nächste Phase frühestens nach dem vorherigen Spielende angesetzt.`,
         });
       } else {
+        pause.durationMinutes = Math.max(0, Math.round((target.getTime() - cursor.getTime()) / 60000));
         cursor = target;
       }
     } else {
-      cursor = new Date(cursor.getTime() + Math.max(1, phase.breakMinutes ?? 15) * 60000);
+      const pauseMinutes = Math.max(1, phase.breakMinutes ?? 15);
+      items[items.length - 1].durationMinutes = pauseMinutes;
+      cursor = new Date(cursor.getTime() + pauseMinutes * 60000);
     }
   });
   return { items, estimatedEnd: toLocalDateTime(cursor), warnings };

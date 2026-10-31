@@ -1,5 +1,5 @@
 import type { PlannedScheduleItem } from '@/domain/tournamentSchedule';
-import { formatPlannedDateTime } from '@/domain/tournamentSchedule';
+import { formatPlannedBreakDuration, formatPlannedDateTime } from '@/domain/tournamentSchedule';
 
 interface Props {
   scheduledStart?: string;
@@ -24,7 +24,9 @@ export function TournamentPlannedSchedule({ scheduledStart, items = [], title = 
       {sorted.length > 0 && <ol className="planned-schedule-list">
         {sorted.map((item) => (
           <li className={`planned-schedule-item planned-schedule-${item.type}`} key={item.id}>
-            <time dateTime={item.at}>{formatPlannedDateTime(item.at)}</time>
+            {item.type === 'break'
+              ? <span className="planned-schedule-duration">{formatPlannedBreakDuration(item)}</span>
+              : <time dateTime={item.at}>{formatPlannedDateTime(item.at)}</time>}
             <div><strong>{item.title}</strong>{item.note && <p>{item.note}</p>}</div>
           </li>
         ))}

@@ -1,6 +1,6 @@
 import type { PlannedTimeline } from '@/domain/tournamentSchedule';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
-import { formatPlannedDateTime, parseLocalDateTime } from '@/domain/tournamentSchedule';
+import { formatPlannedBreakDuration, formatPlannedDateTime, parseLocalDateTime } from '@/domain/tournamentSchedule';
 
 interface Props {
   scheduledStart: string;
@@ -36,10 +36,14 @@ export function PlannedScheduleEditor({
         </li>
         {timeline.items.map((item, index) => (
           <li key={item.id} className={`planned-schedule-phase-row ${item.type === 'break' ? 'is-break' : ''}`}>
-            <time dateTime={item.at}>{formatPlannedDateTime(item.at)}</time>
+            {item.type === 'break'
+              ? <span className="planned-schedule-duration">{formatPlannedBreakDuration(item)}</span>
+              : <time dateTime={item.at}>{formatPlannedDateTime(item.at)}</time>}
             <div>
               <strong>{item.title}</strong>
-              <small>{item.type === 'break' ? 'Geplanter Pausenbeginn' : 'Voraussichtlicher Phasenbeginn'}</small>
+              <small>{item.type === 'break'
+                ? item.durationApproximate ? 'Geschätzte Pausendauer (abhängig vom Spielverlauf)' : 'Geplante Pausendauer'
+                : 'Voraussichtlicher Phasenbeginn'}</small>
               {timeline.warnings.filter((warning) => warning.phaseIndex === index).map((warning) => (
                 <p className="planned-schedule-phase-warning" role="alert" key={warning.message}>{warning.message}</p>
               ))}

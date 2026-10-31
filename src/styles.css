@@ -4709,7 +4709,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .planned-schedule-disclaimer { margin: 10px 0; max-width: 92ch; font-size: .81rem; line-height: 1.5; }
 .planned-schedule-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
 .planned-schedule-item { display: grid; grid-template-columns: minmax(125px, 165px) minmax(0, 1fr); align-items: start; gap: 12px; padding: 12px 2px; border-top: 1px solid #eaecf0; }
-.planned-schedule-item time { font-variant-numeric: tabular-nums; font-weight: 800; font-size: .82rem; color: #344054; }
+.planned-schedule-item time, .planned-schedule-item .planned-schedule-duration { font-variant-numeric: tabular-nums; font-weight: 800; font-size: .82rem; color: #344054; }
 .planned-schedule-item > div { min-width: 0; }
 .planned-schedule-item strong { display: block; overflow-wrap: anywhere; }
 .planned-schedule-item p { margin: 4px 0 0; font-size: .78rem; color: #667085; overflow-wrap: anywhere; }
@@ -4725,7 +4725,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .planned-schedule-entry-fields { grid-template-columns: minmax(0, 1fr); }
   .planned-schedule-entry-fields .planned-schedule-entry-note { grid-column: 1; }
   .planned-schedule-item { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; }
-  .planned-schedule-item time { grid-column: 1 / -1; }
+  .planned-schedule-item time, .planned-schedule-item .planned-schedule-duration { grid-column: 1 / -1; }
   .planned-schedule-start { justify-items: start; }
 }
 
@@ -4733,7 +4733,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .planned-schedule-phase-list { margin: 0; padding: 0; list-style: none; display: grid; border: 1px solid #e4e7ec; border-radius: 12px; overflow: hidden; background: #fff; }
 .planned-schedule-phase-row { display: grid; grid-template-columns: minmax(145px, 185px) minmax(0, 1fr); align-items: start; gap: 14px; padding: 13px 16px; border-bottom: 1px solid #eaecf0; }
 .planned-schedule-phase-row:last-child { border-bottom: 0; }
-.planned-schedule-phase-row time { font-weight: 800; font-variant-numeric: tabular-nums; color: #344054; font-size: .86rem; }
+.planned-schedule-phase-row time, .planned-schedule-phase-row .planned-schedule-duration { font-weight: 800; font-variant-numeric: tabular-nums; color: #344054; font-size: .86rem; }
 .planned-schedule-phase-row strong { display: block; font-size: .92rem; overflow-wrap: anywhere; }
 .planned-schedule-phase-row small { display: block; margin-top: 3px; color: #667085; font-size: .74rem; }
 .planned-schedule-phase-row.is-start { background: #eef8f3; border-left: 4px solid #079455; }
