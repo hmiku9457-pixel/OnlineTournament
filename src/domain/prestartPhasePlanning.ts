@@ -6,6 +6,7 @@ import {
   recommendedSwissRounds, stageLabel, type TournamentDurationPhaseInput,
 } from '@/domain/tournamentCreation';
 import { planningMinutesPerSet } from '@/domain/sports';
+import { parseCalendarDate } from '@/components/CalendarDatePicker';
 import { sportScoring } from '@/domain/sportScoring';
 
 /** In-memory pre-start draft. Existing stage identities are not reused on save:
@@ -23,6 +24,7 @@ export interface PrestartPhaseDraft {
   breakKind: 'minutes' | 'until' | 'overnight';
   breakMinutes: number;
   nextDayStart: string;
+  nextDayDate: string;
   breakUntil: string;
   note: string;
   inlineBreakAfterRound: number;
@@ -48,6 +50,7 @@ export function initialPrestartPhases(tournament: DemoTournament): PrestartPhase
     breakKind: stage.settings.breakKind === 'overnight' ? 'overnight' : stage.settings.breakKind === 'until' ? 'until' : 'minutes',
     breakMinutes: Number(stage.settings.breakMinutes) || 15,
     nextDayStart: String(stage.settings.nextDayStart ?? '09:00'),
+    nextDayDate: String(stage.settings.nextDayDate ?? ''),
     breakUntil: String(stage.settings.breakUntil ?? '12:00'),
     note: String(stage.settings.note ?? ''),
     inlineBreakAfterRound: Number(stage.settings.inlineBreakAfterRound) || 0,
@@ -106,6 +109,7 @@ export function validatePrestartPhases(phases: PrestartPhaseDraft[], activeCount
       if (phase.note.length > 600) errors.push(`${label}: Hinweistext darf maximal 600 Zeichen enthalten.`);
       if (phase.breakKind === 'overnight') {
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(phase.nextDayStart)) errors.push(`${label}: Gültige Startzeit (HH:MM) erforderlich.`);
+        if (phase.nextDayDate && !parseCalendarDate(phase.nextDayDate)) errors.push(`${label}: Ungültiges Fortsetzungsdatum.`);
       } else if (phase.breakKind === 'until') {
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(phase.breakUntil)) errors.push(`${label}: Für „Pause bis“ ist eine gültige Uhrzeit (HH:MM) erforderlich.`);
       } else if (phase.breakKind === 'minutes') {
@@ -176,7 +180,7 @@ export function createPrestartPhase(type: StageType, participants: number, next?
     groupCount: recommendGroupCount(entrants, next?.entrantCount),
     swissRounds: recommendedSwissRounds(entrants),
     knockoutBestOf: Array.from({ length: knockoutRoundLabels(entrants).length }, () => bestOf),
-    breakKind: 'minutes', breakMinutes: 15, nextDayStart: '09:00', breakUntil: '12:00', note: '',
+    breakKind: 'minutes', breakMinutes: 15, nextDayStart: '09:00', nextDayDate: '', breakUntil: '12:00', note: '',
     inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00',
   };
 }
