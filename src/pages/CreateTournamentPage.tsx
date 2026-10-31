@@ -1975,7 +1975,7 @@ export function CreateTournamentPage() {
             </div>
           )}
           {phaseDrafts.length > 0 && <small>Unverbindliche Planung mit {timedSport ? `${matchDurationMinutes} Min. je Spiel` : `${planningMinutesPerSet(sport)} Min. je Satz`}. Zusätzliche Verzögerungen bei der Rundenfreigabe sind nicht enthalten.</small>}
-          {plannedTimeline.warnings.length > 0 && <small>⚠ Eine „Pause bis“-Uhrzeit liegt vor dem geschätzten Beginn der Pause. Bitte Phasenplanung prüfen.</small>}
+          {plannedTimeline.warnings.length > 0 && <small>⚠ Die Pausenplanung enthält einen Zeitkonflikt. Bitte Datum und Uhrzeit in Schritt 4 prüfen.</small>}
         </div>
         {maxReachedStep >= 4 && !canCreate && (
           <div className="wizard-side-validation" role="status">
