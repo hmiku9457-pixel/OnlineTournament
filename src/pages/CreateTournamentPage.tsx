@@ -55,9 +55,10 @@ type PhaseDraft = {
   entrantCount: number;
   knockoutBestOf: number[];
   customEntrants: boolean;
-  breakKind: 'minutes' | 'overnight';
+  breakKind: 'minutes' | 'until' | 'overnight';
   breakMinutes: number;
   nextDayStart: string;
+  breakUntil: string;
   note: string;
 };
 
@@ -241,6 +242,7 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
     breakKind: 'minutes',
     breakMinutes: 15,
     nextDayStart: '09:00',
+    breakUntil: '12:00',
     note: '',
   };
 }
@@ -406,7 +408,9 @@ export function CreateTournamentPage() {
       || (phase.label.trim().length > 0 && phase.note.length <= 600
         && (phase.breakKind === 'minutes'
           ? Number.isInteger(phase.breakMinutes) && phase.breakMinutes >= 1 && phase.breakMinutes <= 1440
-          : /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.nextDayStart))));
+          : phase.breakKind === 'until'
+            ? /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.breakUntil)
+            : phase.breakKind === 'overnight' && /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.nextDayStart))));
   const gameSettingsValid = minimumMatches >= 1 && validMatchDuration && validTurnover;
   const basicsValid = Boolean(name.trim()) && Boolean(sport) && selectedDisciplineValid && tables >= 1 && gameSettingsValid;
   const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
@@ -772,6 +776,7 @@ export function CreateTournamentPage() {
         breakKind: phase.breakKind,
         breakMinutes: phase.breakMinutes,
         nextDayStart: phase.nextDayStart,
+        breakUntil: phase.breakUntil,
         note: phase.note,
       })),
       estimatedDurationMinutes: estimatedTournamentDurationMinutes,
@@ -1300,6 +1305,7 @@ export function CreateTournamentPage() {
                               <p className="phase-quick-facts">
                                 {phase.type === 'BREAK' ? (phase.breakKind === 'overnight'
                                   ? `Spieltagsende · Fortsetzung morgen um ${phase.nextDayStart} Uhr`
+                                  : phase.breakKind === 'until' ? `Pause bis ${phase.breakUntil} Uhr`
                                   : `${phase.breakMinutes} Minuten Pause`) : <>{phase.entrantCount} Teilnehmer · {phase.type === 'GROUPS' ? `${phase.groupCount} Gruppen · ` : ''}
                                 {phase.type === 'SWISS' ? `${phase.swissRounds} Runden · ` : ''}
                                 {phase.type === 'KNOCKOUT' ? `${knockoutRoundLabels(phase.entrantCount).length} Runden · ` : ''}
@@ -1403,6 +1409,8 @@ export function CreateTournamentPage() {
                                 <legend>Art der Unterbrechung</legend>
                                 <label><input type="radio" name={`break-kind-${phase.id}`} checked={phase.breakKind === 'minutes'}
                                   onChange={() => updatePhase(phase.id, { breakKind: 'minutes' })} /> Pause in Minuten</label>
+                                <label><input type="radio" name={`break-kind-${phase.id}`} checked={phase.breakKind === 'until'}
+                                  onChange={() => updatePhase(phase.id, { breakKind: 'until' })} /> Pause bis</label>
                                 <label><input type="radio" name={`break-kind-${phase.id}`} checked={phase.breakKind === 'overnight'}
                                   onChange={() => updatePhase(phase.id, { breakKind: 'overnight' })} /> Spieltagsende</label>
                               </fieldset>
@@ -1410,6 +1418,12 @@ export function CreateTournamentPage() {
                                 <label className="field">Dauer in Minuten
                                   <input type="number" min="1" max="1440" step="1" value={phase.breakMinutes}
                                     onChange={(event) => updatePhase(phase.id, { breakMinutes: Number(event.target.value) })} />
+                                </label>
+                              ) : phase.breakKind === 'until' ? (
+                                <label className="field">Pause bis (Uhrzeit)
+                                  <input type="time" required value={phase.breakUntil}
+                                    onChange={(event) => updatePhase(phase.id, { breakUntil: event.target.value })} />
+                                  <span className="field-hint">Das Turnier wird frühestens zu dieser Uhrzeit fortgesetzt. Ist sie beim Pausenstart bereits vergangen, gilt der nächste Tag. Eine vorzeitige Freigabe bleibt möglich.</span>
                                 </label>
                               ) : (
                                 <label className="field">Startzeit am Folgetag
@@ -1608,7 +1622,7 @@ export function CreateTournamentPage() {
                   <div>
                     <strong>{phase.label}</strong>
                     <small>{phase.type === 'BREAK'
-                    ? phase.breakKind === 'overnight' ? `Spieltagsende · Folgetag ${phase.nextDayStart} Uhr` : `${phase.breakMinutes} Minuten`
+                    ? phase.breakKind === 'overnight' ? `Spieltagsende · Folgetag ${phase.nextDayStart} Uhr` : phase.breakKind === 'until' ? `Pause bis ${phase.breakUntil} Uhr` : `${phase.breakMinutes} Minuten`
                     : `${phase.type === 'GROUPS' ? `${phase.groupCount} Gruppen` : phase.type === 'SWISS' ? `${phase.swissRounds} Runden` : `${phase.entrantCount} Teilnehmer`} · ${phaseEstimates[index]?.estimatedMatches ?? 0} Spiele · ca. ${formatCompactDuration(phaseEstimates[index]?.estimatedDurationMinutes ?? 0)}`}</small>
                   </div>
                 </li>

@@ -912,9 +912,11 @@ export function TournamentControlPage() {
     if (nextStartableStage.type === 'BREAK') {
       const minutes = Number(nextStartableStage.settings.breakMinutes) || 15;
       setPauseMinutes(minutes);
-      setPauseMode('minutes');
+      const clockTarget = nextStartableStage.settings.breakKind === 'until';
+      setPauseMode(clockTarget ? 'clock' : 'minutes');
       const future = new Date(Date.now() + minutes * 60000);
-      setPauseTime(`${String(future.getHours()).padStart(2, '0')}:${String(future.getMinutes()).padStart(2, '0')}`);
+      setPauseTime(clockTarget ? String(nextStartableStage.settings.breakUntil ?? '12:00')
+        : `${String(future.getHours()).padStart(2, '0')}:${String(future.getMinutes()).padStart(2, '0')}`);
     }
     setStartModal({ kind: 'phase', stageName: nextStartableStage.name });
   }
@@ -1490,7 +1492,9 @@ export function TournamentControlPage() {
                 ? 'Die Pause läuft. Die beim Start festgelegte Uhrzeit ist verbindlich, kann aber durch die Turnierleitung vorzeitig freigegeben werden.'
                 : selectedStage.settings.breakKind === 'overnight'
                   ? `Geplante Fortsetzung am Folgetag um ${selectedStage.settings.nextDayStart} Uhr`
-                  : `Voreinstellung: ${selectedStage.settings.breakMinutes} Minuten (beim Pausenstart anpassbar)`}</p>
+                  : selectedStage.settings.breakKind === 'until'
+                    ? `Geplante Pause bis ${selectedStage.settings.breakUntil ?? '12:00'} Uhr (beim Pausenstart anpassbar)`
+                    : `Voreinstellung: ${selectedStage.settings.breakMinutes} Minuten (beim Pausenstart anpassbar)`}</p>
               {Boolean(selectedStage.settings.note) && <p className="tournament-break-note">{String(selectedStage.settings.note)}</p>}
               {isStageCompleted(tournament, selectedStage) ? (
                 <strong className="tournament-break-finished">Pause abgeschlossen</strong>
@@ -1850,6 +1854,7 @@ export function TournamentControlPage() {
             {pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind !== 'overnight' && (
               <div className="break-start-settings">
                 <strong>Wann soll die Pause enden?</strong>
+                {pendingStartStage.settings.breakKind === 'until' && <p className="muted">Vorgabe aus der Turnierplanung: Pause bis {String(pendingStartStage.settings.breakUntil ?? '12:00')} Uhr.</p>}
                 <div className="actions" role="group" aria-label="Pausenplanung">
                   <button className={pauseMode === 'minutes' ? 'btn small primary' : 'btn small'} type="button" aria-pressed={pauseMode === 'minutes'} onClick={() => setPauseMode('minutes')}>Dauer in Minuten</button>
                   <button className={pauseMode === 'clock' ? 'btn small primary' : 'btn small'} type="button" aria-pressed={pauseMode === 'clock'} onClick={() => setPauseMode('clock')}>Uhrzeit wählen</button>

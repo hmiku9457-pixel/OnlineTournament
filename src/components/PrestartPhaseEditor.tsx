@@ -195,7 +195,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                       <span className="prestart-editor-number">{index + 1}</span>
                       <span className="prestart-editor-title"><strong>{phase.label || stageLabel(phase.type)}</strong>
                         <small>{phase.type === 'BREAK'
-                          ? phase.breakKind === 'overnight' ? `Spieltagsende · morgen ${phase.nextDayStart} Uhr` : `${phase.breakMinutes} Minuten`
+                          ? phase.breakKind === 'overnight' ? `Spieltagsende · morgen ${phase.nextDayStart} Uhr` : phase.breakKind === 'until' ? `Pause bis ${phase.breakUntil} Uhr` : `${phase.breakMinutes} Minuten`
                           : `${phase.entrantCount} Teilnehmer${phase.type === 'GROUPS' ? ` · ${phase.groupCount} Gruppen` : ''}${phase.type === 'SWISS' ? ` · ${phase.swissRounds} Runden` : ''}`}
                         </small>
                       </span>
@@ -235,18 +235,23 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                       </label>
                       {phase.type === 'BREAK' ? <>
                         <label>Art der Pause
-                          <select value={phase.breakKind} onChange={(event) => edit(phase.id, { breakKind: event.target.value as 'minutes' | 'overnight' })}>
-                            <option value="minutes">Pause in Minuten</option><option value="overnight">Spieltagsende</option>
+                          <select value={phase.breakKind} onChange={(event) => edit(phase.id, { breakKind: event.target.value as 'minutes' | 'until' | 'overnight' })}>
+                            <option value="minutes">Pause in Minuten</option>
+                            <option value="until">Pause bis</option>
+                            <option value="overnight">Spieltagsende</option>
                           </select>
                         </label>
-                        <label>{phase.breakKind === 'overnight' ? 'Start am Folgetag' : 'Minuten'}
-                          <input type={phase.breakKind === 'overnight' ? 'time' : 'number'}
+                        <label>{phase.breakKind === 'overnight' ? 'Start am Folgetag' : phase.breakKind === 'until' ? 'Pause bis (Uhrzeit)' : 'Minuten'}
+                          <input type={phase.breakKind === 'minutes' ? 'number' : 'time'}
                             min={phase.breakKind === 'minutes' ? 1 : undefined}
                             max={phase.breakKind === 'minutes' ? 1440 : undefined}
-                            value={phase.breakKind === 'overnight' ? phase.nextDayStart : phase.breakMinutes}
+                            value={phase.breakKind === 'overnight' ? phase.nextDayStart : phase.breakKind === 'until' ? phase.breakUntil : phase.breakMinutes}
                             onChange={(event) => edit(phase.id, phase.breakKind === 'overnight'
-                              ? { nextDayStart: event.target.value } : { breakMinutes: Number(event.target.value) })} />
+                              ? { nextDayStart: event.target.value }
+                              : phase.breakKind === 'until' ? { breakUntil: event.target.value }
+                                : { breakMinutes: Number(event.target.value) })} />
                         </label>
+                        {phase.breakKind === 'until' && <p className="muted prestart-editor-wide">Fortsetzung zur eingestellten Uhrzeit; liegt diese beim Pausenstart bereits zurück, gilt der folgende Tag. Vorzeitig beenden bleibt möglich.</p>}
                         <label className="prestart-editor-wide">Hinweis für Spieler (optional)
                           <textarea rows={2} maxLength={600} value={phase.note}
                             onChange={(event) => edit(phase.id, { note: event.target.value })} />

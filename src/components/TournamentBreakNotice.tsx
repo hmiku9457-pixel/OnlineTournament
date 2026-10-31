@@ -13,7 +13,9 @@ export function TournamentBreakNotice({ tournament }: { tournament: DemoTourname
   const planned = resume ? 'Pause läuft'
     : overnight
       ? `Fortsetzung am Folgetag um ${String(stage.settings.nextDayStart ?? '09:00')} Uhr`
-      : `${Number(stage.settings.breakMinutes) || 15} Minuten Pause (vor dem Start anpassbar)`;
+      : stage.settings.breakKind === 'until'
+        ? `Pause bis ${String(stage.settings.breakUntil ?? '12:00')} Uhr (beim Start anpassbar)`
+        : `${Number(stage.settings.breakMinutes) || 15} Minuten Pause (vor dem Start anpassbar)`;
 
   return (
     <section className="tournament-break-notice" role="status" aria-label="Aktuelle Turnierunterbrechung">
