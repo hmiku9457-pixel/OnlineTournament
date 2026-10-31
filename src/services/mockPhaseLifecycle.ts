@@ -269,7 +269,7 @@ export function canFinishBreak(tournament: DemoTournament, stage: TournamentStag
   return Boolean(resume && (early || at.getTime() >= resume.getTime()));
 }
 
-/** Show only relevant leading units; keep the final MM:SS always two digits.
+/** Show the first visible unit without leading zeros; keep later units two digits.
  * Right-aligned monospace layout keeps the remaining colons in place.
  * The displayed range is capped at 999 days to fit the existing timer width. */
 export function formatBreakCountdown(resume: Date | null, now = Date.now()): string {
@@ -281,8 +281,8 @@ export function formatBreakCountdown(resume: Date | null, now = Date.now()): str
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   const suffix = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  if (days > 0) return `${String(days).padStart(3, '0')}:${String(hours).padStart(2, '0')}:${suffix}`;
-  if (hours > 0) return `${String(hours).padStart(2, '0')}:${suffix}`;
+  if (days > 0) return `${days}:${String(hours).padStart(2, '0')}:${suffix}`;
+  if (hours > 0) return `${hours}:${suffix}`;
   return suffix;
 }
 
