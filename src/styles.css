@@ -5051,3 +5051,57 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Turniererstellung · Schritt 2: rote Aktionen und Inline-Speichern */
+.wizard-workspace .participant-step .participant-editor-fields-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: end;
+  gap: 10px 12px;
+}
+.wizard-workspace .participant-step .participant-editor-fields-row .participant-mask {
+  min-width: 0;
+}
+.wizard-workspace .participant-step .participant-editor-fields-row .participant-editor-actions {
+  align-self: end;
+  margin-top: 0;
+  flex-wrap: nowrap;
+}
+.wizard-workspace .participant-step .participant-editor-fields-row .participant-editor-actions .btn {
+  min-height: 37px;
+  white-space: nowrap;
+}
+.wizard-workspace .participant-step .participant-validation:not(:empty) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin-top: 9px;
+}
+.wizard-workspace .participant-step .participant-editor-head-actions .danger-outline {
+  border-color: #e99188;
+  color: #b42318;
+  background: #fff4f2;
+}
+.wizard-workspace .participant-step .participant-editor-head-actions .danger-outline:hover {
+  border-color: #b42318;
+  color: #912018;
+  background: #fee4e2;
+}
+.wizard-workspace .participant-step .participant-icon-delete {
+  border-color: #f1b8b2;
+  background: #fff4f2;
+  color: #b42318;
+}
+.wizard-workspace .participant-step .participant-icon-delete:hover {
+  border-color: #e99188;
+  background: #fee4e2;
+  color: #912018;
+}
+@media (max-width: 760px) {
+  .wizard-workspace .participant-step .participant-editor-fields-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .wizard-workspace .participant-step .participant-editor-fields-row .participant-editor-actions {
+    justify-content: flex-start;
+  }
+}
