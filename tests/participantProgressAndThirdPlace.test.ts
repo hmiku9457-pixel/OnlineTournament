@@ -46,8 +46,8 @@ describe('Teilnehmerstatus und K.-o.-Spiel um Platz 3', () => {
     const qualified = getStageEntrants(tournament, second);
     const eliminated = standings.find((row) => !qualified.includes(row.name));
     expect(eliminated).toBeDefined();
-    // Bis zum Beginn der Folgephase sind alle noch als aktive Teilnehmer geführt.
-    expect(getMockParticipantProgress(tournament, eliminated!.name).status).toBe('Aktiv');
+    // Nichtqualifizierte bleiben als potenzielle Nachrücker erkennbar.
+    expect(getMockParticipantProgress(tournament, eliminated!.name).status).toBe('Nicht für Phase K.-o. qualifiziert');
     expect(startStage(tournament, second)).toBe(true);
     expect(getMockParticipantProgress(tournament, eliminated!.name)).toEqual({
       status: 'Ausgeschieden', placement: 'Gruppe A · Platz 2–4',

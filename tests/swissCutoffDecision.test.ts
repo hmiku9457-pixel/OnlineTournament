@@ -288,7 +288,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     // A correction from the ordinary match editor must update Phase 1.5's
     // separate table and historical results, never the original Swiss record.
     const corrected = { ...firstResult, sideAScore: firstResult.sideBScore, sideBScore: firstResult.sideAScore };
-    completeMockMatch(first.id, [corrected]);
+    completeMockMatch(first.id, [corrected], 'FINISHED', true);
     expect(getSwissCutoffHistory(t, t.stages[0])?.extraRounds?.[0].matches[0]).toMatchObject({
       pointsA: corrected.sideAScore, pointsB: corrected.sideBScore,
     });

@@ -1329,7 +1329,7 @@ export function refreshCompletedStageQualifiers(tournament: DemoTournament, stag
   const adjustedDraw = reconcileQualifiedDraw(tournament, nextStage);
   if (adjustedDraw) {
     recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)',
-      action: 'FOLLOWUP_DRAW_ADJUSTED',
+      action: adjustedDraw === 'KNOCKOUT' ? 'KNOCKOUT_DRAW_REBUILT' : 'FOLLOWUP_DRAW_ADJUSTED',
       description: `Teilnehmerfeld für ${nextStage.name} geändert: ${adjustedDraw === 'KNOCKOUT'
         ? 'KO-Auslosung neu aufgebaut und ungültige Fixierungen entfernt'
         : adjustedDraw === 'GROUPS' ? 'vorbereitete Gruppenauslosung an Nachrücker angepasst'
@@ -1420,7 +1420,7 @@ export function approveMockProgress(tournament: DemoTournament): MockProgressApp
     const adjustedDraw = followingCompetition && reconcileQualifiedDraw(latest, followingCompetition);
     if (adjustedDraw) {
       recordMockAudit({ tournamentId: latest.id, actor: 'Turnierleitung (lokal)',
-        action: 'FOLLOWUP_DRAW_ADJUSTED',
+        action: adjustedDraw === 'KNOCKOUT' ? 'KNOCKOUT_DRAW_REBUILT' : 'FOLLOWUP_DRAW_ADJUSTED',
         description: `Qualifikanten nach Phasenfreigabe geändert: ${followingCompetition!.name} (${adjustedDraw}). Bitte die Auslosung kontrollieren.` });
     }
     updateMockTournamentStatus(latest.id, pending.isLastStage ? 'FINISHED' : 'PAUSED');
