@@ -1,5 +1,4 @@
 import type { DemoTournament } from '@/data/demoTournaments';
-import type { TournamentStatus } from '@/domain/types';
 import { getActiveStage, getNextStartableStage, getPhaseLifecycle } from '@/services/mockPhaseLifecycle';
 import { getPendingMockApproval } from '@/services/mockRuntime';
 
