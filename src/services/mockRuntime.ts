@@ -1055,6 +1055,8 @@ function swissCutoffStatus(tournament: DemoTournament, stage: TournamentStage, r
 
 /** Available immediately after the last regular round; restored after page reload. */
 export function getPendingSwissCutoff(tournament: DemoTournament): SwissCutoffStatus | null {
+  const latest = getAllMockTournaments().find((item) => item.id === tournament.id);
+  if (['ABORTED', 'FINISHED'].includes(latest?.status ?? tournament.status)) return null;
   const active = getActiveStage(tournament);
   if (!active || active.type !== 'SWISS') return null;
   const current = swissCutoffStatus(tournament, active, readResults());
@@ -1617,7 +1619,8 @@ export function restoreMockCorrectedResult(tournament: DemoTournament, auditId: 
 }
 
 export function skipMockThirdPlaceMatch(tournament: DemoTournament, matchId: string) {
-  if (!isMockThirdPlaceMatch(matchId)) return false;
+  const latest = getAllMockTournaments().find((item) => item.id === tournament.id);
+  if (['ABORTED', 'FINISHED'].includes(latest?.status ?? tournament.status) || !isMockThirdPlaceMatch(matchId)) return false;
   const stage = tournament.stages.find((item) => `${item.id}-third-place` === matchId);
   if (!stage || stage.type !== 'KNOCKOUT' || !isStageStarted(tournament, stage)) return false;
   const match = getMockStageMatches(tournament, stage).find((item) => item.id === matchId);
@@ -1667,6 +1670,8 @@ export function confirmMockMatchSide(matchId: string, side: 'A' | 'B', playerCod
 }
 
 export function adminConfirmMockMatch(tournament: DemoTournament, matchId: string) {
+  const latest = getAllMockTournaments().find((item) => item.id === tournament.id);
+  if (['ABORTED', 'FINISHED'].includes(latest?.status ?? tournament.status)) return false;
   const stage = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`)) ?? tournament.stages[0];
   const found = getMockStageMatches(tournament, stage).find((item) => item.id === matchId)
     ?? (stage.type === 'SWISS' ? [

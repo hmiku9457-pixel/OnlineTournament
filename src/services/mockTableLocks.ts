@@ -33,7 +33,8 @@ export function isMockTableBlocked(tournament: DemoTournament, table: string): b
 }
 
 export function setMockTableBlocked(tournament: DemoTournament, table: string, blocked: boolean): boolean {
-  if (!isValidTable(tournament, table) || typeof window === 'undefined') return false;
+  if (['ABORTED', 'FINISHED'].includes(tournament.status)
+    || !isValidTable(tournament, table) || typeof window === 'undefined') return false;
   const all = readTableLocks();
   const current = new Set(getBlockedMockTables(tournament));
   const wasBlocked = current.has(table);

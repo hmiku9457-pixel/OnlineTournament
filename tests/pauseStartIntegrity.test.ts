@@ -2,6 +2,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createMockTournament, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { startFirstStage, startStage, completeStage, getStageEntrants, getBreakResumeAt, computeBreakResumeAt, formatBreakCountdown, canFinishBreak, isStageCompleted, isStageEditable, getStageStartIssue } from '@/services/mockPhaseLifecycle';
 import { getGroupAssignments, setParticipantGroup } from '@/services/mockDrawStore';
+import { setMockTableBlocked } from '@/services/mockTableLocks';
 import { approveMockProgress, abortMockTournament, completeMockMatch, getMockStageMatches, getMockStageBaseMatches, canEditMockMatch, saveMockMatchSets, withdrawMockParticipant } from '@/services/mockRuntime';
 import { getMockConfirmedFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import type { MockPhaseInput } from '@/services/mockTournamentStore';
@@ -89,6 +90,7 @@ describe('turnierweite Sperren und verbindliche Platzierungen', () => {
     expect(isStageCompleted(stopped, stopped.stages[1])).toBe(false);
     expect(isStageEditable(stopped, stopped.stages[2])).toBe(false);
     expect(startStage(stopped, stopped.stages[2])).toBe(false);
+    expect(setMockTableBlocked(stopped, 'Tisch 1', true)).toBe(false);
   });
 });
 
