@@ -4785,3 +4785,19 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .clock-picker-actions .btn:disabled { opacity:.55; cursor:not-allowed; }
 @media (max-height:650px) { .clock-picker-dialog { gap:7px; padding:10px 16px; } .clock-picker-dial { width:min(220px,100%); } }
 @media (max-width:380px) { .clock-picker-dialog { padding:12px; } .clock-picker-dial { width:min(250px,100%); } }
+
+/* One optional round-boundary break nested inside a competitive phase. */
+.phase-inline-break { margin: 14px 0 0; padding: 14px; border: 1px solid #c9d8ee; border-radius: 12px; background: #f4f8fe; }
+.phase-inline-break-toggle { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; cursor: pointer; }
+.phase-inline-break-toggle input { width: 17px; height: 17px; accent-color: #175cd3; }
+.phase-inline-break-toggle strong { font-size: .86rem; }
+.phase-inline-break-toggle .muted { flex-basis: 100%; font-size: .75rem; margin-left: 25px; }
+.phase-inline-break-settings { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(225px, 2fr); gap: 13px; align-items: end; margin-top: 15px; }
+.phase-inline-break-settings > .field { min-width: 0; }
+.phase-inline-break-settings .break-phase-choice { margin: 0; }
+.phase-inline-break-settings .planned-schedule-phase-warning, .phase-inline-break-settings > .field-hint { grid-column: 1 / -1; }
+.phase-inline-break-badge { display: inline-block; margin-left: 5px; font-size: .73rem; color: #175cd3; font-weight: 700; }
+.planned-schedule-ceremony-datetime { display: flex; flex-wrap: wrap; gap: 8px; }
+.planned-schedule-ceremony-datetime input[type=date] { flex: 1 1 120px; min-width: 120px; }
+.planned-schedule-ceremony-datetime .clock-picker-trigger { flex: 1 1 118px; width: auto; }
+@media (max-width: 680px) { .phase-inline-break-settings { grid-template-columns: minmax(0, 1fr); } .phase-inline-break-settings .planned-schedule-phase-warning, .phase-inline-break-settings > .field-hint { grid-column: 1; } }

@@ -417,13 +417,22 @@ export function CreateTournamentPage() {
   const phaseOrderValid = hasValidTerminalStageOrder(phaseDrafts.map((phase) => phase.type))
     && hasValidBreakStageOrder(phaseDrafts.map((phase) => phase.type));
   const phaseConfigurationValid = phaseDrafts.some((phase) => phase.type !== 'BREAK') && phaseOrderValid
-    && phaseDrafts.every((phase) => phase.type !== 'BREAK'
+    && phaseDrafts.every((phase) => {
+      if ((phase.type === 'SWISS' || phase.type === 'KNOCKOUT') && phase.inlineBreakAfterRound > 0) {
+        const rounds = phase.type === 'SWISS' ? phase.swissRounds : knockoutRoundLabels(phase.entrantCount).length;
+        if (phase.inlineBreakAfterRound >= rounds || phase.inlineBreakAfterRound < 1
+          || (phase.inlineBreakKind === 'until'
+            ? !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(phase.inlineBreakUntil)
+            : !Number.isInteger(phase.inlineBreakMinutes) || phase.inlineBreakMinutes < 1 || phase.inlineBreakMinutes > 1440)) return false;
+      }
+      return phase.type !== 'BREAK'
       || (phase.label.trim().length > 0 && phase.note.length <= 600
         && (phase.breakKind === 'minutes'
           ? Number.isInteger(phase.breakMinutes) && phase.breakMinutes >= 1 && phase.breakMinutes <= 1440
           : phase.breakKind === 'until'
             ? /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.breakUntil)
-            : phase.breakKind === 'overnight' && /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.nextDayStart))));
+            : phase.breakKind === 'overnight' && /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.nextDayStart)));
+    });
   const gameSettingsValid = minimumMatches >= 1 && validMatchDuration && validTurnover;
   const basicsValid = Boolean(name.trim()) && Boolean(sport) && selectedDisciplineValid && isValidLocalDateTime(scheduledStart) && tables >= 1 && gameSettingsValid;
   const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
@@ -1354,7 +1363,9 @@ export function CreateTournamentPage() {
                                 {phaseEstimates[index] && ` · ca. ${formatCompactDuration(phaseEstimates[index].estimatedDurationMinutes)}`}</>}
                               </p>
                               {plannedTimeline.warnings.some((warning) => warning.phaseIndex === index) &&
-                                <span className="phase-warning-chip" role="status">⚠ Pause bis liegt vor dem geschätzten Pausenbeginn</span>}
+                                <span className="phase-warning-chip" role="status">⚠ Pausenuhrzeit liegt vor dem geschätzten Pausenbeginn</span>}
+                              {phase.inlineBreakAfterRound > 0 && (phase.type === 'SWISS' || phase.type === 'KNOCKOUT') &&
+                                <span className="phase-inline-break-badge">· Zwischenpause nach Runde {phase.inlineBreakAfterRound}</span>}
                             </div>
                             <div className="phase-order-actions">
                               <button
@@ -1464,14 +1475,14 @@ export function CreateTournamentPage() {
                                 </label>
                               ) : phase.breakKind === 'until' ? (
                                 <label className="field">Pause bis (Uhrzeit)
-                                  <input type="time" required value={phase.breakUntil}
-                                    onChange={(event) => updatePhase(phase.id, { breakUntil: event.target.value })} />
+                                  <ClockTimePicker id={`phase-until-${phase.id}`} label="Pause bis" value={phase.breakUntil}
+                                    onChange={(time) => updatePhase(phase.id, { breakUntil: time })} />
                                   <span className="field-hint">Bei einer realen Pause entscheidet die Turnierleitung über die Freigabe. Für den unverbindlichen Zeitplan sollte die Uhrzeit nicht vor dem geschätzten Pausenbeginn liegen.</span>
                                 </label>
                               ) : (
                                 <label className="field">Startzeit am Folgetag
-                                  <input type="time" required value={phase.nextDayStart}
-                                    onChange={(event) => updatePhase(phase.id, { nextDayStart: event.target.value })} />
+                                  <ClockTimePicker id={`phase-next-day-${phase.id}`} label="Startzeit am Folgetag" value={phase.nextDayStart}
+                                    onChange={(time) => updatePhase(phase.id, { nextDayStart: time })} />
                                 </label>
                               )}
                               {phase.breakKind === 'until' && plannedTimeline.warnings.filter((warning) => warning.phaseIndex === index).map((warning) => (
@@ -1589,6 +1600,49 @@ export function CreateTournamentPage() {
                             </div>
                           )}
                           </div>}
+                          {(phase.type === 'SWISS' || phase.type === 'KNOCKOUT') && (() => {
+                            const totalRounds = phase.type === 'SWISS' ? phase.swissRounds : knockoutRoundLabels(phase.entrantCount).length;
+                            return totalRounds > 1 ? (
+                              <section className="phase-inline-break">
+                                <label className="phase-inline-break-toggle">
+                                  <input type="checkbox" checked={phase.inlineBreakAfterRound > 0}
+                                    onChange={(event) => updatePhase(phase.id, { inlineBreakAfterRound: event.target.checked ? Math.min(2, totalRounds - 1) : 0 })} />
+                                  <strong>Pause innerhalb dieser Phase einplanen</strong>
+                                  <span className="muted">Beispielsweise nach Runde 2, ohne die Schweizer Wertung oder die K.-o.-Auslosung zu unterbrechen.</span>
+                                </label>
+                                {phase.inlineBreakAfterRound > 0 && (
+                                  <div className="phase-inline-break-settings">
+                                    <label className="field">Unterbrechung nach
+                                      <select value={Math.min(phase.inlineBreakAfterRound, totalRounds - 1)}
+                                        onChange={(event) => updatePhase(phase.id, { inlineBreakAfterRound: Number(event.target.value) })}>
+                                        {Array.from({ length: totalRounds - 1 }, (_, round) =>
+                                          <option key={round + 1} value={round + 1}>Runde {round + 1}</option>)}
+                                      </select>
+                                    </label>
+                                    <fieldset className="break-phase-choice">
+                                      <legend>Art der Zwischenpause</legend>
+                                      <label><input type="radio" name={`inline-break-kind-${phase.id}`} checked={phase.inlineBreakKind === 'minutes'}
+                                        onChange={() => updatePhase(phase.id, { inlineBreakKind: 'minutes' })} /> Pause in Minuten</label>
+                                      <label><input type="radio" name={`inline-break-kind-${phase.id}`} checked={phase.inlineBreakKind === 'until'}
+                                        onChange={() => updatePhase(phase.id, { inlineBreakKind: 'until' })} /> Pause bis</label>
+                                    </fieldset>
+                                    {phase.inlineBreakKind === 'minutes'
+                                      ? <label className="field">Dauer in Minuten
+                                          <input type="number" min={1} max={1440} value={phase.inlineBreakMinutes}
+                                            onChange={(event) => updatePhase(phase.id, { inlineBreakMinutes: Number(event.target.value) })}/>
+                                        </label>
+                                      : <label className="field">Zwischenpause bis (Uhrzeit)
+                                          <ClockTimePicker id={`inline-break-time-${phase.id}`} label="Zwischenpause bis"
+                                            value={phase.inlineBreakUntil} onChange={(time) => updatePhase(phase.id, { inlineBreakUntil: time })}/>
+                                        </label>}
+                                    {plannedTimeline.warnings.filter((warning) => warning.phaseIndex === index).map((warning) =>
+                                      <p key={warning.message} className="planned-schedule-phase-warning" role="alert">{warning.message}</p>)}
+                                    <p className="field-hint">Nach der gewählten Runde muss die Turnierleitung die Zwischenpause freigeben, bevor die nächste Runde startet.</p>
+                                  </div>
+                                )}
+                              </section>
+                            ) : null;
+                          })()}
                         </article>
                         </div>
                         {(index < phaseDrafts.length - 1 || !isTerminalStage(phase.type)) && (

@@ -125,6 +125,18 @@ export function validatePrestartPhases(phases: PrestartPhaseDraft[], activeCount
         errors.push(`${label}: Die Gruppenanzahl muss zwischen 2 und ${Math.max(2, maxGroups)} liegen (mindestens zwei pro Gruppe).`);
       }
     }
+    if ((phase.type === 'SWISS' || phase.type === 'KNOCKOUT') && phase.inlineBreakAfterRound > 0) {
+      const rounds = phase.type === 'SWISS' ? phase.swissRounds : knockoutRoundLabels(phase.entrantCount).length;
+      if (!Number.isInteger(phase.inlineBreakAfterRound) || phase.inlineBreakAfterRound < 1 || phase.inlineBreakAfterRound >= rounds) {
+        errors.push(`${label}: Zwischenpause muss vor der letzten Runde liegen.`);
+      }
+      if (phase.inlineBreakKind === 'until' && !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(phase.inlineBreakUntil)) {
+        errors.push(`${label}: Gültige Uhrzeit für die Zwischenpause erforderlich.`);
+      }
+      if (phase.inlineBreakKind === 'minutes' && (!Number.isInteger(phase.inlineBreakMinutes) || phase.inlineBreakMinutes < 1 || phase.inlineBreakMinutes > 1440)) {
+        errors.push(`${label}: Zwischenpause muss zwischen 1 und 1440 Minuten dauern.`);
+      }
+    }
     if (phase.type === 'SWISS') {
       if (!Number.isInteger(phase.swissRounds) || phase.swissRounds < 1
         || phase.swissRounds > Math.min(30, phase.entrantCount - 1)) {
