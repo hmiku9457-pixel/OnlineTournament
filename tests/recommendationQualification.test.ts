@@ -31,7 +31,8 @@ describe('multi-system tournament recommendations', () => {
     const groupSwiss = recommendations.find((item) => item.id === 'groups-swiss');
     expect(groupSwiss).toBeDefined();
     expect(groupSwiss!.phases.map((phase) => phase.entrantCount)).toEqual([20, 12]);
-    expect(groupSwiss!.estimatedMatches).toBe(70); // 40 in groups, then 6 × 5 Swiss fixtures.
+    expect(groupSwiss!.phases[1].swissRounds).toBe(4);
+    expect(groupSwiss!.estimatedMatches).toBe(64); // 40 group matches + 6 pairings × 4 Swiss rounds.
     expect(groupSwiss!.minimumGuaranteedMatches).toBe(4); // Eliminated players receive no Swiss matches.
   });
 
@@ -43,7 +44,8 @@ describe('multi-system tournament recommendations', () => {
     const triple = recommendations.find((item) => item.id === 'groups-swiss-ko');
     expect(triple).toBeDefined();
     expect(triple!.phases.map((phase) => phase.entrantCount)).toEqual([20, 12, 8]);
-    expect(triple!.estimatedMatches).toBe(77); // 40 group, 30 Swiss, 7 knockout.
+    expect(triple!.phases[1].swissRounds).toBe(4);
+    expect(triple!.estimatedMatches).toBe(71); // 40 group + 24 Swiss + 7 knockout matches.
     expect(triple!.minimumGuaranteedMatches).toBe(4);
   });
 
