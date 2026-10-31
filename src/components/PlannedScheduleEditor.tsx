@@ -1,80 +1,73 @@
-import { useState } from 'react';
-import type { PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import type { PlannedTimeline } from '@/domain/tournamentSchedule';
+import { formatPlannedDateTime, parseLocalDateTime } from '@/domain/tournamentSchedule';
 
 interface Props {
   scheduledStart: string;
-  entries: PlannedScheduleItem[];
-  onChange: (entries: PlannedScheduleItem[]) => void;
-  suggestions: () => PlannedScheduleItem[];
+  timeline: PlannedTimeline;
+  awardsEnabled: boolean;
+  awardsAt: string;
+  onToggleAwards: (enabled: boolean) => void;
+  onAwardsAtChange: (value: string) => void;
 }
 
-export function PlannedScheduleEditor({ scheduledStart, entries, onChange, suggestions }: Props) {
-  const [confirmReplace, setConfirmReplace] = useState(false);
-  const update = (id: string, patch: Partial<PlannedScheduleItem>) => {
-    setConfirmReplace(false);
-    onChange(entries.map((entry) => entry.id === id ? { ...entry, ...patch } : entry));
-  };
-  const generate = () => {
-    if (entries.length && !confirmReplace) { setConfirmReplace(true); return; }
-    onChange(suggestions()); setConfirmReplace(false);
-  };
-  const add = () => {
-    if (entries.length >= 80) return;
-    const id = `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    setConfirmReplace(false);
-    onChange([...entries, { id, at: scheduledStart, title: 'Programmpunkt', type: 'other' }]);
-  };
+/** Phases come directly from the tournament configuration: no "Programmpunkt"
+ * placeholders and no separate generate step. Only the optional ceremony
+ * adds an independently adjustable event.
+ */
+export function PlannedScheduleEditor({
+  scheduledStart, timeline, awardsEnabled, awardsAt, onToggleAwards, onAwardsAtChange,
+}: Props) {
+  const expectedEnd = parseLocalDateTime(timeline.estimatedEnd);
+  const ceremony = parseLocalDateTime(awardsAt);
+  const ceremonyTooEarly = awardsEnabled && Boolean(expectedEnd && ceremony && ceremony < expectedEnd);
   return (
     <div className="planned-schedule-editor">
       <div className="planned-schedule-editor-intro">
         <div>
-          <h3>Programmpunkte</h3>
-          <p className="muted">Die Vorschlagszeiten basieren auf der groben Dauer der Phasen. Verschiebe einzelne Termine frei oder ergänze eigene Punkte wie Einlass, Siegerehrung oder Verpflegung.</p>
-        </div>
-        <div className="actions">
-          <button type="button" className="btn" onClick={generate}>
-            {confirmReplace ? 'Ja, bisherigen Zeitplan ersetzen' : entries.length ? 'Vorschlag neu erzeugen' : 'Vorschlag aus Phasen erzeugen'}
-          </button>
-          <button type="button" className="btn primary" onClick={add} disabled={entries.length >= 80}>+ Programmpunkt</button>
-          {confirmReplace && <button type="button" className="btn" onClick={() => setConfirmReplace(false)}>Abbrechen</button>}
+          <h3>Voraussichtlicher Ablauf</h3>
+          <p className="muted">Die Phasen werden automatisch aus deiner Turnierplanung und den geschätzten Spieldauern übernommen. Die Uhrzeiten sind unverbindlich.</p>
         </div>
       </div>
-      {confirmReplace && <p className="planned-schedule-replace-warning" role="alert">Beim erneuten Erzeugen werden die bisherigen Zeitplaneinträge ersetzt. Andere Einstellungen bleiben erhalten.</p>}
-      {entries.length === 0 ? (
-        <div className="planned-schedule-empty-editor">
-          <strong>Noch kein Zeitplan angelegt.</strong>
-          <span>Du kannst einen Vorschlag erzeugen, eigene Programmpunkte hinzufügen oder den Schritt ohne Zeitplan abschließen.</span>
+      <ol className="planned-schedule-phase-list">
+        <li className="planned-schedule-phase-row is-start">
+          <time dateTime={scheduledStart}>{formatPlannedDateTime(scheduledStart)}</time>
+          <div><strong>Turnierbeginn</strong><small>Geplanter Start</small></div>
+        </li>
+        {timeline.items.map((item, index) => (
+          <li key={item.id} className={`planned-schedule-phase-row ${item.type === 'break' ? 'is-break' : ''}`}>
+            <time dateTime={item.at}>{formatPlannedDateTime(item.at)}</time>
+            <div>
+              <strong>{item.title}</strong>
+              <small>{item.type === 'break' ? 'Geplanter Pausenbeginn' : 'Voraussichtlicher Phasenbeginn'}</small>
+              {timeline.warnings.filter((warning) => warning.phaseIndex === index).map((warning) => (
+                <p className="planned-schedule-phase-warning" role="alert" key={warning.message}>{warning.message}</p>
+              ))}
+            </div>
+          </li>
+        ))}
+        {timeline.estimatedEnd && <li className="planned-schedule-phase-row is-finish">
+          <time dateTime={timeline.estimatedEnd}>{formatPlannedDateTime(timeline.estimatedEnd)}</time>
+          <div><strong>Voraussichtliches Turnierende</strong><small>Nach der letzten Turnierphase</small></div>
+        </li>}
+      </ol>
+      <section className="planned-schedule-ceremony">
+        <div>
+          <strong>Siegerehrung <span className="wizard-optional-tag">Optional</span></strong>
+          <p className="muted">Auf Wunsch direkt nach dem geschätzten Turnierende. Die Uhrzeit kannst du anschließend auf einen späteren Zeitpunkt verschieben.</p>
         </div>
-      ) : (
-        <div className="planned-schedule-editor-entries">
-          {entries.map((entry, index) => (
-            <article className="planned-schedule-editor-entry" key={entry.id}>
-              <div className="planned-schedule-entry-head">
-                <strong>Programmpunkt {index + 1}</strong>
-                <button type="button" className="btn small" onClick={() => { setConfirmReplace(false); onChange(entries.filter((item) => item.id !== entry.id)); }}>Entfernen</button>
-              </div>
-              <div className="planned-schedule-entry-fields">
-                <label>Datum und Uhrzeit
-                  <input type="datetime-local" required value={entry.at} onChange={(event) => update(entry.id, { at: event.target.value })}/>
-                </label>
-                <label>Bezeichnung
-                  <input type="text" maxLength={80} required value={entry.title} onChange={(event) => update(entry.id, { title: event.target.value })}/>
-                </label>
-                <label>Art
-                  <select value={entry.type} onChange={(event) => update(entry.id, { type: event.target.value as PlannedScheduleItem['type'] })}>
-                    <option value="competition">Turnierphase</option>
-                    <option value="break">Pause</option>
-                    <option value="other">Organisatorisches</option>
-                  </select>
-                </label>
-                <label className="planned-schedule-entry-note">Hinweis (optional)
-                  <textarea rows={2} maxLength={400} value={entry.note ?? ''} placeholder="z. B. Alle Teilnehmer bitte 15 Minuten vorher bereithalten" onChange={(event) => update(entry.id, { note: event.target.value })}/>
-                </label>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+        {!awardsEnabled ? (
+          <button type="button" className="btn primary" onClick={() => onToggleAwards(true)}>+ Siegerehrung hinzufügen</button>
+        ) : (
+          <div className="planned-schedule-ceremony-actions">
+            <label>Geplanter Beginn der Siegerehrung
+              <input type="datetime-local" required min={timeline.estimatedEnd || undefined}
+                value={awardsAt} onChange={(event) => onAwardsAtChange(event.target.value)}/>
+            </label>
+            <button type="button" className="btn small" onClick={() => onToggleAwards(false)}>Siegerehrung entfernen</button>
+            {ceremonyTooEarly && <p role="alert" className="planned-schedule-phase-warning">Die Siegerehrung darf nicht vor dem voraussichtlichen Turnierende beginnen.</p>}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
