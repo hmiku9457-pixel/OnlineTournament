@@ -1701,7 +1701,7 @@ export function CreateTournamentPage() {
                             </div>
                           )}
                           </div>}
-                          {(phase.type === 'SWISS' || phase.type === 'KNOCKOUT') && (() => {
+                          {isExpanded && (phase.type === 'SWISS' || phase.type === 'KNOCKOUT') && (() => {
                             const totalRounds = phase.type === 'SWISS' ? phase.swissRounds : knockoutRoundLabels(phase.entrantCount).length;
                             return totalRounds > 1 ? (
                               <section className="phase-inline-break">
@@ -1765,7 +1765,6 @@ export function CreateTournamentPage() {
                                     <p className="field-hint">Nach der gewählten Runde muss die Turnierleitung die Zwischenpause freigeben, bevor die nächste Runde startet.</p>
                                   </div>
                                 )}
-                                {!phase.inlineBreakAfterRound && <p className="phase-inline-break-help">Bei Bedarf nach einer Schweizer oder K.-o.-Runde eine zusätzliche Pause einplanen.</p>}
                               </section>
                             ) : null;
                           })()}
