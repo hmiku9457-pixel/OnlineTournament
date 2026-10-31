@@ -80,7 +80,7 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color:
 }
 
 /* Tournament creation wizard */
-.wizard-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+.wizard-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
 .wizard-step { border: 0; background: transparent; color: #667085; padding: 10px 8px; display: flex; gap: 8px; align-items: center; justify-content: center; border-bottom: 3px solid #e4e7ec; font-weight: 700; }
 .wizard-step > .wizard-step-number { width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: 999px; background: #f2f4f7; }
 .wizard-step.active { color: #101828; border-bottom-color: #101828; }
@@ -3528,7 +3528,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .wizard-side-phase-summary { margin-top: 5px; }
 }
 @media (max-width: 700px) {
-  .wizard-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .wizard-steps { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
   .wizard-step { display: flex !important; flex-direction: column; gap: 3px; padding: 7px 1px; min-height: 54px; font-size: .62rem; line-height: 1.15; text-align: center; border-bottom-width: 3px; }
   .wizard-step > .wizard-step-number { width: 22px; height: 22px; font-size: .7rem; }
   .wizard-step:disabled { display: flex !important; }
@@ -4677,4 +4677,56 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 }
 @media print {
   .control-pause-alert { display: none !important; }
+}
+
+/* Optional non-binding schedule across organizer, player and guest views. */
+.schedule-wizard-step { display: grid; gap: 15px; }
+.schedule-wizard-step > h2 { margin: 0; }
+.planned-schedule-editor { display: grid; gap: 13px; }
+.planned-schedule-editor-intro { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.planned-schedule-editor-intro h3 { margin: 0 0 4px; font-size: 1rem; }
+.planned-schedule-editor-intro p { max-width: 68ch; margin: 0; font-size: .83rem; line-height: 1.5; }
+.planned-schedule-editor-intro .actions { justify-content: flex-end; }
+.planned-schedule-editor-intro .actions .btn { font-size: .76rem; }
+.planned-schedule-replace-warning, .wizard-schedule-errors { padding: 12px 14px; border: 1px solid #e9c46a; background: #fff8e7; border-radius: 10px; color: #805500; margin: 0; font-size: .84rem; }
+.wizard-schedule-errors ul { margin: 6px 0 0; padding-left: 22px; }
+.planned-schedule-empty-editor { display: grid; gap: 6px; padding: 25px 18px; background: #f8fafc; border: 1px dashed #98a2b3; border-radius: 12px; text-align: center; color: #475467; }
+.planned-schedule-empty-editor strong { color: #344054; }
+.planned-schedule-editor-entries { display: grid; gap: 10px; }
+.planned-schedule-editor-entry { padding: 13px; border: 1px solid #e4e7ec; border-radius: 11px; background: #fff; }
+.planned-schedule-entry-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+.planned-schedule-entry-fields { display: grid; grid-template-columns: minmax(190px, 1.1fr) minmax(180px, 1.3fr) minmax(120px, .8fr); gap: 10px; }
+.planned-schedule-entry-fields label { display: grid; gap: 4px; min-width: 0; color: #344054; font-weight: 700; font-size: .75rem; }
+.planned-schedule-entry-fields input, .planned-schedule-entry-fields select, .planned-schedule-entry-fields textarea { width: 100%; min-width: 0; min-height: 36px; padding: 8px 9px; border: 1px solid #d0d5dd; border-radius: 8px; background: white; color: #101828; }
+.planned-schedule-entry-fields .planned-schedule-entry-note { grid-column: 1 / -1; }
+.tournament-planned-schedule { margin: 12px 0; }
+.planned-schedule-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.planned-schedule-heading h2 { margin: 3px 0 0; font-size: 1.16rem; }
+.planned-schedule-eyebrow { font-size: .66rem; font-weight: 850; text-transform: uppercase; letter-spacing: .07em; color: #175cd3; }
+.planned-schedule-start { display: grid; justify-items: end; gap: 4px; font-size: .8rem; }
+.planned-schedule-start span { color: #667085; }
+.planned-schedule-start strong { font-size: .94rem; }
+.planned-schedule-disclaimer { margin: 10px 0; max-width: 92ch; font-size: .81rem; line-height: 1.5; }
+.planned-schedule-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.planned-schedule-item { display: grid; grid-template-columns: minmax(125px, 165px) minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 12px 2px; border-top: 1px solid #eaecf0; }
+.planned-schedule-item time { font-variant-numeric: tabular-nums; font-weight: 800; font-size: .82rem; color: #344054; }
+.planned-schedule-item > div { min-width: 0; }
+.planned-schedule-item strong { display: block; overflow-wrap: anywhere; }
+.planned-schedule-item p { margin: 4px 0 0; font-size: .78rem; color: #667085; overflow-wrap: anywhere; }
+.planned-schedule-kind { font-size: .7rem; font-weight: 750; color: #475467; background: #f2f4f7; padding: 4px 7px; border-radius: 999px; white-space: nowrap; }
+.planned-schedule-break .planned-schedule-kind { background: #fffaeb; color: #b54708; }
+.planned-schedule-empty { margin: 8px 0 0; }
+.wizard-side-navigation:has(.wizard-skip-schedule) { display: flex; flex-wrap: wrap; }
+.wizard-side-navigation .wizard-skip-schedule { flex: 1 1 150px; width: auto; }
+.wizard-side-navigation:has(.wizard-skip-schedule) .wizard-continue-button { flex: 1 1 170px; width: auto; }
+@media (max-width: 860px) {
+  .planned-schedule-entry-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .planned-schedule-entry-fields .planned-schedule-entry-note { grid-column: 1 / -1; }
+}
+@media (max-width: 600px) {
+  .planned-schedule-entry-fields { grid-template-columns: minmax(0, 1fr); }
+  .planned-schedule-entry-fields .planned-schedule-entry-note { grid-column: 1; }
+  .planned-schedule-item { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; }
+  .planned-schedule-item time { grid-column: 1 / -1; }
+  .planned-schedule-start { justify-items: start; }
 }

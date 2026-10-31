@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { TournamentBreakNotice } from '@/components/TournamentBreakNotice';
+import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { getMockPlayerSnapshot, getMockRuntimeMatches } from '@/services/mockRuntime';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
 import { getMockTournament } from '@/services/mockTournamentStore';
@@ -35,6 +36,7 @@ export function PlayerTournamentPage() {
       </header>
 
       <TournamentBreakNotice tournament={tournament} />
+      <TournamentPlannedSchedule scheduledStart={tournament.scheduledStart} items={tournament.plannedSchedule} />
 
       <section className="player-dashboard">
         <main className="player-dashboard-main">

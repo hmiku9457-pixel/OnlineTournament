@@ -4,6 +4,7 @@ import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { DrawActionButton } from '@/components/DrawActionButton';
 import { StageCard } from '@/components/StageCard';
 import { TournamentSummaryPanel } from '@/components/TournamentSummaryPanel';
+import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { PrestartPhaseEditor } from '@/components/PrestartPhaseEditor';
 import { initialPrestartPhases, normalizePrestartPhases, validatePrestartPhases } from '@/domain/prestartPhasePlanning';
 import { SportResultEntry } from '@/components/SportResultEntry';
@@ -1179,6 +1180,7 @@ export function TournamentControlPage() {
 
       {tab === 'summary' && (
         <>
+        <TournamentPlannedSchedule scheduledStart={tournament.scheduledStart} items={tournament.plannedSchedule} />
         <TournamentSummaryPanel
           tournament={tournament}
           participants={participants.length}

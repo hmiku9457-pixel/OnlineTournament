@@ -1,5 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import { getBreakResumeAt } from '@/services/mockPhaseLifecycle';
+import { formatPlannedDateTime } from '@/domain/tournamentSchedule';
 import { disciplineLabel } from '@/domain/sports';
 import type { TournamentStage } from '@/domain/types';
 import { getVenueTerminology } from '@/domain/venueTerminology';
@@ -227,6 +228,7 @@ export function TournamentSummaryPanel({
       <div className="tournament-summary-details">
         <h3>Turnierdaten</h3>
         <div className="tournament-summary-facts">
+          {tournament.scheduledStart && <div><span>Geplanter Turnierbeginn</span><strong>{formatPlannedDateTime(tournament.scheduledStart)}</strong></div>}
           <div><span>Sportart</span><strong>{tournament.sport}</strong></div>
           <div><span>Disziplin</span><strong>{disciplineLabel(tournament.discipline)}</strong></div>
           <div><span>Sichtbarkeit</span><strong>{tournament.visibility === 'PRIVATE' ? 'Privat' : tournament.visibility === 'PUBLIC' ? 'Öffentlich' : 'Über Link'}</strong></div>

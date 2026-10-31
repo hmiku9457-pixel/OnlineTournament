@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { TournamentBreakNotice } from '@/components/TournamentBreakNotice';
+import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels } from '@/services/mockCompetitionViews';
 import { getMockRuntimeMatches, getMockStageMatches, isMockParticipantWithdrawn, getSwissRecordBeforeRound, getSwissCurrentRecord } from '@/services/mockRuntime';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
@@ -45,6 +46,7 @@ export function SpectatorPage() {
       </header>
 
       <TournamentBreakNotice tournament={tournament} />
+      <TournamentPlannedSchedule scheduledStart={tournament.scheduledStart} items={tournament.plannedSchedule} />
 
       <section className="spectator-section">
         <div className="spectator-section-head"><h2>Live auf den {venue.dativePlural}</h2><span className="muted">{live.length} laufende Spiele</span></div>

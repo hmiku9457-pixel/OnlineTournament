@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { disciplineLabel } from '@/domain/sports';
+import { formatPlannedDateTime } from '@/domain/tournamentSchedule';
 import {
   buildDashboardTournament, filterAndSortDashboard, summarizeDashboard,
   type DashboardFilter, type DashboardSort, type DashboardTournament,
@@ -50,6 +51,7 @@ function TournamentCard({ item }: { item: DashboardTournament }) {
       {notice && <div className="dashboard-tournament-notice"><span aria-hidden="true">!</span>{notice}</div>}
 
       <div className="dashboard-tournament-meta">
+        {tournament.scheduledStart && <span><strong>Termin:</strong> {formatPlannedDateTime(tournament.scheduledStart)}</span>}
         <span><strong>{tournament.tables}</strong> {getVenueTerminology(tournament.sport).plural}</span>
         <span><strong>{tournament.stages.length}</strong> Phasen</span>
         {item.withdrawals > 0 && <span><strong>{item.withdrawals}</strong> zurückgezogen</span>}
