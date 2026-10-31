@@ -1,4 +1,5 @@
 import type { DemoTournament } from '@/data/demoTournaments';
+import { getBreakResumeAt } from '@/services/mockPhaseLifecycle';
 import { disciplineLabel } from '@/domain/sports';
 import type { TournamentStage } from '@/domain/types';
 import { getVenueTerminology } from '@/domain/venueTerminology';
@@ -118,9 +119,10 @@ export function TournamentSummaryPanel({
     action = onParticipants;
   } else if (activeStage?.type === 'BREAK') {
     actionTitle = activeStage.name;
-    actionText = activeStage.settings.breakKind === 'overnight'
-      ? `Spieltagsende. Fortsetzung am Folgetag um ${activeStage.settings.nextDayStart} Uhr.`
-      : `Geplante Pause von ${activeStage.settings.breakMinutes} Minuten.`;
+    const resume = getBreakResumeAt(tournament, activeStage);
+    actionText = resume
+      ? `Die Pause läuft. Geplante Fortsetzung: ${resume.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })} Uhr. Der Countdown ist oben jederzeit sichtbar.`
+      : 'Die Pause läuft. Den Countdown und die geplante Fortsetzung findest du oben.';
     actionLabel = 'Pausenstatus ansehen';
     action = () => onStage(activeStage);
   } else if (paused) {

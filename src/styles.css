@@ -4571,3 +4571,88 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .sidebar-tournament-heading { margin: 0 3px 1px; font-size: .75rem; }
   .sidebar-tournament-section > .sidebar-live-section { display: none; }
 }
+
+/* Sichtbare und beim Scrollen fixierte Pausensteuerung auf allen Turnier-Tabs. */
+.control-pause-alert {
+  position: sticky;
+  top: 8px;
+  z-index: 18;
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: 15px;
+  padding: 14px 17px;
+  margin: 0 0 12px;
+  border: 1px solid #e9a23b;
+  border-left: 6px solid #b54708;
+  border-radius: 12px;
+  background: linear-gradient(105deg, #fff0c4 0%, #fff8e7 65%, #fffdf7 100%);
+  box-shadow: 0 8px 25px rgb(124 73 8 / 18%);
+  color: #542a0b;
+}
+.control-pause-alert.is-ready {
+  border-color: #48a887;
+  border-left-color: #067647;
+  background: linear-gradient(105deg, #dff8e9 0%, #f1fcf5 70%);
+  color: #054f31;
+}
+.control-pause-alert-symbol {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #92400e;
+  color: #fff;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+.control-pause-alert.is-ready .control-pause-alert-symbol { background: #067647; }
+.control-pause-alert-description { display: grid; gap: 3px; min-width: 0; }
+.control-pause-alert-eyebrow { display: flex; align-items: center; gap: 7px; font-size: .69rem; font-weight: 900; letter-spacing: .065em; }
+.control-pause-alert-indicator { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #b54708; }
+.control-pause-alert.is-ready .control-pause-alert-indicator { background: #067647; }
+.control-pause-alert-title { font-size: 1.06rem; line-height: 1.2; overflow-wrap: anywhere; }
+.control-pause-alert-schedule { font-size: .82rem; line-height: 1.4; }
+.control-pause-alert-note { font-size: .74rem; opacity: .88; overflow-wrap: anywhere; }
+.control-pause-alert-timer {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 138px;
+  padding: 7px 13px;
+  border-radius: 10px;
+  background: #78350f;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.control-pause-alert.is-ready .control-pause-alert-timer { background: #065f46; }
+.control-pause-alert-timer > span { font-size: .69rem; font-weight: 700; }
+.control-pause-alert-timer > strong { font-size: clamp(1.45rem, 2.2vw, 2rem); font-weight: 850; line-height: 1.2; letter-spacing: .025em; }
+.control-pause-alert-actions { display: flex; flex-direction: column; gap: 6px; min-width: 155px; }
+.control-pause-alert-actions .btn { width: 100%; padding: 7px 12px; font-size: .78rem; line-height: 1.2; white-space: nowrap; }
+.control-pause-alert-action.btn { background: #92400e; border-color: #92400e; color: #fff; }
+.control-pause-alert-action.btn:hover { background: #78350f; border-color: #78350f; }
+.control-pause-alert.is-ready .control-pause-alert-action.btn { background: #067647; border-color: #067647; }
+.control-pause-alert-details.btn { border-color: #c9924a; background: rgb(255 255 255 / 75%); color: #78350f; }
+.control-pause-alert .btn:focus-visible { outline: 3px solid #175cd3; outline-offset: 2px; }
+@media (max-width: 1100px) {
+  .control-pause-alert { grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; padding: 11px 13px; }
+  .control-pause-alert-actions { grid-column: 2 / -1; display: flex; flex-direction: row; justify-content: flex-end; min-width: 0; }
+  .control-pause-alert-actions .btn { width: auto; }
+}
+@media (max-width: 650px) {
+  .control-pause-alert { top: 0; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; padding: 10px 11px; }
+  .control-pause-alert-symbol { display: none; }
+  .control-pause-alert-eyebrow { font-size: .63rem; }
+  .control-pause-alert-title { font-size: .93rem; }
+  .control-pause-alert-schedule { font-size: .74rem; }
+  .control-pause-alert-timer { min-width: 96px; padding: 7px 9px; }
+  .control-pause-alert-timer > strong { font-size: 1.35rem; }
+  .control-pause-alert-actions { grid-column: 1 / -1; justify-content: stretch; }
+  .control-pause-alert-actions .btn { flex: 1; min-width: 0; white-space: normal; }
+}
+@media print {
+  .control-pause-alert { display: none !important; }
+}

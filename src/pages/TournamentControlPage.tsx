@@ -44,6 +44,7 @@ import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSl
 import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { generateUniquePlayerCode } from '@/services/mockPlayerCodes';
 import { getStageEntrants, getStageStartIssue, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage, completeStage, canFinishBreak, getBreakResumeAt, formatBreakCountdown, type BreakStartOptions } from '@/services/mockPhaseLifecycle';
+import { TournamentPauseBanner } from '@/components/TournamentPauseBanner';
 import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
 import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration } from '@/services/mockDuration';
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
@@ -1124,12 +1125,6 @@ export function TournamentControlPage() {
                 )}
               </>
             )}
-            {activeBreak && tournament.status !== 'ABORTED' && <>
-              <span className="badge" role="timer" aria-label="Verbleibende Pausenzeit">{formatBreakCountdown(activeBreakResume)}</span>
-              <button className="btn primary" type="button" onClick={() => breakReady ? finishCurrentBreak() : setConfirmEarlyBreak(true)}>
-                {breakReady ? 'Pause beenden' : 'Pause vorzeitig beenden'}
-              </button>
-            </>}
             {tournament.hasStarted && !activeStage && nextStartableStage && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
               <button className="btn primary" type="button" onClick={requestStartNextPhase}>{nextStartableStage.type === 'BREAK' ? 'Pause starten' : 'Nächste Phase starten'}</button>
             )}
@@ -1151,6 +1146,19 @@ export function TournamentControlPage() {
           </div>
         </div>
       </header>
+
+      {activeBreak && !['ABORTED', 'FINISHED'].includes(tournament.status) && (
+        <TournamentPauseBanner
+          stageName={activeBreak.name}
+          overnight={activeBreak.settings.breakKind === 'overnight'}
+          resumeAt={activeBreakResume}
+          ready={breakReady}
+          note={String(activeBreak.settings.note ?? '')}
+          now={Date.now()}
+          onViewDetails={() => { setSelectedStageId(activeBreak.id); setTab('flow'); }}
+          onFinish={() => breakReady ? finishCurrentBreak() : setConfirmEarlyBreak(true)}
+        />
+      )}
 
       <nav className="control-tabs" aria-label="Turnierleitungsbereiche">
         {(anyCompletedPhase ? [...tabs, { id: 'final' as const, label: 'Endplatzierungen' }] : tabs).map((item) => (
