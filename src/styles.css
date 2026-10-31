@@ -4730,3 +4730,24 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .planned-schedule-item time { grid-column: 1 / -1; }
   .planned-schedule-start { justify-items: start; }
 }
+
+/* Auto-generated, phase-oriented timetable. */
+.planned-schedule-phase-list { margin: 0; padding: 0; list-style: none; display: grid; border: 1px solid #e4e7ec; border-radius: 12px; overflow: hidden; background: #fff; }
+.planned-schedule-phase-row { display: grid; grid-template-columns: minmax(145px, 185px) minmax(0, 1fr); align-items: start; gap: 14px; padding: 13px 16px; border-bottom: 1px solid #eaecf0; }
+.planned-schedule-phase-row:last-child { border-bottom: 0; }
+.planned-schedule-phase-row time { font-weight: 800; font-variant-numeric: tabular-nums; color: #344054; font-size: .86rem; }
+.planned-schedule-phase-row strong { display: block; font-size: .92rem; overflow-wrap: anywhere; }
+.planned-schedule-phase-row small { display: block; margin-top: 3px; color: #667085; font-size: .74rem; }
+.planned-schedule-phase-row.is-start { background: #eef8f3; border-left: 4px solid #079455; }
+.planned-schedule-phase-row.is-break { background: #fffaeb; border-left: 4px solid #dc9800; }
+.planned-schedule-phase-row.is-finish { background: #f2f4f7; border-left: 4px solid #667085; }
+.planned-schedule-phase-warning { grid-column: 1 / -1; margin: 8px 0 0; padding: 10px 12px; border: 1px solid #f2bb66; border-radius: 8px; background: #fff3d6; color: #8d4205; font-size: .81rem; line-height: 1.45; }
+.planned-schedule-ceremony { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 15px 17px; border: 1px solid #e4e7ec; border-radius: 12px; background: #f8fafc; }
+.planned-schedule-ceremony > div:first-child { max-width: 65ch; }
+.planned-schedule-ceremony strong { font-size: .92rem; }
+.planned-schedule-ceremony p { margin: 6px 0 0; font-size: .81rem; line-height: 1.5; }
+.planned-schedule-ceremony-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.planned-schedule-ceremony-actions label { display: grid; gap: 5px; font-size: .75rem; font-weight: 700; }
+.planned-schedule-ceremony-actions input { padding: 8px; border: 1px solid #d0d5dd; border-radius: 8px; min-height: 37px; }
+.planned-schedule-ceremony-actions .planned-schedule-phase-warning { width: 100%; }
+@media (max-width: 650px) { .planned-schedule-phase-row { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 11px 12px; } }

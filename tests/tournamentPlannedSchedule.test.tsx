@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { createMockTournament, getMockTournament } from '@/services/mockTournamentStore';
 
@@ -62,7 +62,7 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(suggestion[4].at).toBe('2026-10-31T15:30');
   });
 
-  it('setzt nach Spieltagsende den nächsten Tag und springt bei verstrichener Pause-bis-Uhrzeit ebenfalls weiter', () => {
+  it('setzt nach Spieltagsende den nächsten Tag, warnt aber vor unplausiblen Pause-bis-Uhrzeiten', () => {
     const dates = suggestPlannedSchedule('2026-10-31T17:00', [
       { label: 'Phase', type: 'ROUND_ROBIN', estimatedMinutes: 60 },
       { label: 'Nacht', type: 'BREAK', estimatedMinutes: 0, breakKind: 'overnight', nextDayStart: '09:00' },
@@ -71,8 +71,39 @@ describe('optionaler vorläufiger Zeitplan', () => {
       { label: 'Finale', type: 'KNOCKOUT', estimatedMinutes: 30 },
     ]);
     expect(dates.map((item) => item.at)).toEqual([
-      '2026-10-31T17:00', '2026-10-31T18:00', '2026-11-01T09:00', '2026-11-01T10:10', '2026-11-02T08:00',
+      '2026-10-31T17:00', '2026-10-31T18:00', '2026-11-01T09:00', '2026-11-01T10:10', '2026-11-01T10:10',
     ]);
+  });
+
+  it('bildet den konkreten Turnierplan automatisch ab und erkennt Pause bis vor dem theoretischen Ende', () => {
+    const phases = [
+      { label: 'Schweizer System', type: 'SWISS', estimatedMinutes: 150 },
+      { label: 'Pause', type: 'BREAK', estimatedMinutes: 0, breakKind: 'until' as const, breakUntil: '12:00' },
+      { label: 'K.-o.-Phase', type: 'KNOCKOUT', estimatedMinutes: 120 },
+    ];
+    const invalid = buildPlannedTimeline('2026-11-01T10:00', phases);
+    expect(invalid.items.map((row) => [row.title, row.at])).toEqual([
+      ['Schweizer System', '2026-11-01T10:00'],
+      ['Pause', '2026-11-01T12:30'],
+      ['K.-o.-Phase', '2026-11-01T12:30'],
+    ]);
+    expect(invalid.warnings).toHaveLength(1);
+    expect(invalid.warnings[0].phaseIndex).toBe(1);
+    expect(invalid.warnings[0].message).toContain('12:00 Uhr liegt vor dem voraussichtlichen Pausenbeginn um 12:30 Uhr');
+
+    const corrected = buildPlannedTimeline('2026-11-01T10:00', [
+      phases[0], { ...phases[1], breakUntil: '13:30' }, phases[2],
+    ]);
+    expect(corrected.warnings).toEqual([]);
+    expect(corrected.items.map((row) => [row.title, row.at])).toEqual([
+      ['Schweizer System', '2026-11-01T10:00'],
+      ['Pause', '2026-11-01T12:30'],
+      ['K.-o.-Phase', '2026-11-01T13:30'],
+    ]);
+    expect(corrected.estimatedEnd).toBe('2026-11-01T15:30');
+    const withAwards = [...corrected.items, { id: 'award-ceremony', at: corrected.estimatedEnd, title: 'Siegerehrung', type: 'other' as const }];
+    expect(withAwards.at(-1)).toMatchObject({ title: 'Siegerehrung', at: '2026-11-01T15:30' });
+    expect(validatePlannedSchedule(withAwards)).toEqual([]);
   });
 
   it('lässt leere Pläne zu, prüft aber unvollständige Einträge und Duplikate', () => {
