@@ -4531,3 +4531,34 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .sidebar .nav.sidebar-navigation a { padding: 7px 8px; gap: 6px; font-size: .7rem; }
   .sidebar .nav.sidebar-navigation a svg { width: 15px; height: 15px; }
 }
+
+/* Unified navigation: Turniere > actions > Deine Turniere. */
+.sidebar-tournament-section { display: grid; gap: 10px; min-width: 0; }
+.sidebar-tournament-heading {
+  margin: 0 8px 1px;
+  color: #e4e7ec;
+  font-size: .86rem;
+  font-weight: 850;
+  letter-spacing: .01em;
+}
+.sidebar-tournament-section > .sidebar-live-section {
+  margin-top: 11px;
+  padding-top: 17px;
+  border-top: 1px solid #29374c;
+}
+.sidebar-section-heading h3 {
+  margin: 0;
+  color: #d0d5dd;
+  font-size: .78rem;
+  font-weight: 800;
+}
+.sidebar-live-badge.before {
+  background: rgb(64 137 246 / 16%);
+  color: #b2ddff;
+}
+.sidebar-live-badge.before .sidebar-live-status-dot { background: #84adff; }
+@media (max-width: 900px) {
+  .sidebar-tournament-section { gap: 6px; }
+  .sidebar-tournament-heading { margin: 0 3px 1px; font-size: .75rem; }
+  .sidebar-tournament-section > .sidebar-live-section { display: none; }
+}
