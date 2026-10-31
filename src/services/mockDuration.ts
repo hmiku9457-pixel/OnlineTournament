@@ -2,7 +2,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { planningMinutesPerSet } from '@/domain/sports';
 import { getBreakResumeAt, getStageEntrants, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
-import { getMockStageBaseMatches, getMockStoredResult } from '@/services/mockRuntime';
+import { getMockStageBaseMatches, getMockStoredResult, getTotalSwissRoundCount } from '@/services/mockRuntime';
 
 import { getBlockedMockTables } from '@/services/mockTableLocks';
 import { sportScoring } from '@/domain/sportScoring';
@@ -52,7 +52,9 @@ function remainingStageJobs(tournament: DemoTournament, stage: TournamentStage):
   const started = isStageStarted(tournament, stage);
 
   if (stage.type === 'SWISS') {
-    const rounds = Math.max(1, Number(stage.settings.rounds) || 1);
+    // Hypothetical extra rounds remain excluded; explicitly scheduled
+    // extra rounds count from the moment the director adds them.
+    const rounds = getTotalSwissRoundCount(tournament, stage);
     const perRound = Math.floor(entrants / 2);
     const jobs: DurationJob[] = [];
     for (let round = 1; round <= rounds; round += 1) {

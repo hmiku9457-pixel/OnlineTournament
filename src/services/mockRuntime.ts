@@ -1066,8 +1066,16 @@ export function getSwissCutoffHistory(tournament: DemoTournament, stage: Tournam
   if (!archive) return current ?? null;
   // If a later full-field Swiss round led to another tie, the archive stays
   // visible while the current decision (e.g. a draw) determines final qualifiers.
-  return { ...archive, ...(current ?? {}), extraRounds: current?.extraRounds?.some((round) => round.kind === 'ROUND_ROBIN')
-    ? current.extraRounds : archive.extraRounds };
+  // Preserve historical games, but an expired cutoff signature can never
+  // count as a current decision or determine today's Swiss standings.
+  return { ...archive, ...(current ?? {}), winners: current?.winners,
+    extraRounds: current?.extraRounds?.some((round) => round.kind === 'ROUND_ROBIN')
+      ? current.extraRounds : archive.extraRounds };
+}
+
+/** A saved historical decision is not necessarily valid for today's table. */
+export function getValidSwissCutoffWinners(tournament: DemoTournament, stage: TournamentStage): string[] {
+  return swissCutoffStatus(tournament, stage, readResults())?.decision?.winners ?? [];
 }
 
 /** Reflect the documented decision in the visible positions as well as qualification. */
@@ -1378,8 +1386,23 @@ export function approveMockProgress(tournament: DemoTournament): MockProgressApp
     .filter((match) => pending.kind === 'STAGE'
       || Number(match.id.match(/-sw-r(\d+)-m\d+$/)?.[1] ?? 0) === pending.round)
     .map((match) => match.id));
+  if (pending.kind === 'STAGE' && stage.type === 'SWISS') {
+    const decision = swissCutoffStatus(latest, stage, readResults())?.decision;
+    if (decision?.mode === 'SET') {
+      getSwissCutoffSetMatches(latest, stage).forEach((match) => ids.add(match.id));
+    }
+    if (decision?.extraRounds?.length) {
+      getSwissRoundRobinMatches(latest, stage).forEach((match) => ids.add(match.id));
+    }
+  }
+  const newlyApproved = readResults().filter((entry) => ids.has(entry.matchId)
+    && entry.status === 'FINISHED' && !entry.adminConfirmed);
   writeResults(readResults().map((entry) => ids.has(entry.matchId) && entry.status === 'FINISHED'
     ? { ...entry, adminConfirmed: true } : entry));
+  newlyApproved.filter((entry) => entry.matchId.includes('-sw-cutoff-set-') || entry.matchId.includes('-sw-playoff-'))
+    .forEach((entry) => recordMockAudit({ tournamentId: latest.id, matchId: entry.matchId,
+      actor: 'Turnierleitung (lokal)', action: 'RESULT_CONFIRMED',
+      description: 'Ergebnis des Schweizer Stichentscheids bei der Phasenfreigabe bestätigt' }));
   if (pending.kind === 'ROUND') {
     if (!approveSwissRound(latest, stage, pending.round!)) return null;
     recordMockAudit({ tournamentId: latest.id, actor: 'Turnierleitung', action: 'SWISS_ROUND_APPROVED',

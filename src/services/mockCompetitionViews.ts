@@ -8,7 +8,7 @@ import {
   getMockStageBaseMatches,
   getMockStageMatches,
   getMockStoredResult,
-  applyResolvedSwissCutoffOrder, getSwissCutoffHistory, getTotalSwissRoundCount,
+  applyResolvedSwissCutoffOrder, getValidSwissCutoffWinners, getTotalSwissRoundCount,
 } from '@/services/mockRuntime';
 
 export interface MockStanding {
@@ -198,7 +198,9 @@ export function buildSwissStandings(tournament: DemoTournament, stage: Tournamen
   const sorted = applyResolvedSwissCutoffOrder(tournament, stage, computeStandings(order,
     getMockStageMatches(tournament, stage), tournament.sport, getSwissByeWinners(tournament, stage),
     true, getTotalSwissRoundCount(tournament, stage)));
-  const winners = new Set(getSwissCutoffHistory(tournament, stage)?.winners ?? []);
+  // The historical archive is for display only. Resolve visible shared
+  // places solely from the cutoff decision with a current valid signature.
+  const winners = new Set(getValidSwissCutoffWinners(tournament, stage));
   const places: number[] = [];
   return sorted.map((row, index) => {
     const previous = sorted[index - 1];
