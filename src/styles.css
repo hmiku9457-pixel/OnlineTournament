@@ -4801,3 +4801,93 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .planned-schedule-ceremony-datetime input[type=date] { flex: 1 1 120px; min-width: 120px; }
 .planned-schedule-ceremony-datetime .clock-picker-trigger { flex: 1 1 118px; width: auto; }
 @media (max-width: 680px) { .phase-inline-break-settings { grid-template-columns: minmax(0, 1fr); } .phase-inline-break-settings .planned-schedule-phase-warning, .phase-inline-break-settings > .field-hint { grid-column: 1; } }
+
+/* Turnier erstellen · unified five-step polish and calmer visual hierarchy. */
+.wizard-steps { gap: 9px; margin-bottom: 19px; }
+.wizard-steps .wizard-step { border-radius: 12px; min-height: 61px; padding: 10px 12px; transition: background .17s ease, border-color .17s ease, box-shadow .17s ease; }
+.wizard-steps .wizard-step.completed { background: #f8fcfa; border-color: #d2e9dc; border-bottom-color: #379e73; color: #195b42; }
+.wizard-steps .wizard-step.completed .wizard-step-number { background: #15805b; color: #fff; }
+.wizard-steps .wizard-step.active { background: #f0f5ff; border-color: #9bbcf3; border-bottom-color: #2563eb; box-shadow: 0 2px 10px rgb(29 78 216 / 7%); }
+.wizard-steps .wizard-step:not(:disabled):hover { filter: none; background: #edf4ff; border-color: #9bbcf3; }
+.wizard-steps .wizard-step.completed:not(:disabled):hover { background: #ebf7ef; border-color: #9bd6b3; }
+.wizard-workspace { gap: 17px; }
+.wizard-workspace > .wizard-card { padding: clamp(18px, 2.1vw, 29px); border: 1px solid #dbe3ee; border-radius: 16px; box-shadow: 0 3px 18px rgb(16 24 40 / 4%); background: #fff; }
+.wizard-card > section > h2, .wizard-card .participant-step-head h2 { color: #162b4b; font-size: 1.28rem; letter-spacing: -.025em; }
+.wizard-card > section > p.muted, .wizard-card .participant-step-head p.muted { max-width: 90ch; margin: 7px 0 19px; color: #64748b; line-height: 1.55; }
+.wizard-workspace .field { min-width: 0; }
+.wizard-workspace .field > label { font-weight: 720; }
+.wizard-workspace .field-hint { color: #65758b; line-height: 1.5; }
+.wizard-workspace input:not([type=radio]):not([type=checkbox]), .wizard-workspace select { border-radius: 9px; }
+.wizard-workspace input:focus-visible, .wizard-workspace select:focus-visible, .wizard-workspace textarea:focus-visible { outline: 2px solid #93c5fd; outline-offset: 1px; }
+.wizard-workspace .wizard-venue-choice { background: #f8fafc; border-color: #dee6f0; border-radius: 13px; padding: 15px 17px; }
+.wizard-workspace .wizard-game-settings { border-top-color: #e9eef5; }
+.wizard-workspace .participant-editor { background: #fff; border-color: #dfe7f1; border-radius: 13px; padding: 17px; }
+.wizard-workspace .wizard-test-tools { background: #f8fafc; border-color: #e5ecf5; border-style: dashed; border-radius: 13px; }
+.wizard-workspace .participant-roster-grid-card { border-color: #dfe7f1; border-radius: 13px; }
+.wizard-workspace .participant-roster-multi .participant-roster-row { border-color: #e5eaf2; border-radius: 10px; }
+.wizard-workspace .participant-roster-multi .participant-roster-row:hover { border-color: #c7d9ef; background: #fbfdff; }
+.wizard-workspace .recommendation-list { gap: 11px; }
+.wizard-workspace .recommendation-select { text-align: left; border: 1px solid #dce4f0; border-radius: 12px; padding: 14px 16px; background: #fff; box-shadow: none; }
+.wizard-workspace .recommendation-select:hover { border-color: #9dbbeb; background: #fafcff; }
+.wizard-workspace .recommendation-select.selected { border-color: #3d7ce7; box-shadow: 0 0 0 2px rgb(37 99 235 / 10%); background: #f7faff; }
+.wizard-workspace .format-settings-panel { border: 1px solid #e0e8f2; border-radius: 13px; background: #f8fafc; padding: 16px; }
+.wizard-workspace .phase-add-compact { background: #f7f9fc; border-color: #e3e9f2; border-radius: 12px; }
+.wizard-workspace .phase-config.phase-config-expanded { border-radius: 12px; padding: 13px 14px; }
+.wizard-workspace .phase-config.is-expanded { border-color: #8bb4ef; background: #fcfdff; }
+.wizard-workspace .phase-insert-trigger { min-height: 30px; background: #f8fbff; }
+.wizard-side-summary { border-color: #dbe5f2; border-radius: 15px; box-shadow: 0 4px 16px rgb(16 24 40 / 5%); }
+.wizard-side-summary-heading { padding-top: 18px; padding-bottom: 14px; }
+.wizard-side-facts { gap: 4px; }
+.wizard-side-fact { padding: 11px; }
+.wizard-side-phase-summary { margin-top: 14px; }
+.wizard-side-phase-list { gap: 12px; }
+.wizard-side-duration { margin-top: 17px; padding: 14px 13px; background: #f0f5fc; border: 1px solid #e5ecf6; border-radius: 11px; }
+.wizard-side-duration strong { color: #132e50; font-size: 1.08rem; }
+.wizard-side-actions { border-radius: 13px; padding: 11px; box-shadow: 0 2px 10px rgb(16 24 40 / 4%); }
+
+/* In-phase break: compact switch + collapsible editor. */
+.phase-inline-break { background: #f7faff; border-color: #dae7f8; padding: 11px 13px; border-radius: 11px; }
+.phase-inline-break-header { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; }
+.phase-inline-break-toggle { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-items: center; flex: 1 1 220px; }
+.phase-inline-break-toggle input { grid-row: 1 / 3; margin: 0; }
+.phase-inline-break-toggle strong { font-size: .82rem; line-height: 1.35; color: #223d60; }
+.phase-inline-break-toggle .muted { grid-column: 2; flex-basis: auto; margin: 0; color: #61748b; line-height: 1.4; }
+.phase-inline-break-expand { flex: 0 0 auto; color: #175cd3; background: white; border: 1px solid #bbd4f9; font-size: .74rem; }
+.phase-inline-break-expand:hover { background: #eaf3ff; }
+.phase-inline-break-help { margin: 5px 0 0 28px; color: #65758b; font-size: .72rem; line-height: 1.45; }
+.phase-inline-break-settings { border-top: 1px solid #dbe6f5; padding-top: 13px; margin-top: 13px; }
+
+/* Date sections: one-day events have no redundant date labels. */
+.planned-schedule-phase-list, .planned-schedule-list { overflow: hidden; border-radius: 13px; }
+.planned-schedule-phase-list { display: block; border-color: #dfe7f1; }
+.planned-schedule-day-group { list-style: none; min-width: 0; }
+.planned-schedule-day-group + .planned-schedule-day-group { border-top: 1px solid #b9cce3; }
+.planned-schedule-day-heading { margin: 0; padding: 11px 16px; color: #32567d; background: #ecf2fa; border-bottom: 1px solid #d8e4f1; font-size: .79rem; font-weight: 780; letter-spacing: .01em; }
+.planned-schedule-day-entries { margin: 0; padding: 0; list-style: none; }
+.planned-schedule-phase-row { align-items: center; gap: 15px; padding: 13px 16px; }
+.planned-schedule-phase-row:last-child { border-bottom: 0; }
+.planned-schedule-phase-row strong { color: #223854; }
+.planned-schedule-phase-row.is-break { background: #f0f6ff; }
+.planned-schedule-phase-row.is-start { background: #eef9f3; }
+.planned-schedule-phase-row.is-ceremony { background: #f7f4ff; }
+.planned-schedule-phase-row .planned-schedule-duration { color: #275c93; }
+.tournament-planned-schedule { border: 1px solid #e1e9f3; border-radius: 13px; }
+.tournament-planned-schedule .planned-schedule-day-heading { border-radius: 8px 8px 0 0; }
+.tournament-planned-schedule .planned-schedule-day-group + .planned-schedule-day-group { margin-top: 9px; }
+.tournament-planned-schedule .planned-schedule-item { padding: 12px 2px; }
+.tournament-planned-schedule .planned-schedule-item:first-child { border-top: none; }
+.tournament-planned-schedule .planned-schedule-day-heading + .planned-schedule-day-entries { padding: 2px 10px; }
+.planned-schedule-ceremony { border-radius: 13px; border-color: #dde5f0; background: #fafbff; }
+@media (max-width: 980px) {
+  .wizard-workspace > .wizard-card { padding: 18px; }
+}
+@media (max-width: 700px) {
+  .wizard-steps { gap: 5px; }
+  .wizard-steps .wizard-step { padding: 7px 4px; min-height: 64px; }
+  .wizard-workspace > .wizard-card { padding: 14px; border-radius: 12px; }
+  .phase-inline-break-header { align-items: flex-start; }
+  .planned-schedule-day-heading { padding: 9px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wizard-steps .wizard-step { transition: none; }
+}
