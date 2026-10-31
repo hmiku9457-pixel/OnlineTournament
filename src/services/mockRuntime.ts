@@ -876,6 +876,11 @@ export function canWithdrawMockParticipant(tournament: DemoTournament, name: str
   if (!getRuntimeParticipantNames(tournament).includes(name) || isMockParticipantWithdrawn(tournament, name)) return false;
   const started = tournament.stages.filter((stage) => isStageStarted(tournament, stage));
   const latest = started[started.length - 1];
+  const mostRecentCompleted = [...tournament.stages].reverse().find((stage) =>
+    stage.type !== 'BREAK' && isStageCompleted(tournament, stage) && getStageEntrants(tournament, stage).includes(name));
+  const upcoming = mostRecentCompleted && getNextCompetitionStage(tournament, mostRecentCompleted);
+  if (upcoming && !isStageStarted(tournament, upcoming)
+    && !getStageEntrants(tournament, upcoming).includes(name)) return false;
   // Bereits vor einer laufenden Folgephase ausgeschiedene Teilnehmer
   // können nicht im Nachhinein als freiwilliger Rückzug geführt werden.
   if (latest && !getStageEntrants(tournament, latest).includes(name)) return false;

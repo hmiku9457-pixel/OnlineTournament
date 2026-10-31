@@ -1,13 +1,13 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildRoundRobinStandings, buildSwissStandings } from '@/services/mockCompetitionViews';
-import { getStageEntrants, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
+import { getStageEntrants, getNextCompetitionStage, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
 import { getMockStageBaseMatches, getMockStoredResult, isMockParticipantWithdrawn } from '@/services/mockRuntime';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { resultWinnerSide } from '@/domain/sportScoring';
 
 export interface MockParticipantProgress {
-  status: 'Aktiv' | 'Ausgeschieden' | 'Zurückgezogen' | 'Turniersieger' | 'Beendet';
+  status: 'Aktiv' | 'Ausgeschieden' | 'Zurückgezogen' | 'Turniersieger' | 'Beendet' | `Nicht für Phase ${string} qualifiziert`;
   placement?: string;
 }
 
@@ -95,7 +95,22 @@ export function getMockParticipantProgress(tournament: DemoTournament, name: str
     return { status: 'Zurückgezogen', placement: lastPlayed ? placementInStage(tournament, lastPlayed, name) : undefined };
   }
 
-  if (!getStageEntrants(tournament, latest).includes(name)) {
+  // Between phase approval and the next competition's actual start, a
+  // non-qualifier remains eligible as a replacement without being "Aktiv".
+  // Scheduled break phases must not hide this status.
+  for (const previous of [...started].reverse()) {
+    if (previous.type === 'BREAK' || !isStageCompleted(tournament, previous)
+      || !getStageEntrants(tournament, previous).includes(name)) continue;
+    const nextCompetition = getNextCompetitionStage(tournament, previous);
+    if (nextCompetition && !isStageStarted(tournament, nextCompetition)
+      && !getStageEntrants(tournament, nextCompetition).includes(name)) {
+      return { status: `Nicht für Phase ${nextCompetition.name} qualifiziert`,
+        placement: placementInStage(tournament, previous, name) };
+    }
+    break;
+  }
+
+  if (latest.type !== 'BREAK' && !getStageEntrants(tournament, latest).includes(name)) {
     // Teilnehmer hat sich nicht für die gestartete Folgephase qualifiziert.
     const previous = [...started].reverse().find((stage) => getStageEntrants(tournament, stage).includes(name));
     return { status: 'Ausgeschieden', placement: previous ? placementInStage(tournament, previous, name) : undefined };

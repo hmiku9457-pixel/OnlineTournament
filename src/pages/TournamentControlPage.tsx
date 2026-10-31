@@ -655,7 +655,7 @@ export function TournamentControlPage() {
       switch (participantStatusFilter) {
         case 'active': return progress.status === 'Aktiv';
         case 'playing': return isPlaying;
-        case 'eliminated': return progress.status === 'Ausgeschieden';
+        case 'eliminated': return progress.status === 'Ausgeschieden' || progress.status.startsWith('Nicht für Phase ');
         case 'withdrawn': return progress.status === 'Zurückgezogen';
         default: return true;
       }
@@ -1601,7 +1601,7 @@ export function TournamentControlPage() {
               return (
                 <article className={isWithdrawn ? 'participant-control-row withdrawn' : 'participant-control-row'} key={`${participant}-${index}`}>
                   <span className="participant-list-number">{index + 1}</span>
-                  <div className="participant-control-identity"><strong>{participant}</strong><span className={`participant-inline-status${statusText === 'Spielt gerade' ? ' playing' : statusText === 'Aktiv' ? 'active' : isWithdrawn ? ' withdrawn' : progress.status === 'Ausgeschieden' ? ' eliminated' : ''}`}>{statusText}</span>{progress.placement && <span className="participant-placement">{progress.placement}</span>}</div>
+                  <div className="participant-control-identity"><strong>{participant}</strong><span className={`participant-inline-status${statusText === 'Spielt gerade' ? ' playing' : statusText === 'Aktiv' ? 'active' : isWithdrawn ? ' withdrawn' : progress.status === 'Ausgeschieden' || progress.status.startsWith('Nicht für Phase ') ? ' eliminated' : ''}`}>{statusText}</span>{progress.placement && <span className="participant-placement">{progress.placement}</span>}</div>
                   <code>{tournament.participantCodes?.[participant] ?? String(4100 + index).slice(-4)}</code>
                   <div className="participant-row-actions">
                     <button className="btn small" type="button" onClick={() => setParticipantPanel({ name: participant, mode: 'edit' })}>Daten bearbeiten</button>
@@ -1610,8 +1610,8 @@ export function TournamentControlPage() {
                       canRestoreMockParticipant(tournament, participant)
                         ? <button className="btn small" type="button" onClick={() => { if (restoreMockParticipant(tournament, participant)) { setParticipantVersion((value) => value + 1); setDrawVersion((value) => value + 1); refreshRuntime(); } }}>Rückzug rückgängig</button>
                         : <span className="btn small withdrawal-locked" aria-disabled="true" title="Nur vor einem Phasenstart und bei vorheriger Qualifikation möglich; nicht bei Rückzug während einer Runde.">Rückzug gesperrt</span>
-                    ) : progress.status === 'Ausgeschieden' || progress.status === 'Beendet' || progress.status === 'Turniersieger' || !canWithdrawMockParticipant(tournament, participant)
-                      ? <span className="btn small withdrawal-locked" aria-disabled="true" title="Nach einem Ausscheiden in der K.-o.-Phase ist kein Rückzug mehr möglich.">Rückzug gesperrt</span>
+                    ) : progress.status === 'Ausgeschieden' || progress.status.startsWith('Nicht für Phase ') || progress.status === 'Beendet' || progress.status === 'Turniersieger' || !canWithdrawMockParticipant(tournament, participant)
+                      ? <span className="btn small withdrawal-locked" aria-disabled="true" title={progress.status.startsWith('Nicht für Phase ') ? 'Nicht qualifiziert, aber als Nachrücker vorgemerkt. Ein Rückzug während dieser Wartephase ist nicht vorgesehen.' : 'Nach dem Ausscheiden oder Turnierabschluss ist kein Rückzug mehr möglich.'}>Rückzug gesperrt</span>
                       : <button className="btn small danger-outline" type="button" onClick={() => requestParticipantWithdrawal(participant)}>Zurückziehen</button>}
                   </div>
                 </article>
