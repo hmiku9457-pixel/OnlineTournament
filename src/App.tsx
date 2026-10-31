@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { CreateTournamentPage } from '@/pages/CreateTournamentPage';
@@ -10,6 +10,16 @@ import { SpectatorPage } from '@/pages/SpectatorPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
+/** Force a fresh controller instance when navigating from tournament A to B.
+ * React Router otherwise reuses the same component for the parameterized
+ * route, leaving useState(initialTournament) bound to the old tournament.
+ * Navigating between tabs inside the same tournament keeps the same key.
+ */
+function TournamentControlRoute() {
+  const { tournamentId } = useParams();
+  return <TournamentControlPage key={tournamentId} />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -18,7 +28,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/tournaments/new" element={<CreateTournamentPage />} />
         <Route path="/tournaments/:tournamentId" element={<TournamentPage />} />
-        <Route path="/tournaments/:tournamentId/control" element={<TournamentControlPage />} />
+        <Route path="/tournaments/:tournamentId/control" element={<TournamentControlRoute />} />
         <Route path="/404" element={<NotFoundPage />} />
       </Route>
       <Route path="/player/:tournamentId" element={<PlayerTournamentPage />} />
