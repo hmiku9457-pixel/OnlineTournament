@@ -5,6 +5,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
 import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
+import { blocksInlineBreakRound, isInlineBreakReleased } from '@/services/mockInlineBreak';
 import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, getNextCompetitionStage, getPreviousCompetitionStage, isStageCompleted, isStageStarted, setStageEntrants, reopenStageForQualification, isSwissRoundApproved, approveSwissRound, revokeSwissRoundApprovals, reopenStageAfterCorrection } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
@@ -461,6 +462,10 @@ function swissMatches(tournament: DemoTournament, stage: TournamentStage, result
       const previous = matches.filter((match) => match.round === `Runde ${round - 1}` && !match.autoWinner);
       const previousDone = previous.every((match) => results.find((item) => item.matchId === match.id)?.status === 'FINISHED');
       if (!previousDone || !isSwissRoundApproved(tournament, stage, round - 1)) break;
+      // An approved Swiss round may require a director-controlled break before
+      // any next-round fixtures are generated or assigned.
+      const pauseRound = Number(stage.settings.inlineBreakAfterRound) || 0;
+      if (pauseRound === round - 1 && !isInlineBreakReleased(tournament, stage)) break;
     }
 
     const savedRound = readSwissFixtures().find((item) => item.tournamentId === tournament.id && item.stageId === stage.id && item.round === round);
@@ -719,6 +724,10 @@ function getAssignmentBlockReasonForSnapshot(
   // verhindern eine neue Zuweisung.
   const target = matches.find((match) => match.id === matchId);
   if (!target) return 'Spiel wurde nicht gefunden.';
+  const targetStage = tournament.stages.find((stage) => stage.id === target.stageId);
+  if (targetStage && blocksInlineBreakRound(tournament, targetStage, matchId)) {
+    return 'Vor der nächsten Runde muss die eingeplante Zwischenpause freigegeben werden.';
+  }
   if (target.status !== 'WAITING') return 'Dieses Spiel ist nicht mehr in der Warteschlange.';
 
   const tableOccupied = matches.some((match) => match.id !== matchId && match.table === table && isActiveTableMatch(match));
