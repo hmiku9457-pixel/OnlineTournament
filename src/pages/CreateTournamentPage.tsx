@@ -1489,7 +1489,9 @@ export function CreateTournamentPage() {
                               {plannedTimeline.warnings.some((warning) => warning.phaseIndex === index) &&
                                 <span className="phase-warning-chip" role="status">⚠ Pausenuhrzeit liegt vor dem geschätzten Pausenbeginn</span>}
                               {phase.inlineBreakAfterRound > 0 && (phase.type === 'SWISS' || phase.type === 'KNOCKOUT') &&
-                                <span className="phase-inline-break-badge">· Zwischenpause nach Runde {phase.inlineBreakAfterRound}</span>}
+                                <span className="phase-inline-break-badge">· Zwischenpause nach Runde {phase.inlineBreakAfterRound} {phase.inlineBreakKind === 'minutes'
+                                  ? `für ${phase.inlineBreakMinutes} Minuten`
+                                  : `bis ${phase.inlineBreakUntil} Uhr`}</span>}
                             </div>
                             <div className="phase-order-actions">
                               <button
@@ -1767,10 +1769,10 @@ export function CreateTournamentPage() {
                                     ? current.filter((id) => id !== phase.id) : [...current, phase.id]);
                                 }}
                               >
-                                <span className="phase-inline-break-title">Zwischenpause nach Runde {phase.inlineBreakAfterRound}</span>
+                                <span className="phase-inline-break-title">Zwischenpause nach Runde {phase.inlineBreakAfterRound} {phase.inlineBreakKind === 'minutes'
+                                  ? `für ${phase.inlineBreakMinutes} Minuten`
+                                  : `bis ${phase.inlineBreakUntil} Uhr`}</span>
                                 <span className="phase-inline-break-summary">
-                                  <span className="phase-quick-tag">{phase.inlineBreakKind === 'minutes'
-                                    ? `${phase.inlineBreakMinutes} Min. Pause` : `Pause bis ${phase.inlineBreakUntil} Uhr`}</span>
                                   <span className="phase-quick-tag phase-quick-tag-time">Runde endet ca. {estimatedInlinePauseStart}</span>
                                 </span>
                                 <span className="phase-inline-break-chevron" aria-hidden="true">{inlineBreakExpanded ? '▴' : '▾'}</span>
