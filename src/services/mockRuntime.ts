@@ -105,7 +105,7 @@ export function canEditFinishedResults(tournament: DemoTournament, stage: Tourna
 
 /** Preserve scheduled breaks when an earlier competition needs reapproval. */
 function statusAfterReopening(tournament: DemoTournament): 'PAUSED' | 'RUNNING' {
-  // Never silently resume an explicitly paused tournament on correction.
+  // Preserve an explicitly requested pause during administrative corrections.
   const latest = getAllMockTournaments().find((item) => item.id === tournament.id);
   if ((latest?.status ?? tournament.status) === 'PAUSED') return 'PAUSED';
   return tournament.stages.some((stage) => stage.type === 'BREAK'
@@ -176,185 +176,10 @@ export function canEditMockMatch(tournament: DemoTournament, matchId: string) {
   if (tournament.status === 'ABORTED' || tournament.status === 'FINISHED' || !stage || !canEditFinishedResults(tournament, stage)) return false;
   const cutoffIndex = Number(matchId.match(/-sw-cutoff-set-m(\d+)$/)?.[1] ?? 0);
   if (stage.type === 'SWISS' && cutoffIndex > 0) {
-    const future = (id: string) => {
-      const index = Number(id.match(new RegExp(`^${stage.id}-sw-cutoff-set-m(\\d+)import { isParticipantWithdrawn, saveParticipantWithdrawal, removeParticipantWithdrawal, markWithdrawalRestoreEligibility, getWithdrawalRestoreEligibility, saveWithdrawalTiming, type WithdrawalTiming } from '@/services/mockWithdrawals';
-import { reconcilePrestartDraws, reconcileQualifiedBracket } from '@/services/mockDrawStore';
-import type { DemoTournament } from '@/data/demoTournaments';
-import type { MatchSet, TournamentStage } from '@/domain/types';
-import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
-import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
-import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, getNextCompetitionStage, getPreviousCompetitionStage, isStageCompleted, isStageStarted, setStageEntrants, reopenStageForQualification, isSwissRoundApproved, approveSwissRound, revokeSwissRoundApprovals, reopenStageAfterCorrection } from '@/services/mockPhaseLifecycle';
-import { getRuntimeParticipantNames } from '@/services/mockParticipants';
-import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
-import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
-import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
-import { rankStandings, type RankedParticipant } from '@/domain/standingRankings';
-import { compareRankingRows, resultScore, resultWinnerSide, scoreWithDecision, sportScoring, validateCompleteResult, validateScoreDecision, type ExtraTimeProgress, type ScoreDecision, type WinnerSide } from '@/domain/sportScoring';
-import { getWithdrawalAwardSets } from '@/domain/withdrawalScoring';
-import { newPlayoffRound, playoffBoundaryTie, playoffQualified, playoffRoundFinished, type PlayoffMode } from '@/domain/swissCutoffPlayoff';
-import { addSwissExtraRound, getSwissExtraRoundCount } from '@/services/mockSwissExtendedRounds';
-import { applySwissCutoffDecision, findSwissCutoffTie, type SwissCutoffTie } from '@/domain/swissCutoffTie';
-import { clearSwissCutoffDecision, readSwissCutoffDecision, readSwissRoundRobinHistory, saveSwissCutoffDecision, type StoredSwissCutoffDecision } from '@/services/mockSwissCutoffStore';
-import { isValidSportSet } from '@/domain/sportScoring';
-
-export { getRuntimeParticipantNames } from '@/services/mockParticipants';
-
-export type MockMatchState = 'LIVE' | 'READY' | 'WAITING' | 'CONFIRMATION' | 'FINISHED' | 'CANCELLED';
-
-export interface MockRuntimeMatch {
-  id: string;
-  table: string;
-  sideA: string;
-  sideB: string;
-  score: string;
-  status: MockMatchState;
-  phase: string;
-  stageId: string;
-  round: string;
-  matchDay?: number;
-  bestOf: number;
-  sport: string;
-  decisionSide?: WinnerSide;
-  decision?: ScoreDecision;
-  extraTimeProgress?: ExtraTimeProgress;
-  requiresWinner: boolean;
-  pauseA: number | null;
-  pauseB: number | null;
-  /** True pause before this match started, not the current elapsed time. */
-  startedAt?: number;
-  sets?: MatchSet[];
-  note?: string;
-}
-
-interface StoredMatchResult {
-  matchId: string;
-  sets: MatchSet[];
-  status: MockMatchState;
-  confirmedA?: boolean;
-  confirmedB?: boolean;
-  adminConfirmed?: boolean;
-  forcedWinner?: string;
-  decisionSide?: WinnerSide;
-  decision?: ScoreDecision;
-  extraTimeProgress?: ExtraTimeProgress;
-  /** Beide Halbfinalverlierer erhalten Platz 3, ohne eine Partie auszutragen. */
-  thirdPlaceSkipped?: boolean;
-  /** Tatsächlicher Abschlusszeitpunkt; bei kampflosen Partien wird keine Pause ausgelöst. */
-  finishedAt?: number;
-}
-
-interface StoredMatchRuntime {
-  matchId: string;
-  table?: string;
-  status?: MockMatchState;
-  startedAt?: number;
-  pauseAtStartA?: number | null;
-  pauseAtStartB?: number | null;
-}
-
-interface BaseStageMatch {
-  id: string;
-  sideA: string;
-  sideB: string;
-  round: string;
-  matchDay?: number;
-  autoWinner?: string;
-  bestOf?: number;
-}
-
-const RESULT_KEY = 'online-tournament:mock-match-results:v2';
-const RUNTIME_KEY = 'online-tournament:mock-match-runtime:v1';
-const SWISS_FIXTURE_KEY = 'online-tournament:swiss-round-fixtures:v1';
-
-interface SwissFixture { tournamentId: string; stageId: string; round: number; pairs: [string, string][] }
-
-function readSwissFixtures(): SwissFixture[] {
-  if (typeof window === 'undefined') return [];
-  try { return JSON.parse(window.localStorage.getItem(SWISS_FIXTURE_KEY) ?? '[]') as SwissFixture[]; } catch { return []; }
-}
-
-export function isMockParticipantWithdrawn(tournament: DemoTournament, name: string) {
-  return isParticipantWithdrawn(tournament, name);
-}
-
-export function canEditFinishedResults(tournament: DemoTournament, stage: TournamentStage) {
-  const next = getNextCompetitionStage(tournament, stage);
-  return !next || !isStageStarted(tournament, next);
-}
-
-/** Preserve scheduled breaks when an earlier competition needs reapproval. */
-function statusAfterReopening(tournament: DemoTournament): 'PAUSED' | 'RUNNING' {
-  // Never silently resume an explicitly paused tournament on correction.
-  const latest = getAllMockTournaments().find((item) => item.id === tournament.id);
-  if ((latest?.status ?? tournament.status) === 'PAUSED') return 'PAUSED';
-  return tournament.stages.some((stage) => stage.type === 'BREAK'
-    && isStageStarted(tournament, stage) && !isStageCompleted(tournament, stage))
-    ? 'PAUSED' : 'RUNNING';
-}
-
-/** Real KO / Swiss round index, excluding separate cutoff fixtures.
- * The bronze match is in the same round as the final. */
-function competitionRoundIndex(tournament: DemoTournament, stage: TournamentStage, matchId: string): number | null {
-  // Results and runtime storage are shared by all local tournaments.
-  if (!matchId.startsWith(`${stage.id}-`)) return null;
-  if (stage.type === 'SWISS') {
-    const swiss = matchId.match(/-sw-r(\d+)-m\d+$/);
-    return swiss ? Number(swiss[1]) : null;
-  }
-  if (!['KNOCKOUT', 'DOUBLE_ELIMINATION', 'PLACEMENT'].includes(stage.type)) return null;
-  if (matchId.endsWith('-third-place')) return Math.log2(getBracketSlots(tournament, stage).length);
-  const knockout = matchId.match(/-r(\d+)-m\d+$/);
-  return knockout ? Number(knockout[1]) : null;
-}
-
-/** As soon as ANY later-round game was assigned, previous rounds are frozen.
- * startedAt persists after unassignment, so clearing the table cannot unlock
- * an earlier round. Completed later matches are protected as well. */
-function nextRoundAlreadyStarted(tournament: DemoTournament, stage: TournamentStage, round: number): boolean {
-  const runtime = readRuntime();
-  const results = readResults();
-  return runtime.some((entry) => {
-    const index = competitionRoundIndex(tournament, stage, entry.matchId);
-    return index !== null && index > round && Boolean(entry.startedAt);
-  }) || results.some((entry) => {
-    const index = competitionRoundIndex(tournament, stage, entry.matchId);
-    return index !== null && index > round && (entry.status === 'FINISHED' || entry.sets.length > 0);
-  });
-}
-
-/** After editing an earlier completed match, not-yet-started later-round
- * fixtures are invalidated and rebuilt using the corrected sporting results. */
-function invalidateUnstartedLaterRounds(tournament: DemoTournament, stage: TournamentStage, correctedMatchId: string) {
-  const round = competitionRoundIndex(tournament, stage, correctedMatchId);
-  if (round === null || nextRoundAlreadyStarted(tournament, stage, round)) return;
-  const isLater = (id: string) => {
-    const index = competitionRoundIndex(tournament, stage, id);
-    return index !== null && index > round;
-  };
-  const oldResults = readResults();
-  if (oldResults.some((result) => isLater(result.matchId))) {
-    writeResults(oldResults.filter((result) => !isLater(result.matchId)));
-  }
-  const oldRuntime = readRuntime();
-  if (oldRuntime.some((runtime) => isLater(runtime.matchId))) {
-    writeRuntime(oldRuntime.filter((runtime) => !isLater(runtime.matchId)));
-  }
-  if (stage.type === 'SWISS' && typeof window !== 'undefined') {
-    const fixtures = readSwissFixtures();
-    if (fixtures.some((entry) => entry.tournamentId === tournament.id && entry.stageId === stage.id && entry.round > round)) {
-      window.localStorage.setItem(SWISS_FIXTURE_KEY, JSON.stringify(fixtures.filter((entry) =>
-        entry.tournamentId !== tournament.id || entry.stageId !== stage.id || entry.round <= round)));
-    }
-  }
-}
-
-// Zurückgezogene Gruppen-Teilnehmer verlieren ausnahmslos alle Partien 0:11.
-// Die automatisch gewerteten Begegnungen dürfen daher nicht korrigiert werden.
-))?.[1] ?? 0);
-      return index > cutoffIndex;
-    };
-    // A later decision game may rely on the first game's winner; once its
-    // table was assigned, earlier decision scores are immutable.
+    const prefix = `${stage.id}-sw-cutoff-set-m`;
+    const future = (id: string) => id.startsWith(prefix) && Number(id.slice(prefix.length)) > cutoffIndex;
+    // Later decision games depend on this winner, so the original result
+    // becomes immutable as soon as a subsequent game was assigned.
     if (readRuntime().some((item) => future(item.matchId) && item.startedAt)
       || readResults().some((item) => future(item.matchId) && (item.status === 'FINISHED' || item.sets.length))) return false;
   }
@@ -1586,8 +1411,8 @@ export function abortMockTournament(tournament: DemoTournament, reason: string):
   return true;
 }
 
-/** Recalculate the separate qualification decision when the director corrects
- * a recorded Swiss cutoff set. Normal Swiss scores are deliberately untouched. */
+/** Keep the recorded qualification decision in sync with director edits of
+ * completed Swiss cutoff sets; the sporting Swiss table is unaffected. */
 function syncCorrectedSwissCutoffSet(tournament: DemoTournament, stage: TournamentStage, matchId: string, sets: MatchSet[]): boolean {
   const index = Number(matchId.match(/-sw-cutoff-set-m(\d+)$/)?.[1] ?? 0) - 1;
   if (index < 0 || !sets[0]) return false;
@@ -1595,26 +1420,25 @@ function syncCorrectedSwissCutoffSet(tournament: DemoTournament, stage: Tourname
   const decision = current?.decision;
   if (!current || decision?.mode !== 'SET' || !decision.sets[index]) return false;
   const earlier = decision.sets.slice(0, index);
-  const old = decision.sets[index];
-  const winner = sets[0].sideAScore > sets[0].sideBScore ? old.sideA : old.sideB;
-  const corrected = { sideA: old.sideA, sideB: old.sideB,
-    pointsA: sets[0].sideAScore, pointsB: sets[0].sideBScore, winner };
+  const original = decision.sets[index];
+  const winner = sets[0].sideAScore > sets[0].sideBScore ? original.sideA : original.sideB;
+  const corrected = {
+    sideA: original.sideA, sideB: original.sideB,
+    pointsA: sets[0].sideAScore, pointsB: sets[0].sideBScore, winner,
+  };
   const updated = [...earlier, corrected];
   const eliminated = updated.map((item) => item.winner === item.sideA ? item.sideB : item.sideA);
-  const survivors = current.tie.players.filter((name) => !eliminated.includes(name));
-  const winners = survivors.length === current.tie.slots ? survivors : undefined;
+  const remaining = current.tie.players.filter((name) => !eliminated.includes(name));
   saveSwissCutoffDecision(tournament.id, stage.id, {
     ...decision, signature: current.signature, mode: 'SET',
-    sets: updated, eliminated, winners,
+    sets: updated, eliminated, winners: remaining.length === current.tie.slots ? remaining : undefined,
   });
-  // Later, never-started tie-break fixtures refer to an obsolete pairing.
-  const laterPrefix = `${stage.id}-sw-cutoff-set-m`;
-  const isLater = (id: string) => {
-    if (!id.startsWith(laterPrefix)) return false;
-    return Number(id.slice(laterPrefix.length)) > index + 1;
-  };
-  writeResults(readResults().filter((result) => !isLater(result.matchId)));
-  writeRuntime(readRuntime().filter((runtime) => !isLater(runtime.matchId)));
+  const prefix = `${stage.id}-sw-cutoff-set-m`;
+  const later = (id: string) => id.startsWith(prefix) && Number(id.slice(prefix.length)) > index + 1;
+  const savedResults = readResults();
+  const savedRuntime = readRuntime();
+  if (savedResults.some((result) => later(result.matchId))) writeResults(savedResults.filter((result) => !later(result.matchId)));
+  if (savedRuntime.some((item) => later(item.matchId))) writeRuntime(savedRuntime.filter((item) => !later(item.matchId)));
   return true;
 }
 
