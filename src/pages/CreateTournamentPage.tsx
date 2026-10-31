@@ -1203,9 +1203,9 @@ export function CreateTournamentPage() {
 
 
         {step === 3 && (
-          <section>
+          <section className="format-step">
             <h2>Turnierform auswählen</h2>
-            <p className="muted">Vorschläge sind optional. Du kannst eine Vorlage übernehmen oder im nächsten Schritt deine Phasen vollständig selbst zusammenstellen.</p>
+            <p className="muted">Wähle eine Empfehlung oder stelle deine Turnierphasen im nächsten Schritt selbst zusammen.</p>
 
             <div className="format-step-layout">
               <div className="recommendation-list">
@@ -1219,14 +1219,24 @@ export function CreateTournamentPage() {
                     type="button"
                     onClick={() => selectRecommendation(item)}
                   >
-                    <div className="recommendation-head">
-                      <span className="badge">{index === 0 ? 'Empfohlen' : 'Alternative'}</span>
-                      {selectedRecommendationId === item.id && <span className="badge selected-badge">Als Vorlage gewählt</span>}
+                    <div className="recommendation-heading">
+                      <h3>{item.label}</h3>
+                      <div className="recommendation-labels">
+                        <span className="badge">{index === 0 ? 'Empfohlen' : 'Alternative'}</span>
+                        {selectedRecommendationId === item.id && <span className="badge selected-badge">Ausgewählt</span>}
+                      </div>
                     </div>
-                    <h3>{item.label}</h3>
                     <p>{item.description}</p>
-                    <p className="muted">Geschätzte Spiele insgesamt: {item.estimatedMatches}</p>
-                    <p className="muted">Basisdauer: ca. {formatDuration(item.estimatedDurationMinutes)} · {timedSport ? `${matchDurationMinutes} Min. Spieldauer + ${breakMinutes} Min. Wechselzeit` : `${planningMinutesPerSet(sport)} Min. pro Satz (sportartspezifisch)`}.</p>
+                    {item.phases.length > 1 && (
+                      <p className="recommendation-progression">
+                        Teilnehmer je Phase: {item.phases.map((phase) => phase.entrantCount ?? participantCount).join(' → ')}
+                      </p>
+                    )}
+                    <div className="recommendation-metrics">
+                      <span>{item.estimatedMatches} Spiele</span>
+                      <span>ca. {formatDuration(item.estimatedDurationMinutes)}</span>
+                      <span>{timedSport ? `${matchDurationMinutes} Min./Spiel${breakMinutes ? ` + ${breakMinutes} Min. Wechselzeit` : ''}` : `${planningMinutesPerSet(sport)} Min./Satz`}</span>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -1234,7 +1244,7 @@ export function CreateTournamentPage() {
               <aside className="format-settings-panel">
                 <div className="format-settings-head">
                   <h3>Vorgaben für Vorschläge</h3>
-                  <p className="muted">Diese Grenzen beeinflussen nur die Empfehlung. Die Dauerschätzung richtet sich nach der Sportart; sie berücksichtigt parallele Spiele, aber keine zusätzlichen Verzögerungen durch die Rundenauswertung. Im nächsten Schritt kannst du alles frei ändern.</p>
+                  <p className="muted">Diese Vorgaben steuern nur die Empfehlungen. Alle Phasen lassen sich anschließend individuell bearbeiten.</p>
                 </div>
 
                 <div className="format-setting-fields">
@@ -1294,6 +1304,7 @@ export function CreateTournamentPage() {
                     </label>
                   ))}
                 </fieldset>
+                <p className="format-settings-footnote">Dauerschätzungen berücksichtigen parallele Spiele, jedoch keine zusätzlichen Verzögerungen bei der Rundenauswertung.</p>
               </aside>
             </div>
           </section>
