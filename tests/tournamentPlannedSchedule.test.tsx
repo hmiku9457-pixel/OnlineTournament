@@ -43,6 +43,33 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(toLocalDateTime(parseLocalDateTime(start)!)).toBe(start);
   });
 
+  it('trennt bei einer Uhrzeitpause die reine Spielzeit von der geplanten Gesamtdauer', () => {
+    const tables = 9;
+    const timing = { minutesPerSet: 5 };
+    const group = estimatePhaseMetrics({ type: 'GROUPS', entrantCount: 19, groupCount: 3, bestOf: 1 }, tables, timing);
+    const swiss = estimatePhaseMetrics({ type: 'SWISS', entrantCount: 9, swissRounds: 4, bestOf: 3 }, tables, timing);
+    const knockout = estimatePhaseMetrics({ type: 'KNOCKOUT', entrantCount: 8, bestOf: 5 }, tables, timing);
+    expect([group.estimatedDurationMinutes, swiss.estimatedDurationMinutes, knockout.estimatedDurationMinutes]).toEqual([30, 50, 60]);
+
+    const timeline = buildPlannedTimeline('2026-11-01T10:00', [
+      { type: 'GROUPS', label: 'Gruppenphase', estimatedMinutes: group.estimatedDurationMinutes },
+      { type: 'BREAK', label: 'Pause', estimatedMinutes: 0, breakKind: 'until', breakUntil: '12:00' },
+      { type: 'SWISS', label: 'Schweizer System', estimatedMinutes: swiss.estimatedDurationMinutes, roundCount: 4 },
+      { type: 'KNOCKOUT', label: 'K.-o.-Phase', estimatedMinutes: knockout.estimatedDurationMinutes, roundCount: 3 },
+    ]);
+
+    expect(timeline.items.filter((item) => item.id.startsWith('phase-')).map((item) => item.at)).toEqual([
+      '2026-11-01T10:00', '2026-11-01T10:30', '2026-11-01T12:00', '2026-11-01T12:50',
+    ]);
+    expect(timeline.estimatedEnd).toBe('2026-11-01T13:50');
+    expect(timeline.warnings).toEqual([]);
+    const playingMinutes = group.estimatedDurationMinutes + swiss.estimatedDurationMinutes + knockout.estimatedDurationMinutes;
+    const totalMinutes = plannedTimelineDurationMinutes('2026-11-01T10:00', timeline.estimatedEnd);
+    expect(playingMinutes).toBe(140);
+    expect(totalMinutes).toBe(230);
+    expect(totalMinutes! - playingMinutes).toBe(90);
+  });
+
   it('erzeugt nach den Phasendauern einen editierbaren Ablauf mit Dauer- und Uhrzeitpause', () => {
     const suggestion = suggestPlannedSchedule(start, [
       { label: 'Gruppenphase', type: 'GROUPS', estimatedMinutes: 120 },
