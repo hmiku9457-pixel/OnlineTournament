@@ -13,6 +13,8 @@ interface PhaseLifecycleState {
   approvedSwissRounds?: Record<string, number[]>;
   stageEntrants?: Record<string, string[]>;
   stageStartedAt?: Record<string, string>;
+  /** Exact clock target chosen when beginning a break; stable on reload. */
+  breakResumeAt?: Record<string, string>;
 }
 
 function readAll(): PhaseLifecycleState[] {
@@ -108,6 +110,7 @@ export function isStageCompleted(tournament: DemoTournament, stage: TournamentSt
 }
 
 export function isStageEditable(tournament: DemoTournament, stage: TournamentStage) {
+  if (tournament.status === 'ABORTED' || tournament.status === 'FINISHED') return false;
   const index = getStageIndex(tournament, stage);
   if (index < 0 || isStageStarted(tournament, stage)) return false;
   if (index === 0) return !tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status);
@@ -140,11 +143,47 @@ export function getStageStartIssue(tournament: DemoTournament, stage: Tournament
   return null;
 }
 
-export function startStage(tournament: DemoTournament, stage: TournamentStage) {
+export interface BreakStartOptions {
+  kind: 'minutes' | 'clock';
+  minutes?: number;
+  time?: string;
+}
+
+export function computeBreakResumeAt(start: Date, options: BreakStartOptions): Date | null {
+  if (Number.isNaN(start.getTime())) return null;
+  if (options.kind === 'minutes') {
+    if (!Number.isInteger(options.minutes) || options.minutes! < 1 || options.minutes! > 1440) return null;
+    return new Date(start.getTime() + options.minutes! * 60000);
+  }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(options.time ?? '')) return null;
+  const [hour, minute] = options.time!.split(':').map(Number);
+  const target = new Date(start);
+  target.setHours(hour, minute, 0, 0);
+  if (target.getTime() <= start.getTime()) target.setDate(target.getDate() + 1);
+  return target;
+}
+
+export function startStage(tournament: DemoTournament, stage: TournamentStage, pauseOptions?: BreakStartOptions) {
   if (tournament.status === 'ABORTED' || tournament.status === 'FINISHED' || !isStageEditable(tournament, stage)) return false;
   if (getStageStartIssue(tournament, stage)) return false;
   const entrants = getStageEntrants(tournament, stage);
   const state = getPhaseLifecycle(tournament);
+  const startDate = new Date();
+  let pauseResume: Date | null = null;
+  if (stage.type === 'BREAK') {
+    const options: BreakStartOptions = pauseOptions ?? (stage.settings.breakKind === 'overnight'
+      ? { kind: 'clock', time: String(stage.settings.nextDayStart ?? '09:00') }
+      : { kind: 'minutes', minutes: Number(stage.settings.breakMinutes) || 15 });
+    pauseResume = computeBreakResumeAt(startDate, options);
+    if (!pauseResume) return false;
+    if (stage.settings.breakKind === 'overnight' && !pauseOptions) {
+      // Legacy scheduled day-end always resumes on the following calendar day.
+      const [hour, minute] = String(stage.settings.nextDayStart ?? '09:00').split(':').map(Number);
+      pauseResume = new Date(startDate);
+      pauseResume.setDate(pauseResume.getDate() + 1);
+      pauseResume.setHours(hour, minute, 0, 0);
+    }
+  }
   // Die vor dem Start gültige Auslosung einfrieren. Ansonsten würden bei
   // einem späteren Lesen die ursprüngliche Teilnehmerzahl aus dem Wizard
   // erneut greifen und Nachmeldungen verschwinden / Rückzüge zurückkehren.
@@ -152,7 +191,8 @@ export function startStage(tournament: DemoTournament, stage: TournamentStage) {
     ...state,
     startedStageIds: [...new Set([...state.startedStageIds, stage.id])],
     stageEntrants: { ...(state.stageEntrants ?? {}), [stage.id]: entrants },
-    stageStartedAt: { ...(state.stageStartedAt ?? {}), [stage.id]: new Date().toISOString() },
+    stageStartedAt: { ...(state.stageStartedAt ?? {}), [stage.id]: startDate.toISOString() },
+    breakResumeAt: pauseResume ? { ...(state.breakResumeAt ?? {}), [stage.id]: pauseResume.toISOString() } : state.breakResumeAt,
   });
   return true;
 }
@@ -164,10 +204,11 @@ export function startFirstStage(tournament: DemoTournament) {
   return startStage(tournament, first);
 }
 
-export function completeStage(tournament: DemoTournament, stage: TournamentStage, qualifiedForNext: string[] = []) {
+export function completeStage(tournament: DemoTournament, stage: TournamentStage, qualifiedForNext: string[] = [], earlyBreak = false) {
+  if (tournament.status === 'ABORTED' || tournament.status === 'FINISHED') return false;
   const state = getPhaseLifecycle(tournament);
   if (!state.startedStageIds.includes(stage.id)) return false;
-  if (stage.type === 'BREAK' && !canFinishBreak(tournament, stage)) return false;
+  if (stage.type === 'BREAK' && !canFinishBreak(tournament, stage, new Date(), earlyBreak)) return false;
   const stageIndex = getStageIndex(tournament, stage);
   const nextStage = tournament.stages[stageIndex + 1];
   const stageEntrants = { ...(state.stageEntrants ?? {}) };
@@ -198,7 +239,13 @@ export function completeStage(tournament: DemoTournament, stage: TournamentStage
  */
 export function getBreakResumeAt(tournament: DemoTournament, stage: TournamentStage): Date | null {
   if (stage.type !== 'BREAK') return null;
-  const startedAt = getPhaseLifecycle(tournament).stageStartedAt?.[stage.id];
+  const state = getPhaseLifecycle(tournament);
+  const savedResume = state.breakResumeAt?.[stage.id];
+  if (savedResume) {
+    const exact = new Date(savedResume);
+    if (!Number.isNaN(exact.getTime())) return exact;
+  }
+  const startedAt = state.stageStartedAt?.[stage.id];
   if (!startedAt) return null;
   const start = new Date(startedAt);
   if (Number.isNaN(start.getTime())) return null;
@@ -214,10 +261,21 @@ export function getBreakResumeAt(tournament: DemoTournament, stage: TournamentSt
   return new Date(start.getTime() + Math.max(1, Number(stage.settings.breakMinutes) || 15) * 60000);
 }
 
-export function canFinishBreak(tournament: DemoTournament, stage: TournamentStage, at = new Date()): boolean {
-  if (stage.type !== 'BREAK' || !isStageStarted(tournament, stage) || isStageCompleted(tournament, stage)) return false;
+export function canFinishBreak(tournament: DemoTournament, stage: TournamentStage, at = new Date(), early = false): boolean {
+  if (tournament.status === 'ABORTED' || tournament.status === 'FINISHED'
+    || stage.type !== 'BREAK' || !isStageStarted(tournament, stage) || isStageCompleted(tournament, stage)) return false;
   const resume = getBreakResumeAt(tournament, stage);
-  return Boolean(resume && at.getTime() >= resume.getTime());
+  return Boolean(resume && (early || at.getTime() >= resume.getTime()));
+}
+
+export function formatBreakCountdown(resume: Date | null, now = Date.now()): string {
+  if (!resume || Number.isNaN(resume.getTime())) return 'Keine Fortsetzungszeit';
+  const seconds = Math.max(0, Math.ceil((resume.getTime() - now) / 1000));
+  if (!seconds) return '00:00';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = String(seconds % 60).padStart(2, '0');
+  return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${secs}` : `${String(minutes).padStart(2, '0')}:${secs}`;
 }
 
 /** Reopen a completed stage if a correction invalidates a previously resolved

@@ -2,7 +2,8 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { planningMinutesPerSet } from '@/domain/sports';
 import { getBreakResumeAt, getStageEntrants, isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
-import { getMockStageBaseMatches, getMockStoredResult, getTotalSwissRoundCount } from '@/services/mockRuntime';
+import { getMockStageBaseMatches, getMockStoredResult, getTotalSwissRoundCount, getSwissRoundRobinMatches, getSwissCutoffSetMatches } from '@/services/mockRuntime';
+import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
 
 import { getBlockedMockTables } from '@/services/mockTableLocks';
 import { sportScoring } from '@/domain/sportScoring';
@@ -55,14 +56,25 @@ function remainingStageJobs(tournament: DemoTournament, stage: TournamentStage):
     // Hypothetical extra rounds remain excluded; explicitly scheduled
     // extra rounds count from the moment the director adds them.
     const rounds = getTotalSwissRoundCount(tournament, stage);
-    const perRound = Math.floor(entrants / 2);
+    const activeCount = started
+      ? getStageEntrants(tournament, stage).filter((name) => !isParticipantWithdrawn(tournament, name)).length
+      : entrants;
+    const perRound = Math.floor(Math.max(0, activeCount) / 2);
+    const fixtures = started ? getMockStageBaseMatches(tournament, stage) : [];
     const jobs: DurationJob[] = [];
     for (let round = 1; round <= rounds; round += 1) {
-      for (let game = 1; game <= perRound; game += 1) {
+      const scheduled = fixtures.filter((match) => match.round === `Runde ${round}` && !match.autoWinner);
+      const roundCount = scheduled.length ? scheduled.length : perRound;
+      for (let game = 1; game <= roundCount; game += 1) {
         const result = started ? getMockStoredResult(`${stage.id}-sw-r${round}-m${game}`) : undefined;
         if (result?.status === 'FINISHED') continue;
         jobs.push({ round, remainingMinutes: remainingMinutesForMatch(stage.bestOf, result?.sets.length ?? 0, planningMinutesPerSet(tournament.sport)) });
       }
+    }
+    if (started) {
+      const extra = [...getSwissRoundRobinMatches(tournament, stage), ...getSwissCutoffSetMatches(tournament, stage)];
+      extra.filter((match) => match.status !== 'FINISHED' && match.status !== 'CANCELLED')
+        .forEach((match) => jobs.push({ round: rounds + 1, remainingMinutes: remainingMinutesForMatch(1, match.sets.length, planningMinutesPerSet(tournament.sport)) }));
     }
     return jobs;
   }

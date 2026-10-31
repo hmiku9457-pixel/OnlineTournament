@@ -173,7 +173,9 @@ function invalidateUnstartedLaterRounds(tournament: DemoTournament, stage: Tourn
 // Die automatisch gewerteten Begegnungen dürfen daher nicht korrigiert werden.
 export function canEditMockMatch(tournament: DemoTournament, matchId: string) {
   const stage = tournament.stages.find((item) => matchId.startsWith(`${item.id}-`));
-  if (tournament.status === 'ABORTED' || tournament.status === 'FINISHED' || !stage || !canEditFinishedResults(tournament, stage)) return false;
+  const latestTournament = getAllMockTournaments().find((item) => item.id === tournament.id) ?? tournament;
+  if (latestTournament.status === 'ABORTED' || latestTournament.status === 'FINISHED' || !stage || !isStageStarted(latestTournament, stage)
+    || !canEditFinishedResults(latestTournament, stage)) return false;
   const cutoffIndex = Number(matchId.match(/-sw-cutoff-set-m(\d+)$/)?.[1] ?? 0);
   if (stage.type === 'SWISS' && cutoffIndex > 0) {
     const prefix = `${stage.id}-sw-cutoff-set-m`;

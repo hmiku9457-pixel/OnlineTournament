@@ -224,8 +224,11 @@ export function getMockConfirmedFinalStandings(tournament: DemoTournament): Retu
 
   const eliminated: Array<{ name: string; stageIndex: number; rank: number; origin?: string }> = [];
   tournament.stages.forEach((stage, stageIndex) => {
-    const next = tournament.stages[stageIndex + 1];
-    if (!next || !isStageCompleted(tournament, stage)) return;
+    if (stage.type === 'BREAK' || !isStageCompleted(tournament, stage)) return;
+    const next = getNextCompetitionStage(tournament, stage);
+    // A non-qualifier can still replace someone until the next real
+    // competition starts (even if a scheduled break has already begun).
+    if (!next || !isStageStarted(tournament, next)) return;
     const advancing = new Set(getStageEntrants(tournament, next));
     const leaving = getStageEntrants(tournament, stage).filter((name) => !advancing.has(name));
     if (!leaving.length) return;
