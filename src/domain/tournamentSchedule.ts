@@ -129,6 +129,8 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
             warnings.push({ phaseIndex: index, message: `„${phase.label}“: Die Zwischenpause nach Runde ${afterRound} beginnt voraussichtlich um ${formatPlannedDateTime(toLocalDateTime(inlineStart), false)}. „Pause bis ${phase.inlineBreakUntil ?? '13:00'} Uhr“ liegt davor. Bitte eine spätere Uhrzeit wählen.` });
           } else resume = target;
         } else resume = new Date(inlineStart.getTime() + Math.max(1, phase.inlineBreakMinutes ?? 15) * 60000);
+        items.push({ id: `inline-resume-${index + 1}`, at: toLocalDateTime(resume),
+          title: `Fortsetzung Runde ${afterRound + 1} · ${phase.label}`, type: 'competition' });
         cursor = new Date(resume.getTime() + after * 60000);
       } else cursor = new Date(cursor.getTime() + totalDuration * 60000);
     } else if (phase.breakKind === 'overnight') {

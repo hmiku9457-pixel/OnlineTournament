@@ -50,6 +50,7 @@ describe('Zwischenpause innerhalb einer Wettkampfphase', () => {
     expect(timeline.items.map(row=>[row.title,row.at])).toEqual([
       ['Schweizer System','2026-11-01T10:00'],
       ['Pause nach Runde 2 · Schweizer System','2026-11-01T12:00'],
+      ['Fortsetzung Runde 3 · Schweizer System','2026-11-01T13:00'],
     ]);
     expect(timeline.estimatedEnd).toBe('2026-11-01T15:00');
     expect(plannedTimelineDurationMinutes('2026-11-01T10:00',timeline.estimatedEnd)).toBe(300);
@@ -59,6 +60,7 @@ describe('Zwischenpause innerhalb einer Wettkampfphase', () => {
       onToggleAwards:()=>{},onAwardsAtChange:()=>{},
     }));
     expect(markup).toContain('Pause nach Runde 2 · Schweizer System');
+    expect(markup).toContain('Fortsetzung Runde 3 · Schweizer System');
     expect(markup).toContain('Siegerehrung hinzufügen');
   });
 
