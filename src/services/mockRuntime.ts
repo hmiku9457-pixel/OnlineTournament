@@ -4,7 +4,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
 import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
-import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, getNextCompetitionStage, isStageCompleted, isStageStarted, setStageEntrants, reopenStageForQualification, isSwissRoundApproved, approveSwissRound, revokeSwissRoundApprovals, reopenStageAfterCorrection } from '@/services/mockPhaseLifecycle';
+import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, getNextCompetitionStage, getPreviousCompetitionStage, isStageCompleted, isStageStarted, setStageEntrants, reopenStageForQualification, isSwissRoundApproved, approveSwissRound, revokeSwissRoundApprovals, reopenStageAfterCorrection } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
@@ -106,6 +106,8 @@ export function canEditFinishedResults(tournament: DemoTournament, stage: Tourna
 /** Real KO / Swiss round index, excluding separate cutoff fixtures.
  * The bronze match is in the same round as the final. */
 function competitionRoundIndex(tournament: DemoTournament, stage: TournamentStage, matchId: string): number | null {
+  // Results and runtime storage are shared by all local tournaments.
+  if (!matchId.startsWith(`${stage.id}-`)) return null;
   if (stage.type === 'SWISS') {
     const swiss = matchId.match(/-sw-r(\d+)-m\d+$/);
     return swiss ? Number(swiss[1]) : null;
@@ -779,7 +781,12 @@ export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: Moc
   if (tournament && !canEditMockMatch(tournament, matchId)) throw new Error('Dieses Ergebnis ist gesperrt und wurde nicht gespeichert.');
   const next: StoredMatchResult = { ...previous, matchId, sets, status, decisionSide: undefined, decision: undefined, extraTimeProgress, forcedWinner: undefined, thirdPlaceSkipped: undefined, confirmedA: previous?.confirmedA, confirmedB: previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
-  if (tournament && sets.length > (previous?.sets.length ?? 0)) recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Ergebniseingabe (lokal)', action: 'SET_SAVED', description: sportScoring(tournament.sport).mode === 'score' ? 'Zwischenstand erfasst' : `Satz ${sets.length} bestätigt`, before: previous?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · '), after: sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') });
+  if (tournament && JSON.stringify(sets) !== JSON.stringify(previous?.sets ?? [])) {
+    recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Ergebniseingabe (lokal)',
+      action: 'SET_SAVED', description: sportScoring(tournament.sport).mode === 'score' ? 'Zwischenstand geändert' : 'Satzzwischenstand geändert',
+      before: previous?.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') ?? '–',
+      after: sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ') });
+  }
   return next;
 }
 
@@ -875,15 +882,18 @@ export function canWithdrawMockParticipant(tournament: DemoTournament, name: str
 export function withdrawMockParticipant(tournament: DemoTournament, name: string) {
   if (!canWithdrawMockParticipant(tournament, name)) return false;
   const activeAtWithdrawal = getActiveStage(tournament);
-  const next = getNextStartableStage(tournament);
+  const isSchedulingBreak = activeAtWithdrawal?.type === 'BREAK';
+  const next = isSchedulingBreak && activeAtWithdrawal
+    ? getNextCompetitionStage(tournament, activeAtWithdrawal)
+    : getNextStartableStage(tournament);
   const beforeFirstStart = !tournament.hasStarted && !tournament.stages.some((stage) => isStageStarted(tournament, stage));
-  const qualifiedForUpcoming = Boolean(!activeAtWithdrawal && next && getStageEntrants(tournament, next).includes(name));
+  const qualifiedForUpcoming = Boolean((!activeAtWithdrawal || isSchedulingBreak) && next && getStageEntrants(tournament, next).includes(name));
   markWithdrawalRestoreEligibility(tournament.id, name,
     beforeFirstStart ? { kind: 'PRESTART', phaseId: tournament.stages[0]?.id ?? null }
       : qualifiedForUpcoming && next ? { kind: 'BETWEEN_PHASES', phaseId: next.id }
       : null);
-  const latestCompleted = [...tournament.stages].reverse().find((stage) => isStageCompleted(tournament, stage));
-  const withdrawalTiming: WithdrawalTiming = activeAtWithdrawal
+  const latestCompleted = [...tournament.stages].reverse().find((stage) => stage.type !== 'BREAK' && isStageCompleted(tournament, stage));
+  const withdrawalTiming: WithdrawalTiming = activeAtWithdrawal && !isSchedulingBreak
     ? { kind: 'DURING_PHASE', stageId: activeAtWithdrawal.id }
     : latestCompleted ? { kind: 'AFTER_PHASE', stageId: latestCompleted.id }
       : { kind: 'BEFORE_TOURNAMENT', stageId: null };
@@ -896,12 +906,13 @@ export function withdrawMockParticipant(tournament: DemoTournament, name: string
   } else {
     settleWithdrawnMatches(tournament);
   }
-  // Nach dem Phasenabschluss, aber vor dem Start der Folgephase, muss ein
-  // Rückzug die Qualifikation neu bestimmen (inklusive Nachrückern).
-  for (let index = tournament.stages.length - 2; index >= 0; index -= 1) {
+  // Break stages are transparent to qualification: recompute the latest
+  // completed competition until the following competition actually starts.
+  for (let index = tournament.stages.length - 1; index >= 0; index -= 1) {
     const completed = tournament.stages[index];
-    const upcoming = tournament.stages[index + 1];
-    if (isStageCompleted(tournament, completed) && !isStageStarted(tournament, upcoming)) {
+    if (completed.type === 'BREAK' || !isStageCompleted(tournament, completed)) continue;
+    const upcoming = getNextCompetitionStage(tournament, completed);
+    if (upcoming && !isStageStarted(tournament, upcoming)) {
       refreshCompletedStageQualifiers(tournament, completed);
       break;
     }
@@ -911,6 +922,8 @@ export function withdrawMockParticipant(tournament: DemoTournament, name: string
     const unfinished = getMockStageMatches(tournament, active).some((match) => match.status !== 'FINISHED');
     if (!unfinished) reconcileCompletedPhase(`${active.id}-withdrawal`);
   }
+  recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)',
+    action: 'PARTICIPANT_WITHDRAWN', description: `${name} zurückgezogen (${withdrawalTiming.kind}).`, after: name });
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
   return true;
 }
@@ -925,8 +938,9 @@ export function canRestoreMockParticipant(tournament: DemoTournament, name: stri
     return !tournament.hasStarted && !tournament.stages.some((stage) => isStageStarted(tournament, stage));
   }
   const stage = tournament.stages.find((item) => item.id === record.phaseId);
-  if (!stage || isStageStarted(tournament, stage) || getActiveStage(tournament)) return false;
-  const previous = tournament.stages[tournament.stages.indexOf(stage) - 1];
+  const active = getActiveStage(tournament);
+  if (!stage || isStageStarted(tournament, stage) || (active && active.type !== 'BREAK')) return false;
+  const previous = getPreviousCompetitionStage(tournament, stage);
   return Boolean(previous && isStageCompleted(tournament, previous));
 }
 
@@ -1263,7 +1277,7 @@ function computeStageQualifiers(tournament: DemoTournament, stage: TournamentSta
 export function refreshCompletedStageQualifiers(tournament: DemoTournament, stage: TournamentStage) {
   if (!isStageCompleted(tournament, stage)) return false;
   const stageIndex = tournament.stages.findIndex((item) => item.id === stage.id);
-  const nextStage = tournament.stages[stageIndex + 1];
+  const nextStage = getNextCompetitionStage(tournament, stage);
   if (!nextStage || isStageStarted(tournament, nextStage)) return false;
   const qualified = computeStageQualifiers(tournament, stage, readResults());
   if (stage.type === 'SWISS' && swissCutoffStatus(tournament, stage, readResults()) && !qualified.length) {
@@ -1272,7 +1286,11 @@ export function refreshCompletedStageQualifiers(tournament: DemoTournament, stag
     reopenStageForQualification(tournament, stage);
     return false;
   }
-  setStageEntrants(tournament, nextStage, qualified);
+  const start = tournament.stages.indexOf(stage) + 1;
+  const end = tournament.stages.indexOf(nextStage);
+  for (const following of tournament.stages.slice(start, end + 1)) {
+    setStageEntrants(tournament, following, qualified);
+  }
   return true;
 }
 
@@ -1298,10 +1316,13 @@ export function getPendingMockApproval(tournament: DemoTournament): MockProgress
   const stage = getActiveStage(tournament);
   if (!stage) return null;
   const matches = getMockStageMatches(tournament, stage);
-  if (!matches.length || matches.some((match) => match.status !== 'FINISHED')) return null;
+  if (matches.some((match) => match.status !== 'FINISHED')) return null;
+  const swissFixtures = stage.type === 'SWISS' ? getMockStageBaseMatches(tournament, stage) : [];
+  const allBye = stage.type === 'SWISS' && swissFixtures.some((match) => match.autoWinner && match.sideB === 'Freilos');
+  if (!matches.length && !allBye) return null;
   const totalRounds = stage.type === 'SWISS' ? getTotalSwissRoundCount(tournament, stage) : 0;
   const round = stage.type === 'SWISS'
-    ? Math.max(0, ...matches.map((match) => Number(match.id.match(/-sw-r(\d+)-m\d+$/)?.[1] ?? 0)))
+    ? Math.max(0, ...swissFixtures.map((match) => Number(match.id.match(/-sw-r(\d+)-m\d+$/)?.[1] ?? 0)))
     : null;
   if (stage.type === 'SWISS' && (!round || (round < totalRounds && isSwissRoundApproved(tournament, stage, round)))) return null;
   const lastRound = stage.type !== 'SWISS' || round === totalRounds;
