@@ -449,13 +449,6 @@ export function CreateTournamentPage() {
       && (index !== 0 || phase.entrantCount === participantCount)
       && (phase.type !== 'GROUPS' || (phase.groupCount >= 2 && phase.groupCount <= Math.floor(phase.entrantCount / 2)));
   });
-  const canCreate = basicsValid && participantsValid && gameSettingsValid
-    && phaseConfigurationValid && phaseEntrantsValid && hasVisitedPhaseStep;
-  const canContinue =
-    (step === 1 && basicsValid) ||
-    (step === 2 && participantsValid) ||
-    step === 3 ||
-    (step === 4 && canCreate);
 
   function updateParticipantForm(field: ParticipantField, value: string) {
     setParticipantForm((current) => ({ ...current, [field]: value }));
@@ -884,6 +877,19 @@ export function CreateTournamentPage() {
     || (plannedTimeline.estimatedEnd && awardsAt < plannedTimeline.estimatedEnd))
     ? 'Die Siegerehrung muss am oder nach dem voraussichtlichen Turnierende liegen.' : null;
   const scheduleIssues = [...validatePlannedSchedule(plannedSchedule), ...(ceremonyIssue ? [ceremonyIssue] : [])];
+  const overnightDatesValid = phaseDrafts.every((phase, index) => {
+    if (phase.type !== 'BREAK' || phase.breakKind !== 'overnight') return true;
+    const plannedStart = plannedTimeline.items.find((item) => item.id === 'phase-' + (index + 1))?.at;
+    return !phase.nextDayDate || (Boolean(parseCalendarDate(phase.nextDayDate)) && Boolean(plannedStart)
+      && phase.nextDayDate > plannedStart!.slice(0, 10));
+  });
+  const canCreate = basicsValid && participantsValid && gameSettingsValid
+    && phaseConfigurationValid && phaseEntrantsValid && overnightDatesValid && hasVisitedPhaseStep;
+  const canContinue =
+    (step === 1 && basicsValid) ||
+    (step === 2 && participantsValid) ||
+    step === 3 ||
+    (step === 4 && canCreate);
 
   return (
     <>
@@ -1645,7 +1651,8 @@ export function CreateTournamentPage() {
                                 <label><input type="radio" name={`break-kind-${phase.id}`} checked={phase.breakKind === 'overnight'}
                                   onChange={() => updatePhase(phase.id, { breakKind: 'overnight' })} /> Spieltagsende</label>
                               </fieldset>
-                              {phase.breakKind === 'until' && plannedTimeline.warnings.filter((warning) => warning.phaseIndex === index).map((warning) => (
+                              {(phase.breakKind === 'until' || phase.breakKind === 'overnight')
+                                && plannedTimeline.warnings.filter((warning) => warning.phaseIndex === index).map((warning) => (
                                 <p className="planned-schedule-phase-warning" role="alert" key={warning.message}>{warning.message}</p>
                               ))}
                               <div className="field break-phase-notes">
