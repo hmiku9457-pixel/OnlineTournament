@@ -743,7 +743,7 @@ export function CreateTournamentPage() {
   }
 
   function goNext() {
-    if (!canContinue || step === 5) return;
+    if (!canContinue) return;
     const next = (step + 1) as WizardStep;
     if (step === 3) {
       if (phaseDrafts.length === 0 && selectedRecommendation) {
