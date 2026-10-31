@@ -1757,7 +1757,7 @@ export function CreateTournamentPage() {
         <div className="wizard-side-duration">
           <span>Voraussichtliche Dauer</span>
           <strong>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : 'Noch offen'}</strong>
-          {phaseDrafts.length > 0 && <small>Zeitraum vom geplanten Beginn bis zum theoretischen Turnierende, einschließlich geplanter Pausen. Spielzeit mit {planningMinutesPerSet(sport)} Min. pro Satz (soweit anwendbar); ohne zusätzliche Verzögerungen bei der Rundenfreigabe.</small>}
+          {phaseDrafts.length > 0 && <small>Zeitraum vom geplanten Beginn bis zum theoretischen Turnierende einschließlich geplanter Pausen. {timedSport ? `Planungswert: ${matchDurationMinutes} Min. je Spiel.` : `Planungswert: ${planningMinutesPerSet(sport)} Min. je Satz.`} Zusätzliche Verzögerungen bei der Rundenfreigabe sind nicht enthalten.</small>}
           {plannedTimeline.warnings.length > 0 && <small>⚠ Eine „Pause bis“-Uhrzeit liegt vor dem geschätzten Beginn der Pause. Bitte Phasenplanung prüfen.</small>}
         </div>
         {maxReachedStep >= 4 && !canCreate && (
