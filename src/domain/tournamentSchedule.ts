@@ -68,6 +68,11 @@ export interface SchedulePhaseProposal {
   breakMinutes?: number;
   breakUntil?: string;
   nextDayStart?: string;
+  roundCount?: number;
+  inlineBreakAfterRound?: number;
+  inlineBreakKind?: 'minutes' | 'until';
+  inlineBreakMinutes?: number;
+  inlineBreakUntil?: string;
 }
 
 export interface PlannedTimeline {
@@ -108,7 +113,24 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
       type: isBreak ? 'break' : 'competition',
     });
     if (!isBreak) {
-      cursor = new Date(cursor.getTime() + Math.max(0, phase.estimatedMinutes) * 60000);
+      const totalDuration = Math.max(0, phase.estimatedMinutes);
+      const roundCount = Math.max(0, Math.trunc(phase.roundCount ?? 0));
+      const afterRound = Number(phase.inlineBreakAfterRound) || 0;
+      if (roundCount > 1 && afterRound >= 1 && afterRound < roundCount) {
+        const before = Math.round(totalDuration * afterRound / roundCount);
+        const after = Math.round(totalDuration) - before;
+        const inlineStart = new Date(cursor.getTime() + before * 60000);
+        items.push({ id: `inline-break-${index + 1}`, at: toLocalDateTime(inlineStart),
+          title: `Pause nach Runde ${afterRound} · ${phase.label}`, type: 'break' });
+        let resume = inlineStart;
+        if (phase.inlineBreakKind === 'until') {
+          const target = clockAt(inlineStart, phase.inlineBreakUntil ?? '13:00');
+          if (target < inlineStart) {
+            warnings.push({ phaseIndex: index, message: `„${phase.label}“: Die Zwischenpause nach Runde ${afterRound} beginnt voraussichtlich um ${formatPlannedDateTime(toLocalDateTime(inlineStart), false)}. „Pause bis ${phase.inlineBreakUntil ?? '13:00'} Uhr“ liegt davor. Bitte eine spätere Uhrzeit wählen.` });
+          } else resume = target;
+        } else resume = new Date(inlineStart.getTime() + Math.max(1, phase.inlineBreakMinutes ?? 15) * 60000);
+        cursor = new Date(resume.getTime() + after * 60000);
+      } else cursor = new Date(cursor.getTime() + totalDuration * 60000);
     } else if (phase.breakKind === 'overnight') {
       cursor = clockAt(cursor, phase.nextDayStart ?? '09:00', true);
     } else if (phase.breakKind === 'until') {

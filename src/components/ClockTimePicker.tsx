@@ -68,9 +68,10 @@ interface ClockTimePickerProps {
   id: string;
   value: string;
   onChange: (value: string) => void;
+  label?: string;
 }
 
-export function ClockTimePicker({ id, value, onChange }: ClockTimePickerProps) {
+export function ClockTimePicker({ id, value, onChange, label = 'Uhrzeit' }: ClockTimePickerProps) {
   const dialogTitle = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
@@ -126,7 +127,7 @@ export function ClockTimePicker({ id, value, onChange }: ClockTimePickerProps) {
   return (
     <>
       <button id={id} ref={triggerRef} type="button" className="clock-picker-trigger"
-        aria-haspopup="dialog" aria-expanded={open} aria-label={`Geplanten Turnierbeginn einstellen, aktuell ${value} Uhr`}
+        aria-haspopup="dialog" aria-expanded={open} aria-label={`${label} einstellen, aktuell ${value} Uhr`}
         onClick={show}>
         <span className="clock-picker-trigger-value">{value}</span>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -139,7 +140,7 @@ export function ClockTimePicker({ id, value, onChange }: ClockTimePickerProps) {
           <section ref={dialogRef} className="clock-picker-dialog" role="dialog" aria-modal="true"
             aria-labelledby={dialogTitle} onKeyDown={containFocus}>
             <div className="clock-picker-dialog-header">
-              <h2 id={dialogTitle}>Turnierbeginn einstellen</h2>
+              <h2 id={dialogTitle}>{label} einstellen</h2>
               <button type="button" className="clock-picker-close" aria-label="Schließen" onClick={close}>×</button>
             </div>
             <p className="clock-picker-dialog-note">Uhrzeit im 24-Stunden-Format auswählen.</p>

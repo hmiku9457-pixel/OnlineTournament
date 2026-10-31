@@ -63,6 +63,10 @@ type PhaseDraft = {
   nextDayStart: string;
   breakUntil: string;
   note: string;
+  inlineBreakAfterRound: number;
+  inlineBreakKind: 'minutes' | 'until';
+  inlineBreakMinutes: number;
+  inlineBreakUntil: string;
 };
 
 const stepLabels = ['Grunddaten', 'Teilnehmer', 'Turnierform', 'Phasen', 'Zeitplan'];
@@ -247,6 +251,7 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
     nextDayStart: '09:00',
     breakUntil: '12:00',
     note: '',
+    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00',
   };
 }
 
@@ -787,6 +792,10 @@ export function CreateTournamentPage() {
         nextDayStart: phase.nextDayStart,
         breakUntil: phase.breakUntil,
         note: phase.note,
+        inlineBreakAfterRound: phase.inlineBreakAfterRound,
+        inlineBreakKind: phase.inlineBreakKind,
+        inlineBreakMinutes: phase.inlineBreakMinutes,
+        inlineBreakUntil: phase.inlineBreakUntil,
       })),
       estimatedDurationMinutes: estimatedTournamentDurationMinutes,
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
@@ -818,6 +827,11 @@ export function CreateTournamentPage() {
     breakMinutes: phase.breakMinutes,
     breakUntil: phase.breakUntil,
     nextDayStart: phase.nextDayStart,
+    roundCount: phase.type === 'SWISS' ? phase.swissRounds : phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount).length : undefined,
+    inlineBreakAfterRound: phase.inlineBreakAfterRound,
+    inlineBreakKind: phase.inlineBreakKind,
+    inlineBreakMinutes: phase.inlineBreakMinutes,
+    inlineBreakUntil: phase.inlineBreakUntil,
   }))), [scheduledStart, phaseDrafts, phaseEstimates]);
   // The creation overview shows the same elapsed span as the timeline
   // (including "Pause bis", duration pauses and overnight interruptions).

@@ -25,6 +25,10 @@ export interface PrestartPhaseDraft {
   nextDayStart: string;
   breakUntil: string;
   note: string;
+  inlineBreakAfterRound: number;
+  inlineBreakKind: 'minutes' | 'until';
+  inlineBreakMinutes: number;
+  inlineBreakUntil: string;
 }
 
 const competitive = (phase: PrestartPhaseDraft) => phase.type !== 'BREAK';
@@ -46,6 +50,10 @@ export function initialPrestartPhases(tournament: DemoTournament): PrestartPhase
     nextDayStart: String(stage.settings.nextDayStart ?? '09:00'),
     breakUntil: String(stage.settings.breakUntil ?? '12:00'),
     note: String(stage.settings.note ?? ''),
+    inlineBreakAfterRound: Number(stage.settings.inlineBreakAfterRound) || 0,
+    inlineBreakKind: stage.settings.inlineBreakKind === 'minutes' ? 'minutes' : 'until',
+    inlineBreakMinutes: Number(stage.settings.inlineBreakMinutes) || 15,
+    inlineBreakUntil: String(stage.settings.inlineBreakUntil ?? '13:00'),
   }));
 }
 
@@ -157,6 +165,7 @@ export function createPrestartPhase(type: StageType, participants: number, next?
     swissRounds: recommendedSwissRounds(entrants),
     knockoutBestOf: Array.from({ length: knockoutRoundLabels(entrants).length }, () => bestOf),
     breakKind: 'minutes', breakMinutes: 15, nextDayStart: '09:00', breakUntil: '12:00', note: '',
+    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00',
   };
 }
 

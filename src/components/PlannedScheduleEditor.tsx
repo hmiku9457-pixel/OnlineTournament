@@ -1,4 +1,5 @@
 import type { PlannedTimeline } from '@/domain/tournamentSchedule';
+import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { formatPlannedDateTime, parseLocalDateTime } from '@/domain/tournamentSchedule';
 
 interface Props {
@@ -66,8 +67,12 @@ export function PlannedScheduleEditor({
         ) : (
           <div className="planned-schedule-ceremony-actions">
             <label>Geplanter Beginn der Siegerehrung
-              <input type="datetime-local" required min={timeline.estimatedEnd || undefined}
-                value={awardsAt} onChange={(event) => onAwardsAtChange(event.target.value)}/>
+              <div className="planned-schedule-ceremony-datetime">
+                <input aria-label="Datum der Siegerehrung" type="date" required min={timeline.estimatedEnd.slice(0, 10) || undefined}
+                  value={awardsAt.slice(0, 10)} onChange={(event) => onAwardsAtChange(`${event.target.value}T${awardsAt.slice(11, 16) || '00:00'}`)}/>
+                <ClockTimePicker id="awards-ceremony-time" label="Uhrzeit der Siegerehrung"
+                  value={awardsAt.slice(11, 16)} onChange={(time) => onAwardsAtChange(`${awardsAt.slice(0, 10)}T${time}`)} />
+              </div>
             </label>
             <button type="button" className="btn small" onClick={() => onToggleAwards(false)}>Siegerehrung entfernen</button>
             {ceremonyTooEarly && <p role="alert" className="planned-schedule-phase-warning">Die Siegerehrung darf nicht vor dem voraussichtlichen Turnierende beginnen.</p>}

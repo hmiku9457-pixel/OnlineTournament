@@ -26,6 +26,10 @@ export interface MockPhaseInput {
   nextDayStart?: string;
   breakUntil?: string;
   note?: string;
+  inlineBreakAfterRound?: number;
+  inlineBreakKind?: 'minutes' | 'until';
+  inlineBreakMinutes?: number;
+  inlineBreakUntil?: string;
 }
 
 export interface CreateMockTournamentInput {
@@ -83,6 +87,12 @@ function toStage(tournamentId: string, phase: MockPhaseInput, index: number, nex
     settings.nextDayStart = phase.nextDayStart ?? '09:00';
     settings.breakUntil = phase.breakUntil ?? '12:00';
     settings.note = phase.note ?? '';
+  }
+  if ((phase.type === 'SWISS' || phase.type === 'KNOCKOUT') && phase.inlineBreakAfterRound) {
+    settings.inlineBreakAfterRound = phase.inlineBreakAfterRound;
+    settings.inlineBreakKind = phase.inlineBreakKind ?? 'until';
+    settings.inlineBreakMinutes = phase.inlineBreakMinutes ?? 15;
+    settings.inlineBreakUntil = phase.inlineBreakUntil ?? '13:00';
   }
   if (phase.type === 'SWISS') settings.rounds = phase.swissRounds;
   if (phase.type === 'KNOCKOUT') {
@@ -183,6 +193,8 @@ export function updatePrestartTournamentPhases(
     bestOf: phase.bestOf, knockoutBestOf: [...phase.knockoutBestOf],
     breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
     nextDayStart: phase.nextDayStart, breakUntil: phase.breakUntil, note: phase.note,
+    inlineBreakAfterRound: phase.inlineBreakAfterRound, inlineBreakKind: phase.inlineBreakKind,
+    inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
   }));
   const stages = phases.map((phase, index) => {
     const nextPlaying = phases.slice(index + 1).find((item) => item.type !== 'BREAK');
