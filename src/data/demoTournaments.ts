@@ -1,4 +1,5 @@
 import type { VenueLayout } from '@/domain/venueLayout';
+import type { PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import type { Discipline, TournamentStage, TournamentStatus, Visibility } from '@/domain/types';
 
 export interface DemoArea {
@@ -33,6 +34,10 @@ export interface DemoTournament {
   venueLayout?: VenueLayout;
   matchDurationMinutes?: number;
   venueTurnoverMinutes?: number;
+  /** Local wall-clock date/time, YYYY-MM-DDTHH:mm (not a UTC instant). */
+  scheduledStart?: string;
+  /** Optional, non-binding public itinerary; never controls stage starts. */
+  plannedSchedule?: PlannedScheduleItem[];
 }
 
 // Statische Testturniere wurden bewusst entfernt. Der UI-Prototyp arbeitet ab jetzt

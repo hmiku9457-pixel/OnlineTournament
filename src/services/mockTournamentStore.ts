@@ -1,3 +1,4 @@
+import { validatePlannedSchedule, isValidLocalDateTime, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { getPhaseLifecycle, resetPrestartPhaseLifecycle } from '@/services/mockPhaseLifecycle';
 import { generatePlayerCodes, generateUniquePlayerCode } from '@/services/mockPlayerCodes';
 import { recordMockAudit } from '@/services/mockAudit';
@@ -36,6 +37,8 @@ export interface CreateMockTournamentInput {
   participantNames: string[];
   phases: MockPhaseInput[];
   estimatedDurationMinutes: number;
+  scheduledStart?: string;
+  plannedSchedule?: PlannedScheduleItem[];
   venueLayout?: VenueLayout;
   matchDurationMinutes?: number;
   venueTurnoverMinutes?: number;
@@ -109,6 +112,12 @@ function createId() {
 }
 
 export function createMockTournament(input: CreateMockTournamentInput): DemoTournament {
+  // Existing programmatic test fixtures without a public start time remain valid.
+  if (input.scheduledStart !== undefined && !isValidLocalDateTime(input.scheduledStart)) {
+    throw new Error('Ungültiges Turnierdatum oder Startzeit.');
+  }
+  const scheduleIssues = validatePlannedSchedule(input.plannedSchedule ?? []);
+  if (scheduleIssues.length) throw new Error(scheduleIssues[0]);
   const id = createId();
   const stages = input.phases.map((phase, index) => {
     const nextCompetition = input.phases.slice(index + 1).find((next) => next.type !== 'BREAK');
@@ -139,6 +148,8 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
     venueLayout: input.venueLayout,
     matchDurationMinutes: input.matchDurationMinutes ?? 15,
     venueTurnoverMinutes: input.venueTurnoverMinutes ?? 0,
+    scheduledStart: input.scheduledStart,
+    plannedSchedule: input.plannedSchedule?.map((entry) => ({ ...entry })) ?? [],
   };
 
   const existing = readLocalTournaments();
