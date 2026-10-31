@@ -250,6 +250,7 @@ export function updateMockTournamentStatus(tournamentId: string, status: Tournam
     if (localTournament.status !== status && (status === 'PAUSED' || (status === 'RUNNING' && localTournament.status === 'PAUSED'))) {
       recordMockAudit({ tournamentId, actor: 'Turnierleitung (lokal)', action: status === 'PAUSED' ? 'TOURNAMENT_PAUSED' : 'TOURNAMENT_RESUMED', description: status === 'PAUSED' ? 'Turnier pausiert – neue Zuweisungen gesperrt' : 'Turnier fortgesetzt', before: localTournament.status, after: status });
     }
+    window.dispatchEvent(new CustomEvent('mock-runtime-change'));
     return updated;
   }
 
@@ -410,6 +411,7 @@ export function removeLocalPrototypeTournaments() {
   window.localStorage.removeItem('online-tournament:swiss-cutoff-decisions:v1');
   window.localStorage.removeItem('online-tournament:swiss-extra-rounds:v1');
   window.localStorage.removeItem('online-tournament:swiss-round-robin-history:v1');
+  window.dispatchEvent(new CustomEvent('mock-runtime-change'));
 }
 
 export function countActiveMockTournaments() {
