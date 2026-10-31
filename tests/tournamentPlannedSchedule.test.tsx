@@ -133,8 +133,11 @@ describe('optionaler vorläufiger Zeitplan', () => {
       awardsEnabled: true, awardsAt: timeline.estimatedEnd,
       onToggleAwards: () => {}, onAwardsAtChange: () => {},
     }));
-    expect(withAwards).toContain('value="2026-11-01T15:30"');
-    expect(withAwards).toContain('min="2026-11-01T15:30"');
+    expect(withAwards).toContain('value="2026-11-01"');
+    expect(withAwards).toContain('min="2026-11-01"');
+    expect(withAwards).toContain('id="awards-ceremony-time"');
+    expect(withAwards).toContain('15:30');
+    expect(withAwards).toContain('aria-haspopup="dialog"');
     expect(withAwards).toContain('Siegerehrung entfernen');
     expect(withAwards).toContain('class="planned-schedule-phase-row is-ceremony"');
     expect(withAwards).toContain('<strong>Siegerehrung</strong>');
