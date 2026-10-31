@@ -74,7 +74,7 @@ function remainingStageJobs(tournament: DemoTournament, stage: TournamentStage):
     if (started) {
       const extra = [...getSwissRoundRobinMatches(tournament, stage), ...getSwissCutoffSetMatches(tournament, stage)];
       extra.filter((match) => match.status !== 'FINISHED' && match.status !== 'CANCELLED')
-        .forEach((match) => jobs.push({ round: rounds + 1, remainingMinutes: remainingMinutesForMatch(1, match.sets.length, planningMinutesPerSet(tournament.sport)) }));
+        .forEach((match) => jobs.push({ round: rounds + 1, remainingMinutes: remainingMinutesForMatch(1, match.sets?.length ?? 0, planningMinutesPerSet(tournament.sport)) }));
     }
     return jobs;
   }
