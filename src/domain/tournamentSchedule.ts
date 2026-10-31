@@ -65,6 +65,45 @@ export function formatPlannedBreakDuration(item: PlannedScheduleItem): string {
   return item.durationApproximate ? `ca. ${duration}` : duration;
 }
 
+/** Day grouping for informational timetables. Pause durations stay relative,
+ * while all actual phase times are displayed without redundant dates.
+ */
+export interface PlannedDayGroup {
+  date: string;
+  label: string;
+  items: PlannedScheduleItem[];
+}
+export interface PlannedDayGroups {
+  multipleDays: boolean;
+  days: PlannedDayGroup[];
+}
+export function formatPlannedClockTime(value: string): string {
+  return formatPlannedDateTime(value, false);
+}
+export function groupPlannedScheduleDays(items: PlannedScheduleItem[], scheduledStart?: string): PlannedDayGroups {
+  const dayMap = new Map<string, PlannedScheduleItem[]>();
+  const dates = new Set<string>();
+  if (scheduledStart && isValidLocalDateTime(scheduledStart)) dates.add(scheduledStart.slice(0, 10));
+  for (const item of [...items].sort((a, b) => a.at.localeCompare(b.at))) {
+    const date = isValidLocalDateTime(item.at) ? item.at.slice(0, 10) : 'unknown';
+    if (date !== 'unknown') dates.add(date);
+    const dayItems = dayMap.get(date) ?? [];
+    dayItems.push(item);
+    dayMap.set(date, dayItems);
+  }
+  return {
+    multipleDays: dates.size > 1,
+    days: [...dayMap.entries()].map(([date, entries]) => ({
+      date,
+      label: date === 'unknown' ? 'Datum noch offen'
+        : parseLocalDateTime(`${date}T12:00`)!.toLocaleDateString('de-DE', {
+          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        }),
+      items: entries,
+    })),
+  };
+}
+
 export function validatePlannedSchedule(items: PlannedScheduleItem[]): string[] {
   if (items.length > 80) return ['Der Zeitplan darf höchstens 80 Einträge enthalten.'];
   const issues: string[] = [];

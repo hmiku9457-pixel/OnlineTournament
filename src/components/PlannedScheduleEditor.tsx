@@ -1,6 +1,6 @@
-import type { PlannedTimeline } from '@/domain/tournamentSchedule';
+import type { PlannedTimeline, PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
-import { formatPlannedBreakDuration, formatPlannedDateTime, parseLocalDateTime } from '@/domain/tournamentSchedule';
+import { formatPlannedBreakDuration, formatPlannedClockTime, groupPlannedScheduleDays, parseLocalDateTime } from '@/domain/tournamentSchedule';
 
 interface Props {
   scheduledStart: string;
@@ -11,55 +11,70 @@ interface Props {
   onAwardsAtChange: (value: string) => void;
 }
 
-/** Phases come directly from the tournament configuration: no "Programmpunkt"
- * placeholders and no separate generate step. Only the optional ceremony
- * adds an independently adjustable event.
- */
+/** Phase starts and pause lengths come from the same non-binding timeline. */
 export function PlannedScheduleEditor({
   scheduledStart, timeline, awardsEnabled, awardsAt, onToggleAwards, onAwardsAtChange,
 }: Props) {
   const expectedEnd = parseLocalDateTime(timeline.estimatedEnd);
   const ceremony = parseLocalDateTime(awardsAt);
   const ceremonyTooEarly = awardsEnabled && Boolean(expectedEnd && ceremony && ceremony < expectedEnd);
+  const entries: PlannedScheduleItem[] = [
+    { id: 'scheduled-start', at: scheduledStart, title: 'Turnierbeginn', type: 'other' },
+    ...timeline.items,
+    ...(timeline.estimatedEnd
+      ? [{ id: 'estimated-finish', at: timeline.estimatedEnd, title: 'Voraussichtliches Turnierende', type: 'other' as const }]
+      : []),
+    ...(awardsEnabled
+      ? [{ id: 'awards-ceremony', at: awardsAt, title: 'Siegerehrung', type: 'other' as const }]
+      : []),
+  ];
+  const grouped = groupPlannedScheduleDays(entries, scheduledStart);
+  const renderRow = (item: PlannedScheduleItem) => {
+    const isStart = item.id === 'scheduled-start';
+    const isFinish = item.id === 'estimated-finish';
+    const isCeremony = item.id === 'awards-ceremony';
+    const isBreak = item.type === 'break';
+    const hint = isStart ? 'Geplanter Start'
+      : isFinish ? 'Nach der letzten Turnierphase'
+        : isCeremony ? 'Optionaler Abschluss · geplante Uhrzeit'
+          : isBreak ? item.durationApproximate ? 'Pause · geschätzte Dauer (abhängig vom Spielverlauf)' : 'Pause · geplante Dauer'
+            : item.id.startsWith('inline-resume-') ? 'Voraussichtliche Fortsetzung'
+              : 'Voraussichtlicher Phasenbeginn';
+    const phaseIndex = item.id.startsWith('inline-break-') || item.id.startsWith('inline-resume-')
+      ? Number(item.id.split('-').at(-1)) - 1
+      : item.id.startsWith('phase-') ? Number(item.id.slice(6)) - 1 : -1;
+    return (
+      <li key={item.id} className={`planned-schedule-phase-row${isStart ? ' is-start' : isFinish ? ' is-finish' : isCeremony ? ' is-ceremony' : isBreak ? ' is-break' : ''}`}>
+        {isBreak
+          ? <span className="planned-schedule-duration">{formatPlannedBreakDuration(item)}</span>
+          : <time dateTime={item.at}>{formatPlannedClockTime(item.at)}</time>}
+        <div>
+          <strong>{item.title}</strong>
+          <small>{hint}</small>
+          {timeline.warnings.filter((warning) => warning.phaseIndex === phaseIndex && (
+            item.id === `phase-${phaseIndex + 1}` || item.id === `inline-break-${phaseIndex + 1}`
+          )).map((warning) => (
+            <p className="planned-schedule-phase-warning" role="alert" key={warning.message}>{warning.message}</p>
+          ))}
+        </div>
+      </li>
+    );
+  };
   return (
     <div className="planned-schedule-editor">
       <div className="planned-schedule-editor-intro">
         <div>
           <h3>Voraussichtlicher Ablauf</h3>
-          <p className="muted">Die Phasen werden automatisch aus deiner Turnierplanung und den geschätzten Spieldauern übernommen. Phasenbeginn und Pausendauern sind unverbindliche Richtwerte.</p>
+          <p className="muted">Phasen und Pausen werden automatisch aus deiner Planung übernommen. Uhrzeiten und Pausendauern sind unverbindliche Richtwerte.</p>
         </div>
       </div>
       <ol className="planned-schedule-phase-list">
-        <li className="planned-schedule-phase-row is-start">
-          <time dateTime={scheduledStart}>{formatPlannedDateTime(scheduledStart)}</time>
-          <div><strong>Turnierbeginn</strong><small>Geplanter Start</small></div>
-        </li>
-        {timeline.items.map((item, index) => (
-          <li key={item.id} className={`planned-schedule-phase-row ${item.type === 'break' ? 'is-break' : ''}`}>
-            {item.type === 'break'
-              ? <span className="planned-schedule-duration">{formatPlannedBreakDuration(item)}</span>
-              : <time dateTime={item.at}>{formatPlannedDateTime(item.at)}</time>}
-            <div>
-              <strong>{item.title}</strong>
-              <small>{item.type === 'break'
-                ? item.durationApproximate ? 'Geschätzte Pausendauer (abhängig vom Spielverlauf)' : 'Geplante Pausendauer'
-                : 'Voraussichtlicher Phasenbeginn'}</small>
-              {timeline.warnings.filter((warning) => warning.phaseIndex === index).map((warning) => (
-                <p className="planned-schedule-phase-warning" role="alert" key={warning.message}>{warning.message}</p>
-              ))}
-            </div>
+        {grouped.days.map((day) => (
+          <li className="planned-schedule-day-group" key={day.date}>
+            {grouped.multipleDays && <h4 className="planned-schedule-day-heading">{day.label}</h4>}
+            <ol className="planned-schedule-day-entries">{day.items.map(renderRow)}</ol>
           </li>
         ))}
-        {timeline.estimatedEnd && <li className="planned-schedule-phase-row is-finish">
-          <time dateTime={timeline.estimatedEnd}>{formatPlannedDateTime(timeline.estimatedEnd)}</time>
-          <div><strong>Voraussichtliches Turnierende</strong><small>Nach der letzten Turnierphase</small></div>
-        </li>}
-        {awardsEnabled && (
-          <li className="planned-schedule-phase-row is-ceremony">
-            <time dateTime={awardsAt}>{formatPlannedDateTime(awardsAt)}</time>
-            <div><strong>Siegerehrung</strong><small>Optionaler Abschluss · geplante Uhrzeit</small></div>
-          </li>
-        )}
       </ol>
       <section className="planned-schedule-ceremony">
         <div>
