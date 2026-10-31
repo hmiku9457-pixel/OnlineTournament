@@ -58,6 +58,7 @@ export function CalendarDatePicker({
   const selected = parseCalendarDate(value);
   const minimum = minDate && parseCalendarDate(minDate) ? minDate : '';
   const today = toCalendarDate(new Date());
+  const displayDate = (date: Date) => date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const days = calendarMonthDays(viewYear, viewMonth);
 
   function show() {
@@ -110,10 +111,10 @@ export function CalendarDatePicker({
     <>
       <button id={id} ref={triggerRef} type="button" className="calendar-picker-trigger"
         aria-haspopup="dialog" aria-expanded={open} aria-required={required}
-        aria-label={label + ' auswählen' + (selected ? ', aktuell ' + selected.toLocaleDateString('de-DE') : ', noch nicht festgelegt')}
+        aria-label={label + ' auswählen' + (selected ? ', aktuell ' + displayDate(selected) : ', noch nicht festgelegt')}
         onClick={show}>
         <span className={selected ? 'calendar-picker-value' : 'calendar-picker-placeholder'}>
-          {selected ? selected.toLocaleDateString('de-DE') : 'TT.MM.JJJJ'}
+          {selected ? displayDate(selected) : 'TT.MM.JJJJ'}
         </span>
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <rect x="3" y="5" width="18" height="16" rx="2" />
@@ -159,7 +160,7 @@ export function CalendarDatePicker({
               })}
             </div>
             <div className="calendar-picker-dialog-foot">
-              {minimum && <span>Frühestens: {parseCalendarDate(minimum)?.toLocaleDateString('de-DE')}</span>}
+              {minimum && <span>Frühestens: {displayDate(parseCalendarDate(minimum)!)}</span>}
               <button type="button" className="btn small" disabled={Boolean(minimum && today < minimum)}
                 onClick={() => choose(today)}>Heute</button>
             </div>
