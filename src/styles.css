@@ -5192,3 +5192,105 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .wizard-workspace .format-step .format-step-layout { grid-template-columns: minmax(0, 1fr); }
   .wizard-workspace .format-step .format-settings-panel { position: static; }
 }
+
+/* Turniererstellung Schritt 3: Phasenüberschriften, Teilnehmerquoten und Kennzahlen-Tags */
+.wizard-workspace .format-step .format-step-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 9px 16px;
+  margin-bottom: 10px;
+}
+.wizard-workspace .format-step .format-step-header > div {
+  flex: 1 1 290px;
+  min-width: 0;
+}
+.wizard-workspace .format-step .format-step-header h2 {
+  margin: 0 0 3px;
+  color: #162b4b;
+  font-size: 1.28rem;
+  letter-spacing: -.025em;
+}
+.wizard-workspace .format-step .format-step-header p.muted {
+  margin: 0;
+  color: #64748b;
+  font-size: .84rem;
+  line-height: 1.4;
+}
+.wizard-workspace .format-step .format-info-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid #dce5ef;
+  border-radius: 999px;
+  background: #f5f8fc;
+  color: #475467;
+  font-size: .72rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.wizard-workspace .format-step .recommendation-phase-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  flex: 1 1 220px;
+  min-width: 0;
+  margin: 0;
+  font-size: .88rem;
+  line-height: 1.35;
+}
+.wizard-workspace .format-step .recommendation-phase-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.wizard-workspace .format-step .recommendation-phase-name {
+  color: #162b4b;
+  font-weight: 750;
+}
+.wizard-workspace .format-step .recommendation-phase-arrow {
+  color: #8996a8;
+  font-weight: 700;
+  margin-right: 2px;
+}
+.wizard-workspace .format-step .recommendation-phase-count {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 1px solid #d8e6fa;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #175cd3;
+  font-size: .7rem;
+  font-weight: 800;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.wizard-workspace .format-step .recommendation-metrics {
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+}
+.wizard-workspace .format-step .recommendation-metric-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid #e0eaf8;
+  border-radius: 999px;
+  background: #f3f7ff;
+  color: #175cd3;
+  font-size: .71rem;
+  font-weight: 720;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 720px) {
+  .wizard-workspace .format-step .format-info-tag { margin-right: auto; }
+}
