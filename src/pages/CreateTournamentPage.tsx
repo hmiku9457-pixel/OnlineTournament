@@ -852,8 +852,11 @@ export function CreateTournamentPage() {
   // The creation overview shows the same elapsed span as the timeline
   // (including "Pause bis", duration pauses and overnight interruptions).
   // This estimate also becomes the tournament's stored original estimate.
+  const estimatedPlayingMinutes = phaseEstimates.reduce((total, estimate, index) =>
+    total + (phaseDrafts[index]?.type === 'BREAK' ? 0 : estimate.estimatedDurationMinutes), 0);
   const estimatedTournamentDurationMinutes = plannedTimelineDurationMinutes(scheduledStart, plannedTimeline.estimatedEnd)
     ?? phaseEstimates.reduce((total, item) => total + item.estimatedDurationMinutes, 0);
+  const estimatedBreakMinutes = Math.max(0, estimatedTournamentDurationMinutes - estimatedPlayingMinutes);
   const awardsAt = awardsAtOverride ?? plannedTimeline.estimatedEnd;
   const plannedSchedule: PlannedScheduleItem[] = [
     ...plannedTimeline.items,
@@ -1393,6 +1396,12 @@ export function CreateTournamentPage() {
                         ? nextPhase.entrantCount : null;
                       const plannedPhaseStart = plannedTimeline.items.find((item) => item.id === `phase-${index + 1}`)?.at;
                       const plannedInlinePause = plannedTimeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at;
+                      // The next phase begins when this phase (including a scheduled pause) ends.
+                      const plannedPhaseEnd = plannedTimeline.items.find((item) => item.id === `phase-${index + 2}`)?.at
+                        ?? plannedTimeline.estimatedEnd;
+                      const estimatedPhaseEnd = plannedPhaseEnd && isValidLocalDateTime(plannedPhaseEnd)
+                        ? formatPlannedDateTime(plannedPhaseEnd, plannedPhaseEnd.slice(0, 10) !== scheduledStart.slice(0, 10))
+                        : 'noch nicht berechenbar';
                       const estimatedPauseStart = plannedPhaseStart && isValidLocalDateTime(plannedPhaseStart)
                         ? formatPlannedDateTime(plannedPhaseStart) : 'noch nicht berechenbar';
                       const estimatedInlinePauseStart = plannedInlinePause && isValidLocalDateTime(plannedInlinePause)
@@ -1450,7 +1459,7 @@ export function CreateTournamentPage() {
                                   </>
                                 ) : (
                                   <>
-                                    <span className="phase-quick-tag">{phase.entrantCount} Teilnehmer</span>
+                                    <span className="phase-quick-tag phase-quick-tag-participants">{phase.entrantCount} Teilnehmer</span>
                                     {phase.type === 'GROUPS' && <span className="phase-quick-tag">{phase.groupCount} Gruppen</span>}
                                     {phase.type === 'SWISS' && <span className="phase-quick-tag">{phase.swissRounds} Runden</span>}
                                     {phase.type === 'KNOCKOUT' && <span className="phase-quick-tag">{knockoutRoundLabels(phase.entrantCount).length} Runden</span>}
@@ -1458,6 +1467,7 @@ export function CreateTournamentPage() {
                                     {phaseEstimates[index] && <span className="phase-quick-tag phase-quick-tag-time">ca. {formatCompactDuration(phaseEstimates[index].estimatedDurationMinutes)}</span>}
                                   </>
                                 )}
+                                <span className="phase-quick-tag phase-quick-tag-end">Ende ca. {estimatedPhaseEnd}</span>
                               </div>
                               {plannedTimeline.warnings.some((warning) => warning.phaseIndex === index) &&
                                 <span className="phase-warning-chip" role="status">⚠ Pausenuhrzeit liegt vor dem geschätzten Pausenbeginn</span>}
@@ -1551,15 +1561,34 @@ export function CreateTournamentPage() {
                           )}
                           {phase.type === 'BREAK' ? (
                             <div className="break-phase-fields">
-                              <p className="phase-break-estimate" role="status">
-                                <strong>Vorherige Phase voraussichtlich beendet:</strong> {estimatedPauseStart}
-                                <span> Planungswert – der tatsächliche Beginn der Pause hängt vom Turnierverlauf ab.</span>
-                              </p>
-                              <label className="field">Name der Pause
-                                <input type="text" maxLength={80} value={phase.label}
-                                  placeholder="z. B. Mittagspause"
-                                  onChange={(event) => updatePhase(phase.id, { label: event.target.value })} />
-                              </label>
+                              <div className="break-phase-inputs">
+                                <label className="field">Name der Pause
+                                  <input type="text" maxLength={80} value={phase.label}
+                                    placeholder="z. B. Mittagspause"
+                                    onChange={(event) => updatePhase(phase.id, { label: event.target.value })} />
+                                </label>
+                                {phase.breakKind === 'minutes' ? (
+                                  <label className="field">Dauer in Minuten
+                                    <input type="number" min="1" max="1440" step="1" value={phase.breakMinutes}
+                                      onChange={(event) => updatePhase(phase.id, { breakMinutes: Number(event.target.value) })} />
+                                  </label>
+                                ) : phase.breakKind === 'until' ? (
+                                  <label className="field">Pause bis (Uhrzeit)
+                                    <ClockTimePicker id={`phase-until-${phase.id}`} label="Pause bis" value={phase.breakUntil}
+                                      onChange={(time) => updatePhase(phase.id, { breakUntil: time })} />
+                                  </label>
+                                ) : (
+                                  <label className="field">Startzeit am Folgetag
+                                    <ClockTimePicker id={`phase-next-day-${phase.id}`} label="Startzeit am Folgetag" value={phase.nextDayStart}
+                                      onChange={(time) => updatePhase(phase.id, { nextDayStart: time })} />
+                                  </label>
+                                )}
+                                {phase.breakKind === 'until' && (
+                                  <p className="field-hint break-phase-time-hint">
+                                    Der Zeitpunkt ist eine Planungshilfe und sollte nach dem geschätzten Pausenbeginn liegen. Die Turnierleitung gibt die Fortsetzung tatsächlich frei.
+                                  </p>
+                                )}
+                              </div>
                               <fieldset className="break-phase-choice">
                                 <legend>Art der Unterbrechung</legend>
                                 <label><input type="radio" name={`break-kind-${phase.id}`} checked={phase.breakKind === 'minutes'}
@@ -1569,32 +1598,18 @@ export function CreateTournamentPage() {
                                 <label><input type="radio" name={`break-kind-${phase.id}`} checked={phase.breakKind === 'overnight'}
                                   onChange={() => updatePhase(phase.id, { breakKind: 'overnight' })} /> Spieltagsende</label>
                               </fieldset>
-                              {phase.breakKind === 'minutes' ? (
-                                <label className="field">Dauer in Minuten
-                                  <input type="number" min="1" max="1440" step="1" value={phase.breakMinutes}
-                                    onChange={(event) => updatePhase(phase.id, { breakMinutes: Number(event.target.value) })} />
-                                </label>
-                              ) : phase.breakKind === 'until' ? (
-                                <label className="field">Pause bis (Uhrzeit)
-                                  <ClockTimePicker id={`phase-until-${phase.id}`} label="Pause bis" value={phase.breakUntil}
-                                    onChange={(time) => updatePhase(phase.id, { breakUntil: time })} />
-                                  <span className="field-hint">Bei einer realen Pause entscheidet die Turnierleitung über die Freigabe. Für den unverbindlichen Zeitplan sollte die Uhrzeit nicht vor dem geschätzten Pausenbeginn liegen.</span>
-                                </label>
-                              ) : (
-                                <label className="field">Startzeit am Folgetag
-                                  <ClockTimePicker id={`phase-next-day-${phase.id}`} label="Startzeit am Folgetag" value={phase.nextDayStart}
-                                    onChange={(time) => updatePhase(phase.id, { nextDayStart: time })} />
-                                </label>
-                              )}
                               {phase.breakKind === 'until' && plannedTimeline.warnings.filter((warning) => warning.phaseIndex === index).map((warning) => (
                                 <p className="planned-schedule-phase-warning" role="alert" key={warning.message}>{warning.message}</p>
                               ))}
-                              <label className="field break-phase-notes">Hinweis an Spieler (optional)
-                                <textarea rows={3} maxLength={600} value={phase.note}
+                              <div className="field break-phase-notes">
+                                <div className="break-phase-note-heading">
+                                  <label htmlFor={`phase-note-${phase.id}`}>Hinweis an Spieler (optional)</label>
+                                  <span className="field-hint">Diese Information wird im Turnierverlauf angezeigt.</span>
+                                </div>
+                                <textarea id={`phase-note-${phase.id}`} rows={2} maxLength={600} value={phase.note}
                                   placeholder="z. B. Treffpunkt, Verpflegung oder organisatorische Hinweise"
                                   onChange={(event) => updatePhase(phase.id, { note: event.target.value })} />
-                                <span className="field-hint">Diese Information wird im Turnierverlauf angezeigt.</span>
-                              </label>
+                              </div>
                             </div>
                           ) : <div className="phase-settings-grid">
                             {index > 0 && isTerminalStage(phase.type) && (
@@ -1787,13 +1802,6 @@ export function CreateTournamentPage() {
                                 {index + 1 < phaseDrafts.length && phase.type !== 'BREAK' && phaseDrafts[index + 1]?.type !== 'BREAK' && (
                                   <>
                                     <button className="btn small" type="button" onClick={() => insertPhase(index + 1, 'BREAK')}>+ Pause / Spieltagsende</button>
-                                    <span className="phase-insert-pause-hint">
-                                      Vorherige Phase voraussichtlich beendet: {(() => {
-                                        const nextStart = plannedTimeline.items.find((item) => item.id === `phase-${index + 2}`)?.at;
-                                        return nextStart && isValidLocalDateTime(nextStart)
-                                          ? formatPlannedDateTime(nextStart) : 'noch nicht berechenbar';
-                                      })()}
-                                    </span>
                                   </>
                                 )}
                                 <button className="btn small" type="button" onClick={() => setPhaseInsertIndex(null)}>Abbrechen</button>
@@ -1887,9 +1895,16 @@ export function CreateTournamentPage() {
           <strong>{phaseDrafts.length} Phasen automatisch geplant{awardsEnabled ? ' · mit Siegerehrung' : ''}</strong>
         </button>}
         <div className="wizard-side-duration">
-          <span>Voraussichtliche Dauer</span>
-          <strong>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : 'Noch offen'}</strong>
-          {phaseDrafts.length > 0 && <small>Zeitraum vom geplanten Beginn bis zum theoretischen Turnierende einschließlich geplanter Pausen. {timedSport ? `Planungswert: ${matchDurationMinutes} Min. je Spiel.` : `Planungswert: ${planningMinutesPerSet(sport)} Min. je Satz.`} Zusätzliche Verzögerungen bei der Rundenfreigabe sind nicht enthalten.</small>}
+          <span>Voraussichtliche Spielzeit</span>
+          <strong>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedPlayingMinutes)}` : 'Noch offen'}</strong>
+          {phaseDrafts.length > 0 && (
+            <div className="wizard-side-duration-breakdown">
+              <span>Geplante Pausen <strong>{formatDuration(estimatedBreakMinutes)}</strong></span>
+              <span>Gesamtdauer inkl. Pausen <strong>{formatDuration(estimatedTournamentDurationMinutes)}</strong></span>
+              {plannedTimeline.estimatedEnd && <span>Voraussichtliches Ende <strong>{formatPlannedDateTime(plannedTimeline.estimatedEnd)}</strong></span>}
+            </div>
+          )}
+          {phaseDrafts.length > 0 && <small>Unverbindliche Planung mit {timedSport ? `${matchDurationMinutes} Min. je Spiel` : `${planningMinutesPerSet(sport)} Min. je Satz`}. Zusätzliche Verzögerungen bei der Rundenfreigabe sind nicht enthalten.</small>}
           {plannedTimeline.warnings.length > 0 && <small>⚠ Eine „Pause bis“-Uhrzeit liegt vor dem geschätzten Beginn der Pause. Bitte Phasenplanung prüfen.</small>}
         </div>
         {maxReachedStep >= 4 && !canCreate && (
