@@ -105,7 +105,7 @@ export function AppShell() {
           </section>
 
           <details className="sidebar-mobile-live">
-            <summary><span className="sidebar-mobile-live-title"><span className="sidebar-live-status-dot" aria-hidden="true"/>Deine Turniere</span>
+            <summary><span className="sidebar-mobile-live-title">Deine Turniere</span>
               <span className="sidebar-live-total">{yourTournaments.length}</span></summary>
             <SidebarTournamentList tournaments={yourTournaments}/>
           </details>
