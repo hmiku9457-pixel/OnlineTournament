@@ -30,7 +30,7 @@ import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/
 import { createMockTournament } from '@/services/mockTournamentStore';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
-import { isValidLocalDateTime, suggestPlannedSchedule, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, isValidLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
@@ -322,7 +322,8 @@ export function CreateTournamentPage() {
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('09:00');
   const scheduledStart = `${scheduledDate}T${scheduledTime}`;
-  const [plannedSchedule, setPlannedSchedule] = useState<PlannedScheduleItem[]>([]);
+  const [awardsEnabled, setAwardsEnabled] = useState(false);
+  const [awardsAtOverride, setAwardsAtOverride] = useState<string | null>(null);
   const [sport, setSport] = useState('');
   const availableDisciplines = disciplineOptionsForSport(sport);
   const venue = getVenueTerminology(sport);
@@ -428,7 +429,6 @@ export function CreateTournamentPage() {
   });
   const canCreate = basicsValid && participantsValid && gameSettingsValid
     && phaseConfigurationValid && phaseEntrantsValid && hasVisitedPhaseStep;
-  const scheduleIssues = validatePlannedSchedule(plannedSchedule);
   const canContinue =
     (step === 1 && basicsValid) ||
     (step === 2 && participantsValid) ||
@@ -825,6 +825,27 @@ export function CreateTournamentPage() {
     }, tables, timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : undefined)),
     [phaseDrafts, tables, timedSport, matchDurationMinutes, breakMinutes],
   );
+
+  // The timetable is derived on every phase/date edit. No manual "generate"
+  // action or stale copy of the phases can remain in the wizard.
+  const plannedTimeline = useMemo(() => buildPlannedTimeline(scheduledStart, phaseDrafts.map((phase, index) => ({
+    label: phase.label,
+    type: phase.type,
+    estimatedMinutes: phaseEstimates[index]?.estimatedDurationMinutes ?? 0,
+    breakKind: phase.breakKind,
+    breakMinutes: phase.breakMinutes,
+    breakUntil: phase.breakUntil,
+    nextDayStart: phase.nextDayStart,
+  }))), [scheduledStart, phaseDrafts, phaseEstimates]);
+  const awardsAt = awardsAtOverride ?? plannedTimeline.estimatedEnd;
+  const plannedSchedule: PlannedScheduleItem[] = [
+    ...plannedTimeline.items,
+    ...(awardsEnabled ? [{ id: 'award-ceremony', at: awardsAt, title: 'Siegerehrung', type: 'other' as const }] : []),
+  ];
+  const ceremonyIssue = awardsEnabled && (!isValidLocalDateTime(awardsAt)
+    || (plannedTimeline.estimatedEnd && awardsAt < plannedTimeline.estimatedEnd))
+    ? 'Die Siegerehrung muss am oder nach dem voraussichtlichen Turnierende liegen.' : null;
+  const scheduleIssues = [...validatePlannedSchedule(plannedSchedule), ...(ceremonyIssue ? [ceremonyIssue] : [])];
 
   return (
     <>
@@ -1441,7 +1462,7 @@ export function CreateTournamentPage() {
                                 <label className="field">Pause bis (Uhrzeit)
                                   <input type="time" required value={phase.breakUntil}
                                     onChange={(event) => updatePhase(phase.id, { breakUntil: event.target.value })} />
-                                  <span className="field-hint">Das Turnier wird frühestens zu dieser Uhrzeit fortgesetzt. Ist sie beim Pausenstart bereits vergangen, gilt der nächste Tag. Eine vorzeitige Freigabe bleibt möglich.</span>
+                                  <span className="field-hint">Bei einer realen Pause entscheidet die Turnierleitung über die Freigabe. Für den unverbindlichen Zeitplan sollte die Uhrzeit nicht vor dem geschätzten Pausenbeginn liegen.</span>
                                 </label>
                               ) : (
                                 <label className="field">Startzeit am Folgetag
@@ -1449,6 +1470,9 @@ export function CreateTournamentPage() {
                                     onChange={(event) => updatePhase(phase.id, { nextDayStart: event.target.value })} />
                                 </label>
                               )}
+                              {phase.breakKind === 'until' && plannedTimeline.warnings.filter((warning) => warning.phaseIndex === index).map((warning) => (
+                                <p className="planned-schedule-phase-warning" role="alert" key={warning.message}>{warning.message}</p>
+                              ))}
                               <label className="field break-phase-notes">Hinweis an Spieler (optional)
                                 <textarea rows={3} maxLength={600} value={phase.note}
                                   placeholder="z. B. Treffpunkt, Verpflegung oder organisatorische Hinweise"
@@ -1600,20 +1624,14 @@ export function CreateTournamentPage() {
         {step === 5 && (
           <section className="schedule-wizard-step">
             <h2>Zeitplan <span className="wizard-optional-tag">Optional</span></h2>
-            <p className="muted">Veröffentliche einen unverbindlichen Ablauf als Orientierung für Spieler und interessierte Gäste. Dieser Zeitplan steuert weder Spiele noch Phasen und kann am Turniertag abweichen.</p>
+            <p className="muted">Der Zeitplan wird automatisch aus deinen Phasen und deren geschätzter Dauer berechnet. Er ist eine unverbindliche Vorabinformation und hat keinen Einfluss auf den tatsächlichen Ablauf.</p>
             <PlannedScheduleEditor
               scheduledStart={scheduledStart}
-              entries={plannedSchedule}
-              onChange={setPlannedSchedule}
-              suggestions={() => suggestPlannedSchedule(scheduledStart, phaseDrafts.map((phase, index) => ({
-                label: phase.label,
-                type: phase.type,
-                estimatedMinutes: phaseEstimates[index]?.estimatedDurationMinutes ?? 0,
-                breakKind: phase.breakKind,
-                breakMinutes: phase.breakMinutes,
-                breakUntil: phase.breakUntil,
-                nextDayStart: phase.nextDayStart,
-              })))}
+              timeline={plannedTimeline}
+              awardsEnabled={awardsEnabled}
+              awardsAt={awardsAt}
+              onToggleAwards={(enabled) => { setAwardsEnabled(enabled); setAwardsAtOverride(null); }}
+              onAwardsAtChange={setAwardsAtOverride}
             />
             {scheduleIssues.length > 0 && <div className="wizard-schedule-errors" role="alert">
               <strong>Bitte diese Zeitplan-Angaben korrigieren:</strong>
@@ -1674,7 +1692,7 @@ export function CreateTournamentPage() {
         </div>
         {maxReachedStep >= 5 && <button className="wizard-side-fact wizard-side-schedule" type="button" onClick={() => navigateToStep(5)}>
           <span>Zeitplan <span aria-hidden="true">↗</span></span>
-          <strong>{plannedSchedule.length ? `${plannedSchedule.length} geplante Programmpunkte` : 'Optional · noch ohne Einträge'}</strong>
+          <strong>{phaseDrafts.length} Phasen automatisch geplant{awardsEnabled ? ' · mit Siegerehrung' : ''}</strong>
         </button>}
         <div className="wizard-side-duration">
           <span>Voraussichtliche Dauer</span>
