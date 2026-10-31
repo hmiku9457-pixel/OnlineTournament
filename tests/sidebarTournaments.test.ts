@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DemoTournament } from '@/data/demoTournaments';
-import { sidebarLiveTournaments } from '@/domain/sidebarTournaments';
+import { sidebarTournaments } from '@/domain/sidebarTournaments';
 
 function tournament(id: string, status: DemoTournament['status']): DemoTournament {
   return {
@@ -35,29 +35,48 @@ function tournament(id: string, status: DemoTournament['status']): DemoTournamen
   };
 }
 
-describe('live tournament sidebar', () => {
-  it('includes running and paused tournaments, not ready or finished ones', () => {
-    const rows = sidebarLiveTournaments([
+describe('Deine Turniere sidebar', () => {
+  it('includes tournaments before their first start as well as running and paused ones', () => {
+    const rows = sidebarTournaments([
       tournament('ready', 'READY'),
       tournament('paused', 'PAUSED'),
+      tournament('registration', 'REGISTRATION'),
       tournament('running', 'RUNNING'),
+      tournament('draft', 'DRAFT'),
       tournament('ended', 'FINISHED'),
+      tournament('archived', 'ARCHIVED'),
       tournament('aborted', 'ABORTED'),
     ]);
-    expect(rows.map((entry) => entry.id)).toEqual(['running', 'paused']);
-    expect(rows.map((entry) => entry.statusLabel)).toEqual(['Läuft', 'Pausiert']);
+    expect(rows.map((entry) => entry.id)).toEqual([
+      'running', 'paused', 'ready', 'registration', 'draft',
+    ]);
+    expect(rows.map((entry) => entry.statusLabel)).toEqual([
+      'Läuft', 'Pausiert', 'Bereit', 'Anmeldung', 'Entwurf',
+    ]);
   });
 
-  it('shows the actual active phase and phase-based progress', () => {
-    const [row] = sidebarLiveTournaments([tournament('active', 'RUNNING')]);
+  it('shows the actual playing phase and phase-based progress', () => {
+    const [row] = sidebarTournaments([tournament('active', 'RUNNING')]);
     expect(row.phaseLabel).toContain('Phase 1: Gruppenphase');
     expect(row.completedPhases).toBe(0);
     expect(row.totalPhases).toBe(1);
     expect(row.progressPercent).toBe(0);
   });
 
-  it('handles an empty list without placeholder tournaments', () => {
-    expect(sidebarLiveTournaments([])).toEqual([]);
-    expect(sidebarLiveTournaments([tournament('ready', 'READY')])).toEqual([]);
+  it('shows a start phase for an unstarted tournament', () => {
+    const [row] = sidebarTournaments([tournament('ready', 'READY')]);
+    expect(row.phaseLabel).toBe('Startphase 1: Gruppenphase');
+    expect(row.statusLabel).toBe('Bereit');
+    expect(row.needsApproval).toBe(false);
+  });
+
+  it('keeps ordering stable for tournaments with the same status', () => {
+    const rows = sidebarTournaments([tournament('ready1', 'READY'), tournament('ready2', 'READY')]);
+    expect(rows.map((entry) => entry.id)).toEqual(['ready1', 'ready2']);
+  });
+
+  it('handles an empty list and excludes only completed or aborted tournaments', () => {
+    expect(sidebarTournaments([])).toEqual([]);
+    expect(sidebarTournaments([tournament('ended', 'FINISHED'), tournament('aborted', 'ABORTED')])).toEqual([]);
   });
 });
