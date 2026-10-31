@@ -28,8 +28,11 @@ import {
 import type { Discipline, StageType } from '@/domain/types';
 import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/recommendations';
 import { createMockTournament } from '@/services/mockTournamentStore';
+import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
+import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
+import { isValidLocalDateTime, suggestPlannedSchedule, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
-type WizardStep = 1 | 2 | 3 | 4;
+type WizardStep = 1 | 2 | 3 | 4 | 5;
 
 type ParticipantFields = {
   firstName: string;
@@ -62,7 +65,7 @@ type PhaseDraft = {
   note: string;
 };
 
-const stepLabels = ['Grunddaten', 'Teilnehmer', 'Turnierform', 'Phasen'];
+const stepLabels = ['Grunddaten', 'Teilnehmer', 'Turnierform', 'Phasen', 'Zeitplan'];
 const initialEnabledSystems = Object.fromEntries(
   tournamentSystemOptions.map((option) => [option.id, true]),
 ) as Record<TournamentSystemId, boolean>;
@@ -316,6 +319,10 @@ export function CreateTournamentPage() {
   const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>(1);
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(false);
   const [name, setName] = useState('');
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('09:00');
+  const scheduledStart = `${scheduledDate}T${scheduledTime}`;
+  const [plannedSchedule, setPlannedSchedule] = useState<PlannedScheduleItem[]>([]);
   const [sport, setSport] = useState('');
   const availableDisciplines = disciplineOptionsForSport(sport);
   const venue = getVenueTerminology(sport);
@@ -412,7 +419,7 @@ export function CreateTournamentPage() {
             ? /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.breakUntil)
             : phase.breakKind === 'overnight' && /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.nextDayStart))));
   const gameSettingsValid = minimumMatches >= 1 && validMatchDuration && validTurnover;
-  const basicsValid = Boolean(name.trim()) && Boolean(sport) && selectedDisciplineValid && tables >= 1 && gameSettingsValid;
+  const basicsValid = Boolean(name.trim()) && Boolean(sport) && selectedDisciplineValid && isValidLocalDateTime(scheduledStart) && tables >= 1 && gameSettingsValid;
   const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
     const maximum = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
     return phase.entrantCount >= 2 && phase.entrantCount <= maximum
@@ -421,12 +428,12 @@ export function CreateTournamentPage() {
   });
   const canCreate = basicsValid && participantsValid && gameSettingsValid
     && phaseConfigurationValid && phaseEntrantsValid && hasVisitedPhaseStep;
-
+  const scheduleIssues = validatePlannedSchedule(plannedSchedule);
   const canContinue =
     (step === 1 && basicsValid) ||
     (step === 2 && participantsValid) ||
     step === 3 ||
-    step === 4;
+    (step === 4 && canCreate);
 
   function updateParticipantForm(field: ParticipantField, value: string) {
     setParticipantForm((current) => ({ ...current, [field]: value }));
@@ -736,7 +743,7 @@ export function CreateTournamentPage() {
   }
 
   function goNext() {
-    if (!canContinue || step === 4) return;
+    if (!canContinue || step === 5) return;
     const next = (step + 1) as WizardStep;
     if (step === 3) {
       if (phaseDrafts.length === 0 && selectedRecommendation) {
@@ -754,12 +761,14 @@ export function CreateTournamentPage() {
     navigateToStep((step - 1) as WizardStep);
   }
 
-  function submitTournament() {
-    if (step !== 4 || !canCreate) return;
+  function submitTournament(skipSchedule = false) {
+    if ((step !== 4 && step !== 5) || !canCreate || (!skipSchedule && scheduleIssues.length > 0)) return;
     const tournament = createMockTournament({
       name,
       sport,
       discipline,
+      scheduledStart,
+      plannedSchedule: skipSchedule ? [] : plannedSchedule.map((entry) => ({ ...entry, title: entry.title.trim(), note: entry.note?.trim() })),
       tables,
       minimumMatches,
       matchDurationMinutes,
@@ -822,7 +831,7 @@ export function CreateTournamentPage() {
       <header className="page-head">
         <div>
           <h1>Turnier erstellen</h1>
-          <p className="muted">Schritt {step} von 4 · Einstellungen bleiben erhalten und können jederzeit über die bereits erreichten Schritte geändert werden.</p>
+          <p className="muted">Schritt {step} von 5 · Einstellungen bleiben erhalten und können jederzeit über die bereits erreichten Schritte geändert werden.</p>
         </div>
       </header>
 
@@ -831,11 +840,11 @@ export function CreateTournamentPage() {
           const stepNumber = (index + 1) as WizardStep;
           const reached = stepNumber <= maxReachedStep;
           const stepValid = [basicsValid, participantsValid, maxReachedStep >= 4,
-            phaseConfigurationValid && phaseEntrantsValid][index];
+            phaseConfigurationValid && phaseEntrantsValid, scheduleIssues.length === 0][index];
           const current = step === stepNumber;
           const complete = reached && !current && stepValid;
           const needsReview = reached && !current && !stepValid;
-          const stateLabel = current ? 'Aktuell' : complete ? 'Erledigt' : needsReview ? 'Prüfen' : 'Offen';
+          const stateLabel = current ? 'Aktuell' : complete ? (stepNumber === 5 && plannedSchedule.length === 0 ? 'Optional' : 'Erledigt') : needsReview ? 'Prüfen' : 'Offen';
           return (
             <button
               className={`wizard-step ${current ? 'active' : complete ? 'completed' : needsReview ? 'needs-attention' : 'upcoming'}`}
@@ -863,6 +872,15 @@ export function CreateTournamentPage() {
               <div className="field full">
                 <label htmlFor="name">Turniername</label>
                 <input id="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Vereinsmeisterschaft 2027" autoFocus />
+              </div>
+              <div className="field">
+                <label htmlFor="tournament-date">Turnierdatum *</label>
+                <input id="tournament-date" type="date" required value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} />
+              </div>
+              <div className="field">
+                <label htmlFor="tournament-start-time">Geplanter Turnierbeginn *</label>
+                <input id="tournament-start-time" type="time" required value={scheduledTime} onChange={(event) => setScheduledTime(event.target.value)} />
+                <span className="field-hint">Vorabinformation: Der tatsächliche Turnierstart erfolgt weiterhin durch die Turnierleitung.</span>
               </div>
               <div className="field">
                 <label htmlFor="sport">Sportart</label>
@@ -1579,7 +1597,31 @@ export function CreateTournamentPage() {
           </section>
         )}
 
-
+        {step === 5 && (
+          <section className="schedule-wizard-step">
+            <h2>Zeitplan <span className="wizard-optional-tag">Optional</span></h2>
+            <p className="muted">Veröffentliche einen unverbindlichen Ablauf als Orientierung für Spieler und interessierte Gäste. Dieser Zeitplan steuert weder Spiele noch Phasen und kann am Turniertag abweichen.</p>
+            <PlannedScheduleEditor
+              scheduledStart={scheduledStart}
+              entries={plannedSchedule}
+              onChange={setPlannedSchedule}
+              suggestions={() => suggestPlannedSchedule(scheduledStart, phaseDrafts.map((phase, index) => ({
+                label: phase.label,
+                type: phase.type,
+                estimatedMinutes: phaseEstimates[index]?.estimatedDurationMinutes ?? 0,
+                breakKind: phase.breakKind,
+                breakMinutes: phase.breakMinutes,
+                breakUntil: phase.breakUntil,
+                nextDayStart: phase.nextDayStart,
+              })))}
+            />
+            {scheduleIssues.length > 0 && <div className="wizard-schedule-errors" role="alert">
+              <strong>Bitte diese Zeitplan-Angaben korrigieren:</strong>
+              <ul>{scheduleIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
+            </div>}
+            <TournamentPlannedSchedule scheduledStart={scheduledStart} items={plannedSchedule.filter((entry) => isValidLocalDateTime(entry.at) && Boolean(entry.title.trim()))} title="Vorschau für Spieler und Gäste" />
+          </section>
+        )}
       </div>
 
       <div className="wizard-sidebar-column">
@@ -1589,13 +1631,14 @@ export function CreateTournamentPage() {
             <span className="wizard-side-kicker">Während der Erstellung</span>
             <h2>Dein Turnier</h2>
           </div>
-          <span className="wizard-side-step">{step}/4</span>
+          <span className="wizard-side-step">{step}/5</span>
         </div>
         <div className="wizard-side-facts">
           <button type="button" className="wizard-side-fact" onClick={() => navigateToStep(1)}>
             <span>Grunddaten <span aria-hidden="true">↗</span></span>
             <strong>{name.trim() || 'Noch kein Name'}</strong>
             <small>{sportOptions.find((item) => item.id === sport)?.label ?? 'Sportart auswählen'} · {sport ? disciplineLabel(discipline) : 'Disziplin offen'} · {tables} {venue.plural} · mindestens {minimumMatches} Spiele</small>
+            <small>{isValidLocalDateTime(scheduledStart) ? `Geplanter Beginn: ${scheduledDate} · ${scheduledTime} Uhr` : 'Turnierdatum noch offen'}</small>
           </button>
           <button type="button" className="wizard-side-fact" disabled={maxReachedStep < 2} onClick={() => navigateToStep(2)}>
             <span>Teilnehmer {maxReachedStep >= 2 && <span aria-hidden="true">↗</span>}</span>
@@ -1629,6 +1672,10 @@ export function CreateTournamentPage() {
               ))}
             </ol>}
         </div>
+        {maxReachedStep >= 5 && <button className="wizard-side-fact wizard-side-schedule" type="button" onClick={() => navigateToStep(5)}>
+          <span>Zeitplan <span aria-hidden="true">↗</span></span>
+          <strong>{plannedSchedule.length ? `${plannedSchedule.length} geplante Programmpunkte` : 'Optional · noch ohne Einträge'}</strong>
+        </button>}
         <div className="wizard-side-duration">
           <span>Voraussichtliche Dauer</span>
           <strong>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : 'Noch offen'}</strong>
@@ -1658,10 +1705,11 @@ export function CreateTournamentPage() {
         {step === 3 && <span className="muted wizard-optional-note">Eine Empfehlung ist optional.</span>}
         <div className="wizard-side-navigation">
           <button className="btn" type="button" onClick={goBack} disabled={step === 1}>← Zurück</button>
-        {step < 4 ? (
-          <button className="btn primary wizard-continue-button" type="button" onClick={goNext} disabled={!canContinue}>Weiter →</button>
+        {step === 4 && <button className="btn wizard-skip-schedule" type="button" onClick={() => submitTournament(true)} disabled={!canCreate}>Ohne Zeitplan erstellen</button>}
+        {step < 5 ? (
+          <button className="btn primary wizard-continue-button" type="button" onClick={goNext} disabled={!canContinue}>{step === 4 ? 'Weiter zum Zeitplan →' : 'Weiter →'}</button>
         ) : (
-          <button className="btn primary wizard-continue-button" type="button" onClick={submitTournament} disabled={!canCreate}>Turnier erstellen</button>
+          <button className="btn primary wizard-continue-button" type="button" onClick={() => submitTournament(false)} disabled={!canCreate || scheduleIssues.length > 0}>Turnier erstellen</button>
         )}
         </div>
       </div>
