@@ -128,6 +128,8 @@ export interface SchedulePhaseProposal {
   breakMinutes?: number;
   breakUntil?: string;
   nextDayStart?: string;
+  /** Optional explicit return date; absent means the calendar day after the previous phase. */
+  nextDayDate?: string;
   roundCount?: number;
   inlineBreakAfterRound?: number;
   inlineBreakKind?: 'minutes' | 'until';
@@ -200,7 +202,13 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
       } else cursor = new Date(cursor.getTime() + totalDuration * 60000);
     } else if (phase.breakKind === 'overnight') {
       const pauseStart = cursor;
-      cursor = clockAt(cursor, phase.nextDayStart ?? '09:00', true);
+      const explicit = phase.nextDayDate ? parseLocalDateTime(phase.nextDayDate + 'T' + (phase.nextDayStart ?? '09:00')) : null;
+      const tomorrow = clockAt(cursor, phase.nextDayStart ?? '09:00', true);
+      if (phase.nextDayDate && (!explicit || phase.nextDayDate <= toLocalDateTime(cursor).slice(0, 10))) {
+        warnings.push({ phaseIndex: index,
+          message: '„' + phase.label + '“: Das Fortsetzungsdatum muss nach dem Ende der vorherigen Phase liegen. Bitte ein späteres Datum wählen.' });
+      }
+      cursor = explicit && phase.nextDayDate! > toLocalDateTime(pauseStart).slice(0, 10) ? explicit : tomorrow;
       const pause = items[items.length - 1];
       pause.durationMinutes = Math.max(0, Math.round((cursor.getTime() - pauseStart.getTime()) / 60000));
       pause.durationApproximate = true;
