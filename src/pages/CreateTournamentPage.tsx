@@ -29,6 +29,7 @@ import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/
 import { createMockTournament } from '@/services/mockTournamentStore';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
+import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedTimelineDurationMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
@@ -61,6 +62,7 @@ type PhaseDraft = {
   breakKind: 'minutes' | 'until' | 'overnight';
   breakMinutes: number;
   nextDayStart: string;
+  nextDayDate: string;
   breakUntil: string;
   note: string;
   inlineBreakAfterRound: number;
@@ -249,6 +251,7 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
     breakKind: 'minutes',
     breakMinutes: 15,
     nextDayStart: '09:00',
+    nextDayDate: '',
     breakUntil: '12:00',
     note: '',
     inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00',
@@ -817,6 +820,7 @@ export function CreateTournamentPage() {
         breakKind: phase.breakKind,
         breakMinutes: phase.breakMinutes,
         nextDayStart: phase.nextDayStart,
+        nextDayDate: phase.nextDayDate,
         breakUntil: phase.breakUntil,
         note: phase.note,
         inlineBreakAfterRound: phase.inlineBreakAfterRound,
@@ -856,6 +860,7 @@ export function CreateTournamentPage() {
     breakMinutes: phase.breakMinutes,
     breakUntil: phase.breakUntil,
     nextDayStart: phase.nextDayStart,
+    nextDayDate: phase.nextDayDate,
     roundCount: phase.type === 'SWISS' ? phase.swissRounds : phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount).length : undefined,
     inlineBreakAfterRound: phase.inlineBreakAfterRound,
     inlineBreakKind: phase.inlineBreakKind,
@@ -929,7 +934,7 @@ export function CreateTournamentPage() {
               </div>
               <div className="field">
                 <label htmlFor="tournament-date">Turnierdatum <span className="wizard-required-mark" aria-hidden="true">*</span></label>
-                <input id="tournament-date" type="date" required value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} />
+                <CalendarDatePicker id="tournament-date" label="Turnierdatum" required value={scheduledDate} onChange={setScheduledDate} />
                 <span className="field-hint">Geplantes Datum für die Ankündigung und den Zeitplan. Den tatsächlichen Turnierstart legt die Turnierleitung fest.</span>
               </div>
               <div className="field">
@@ -1421,6 +1426,7 @@ export function CreateTournamentPage() {
                         : 'noch nicht berechenbar';
                       const estimatedPauseStart = plannedPhaseStart && isValidLocalDateTime(plannedPhaseStart)
                         ? formatPlannedDateTime(plannedPhaseStart) : 'noch nicht berechenbar';
+                      const earliestContinuationDate = nextCalendarDate((plannedPhaseStart ?? scheduledStart).slice(0, 10));
                       const estimatedInlinePauseStart = plannedInlinePause && isValidLocalDateTime(plannedInlinePause)
                         ? formatPlannedDateTime(plannedInlinePause) : 'noch nicht berechenbar';
                       return (
@@ -1471,7 +1477,7 @@ export function CreateTournamentPage() {
                                       ? 'Spieltagsende'
                                       : phase.breakKind === 'until' ? `Pause bis ${phase.breakUntil} Uhr`
                                       : `${phase.breakMinutes} Min. Pause`}</span>
-                                    {phase.breakKind === 'overnight' && <span className="phase-quick-tag">Fortsetzung morgen ${phase.nextDayStart} Uhr</span>}
+                                    {phase.breakKind === 'overnight' && <span className="phase-quick-tag">Fortsetzung: {estimatedPhaseEnd}</span>}
                                     <span className="phase-quick-tag phase-quick-tag-time">Nach vorheriger Phase: ca. {estimatedPauseStart}</span>
                                   </>
                                 ) : (
@@ -1593,7 +1599,7 @@ export function CreateTournamentPage() {
                           {phase.type === 'BREAK' ? (
                             <div className="break-phase-fields">
                               <div className="break-phase-inputs">
-                                <label className="field">Name der Pause
+                                <label className={phase.breakKind === 'overnight' ? 'field break-overnight-name' : 'field'}>Name der Pause
                                   <input type="text" maxLength={80} value={phase.label}
                                     placeholder="z. B. Mittagspause"
                                     onChange={(event) => updatePhase(phase.id, { label: event.target.value })} />
@@ -1609,10 +1615,20 @@ export function CreateTournamentPage() {
                                       onChange={(time) => updatePhase(phase.id, { breakUntil: time })} />
                                   </label>
                                 ) : (
-                                  <label className="field">Startzeit am Folgetag
-                                    <ClockTimePicker id={`phase-next-day-${phase.id}`} label="Startzeit am Folgetag" value={phase.nextDayStart}
-                                      onChange={(time) => updatePhase(phase.id, { nextDayStart: time })} />
-                                  </label>
+                                  <>
+                                    <div className="field">
+                                      <label htmlFor={`phase-next-day-date-${phase.id}`}>Fortsetzungsdatum</label>
+                                      <CalendarDatePicker id={`phase-next-day-date-${phase.id}`} label="Fortsetzungsdatum"
+                                        value={phase.nextDayDate || earliestContinuationDate}
+                                        minDate={earliestContinuationDate}
+                                        onChange={(date) => updatePhase(phase.id, { nextDayDate: date })} />
+                                    </div>
+                                    <div className="field">
+                                      <label htmlFor={`phase-next-day-${phase.id}`}>Fortsetzungsuhrzeit</label>
+                                      <ClockTimePicker id={`phase-next-day-${phase.id}`} label="Fortsetzungsuhrzeit" value={phase.nextDayStart}
+                                        onChange={(time) => updatePhase(phase.id, { nextDayStart: time })} />
+                                    </div>
+                                  </>
                                 )}
                                 {phase.breakKind === 'until' && (
                                   <p className="field-hint break-phase-time-hint">
@@ -1921,7 +1937,7 @@ export function CreateTournamentPage() {
                   <div>
                     <strong>{phase.label}</strong>
                     <small>{phase.type === 'BREAK'
-                    ? phase.breakKind === 'overnight' ? `Spieltagsende · Folgetag ${phase.nextDayStart} Uhr` : phase.breakKind === 'until' ? `Pause bis ${phase.breakUntil} Uhr` : `${phase.breakMinutes} Minuten`
+                    ? phase.breakKind === 'overnight' ? `Spieltagsende · Fortsetzung ${formatPlannedDateTime(plannedTimeline.items.find((item) => item.id === `phase-${index + 2}`)?.at ?? '')}` : phase.breakKind === 'until' ? `Pause bis ${phase.breakUntil} Uhr` : `${phase.breakMinutes} Minuten`
                     : `${phase.type === 'GROUPS' ? `${phase.groupCount} Gruppen` : phase.type === 'SWISS' ? `${phase.swissRounds} Runden` : `${phase.entrantCount} Teilnehmer`} · ${phaseEstimates[index]?.estimatedMatches ?? 0} Spiele · ca. ${formatCompactDuration(phaseEstimates[index]?.estimatedDurationMinutes ?? 0)}`}</small>
                   </div>
                 </li>
