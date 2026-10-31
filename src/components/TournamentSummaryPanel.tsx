@@ -41,7 +41,9 @@ function stageDetails(stage: TournamentStage): string {
   if (stage.type === 'BREAK') {
     return stage.settings.breakKind === 'overnight'
       ? `Spieltagsende · Fortsetzung am Folgetag um ${stage.settings.nextDayStart} Uhr`
-      : `${stage.settings.breakMinutes} Minuten Pause`;
+      : stage.settings.breakKind === 'until'
+        ? `Pause bis ${stage.settings.breakUntil} Uhr`
+        : `${stage.settings.breakMinutes} Minuten Pause`;
   }
   switch (stage.type) {
     case 'ROUND_ROBIN':
