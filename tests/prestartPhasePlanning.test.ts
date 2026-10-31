@@ -67,6 +67,34 @@ describe('replan before tournament start', () => {
     expect(validatePrestartPhases(phases, 12)).toEqual([]);
   });
 
+  it('retains explicit continuation dates from stored overnight stages', () => {
+    const withOvernight = {
+      ...tournament,
+      stages: [
+        tournament.stages[0],
+        {
+          ...tournament.stages[1],
+          id: 'overnight',
+          name: 'Pause',
+          type: 'BREAK' as const,
+          settings: {
+            entrants: 12,
+            breakKind: 'overnight',
+            nextDayStart: '10:15',
+            nextDayDate: '2026-11-07',
+          },
+        },
+        { ...tournament.stages[2], orderIndex: 3 },
+      ],
+    };
+    const drafts = initialPrestartPhases(withOvernight);
+    expect(drafts[1].nextDayDate).toBe('2026-11-07');
+    expect(drafts[1].nextDayStart).toBe('10:15');
+    expect(createPrestartPhase('BREAK', 12).nextDayDate).toBe('');
+    drafts[1].nextDayDate = 'not-a-date';
+    expect(validatePrestartPhases(drafts, 19).some((error) => error.includes('Fortsetzungsdatum'))).toBe(true);
+  });
+
   it('keeps set duration estimates sport aware and blocks edits after start', () => {
     const phases = normalizePrestartPhases(initialPrestartPhases(tournament), 19);
     expect(estimatePrestartDuration(tournament, phases)).toBeGreaterThan(0);
