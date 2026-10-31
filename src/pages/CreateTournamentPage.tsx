@@ -1073,7 +1073,7 @@ export function CreateTournamentPage() {
                   </div>
                   <div className="participant-editor-head-actions">
                     {editingParticipantId && (
-                      <button className="btn small" type="button" onClick={resetParticipantEditor}>Abbrechen</button>
+                      <button className="btn small danger-outline" type="button" onClick={resetParticipantEditor}>Abbrechen</button>
                     )}
                     <button className="btn small wizard-test-player-button" type="button" onClick={generateTestParticipants}
                       disabled={participantCount >= 19}
@@ -1083,7 +1083,8 @@ export function CreateTournamentPage() {
                   </div>
                 </div>
 
-                <div className="participant-mask">
+                <div className="participant-editor-fields-row">
+                  <div className="participant-mask">
                   <div className="field">
                     <label htmlFor="participant-first">{discipline === 'TEAMS' ? 'Mannschaftsname' : discipline === 'DOUBLES' ? 'Spieler 1 · Vorname' : 'Vorname'}</label>
                     <input
@@ -1131,15 +1132,16 @@ export function CreateTournamentPage() {
                   )}
                 </div>
 
-                <div className="participant-editor-actions">
-                  <button className="btn primary" type="button" onClick={saveParticipant}>
-                    {editingParticipantId ? 'Änderungen speichern' : discipline === 'TEAMS' ? 'Mannschaft hinzufügen' : discipline === 'SINGLES' ? 'Spieler hinzufügen' : 'Doppel hinzufügen'}
-                  </button>
-                  <div className="participant-validation" aria-live="polite">
-                    {participantErrorMessages.map((message) => (
-                      <span className="field-error" key={message}>{message}</span>
-                    ))}
+                  <div className="participant-editor-actions">
+                    <button className="btn primary" type="button" onClick={saveParticipant}>
+                      {editingParticipantId ? 'Änderungen speichern' : discipline === 'TEAMS' ? 'Mannschaft hinzufügen' : discipline === 'SINGLES' ? 'Spieler hinzufügen' : 'Doppel hinzufügen'}
+                    </button>
                   </div>
+                </div>
+                <div className="participant-validation" aria-live="polite">
+                  {participantErrorMessages.map((message) => (
+                    <span className="field-error" key={message}>{message}</span>
+                  ))}
                 </div>
               </div>
             </div>
