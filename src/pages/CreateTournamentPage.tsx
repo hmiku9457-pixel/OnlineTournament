@@ -30,7 +30,7 @@ import { createMockTournament } from '@/services/mockTournamentStore';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
-import { buildPlannedTimeline, isValidLocalDateTime, plannedTimelineDurationMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedTimelineDurationMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
@@ -1338,9 +1338,9 @@ export function CreateTournamentPage() {
         )}
 
         {step === 4 && (
-          <section>
+          <section className="phase-wizard-step">
             <h2>Phasen konfigurieren</h2>
-            <p className="muted">Phasen sind kompakt zusammengefasst. Öffne die Einstellungen nur bei Bedarf und füge neue Phasen direkt an der gewünschten Stelle ein.</p>
+            <p className="muted">Ordne deine Phasen an und öffne bei Bedarf die Einstellungen.</p>
 
             <div className="phase-step-layout">
               <div className="phase-step-main">
@@ -1355,8 +1355,9 @@ export function CreateTournamentPage() {
                 <div className="phase-add-panel phase-add-compact">
                   <div>
                     <strong>{phaseDrafts.length ? 'Phasenreihenfolge' : 'Erste Phase hinzufügen'}</strong>
-                    <span className="muted">{phaseDrafts.length ? 'Klicke zwischen den Phasen auf „+ weitere Phase hier einfügen“, um dort eine Phase hinzuzufügen.' : 'Wähle ein Turniersystem für die erste Phase.'}</span>
-                    <span className="phase-ko-rule"><span aria-hidden="true">🔒</span> Eine K.-o.-Phase steht immer am Ende und kann nicht verschoben werden.</span>
+                    <span className="muted">{phaseDrafts.length
+                      ? 'Per Griff verschieben · Zwischen den Phasen über + einfügen · K.-o. bleibt zuletzt.'
+                      : 'Wähle ein Turniersystem für die erste Phase.'}</span>
                   </div>
                   {phaseDrafts.length > 0 && <button className="btn small" type="button"
                     aria-expanded={phaseInsertIndex === 0}
@@ -1390,6 +1391,12 @@ export function CreateTournamentPage() {
                         ? recommendedSwissRounds(phase.entrantCount, minimumMatches) : null;
                       const groupQualifiers = nextPhase && nextPhase.entrantCount < phase.entrantCount
                         ? nextPhase.entrantCount : null;
+                      const plannedPhaseStart = plannedTimeline.items.find((item) => item.id === `phase-${index + 1}`)?.at;
+                      const plannedInlinePause = plannedTimeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at;
+                      const estimatedPauseStart = plannedPhaseStart && isValidLocalDateTime(plannedPhaseStart)
+                        ? formatPlannedDateTime(plannedPhaseStart) : 'noch nicht berechenbar';
+                      const estimatedInlinePauseStart = plannedInlinePause && isValidLocalDateTime(plannedInlinePause)
+                        ? formatPlannedDateTime(plannedInlinePause) : 'noch nicht berechenbar';
                       return (
                         <div className={`phase-sequence-item${dropTargetPhaseId === phase.id ? ' is-drop-target' : ''}${draggingPhaseId === phase.id ? ' is-being-dragged' : ''}`}
                           key={phase.id}
@@ -1426,19 +1433,32 @@ export function CreateTournamentPage() {
                             }
                           }}>
                           <div className="phase-config-head">
-                            <div>
-                              <span className="badge">Phase {index + 1}</span>
-                              <h3>{phase.label}</h3>
-                              <p className="phase-quick-facts">
-                                {phase.type === 'BREAK' ? (phase.breakKind === 'overnight'
-                                  ? `Spieltagsende · Fortsetzung morgen um ${phase.nextDayStart} Uhr`
-                                  : phase.breakKind === 'until' ? `Pause bis ${phase.breakUntil} Uhr`
-                                  : `${phase.breakMinutes} Minuten Pause`) : <>{phase.entrantCount} Teilnehmer · {phase.type === 'GROUPS' ? `${phase.groupCount} Gruppen · ` : ''}
-                                {phase.type === 'SWISS' ? `${phase.swissRounds} Runden · ` : ''}
-                                {phase.type === 'KNOCKOUT' ? `${knockoutRoundLabels(phase.entrantCount).length} Runden · ` : ''}
-                                {timedSport ? `${matchDurationMinutes} Min. pro Spiel` : `Best-of-${phase.bestOf}`}
-                                {phaseEstimates[index] && ` · ca. ${formatCompactDuration(phaseEstimates[index].estimatedDurationMinutes)}`}</>}
-                              </p>
+                            <div className="phase-card-summary">
+                              <div className="phase-card-title">
+                                <span className="badge">Phase {index + 1}</span>
+                                <h3>{phase.label}</h3>
+                              </div>
+                              <div className="phase-quick-tags">
+                                {phase.type === 'BREAK' ? (
+                                  <>
+                                    <span className="phase-quick-tag">{phase.breakKind === 'overnight'
+                                      ? 'Spieltagsende'
+                                      : phase.breakKind === 'until' ? `Pause bis ${phase.breakUntil} Uhr`
+                                      : `${phase.breakMinutes} Min. Pause`}</span>
+                                    {phase.breakKind === 'overnight' && <span className="phase-quick-tag">Fortsetzung morgen ${phase.nextDayStart} Uhr</span>}
+                                    <span className="phase-quick-tag phase-quick-tag-time">Nach vorheriger Phase: ca. {estimatedPauseStart}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="phase-quick-tag">{phase.entrantCount} Teilnehmer</span>
+                                    {phase.type === 'GROUPS' && <span className="phase-quick-tag">{phase.groupCount} Gruppen</span>}
+                                    {phase.type === 'SWISS' && <span className="phase-quick-tag">{phase.swissRounds} Runden</span>}
+                                    {phase.type === 'KNOCKOUT' && <span className="phase-quick-tag">{knockoutRoundLabels(phase.entrantCount).length} Runden</span>}
+                                    <span className="phase-quick-tag">{timedSport ? `${matchDurationMinutes} Min./Spiel` : `Best-of-${phase.bestOf}`}</span>
+                                    {phaseEstimates[index] && <span className="phase-quick-tag phase-quick-tag-time">ca. {formatCompactDuration(phaseEstimates[index].estimatedDurationMinutes)}</span>}
+                                  </>
+                                )}
+                              </div>
                               {plannedTimeline.warnings.some((warning) => warning.phaseIndex === index) &&
                                 <span className="phase-warning-chip" role="status">⚠ Pausenuhrzeit liegt vor dem geschätzten Pausenbeginn</span>}
                               {phase.inlineBreakAfterRound > 0 && (phase.type === 'SWISS' || phase.type === 'KNOCKOUT') &&
@@ -1531,6 +1551,10 @@ export function CreateTournamentPage() {
                           )}
                           {phase.type === 'BREAK' ? (
                             <div className="break-phase-fields">
+                              <p className="phase-break-estimate" role="status">
+                                <strong>Vorherige Phase voraussichtlich beendet:</strong> {estimatedPauseStart}
+                                <span> Planungswert – der tatsächliche Beginn der Pause hängt vom Turnierverlauf ab.</span>
+                              </p>
                               <label className="field">Name der Pause
                                 <input type="text" maxLength={80} value={phase.label}
                                   placeholder="z. B. Mittagspause"
@@ -1706,6 +1730,11 @@ export function CreateTournamentPage() {
                                     </button>
                                   )}
                                 </div>
+                                {phase.inlineBreakAfterRound > 0 && (
+                                  <p className="phase-inline-break-estimate" role="status">
+                                    Runde {phase.inlineBreakAfterRound} endet voraussichtlich: <strong>{estimatedInlinePauseStart}</strong>
+                                  </p>
+                                )}
                                 {phase.inlineBreakAfterRound > 0 && expandedInlineBreakIds.includes(phase.id) && (
                                   <div id={`inline-break-settings-${phase.id}`} className="phase-inline-break-settings">
                                     <label className="field">Unterbrechung nach
@@ -1757,7 +1786,16 @@ export function CreateTournamentPage() {
                                     onClick={() => insertPhase(index + 1, system.stageType)}>+ {system.label}</button>
                                 ))}
                                 {index + 1 < phaseDrafts.length && phase.type !== 'BREAK' && phaseDrafts[index + 1]?.type !== 'BREAK' && (
-                                  <button className="btn small" type="button" onClick={() => insertPhase(index + 1, 'BREAK')}>+ Pause / Spieltagsende</button>
+                                  <>
+                                    <button className="btn small" type="button" onClick={() => insertPhase(index + 1, 'BREAK')}>+ Pause / Spieltagsende</button>
+                                    <span className="phase-insert-pause-hint">
+                                      Vorherige Phase voraussichtlich beendet: {(() => {
+                                        const nextStart = plannedTimeline.items.find((item) => item.id === `phase-${index + 2}`)?.at;
+                                        return nextStart && isValidLocalDateTime(nextStart)
+                                          ? formatPlannedDateTime(nextStart) : 'noch nicht berechenbar';
+                                      })()}
+                                    </span>
+                                  </>
                                 )}
                                 <button className="btn small" type="button" onClick={() => setPhaseInsertIndex(null)}>Abbrechen</button>
                               </div>
