@@ -78,10 +78,29 @@ function calculateGroupPlan(playerCount: number, minimumMatches: number, maxGrou
 
 function calculateSwissPlan(playerCount: number, minimumMatches: number, maxSwissRoundsSetting?: number) {
   const recommendedRounds = Math.max(minimumMatches, Math.ceil(Math.log2(playerCount)));
-  const rounds = clampInteger(maxSwissRoundsSetting, recommendedRounds, 1, recommendedRounds);
+  // Limit to the number of distinct possible opponents in the reduced field.
+  const rounds = clampInteger(maxSwissRoundsSetting, recommendedRounds, 1, Math.min(30, playerCount - 1, recommendedRounds));
   const matches = Math.floor(playerCount / 2) * rounds;
   const roundsBelowMinimum = Math.max(0, minimumMatches - rounds);
   return { rounds, matches, roundsBelowMinimum };
+}
+
+/**
+ * Typical group qualifiers: roughly the best half, selected in comparable
+ * numbers from every group whenever the group sizes permit.
+ */
+function groupQualifiers(playerCount: number, groupCount: number): number {
+  const smallestGroup = Math.floor(playerCount / groupCount);
+  const perGroup = Math.max(1, Math.ceil(smallestGroup / 2));
+  return Math.min(playerCount - 1, Math.max(2, perGroup * groupCount));
+}
+
+/** Prefer an even per-group qualification field before a later knock-out cut. */
+function groupQualifiersBeforeKnockout(playerCount: number, groupCount: number, knockoutEntrants: number): number {
+  const natural = groupQualifiers(playerCount, groupCount);
+  const minimum = knockoutEntrants + 1;
+  const balanced = Math.ceil(minimum / groupCount) * groupCount;
+  return Math.min(playerCount - 1, Math.max(natural, balanced < playerCount ? balanced : minimum));
 }
 
 function distributedGroupMatches(playerCount: number, groupCount: number): number {
@@ -201,9 +220,21 @@ export function recommendTournamentFormats(
   const group = calculateGroupPlan(playerCount, minimumMatches, settings.maxGroups);
   const swiss = calculateSwissPlan(playerCount, minimumMatches, settings.maxSwissRounds);
   const defaultQualifiers = playerCount >= 16 ? 8 : 4;
-  const qualifiers = clampInteger(settings.knockoutQualifierCount, defaultQualifiers, 2, playerCount);
+  // A combined format must cut the field before the K.-o. phase.
+  const qualifiers = clampInteger(settings.knockoutQualifierCount, defaultQualifiers, 2, Math.max(2, playerCount - 1));
+  const groupSwissEntrants = playerCount >= 4 ? groupQualifiers(playerCount, group.groupCount) : playerCount;
+  const groupSwissRounds = calculateSwissPlan(groupSwissEntrants, minimumMatches, settings.maxSwissRounds);
+  // Three-system suggestions need two genuine qualification cuts.
+  const tripleKnockoutEntrants = Math.min(qualifiers, playerCount - 2);
+  const tripleSwissEntrants = playerCount >= 4
+    ? groupQualifiersBeforeKnockout(playerCount, group.groupCount, tripleKnockoutEntrants)
+    : playerCount;
+  const tripleSwissRounds = calculateSwissPlan(tripleSwissEntrants, minimumMatches, settings.maxSwissRounds);
 
   function addRecommendation(candidate: Omit<FormatRecommendation, 'estimatedDurationMinutes' | 'estimatedMatches'>) {
+    // Any change of competition system must eliminate at least one participant.
+    if (candidate.phases.length > 1 && candidate.phases.some((phase, index) =>
+      index > 0 && (phase.entrantCount ?? playerCount) >= (candidate.phases[index - 1].entrantCount ?? playerCount))) return;
     const baselineDuration = estimateDurationMinutes(candidate.phases, playerCount, tableCount);
     const estimatedDurationMinutes = Math.round(baselineDuration * (Math.max(1, input.matchDurationMinutes ?? 15) + Math.max(0, input.venueTurnoverMinutes ?? 0)) / MINUTES_PER_SET);
     const estimatedMatches = totalEstimatedMatches(candidate.phases, playerCount);
@@ -267,7 +298,7 @@ export function recommendTournamentFormats(
     });
   }
 
-  if (systemsEnabled(['groups', 'knockout'], settings)) {
+  if (playerCount >= 3 && systemsEnabled(['groups', 'knockout'], settings)) {
     const groupTableBonus = Math.min(tableCount, group.groupCount) * 2;
     const largeFieldPenalty = playerCount >= 20 ? 20 : playerCount >= 16 ? 10 : 0;
     addRecommendation({
@@ -284,7 +315,7 @@ export function recommendTournamentFormats(
     });
   }
 
-  if (systemsEnabled(['swiss', 'knockout'], settings)) {
+  if (playerCount >= 3 && systemsEnabled(['swiss', 'knockout'], settings)) {
     addRecommendation({
       id: 'swiss-ko',
       label: `${swiss.rounds} Runden Schweizer System → ${qualifiers} Qualifizierte → K.-o.`,
@@ -299,17 +330,18 @@ export function recommendTournamentFormats(
     });
   }
 
-  if (systemsEnabled(['groups', 'swiss'], settings)) {
+  if (playerCount >= 4 && systemsEnabled(['groups', 'swiss'], settings)) {
     addRecommendation({
       id: 'groups-swiss',
-      label: `${group.groupCount} Gruppen → ${swiss.rounds} Runden Schweizer System`,
-      description: 'Gruppenphase als Einstieg, anschließend Schweizer System statt einer K.-o.-Entscheidung.',
-      minimumGuaranteedMatches: group.minimumGuaranteedMatches + swiss.rounds,
+      label: `${group.groupCount} Gruppen → ${groupSwissEntrants} Qualifizierte → ${groupSwissRounds.rounds} Runden Schweizer System`,
+      description: `Nach der Gruppenphase spielen nur die ${groupSwissEntrants} Bestplatzierten im Schweizer System weiter.`,
+      // Eliminated participants play only the group stage.
+      minimumGuaranteedMatches: group.minimumGuaranteedMatches,
       score: playerCount >= 12 ? 78 : 58,
       requiredSystems: ['groups', 'swiss'],
       phases: [
         createPhaseTemplate('GROUPS', 1, { groupCount: group.groupCount, entrantCount: playerCount }),
-        createPhaseTemplate('SWISS', 2, { swissRounds: swiss.rounds, entrantCount: playerCount }),
+        createPhaseTemplate('SWISS', 2, { swissRounds: groupSwissRounds.rounds, entrantCount: groupSwissEntrants }),
       ],
     });
   }
@@ -317,15 +349,15 @@ export function recommendTournamentFormats(
   if (systemsEnabled(['groups', 'swiss', 'knockout'], settings) && playerCount >= 12) {
     addRecommendation({
       id: 'groups-swiss-ko',
-      label: `${group.groupCount} Gruppen → Schweizer System → ${qualifiers} Qualifizierte → K.-o.`,
-      description: 'Mehrstufige Variante mit Gruppen, Schweizer Zwischenphase und abschließender K.-o.-Runde.',
-      minimumGuaranteedMatches: group.minimumGuaranteedMatches + swiss.rounds,
+      label: `${group.groupCount} Gruppen → ${tripleSwissEntrants} Qualifizierte → Schweizer System → ${tripleKnockoutEntrants} Qualifizierte → K.-o.`,
+      description: `Nach der Gruppenphase spielen ${tripleSwissEntrants} Teilnehmer im Schweizer System weiter; die besten ${tripleKnockoutEntrants} erreichen die K.-o.-Phase.`,
+      minimumGuaranteedMatches: group.minimumGuaranteedMatches,
       score: 64,
       requiredSystems: ['groups', 'swiss', 'knockout'],
       phases: [
         createPhaseTemplate('GROUPS', 1, { groupCount: group.groupCount, entrantCount: playerCount }),
-        createPhaseTemplate('SWISS', 2, { swissRounds: swiss.rounds, entrantCount: playerCount }),
-        createPhaseTemplate('KNOCKOUT', 3, { entrantCount: qualifiers }),
+        createPhaseTemplate('SWISS', 2, { swissRounds: tripleSwissRounds.rounds, entrantCount: tripleSwissEntrants }),
+        createPhaseTemplate('KNOCKOUT', 3, { entrantCount: tripleKnockoutEntrants }),
       ],
     });
   }
