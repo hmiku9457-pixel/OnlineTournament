@@ -27,7 +27,7 @@ afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 const score = [{ number: 1, sideAScore: 11, sideBScore: 7 }];
 const phase = (type: 'SWISS' | 'KNOCKOUT', afterRound: number) => ({
   type, label: type === 'SWISS' ? 'Schweizer System' : 'K.-o.-Phase',
-  entrantCount: type === 'SWISS' ? 4 : 8, groupCount: 2, swissRounds: 4,
+  entrantCount: type === 'SWISS' ? 4 : 8, groupCount: 2, swissRounds: 3,
   bestOf: 1, knockoutBestOf: [1,1,1],
   inlineBreakAfterRound: afterRound, inlineBreakKind: 'until' as const, inlineBreakUntil: '13:00', inlineBreakMinutes: 30,
 });

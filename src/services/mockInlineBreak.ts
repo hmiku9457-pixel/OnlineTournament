@@ -1,5 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
+import { getAllMockTournaments } from '@/services/mockTournamentStore';
 import { computeBreakResumeAt, isStageStarted, isSwissRoundApproved, type BreakStartOptions } from '@/services/mockPhaseLifecycle';
 
 const STORAGE_KEY = 'online-tournament:mock-inline-breaks:v1';
@@ -95,8 +96,11 @@ export function startInlineBreak(
   stageMatches: readonly InlineBreakMatch[] = [],
   override?: BreakStartOptions,
 ): boolean {
-  if (tournament.status !== 'RUNNING') return false;
-  const status = getInlineBreakStatus(tournament, stage, stageMatches);
+  // Always use the persisted tournament status: callers may hold a stale
+  // snapshot immediately after the director starts or resumes the event.
+  const current = getAllMockTournaments().find((item) => item.id === tournament.id) ?? tournament;
+  if (current.status !== 'RUNNING') return false;
+  const status = getInlineBreakStatus(current, stage, stageMatches);
   if (status?.state !== 'ready') return false;
   const started = new Date();
   const options = override ?? (status.config.kind === 'until'
@@ -109,8 +113,9 @@ export function startInlineBreak(
 }
 
 export function canFinishInlineBreak(tournament: DemoTournament, stage: TournamentStage, now = new Date(), early = false): boolean {
-  if (tournament.status === 'ABORTED' || tournament.status === 'FINISHED') return false;
-  const status = getInlineBreakStatus(tournament, stage);
+  const current = getAllMockTournaments().find((item) => item.id === tournament.id) ?? tournament;
+  if (current.status === 'ABORTED' || current.status === 'FINISHED') return false;
+  const status = getInlineBreakStatus(current, stage);
   return status?.state === 'running'
     && Boolean(status.resumeAt && (early || now.getTime() >= status.resumeAt.getTime()));
 }
