@@ -83,15 +83,16 @@ describe('optionaler vorläufiger Zeitplan', () => {
   });
 
   it('speichert Turnierbeginn und unverbindlichen Ablauf dauerhaft, ohne Live-Phasen zu verändern', () => {
+    const sent = example.map((entry) => ({ ...entry }));
     const input = { name: 'Zeitplan-Cup', sport: 'table_tennis', discipline: 'SINGLES' as const, tables: 2,
       minimumMatches: 1, participantNames: ['Anna', 'Bernd'],
       phases: [{ type: 'ROUND_ROBIN' as const, label: 'Jeder gegen Jeden', entrantCount: 2, groupCount: 1,
         swissRounds: 1, bestOf: 1, knockoutBestOf: [] }], estimatedDurationMinutes: 45,
-      scheduledStart: start, plannedSchedule: example };
+      scheduledStart: start, plannedSchedule: sent };
     const tournament = createMockTournament(input);
     expect(tournament.scheduledStart).toBe(start);
     expect(tournament.plannedSchedule).toEqual(example);
-    example[0].title = 'Später geändert';
+    sent[0].title = 'Später geändert';
     expect(getMockTournament(tournament.id).plannedSchedule?.[0].title).toBe('Gruppenphase');
     expect(getMockTournament(tournament.id).hasStarted).toBe(false);
     const without = createMockTournament({ ...input, name: 'Ohne Zeitplan', plannedSchedule: [] });
@@ -105,6 +106,9 @@ describe('optionaler vorläufiger Zeitplan', () => {
     }));
     expect(markup).toContain('Geplanter Turnierbeginn');
     expect(markup).toContain('unverbindlich');
+    expect(markup).toContain('Gruppenphase');
+    expect(markup).toContain('Mittagspause');
+    expect(markup).toContain('Siegerehrung');
     expect(markup.indexOf('Gruppenphase')).toBeLessThan(markup.indexOf('Mittagspause'));
     expect(markup.indexOf('Mittagspause')).toBeLessThan(markup.indexOf('Siegerehrung'));
     expect(markup).toContain('Verpflegung im Foyer');
