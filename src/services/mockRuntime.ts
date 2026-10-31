@@ -1,3 +1,4 @@
+import { groupLetter } from '@/domain/groupLabels';
 import { isParticipantWithdrawn, saveParticipantWithdrawal, removeParticipantWithdrawal, markWithdrawalRestoreEligibility, getWithdrawalRestoreEligibility, saveWithdrawalTiming, type WithdrawalTiming } from '@/services/mockWithdrawals';
 import { reconcilePrestartDraws, reconcileQualifiedDraw } from '@/services/mockDrawStore';
 import type { DemoTournament } from '@/data/demoTournaments';
@@ -286,7 +287,7 @@ function groupMatches(tournament: DemoTournament, stage: TournamentStage): BaseS
 
   for (let dayIndex = 0; dayIndex < maxDays; dayIndex += 1) {
     schedules.forEach((schedule, groupIndex) => {
-      const groupLabel = `Gruppe ${String.fromCharCode(65 + groupIndex)}`;
+      const groupLabel = `Gruppe ${groupLetter(groupIndex)}`;
       (schedule[dayIndex] ?? []).forEach(([sideA, sideB], matchIndex) => {
         matches.push({
           id: `${stage.id}-g${groupIndex + 1}-d${dayIndex + 1}-m${matchIndex + 1}`,
@@ -1287,7 +1288,7 @@ function computeStageQualifiers(tournament: DemoTournament, stage: TournamentSta
 
   if (stage.type === 'GROUPS') {
     const rankings = groupMembers(tournament, stage).map((members, groupIndex) => {
-      const groupLabel = `Gruppe ${String.fromCharCode(65 + groupIndex)}`;
+      const groupLabel = `Gruppe ${groupLetter(groupIndex)}`;
       return rankParticipants(members, matches.filter((match) => match.round === groupLabel), results, tournament.sport);
     });
     const qualified: string[] = [];

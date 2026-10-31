@@ -1,3 +1,4 @@
+import { groupLetter } from '@/domain/groupLabels';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { seededGroupAssignments, seededKnockoutSlots, seededKnockoutSlotsAvoidingGroups, snakeSeededGroupOrder } from '@/engine/seededDraws';
@@ -151,7 +152,7 @@ export function setParticipantGroup(tournament: DemoTournament, stage: Tournamen
   if (previous === groupIndex) return true;
   current[participant] = groupIndex;
   upsert({ tournamentId: tournament.id, stageId: stage.id, groupAssignments: current });
-  auditDraw(tournament, stage, `${participant} von Gruppe ${String.fromCharCode(65 + previous)} in Gruppe ${String.fromCharCode(65 + groupIndex)} verschoben`);
+  auditDraw(tournament, stage, `${participant} von Gruppe ${groupLetter(previous)} in Gruppe ${groupLetter(groupIndex)} verschoben`);
   return true;
 }
 

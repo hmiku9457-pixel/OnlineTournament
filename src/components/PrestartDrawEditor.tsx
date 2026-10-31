@@ -1,3 +1,4 @@
+import { groupLetter } from '@/domain/groupLabels';
 import type { DragEvent } from 'react';
 import { DrawActionButton } from '@/components/DrawActionButton';
 import type { DemoTournament } from '@/data/demoTournaments';
@@ -21,7 +22,7 @@ interface Props {
 const DRAG_TYPE = 'text/online-tournament-draw';
 
 function groupLabel(index: number) {
-  return `Gruppe ${String.fromCharCode(65 + index)}`;
+  return `Gruppe ${groupLetter(index)}`;
 }
 
 function setDragValue(event: DragEvent, value: string) {

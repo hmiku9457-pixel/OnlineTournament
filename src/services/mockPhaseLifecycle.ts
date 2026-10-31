@@ -1,3 +1,4 @@
+import { groupLetter } from '@/domain/groupLabels';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
@@ -137,7 +138,7 @@ export function getStageStartIssue(tournament: DemoTournament, stage: Tournament
     entrants.forEach((participant) => { counts[assignments[participant] ?? 0] += 1; });
     const singleton = counts.findIndex((count) => count === 1);
     if (singleton !== -1) {
-      return `Gruppe ${String.fromCharCode(65 + singleton)} enthält nur einen Teilnehmer. Leere Gruppen sind erlaubt; bitte den einzelnen Teilnehmer einer anderen Gruppe zuordnen.`;
+      return `Gruppe ${groupLetter(singleton)} enthält nur einen Teilnehmer. Leere Gruppen sind erlaubt; bitte den einzelnen Teilnehmer einer anderen Gruppe zuordnen.`;
     }
   }
   return null;

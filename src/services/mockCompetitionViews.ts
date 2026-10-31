@@ -1,3 +1,4 @@
+import { groupLetter } from '@/domain/groupLabels';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { compareRankingRows, resultScore, resultWinnerSide, type ExtraTimeProgress, type ScoreDecision } from '@/domain/sportScoring';
@@ -125,7 +126,7 @@ export function buildMockGroups(tournament: DemoTournament, stage: TournamentSta
   const stageMatches = getMockStageMatches(tournament, stage);
 
   return groups.map((members, groupIndex) => {
-    const label = `Gruppe ${String.fromCharCode(65 + groupIndex)}`;
+    const label = `Gruppe ${groupLetter(groupIndex)}`;
     const groupMatches = stageMatches.filter((match) => match.round === label);
     const standings = computeStandings(members, groupMatches, tournament.sport);
     const matches: MockGroupMatch[] = groupMatches.map((match) => {
