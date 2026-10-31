@@ -5651,8 +5651,8 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 }
 
 /* Kalenderdialog und einheitlich hohe Eingabefelder für eigenständige Pausen */
-.wizard-workspace .phase-wizard-step .break-phase-fields > .break-phase-inputs input:not([type="radio"]),
-.wizard-workspace .phase-wizard-step .break-phase-fields > .break-phase-inputs select,
+.wizard-workspace .phase-wizard-step .break-phase-fields > .break-phase-inputs > .field > input:not([type="radio"]),
+.wizard-workspace .phase-wizard-step .break-phase-fields > .break-phase-inputs > .field > select,
 .wizard-workspace .phase-wizard-step .break-phase-fields > .break-phase-inputs .clock-picker-trigger,
 .wizard-workspace .phase-wizard-step .break-phase-fields > .break-phase-inputs .calendar-picker-trigger {
   box-sizing: border-box;
