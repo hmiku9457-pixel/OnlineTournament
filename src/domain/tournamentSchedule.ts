@@ -183,6 +183,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
     } else {
       const pauseMinutes = Math.max(1, phase.breakMinutes ?? 15);
       items[items.length - 1].durationMinutes = pauseMinutes;
+      items[items.length - 1].durationApproximate = false;
       cursor = new Date(cursor.getTime() + pauseMinutes * 60000);
     }
   });
