@@ -62,40 +62,67 @@ export interface SchedulePhaseProposal {
   nextDayStart?: string;
 }
 
-function nextClockTarget(current: Date, time: string, followingDay = false): Date {
+export interface PlannedTimeline {
+  /** Scheduled start of every phase, in the same order as the phase editor. */
+  items: PlannedScheduleItem[];
+  /** Expected end of the last phase, useful for planning an awards ceremony. */
+  estimatedEnd: string;
+  /** Inconsistent clock pauses are kept on the same day and flagged, never silently shifted to tomorrow. */
+  warnings: Array<{ phaseIndex: number; message: string }>;
+}
+
+function clockAt(current: Date, time: string, followingDay = false): Date {
   const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
   if (!match) return new Date(current);
   const next = new Date(current);
   if (followingDay) next.setDate(next.getDate() + 1);
   next.setHours(Number(match[1]), Number(match[2]), 0, 0);
-  if (!followingDay && next.getTime() <= current.getTime()) next.setDate(next.getDate() + 1);
   return next;
 }
 
-/** Suggest phase START times from a rough estimate; user can freely edit them.
- * No fixtures are scheduled and none of these timestamps control tournament flow.
+/** Calculate the whole non-binding timetable, starting with the first tournament
+ * phase. A "Pause bis" that would end before the theoretical pause begins
+ * produces a warning instead of introducing an unexplained next-day delay.
+ * Actual phase starts and game assignments never read these values.
  */
-export function suggestPlannedSchedule(start: string, phases: SchedulePhaseProposal[]): PlannedScheduleItem[] {
-  const parsed = parseLocalDateTime(start);
-  if (!parsed) return [];
-  let cursor = parsed;
-  return phases.map((phase, index) => {
+export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposal[]): PlannedTimeline {
+  const cursorStart = parseLocalDateTime(start);
+  if (!cursorStart) return { items: [], estimatedEnd: '', warnings: [] };
+  let cursor = cursorStart;
+  const warnings: PlannedTimeline['warnings'] = [];
+  const items: PlannedScheduleItem[] = [];
+  phases.forEach((phase, index) => {
     const isBreak = phase.type === 'BREAK';
-    const item: PlannedScheduleItem = {
+    items.push({
       id: `phase-${index + 1}`,
       at: toLocalDateTime(cursor),
       title: phase.label,
       type: isBreak ? 'break' : 'competition',
-    };
+    });
     if (!isBreak) {
       cursor = new Date(cursor.getTime() + Math.max(0, phase.estimatedMinutes) * 60000);
     } else if (phase.breakKind === 'overnight') {
-      cursor = nextClockTarget(cursor, phase.nextDayStart ?? '09:00', true);
+      cursor = clockAt(cursor, phase.nextDayStart ?? '09:00', true);
     } else if (phase.breakKind === 'until') {
-      cursor = nextClockTarget(cursor, phase.breakUntil ?? '12:00');
+      const target = clockAt(cursor, phase.breakUntil ?? '12:00');
+      if (target.getTime() < cursor.getTime()) {
+        const planned = String(phase.breakUntil ?? '12:00');
+        const earliest = formatPlannedDateTime(toLocalDateTime(cursor), false);
+        warnings.push({
+          phaseIndex: index,
+          message: `„${phase.label}“: Pause bis ${planned} Uhr liegt vor dem voraussichtlichen Pausenbeginn um ${earliest}. Bitte eine spätere Uhrzeit wählen. Für die Vorschau wird die nächste Phase frühestens nach dem vorherigen Spielende angesetzt.`,
+        });
+      } else {
+        cursor = target;
+      }
     } else {
       cursor = new Date(cursor.getTime() + Math.max(1, phase.breakMinutes ?? 15) * 60000);
     }
-    return item;
   });
+  return { items, estimatedEnd: toLocalDateTime(cursor), warnings };
+}
+
+/** Backwards-compatible helper for templates and external callers. */
+export function suggestPlannedSchedule(start: string, phases: SchedulePhaseProposal[]): PlannedScheduleItem[] {
+  return buildPlannedTimeline(start, phases).items;
 }
