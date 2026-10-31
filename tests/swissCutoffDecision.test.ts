@@ -6,9 +6,11 @@ import {
   completeMockMatch, getMockStageMatches, getPendingSwissCutoff, getSwissCutoffHistory,
   getMockRuntimeMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, beginSwissCutoffSetMatch, assignMockMatchToTable, findMockRuntimeMatch,
   recordSwissCutoffSet, recordSwissCutoffLot, resetSwissCutoffSets, refreshCompletedStageQualifiers,
-  beginSwissCutoffPlayoff, recordSwissCutoffPlayoffResult,
+  beginSwissCutoffPlayoff, recordSwissCutoffPlayoffResult, getPendingMockApproval, canEditMockMatch,
+  restoreMockCorrectedResult,
 } from '@/services/mockRuntime';
 import { buildSwissStandings } from '@/services/mockCompetitionViews';
+import { getMockAudit } from '@/services/mockAudit';
 import { equalSwissSportingRank, findSwissCutoffTie } from '@/domain/swissCutoffTie';
 import type { RankedParticipant } from '@/domain/standingRankings';
 
@@ -337,6 +339,42 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(getPendingSwissCutoff(t)).toBeNull();
     expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
+  });
+  it('korrigiert einen bereits freigegebenen Entscheidungssatz samt Qualifikation und Undo', () => {
+    const t = create();
+    completeRound(t);
+    const tie = getPendingSwissCutoff(t)!;
+    const [a, b] = tie.tie.players;
+    expect(beginSwissCutoffSetMatch(t)).toBeNull();
+    const match = getMockRuntimeMatches(t)[0];
+    completeMockMatch(match.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]);
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(getStageEntrants(t, t.stages[1])).toEqual([a]);
+    expect(canEditMockMatch(t, match.id)).toBe(true);
+
+    completeMockMatch(match.id, [{ number: 1, sideAScore: 7, sideBScore: 11 }], 'FINISHED', true);
+    expect(isStageCompleted(t, t.stages[0])).toBe(false);
+    expect(getSwissCutoffHistory(t, t.stages[0])?.winners).toEqual([b]);
+    expect(getPendingMockApproval(t)?.kind).toBe('STAGE');
+    const correction = getMockAudit(t.id).find((entry) => entry.matchId === match.id && entry.action === 'RESULT_CORRECTED');
+    expect(correction).toBeDefined();
+    expect(restoreMockCorrectedResult(t, correction!.id)).toBe(true);
+    expect(getSwissCutoffHistory(t, t.stages[0])?.winners).toEqual([a]);
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(getStageEntrants(t, t.stages[1])).toEqual([a]);
+  });
+
+  it('sperrt den ersten Entscheidungssatz nach der Tischzuweisung eines Folgeentscheids', () => {
+    const t = create(8, 1);
+    completeRound(t);
+    expect(beginSwissCutoffSetMatch(t)).toBeNull();
+    const first = getMockRuntimeMatches(t)[0];
+    completeMockMatch(first.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]);
+    const second = getMockRuntimeMatches(t).find((match) => match.id !== first.id);
+    expect(second).toBeDefined();
+    expect(assignMockMatchToTable(t, second!.id, 'Tisch 1')).toBe(true);
+    expect(canEditMockMatch(t, first.id)).toBe(false);
+    expect(() => completeMockMatch(first.id, [{ number: 1, sideAScore: 7, sideBScore: 11 }], 'FINISHED', true)).toThrow('gesperrt');
   });
 });
 

@@ -1,7 +1,8 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { createMockTournament, updateMockTournamentStatus, getMockTournament, updateMockParticipantName } from '@/services/mockTournamentStore';
-import { startFirstStage, startStage, isStageCompleted, getStageEntrants } from '@/services/mockPhaseLifecycle';
-import { approveMockProgress, getPendingMockApproval, getMockStageMatches, canEditMockMatch, completeMockMatch, assignMockMatchToTable, getMockStoredResult, withdrawMockParticipant, restoreMockParticipant, canRestoreMockParticipant, saveMockMatchSets } from '@/services/mockRuntime';
+import { startFirstStage, startStage, isStageCompleted, getStageEntrants, getStageStartIssue } from '@/services/mockPhaseLifecycle';
+import { approveMockProgress, getPendingMockApproval, getMockStageMatches, canEditMockMatch, completeMockMatch, assignMockMatchToTable, getMockStoredResult, withdrawMockParticipant, restoreMockParticipant, canRestoreMockParticipant, saveMockMatchSets, abortMockTournament, canWithdrawMockParticipant } from '@/services/mockRuntime';
+import { getGroupAssignments, setParticipantGroup, toggleBracketPin, getPinnedBracketSlots, getBracketSlots } from '@/services/mockDrawStore';
 import { getMockAudit } from '@/services/mockAudit';
 import { setMockTableBlocked } from '@/services/mockTableLocks';
 import type { MockPhaseInput } from '@/services/mockTournamentStore';
@@ -130,6 +131,73 @@ describe('local director integrity', () => {
     expect(audit.some(e => e.action === 'TABLE_BLOCKED')).toBe(true);
     expect(audit.some(e => e.action === 'TABLE_UNBLOCKED')).toBe(true);
     expect(getMockTournament('absent').stages).toHaveLength(0);
+  });
+
+  it('allows empty groups but rejects singleton groups until moved', () => {
+    const t = create([phase('GROUPS', 4)]);
+    const stage = t.stages[0];
+    const assignments = getGroupAssignments(t, stage);
+    const membersB = t.participantNames!.filter(name => assignments[name] === 1);
+    expect(membersB).toHaveLength(2);
+    expect(setParticipantGroup(t, stage, membersB[0], 0)).toBe(true);
+    expect(getStageStartIssue(t, stage)).toContain('nur einen Teilnehmer');
+    expect(startFirstStage(t)).toBe(false);
+    expect(setParticipantGroup(t, stage, membersB[1], 0)).toBe(true);
+    expect(getStageStartIssue(t, stage)).toBeNull();
+    expect(startFirstStage(t)).toBe(true);
+  });
+
+  it('rejects a next phase when only one eligible participant remains', () => {
+    const t = create([phase('ROUND_ROBIN', 2), phase('KNOCKOUT', 2)], 'Small', 2);
+    start(t);
+    getMockStageMatches(t, t.stages[0]).forEach(m => completeMockMatch(m.id, win));
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    const qualified = getStageEntrants(t, t.stages[1])[0];
+    expect(withdrawMockParticipant(t, qualified)).toBe(true);
+    expect(getStageEntrants(t, t.stages[1])).toHaveLength(1);
+    expect(getStageStartIssue(t, t.stages[1])).toContain('mindestens zwei');
+    expect(startStage(t, t.stages[1])).toBe(false);
+  });
+
+  it('prevents withdrawals after abort without changing completed group results', () => {
+    const t = create([phase('GROUPS', 4)]);
+    start(t);
+    const match = getMockStageMatches(t, t.stages[0])[0];
+    completeMockMatch(match.id, win);
+    expect(abortMockTournament(t, 'Test')).toBe(true);
+    const snapshot = getMockStoredResult(match.id);
+    expect(canWithdrawMockParticipant(t, match.sideA)).toBe(false);
+    expect(withdrawMockParticipant(t, match.sideA)).toBe(false);
+    expect(getMockStoredResult(match.id)).toEqual(snapshot);
+  });
+
+  it('rebuilds a pinned knockout draw when a qualifier withdraws', () => {
+    const t = create([phase('GROUPS', 4), phase('KNOCKOUT', 2)]);
+    start(t);
+    getMockStageMatches(t, t.stages[0]).forEach(m => completeMockMatch(m.id, win));
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    const ko = t.stages[1];
+    const originallyQualified = getStageEntrants(t, ko);
+    expect(toggleBracketPin(t, ko, 0)).toBe(true);
+    expect(getPinnedBracketSlots(t, ko)).toEqual([0]);
+    expect(withdrawMockParticipant(t, originallyQualified[0])).toBe(true);
+    expect(getStageEntrants(t, ko)).not.toContain(originallyQualified[0]);
+    expect(getPinnedBracketSlots(t, ko)).toEqual([]);
+    expect(getBracketSlots(t, ko)).toEqual(expect.arrayContaining(getStageEntrants(t, ko)));
+    expect(getMockAudit(t.id).some(e => e.action === 'KNOCKOUT_DRAW_REBUILT')).toBe(true);
+  });
+
+  it('keeps a manually paused tournament paused after correcting an approved stage', () => {
+    const t = create([phase('ROUND_ROBIN', 4), phase('KNOCKOUT', 2)]);
+    start(t);
+    const first = getMockStageMatches(t, t.stages[0])[0];
+    getMockStageMatches(t, t.stages[0]).forEach(m => completeMockMatch(m.id, win));
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    updateMockTournamentStatus(t.id, 'RUNNING');
+    updateMockTournamentStatus(t.id, 'PAUSED');
+    completeMockMatch(first.id, lose, 'FINISHED', true);
+    expect(getMockTournament(t.id).status).toBe('PAUSED');
+    expect(isStageCompleted(t, t.stages[0])).toBe(false);
   });
 
   it('updates Swiss decisions and walkover references after a participant rename', () => {
