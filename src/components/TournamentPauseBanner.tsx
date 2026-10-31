@@ -25,7 +25,7 @@ export function TournamentPauseBanner({
   return (
     <section className={`control-pause-alert no-print${ready ? ' is-ready' : ''}`}
       aria-label="Laufende Turnierpause" data-testid="director-pause-banner">
-      <div className="control-pause-alert-symbol" aria-hidden="true">⏸</div>
+      <div className="control-pause-alert-symbol" aria-hidden="true" />
       <div className="control-pause-alert-description">
         <div className="control-pause-alert-eyebrow">
           <span className="control-pause-alert-indicator" aria-hidden="true" />

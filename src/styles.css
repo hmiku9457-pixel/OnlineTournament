@@ -4597,15 +4597,26 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   color: #054f31;
 }
 .control-pause-alert-symbol {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   width: 44px;
   height: 44px;
   border-radius: 12px;
   background: #92400e;
   color: #fff;
-  font-size: 1.45rem;
-  line-height: 1;
+  flex: none;
+}
+/* Two symmetric bars instead of a font glyph: optically and geometrically centered. */
+.control-pause-alert-symbol::before,
+.control-pause-alert-symbol::after {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 18px;
+  border-radius: 2px;
+  background: currentColor;
 }
 .control-pause-alert.is-ready .control-pause-alert-symbol { background: #067647; }
 .control-pause-alert-description { display: grid; gap: 3px; min-width: 0; }
@@ -4619,17 +4630,27 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   display: grid;
   justify-items: center;
   gap: 2px;
-  min-width: 138px;
+  min-width: 0;
   padding: 7px 13px;
   border-radius: 10px;
   background: #78350f;
   color: #fff;
-  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .control-pause-alert.is-ready .control-pause-alert-timer { background: #065f46; }
 .control-pause-alert-timer > span { font-size: .69rem; font-weight: 700; }
-.control-pause-alert-timer > strong { font-size: clamp(1.45rem, 2.2vw, 2rem); font-weight: 850; line-height: 1.2; letter-spacing: .025em; }
+.control-pause-alert-timer > strong {
+  display: block;
+  width: 12ch;
+  min-width: 12ch;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.15rem, 1.8vw, 1.7rem);
+  font-weight: 850;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
 .control-pause-alert-actions { display: flex; flex-direction: column; gap: 6px; min-width: 155px; }
 .control-pause-alert-actions .btn { width: 100%; padding: 7px 12px; font-size: .78rem; line-height: 1.2; white-space: nowrap; }
 .control-pause-alert-action.btn { background: #92400e; border-color: #92400e; color: #fff; }
@@ -4648,8 +4669,8 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .control-pause-alert-eyebrow { font-size: .63rem; }
   .control-pause-alert-title { font-size: .93rem; }
   .control-pause-alert-schedule { font-size: .74rem; }
-  .control-pause-alert-timer { min-width: 96px; padding: 7px 9px; }
-  .control-pause-alert-timer > strong { font-size: 1.35rem; }
+  .control-pause-alert-timer { min-width: 0; padding: 7px 8px; }
+  .control-pause-alert-timer > strong { font-size: clamp(.87rem, 3vw, 1.08rem); }
   .control-pause-alert-actions { grid-column: 1 / -1; justify-content: stretch; }
   .control-pause-alert-actions .btn { flex: 1; min-width: 0; white-space: normal; }
 }
