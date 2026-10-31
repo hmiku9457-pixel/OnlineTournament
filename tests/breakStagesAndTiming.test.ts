@@ -27,6 +27,10 @@ describe('break phases', () => {
       .toMatchObject({ estimatedMatches: 0, estimatedDurationMinutes: 25 });
     expect(estimatePhaseMetrics({ ...base, breakKind: 'overnight', breakMinutes: 25 }, 4))
       .toMatchObject({ estimatedMatches: 0, estimatedDurationMinutes: 0 });
+    // Without a known pause-start time an absolute clock target has no
+    // measurable duration; don't incorrectly reuse the minutes preset.
+    expect(estimatePhaseMetrics({ ...base, breakKind: 'until', breakMinutes: 25 }, 4))
+      .toMatchObject({ estimatedMatches: 0, estimatedDurationMinutes: 0, approximate: true });
   });
   it('permits breaks between competitions, never first, last or adjacent', () => {
     expect(hasValidBreakStageOrder(['GROUPS', 'BREAK', 'SWISS', 'BREAK', 'KNOCKOUT'])).toBe(true);

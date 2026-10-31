@@ -1633,6 +1633,8 @@ export function CreateTournamentPage() {
           <span>Voraussichtliche Dauer</span>
           <strong>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : 'Noch offen'}</strong>
           {phaseDrafts.length > 0 && <small>Schätzung · verändert sich mit den Phasen und {venue.dativePlural}.</small>}
+          {phaseDrafts.some((phase) => phase.type === 'BREAK' && phase.breakKind === 'until') &&
+            <small>„Pause bis“ wird erst beim tatsächlichen Pausenstart zeitlich berechnet und ist nicht in der Dauerprognose enthalten.</small>}
         </div>
         {maxReachedStep >= 4 && !canCreate && (
           <div className="wizard-side-validation" role="status">

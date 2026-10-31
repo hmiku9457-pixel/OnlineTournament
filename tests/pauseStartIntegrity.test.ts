@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { createMockTournament, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
+import { createMockTournament, getMockTournament, updateMockTournamentStatus, updatePrestartTournamentPhases } from '@/services/mockTournamentStore';
+import { initialPrestartPhases } from '@/domain/prestartPhasePlanning';
 import { startFirstStage, startStage, completeStage, getStageEntrants, getBreakResumeAt, computeBreakResumeAt, formatBreakCountdown, canFinishBreak, isStageCompleted, isStageEditable, getStageStartIssue } from '@/services/mockPhaseLifecycle';
 import { getGroupAssignments, setParticipantGroup } from '@/services/mockDrawStore';
 import { setMockTableBlocked } from '@/services/mockTableLocks';
@@ -102,6 +103,38 @@ describe('steuerbare Pause', () => {
     expect(computeBreakResumeAt(start, { kind: 'clock', time: '15:30' })?.getDate()).toBe(31);
     expect(computeBreakResumeAt(start, { kind: 'clock', time: '12:00' })?.getDate()).toBe(1);
     expect(computeBreakResumeAt(start, { kind: 'clock', time: '25:99' })).toBeNull();
+  });
+
+  it('übernimmt Pause bis aus der Turniererstellung und der Vorstartbearbeitung in den Countdown', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2026, 9, 31, 14, 0, 0));
+      const created = create([phase('GROUPS'), { ...phase('BREAK'), breakKind: 'until', breakUntil: '15:30' }, phase('KNOCKOUT', 2)]);
+      expect(getMockTournament(created.id).stages[1].settings).toMatchObject({ breakKind: 'until', breakUntil: '15:30' });
+
+      const draft = initialPrestartPhases(getMockTournament(created.id));
+      expect(draft[1]).toMatchObject({ breakKind: 'until', breakUntil: '15:30' });
+      draft[1].breakUntil = '17:45';
+      const saved = updatePrestartTournamentPhases(created.id, draft);
+      expect(saved.ok).toBe(true);
+      const t = getMockTournament(created.id);
+      expect(t.stages[1].settings.breakUntil).toBe('17:45');
+      expect(startFirstStage(t)).toBe(true);
+      updateMockTournamentStatus(t.id, 'RUNNING');
+      getMockStageMatches(t, t.stages[0]).forEach((match) => completeMockMatch(match.id, score));
+      expect(approveMockProgress(t)?.kind).toBe('STAGE');
+      expect(startStage(t, t.stages[1])).toBe(true);
+      const target = getBreakResumeAt(t, t.stages[1])!;
+      expect(target.getHours()).toBe(17);
+      expect(target.getMinutes()).toBe(45);
+      expect(target.getDate()).toBe(31);
+      expect(formatBreakCountdown(target, new Date(2026, 9, 31, 14, 0, 0).getTime())).toBe('3:45:00');
+      // The planned target stays fixed and the phase cannot be completed early by accident.
+      expect(canFinishBreak(t, t.stages[1])).toBe(false);
+      expect(getBreakResumeAt(t, t.stages[1])!.getTime()).toBe(target.getTime());
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('behält die feste Uhrzeit bei und erlaubt vorzeitiges Beenden', () => {

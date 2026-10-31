@@ -52,6 +52,21 @@ describe('replan before tournament start', () => {
     expect(validatePrestartPhases(valid, 12)).toContain('Eine Pause muss zwischen zwei Spielphasen stehen.');
   });
 
+  it('validiert die neue Pausenart mit Uhrzeit getrennt von Minuten und Spieltagsende', () => {
+    const phases = normalizePrestartPhases(initialPrestartPhases(tournament), 12);
+    phases[0].groupCount = 3;
+    phases[1].swissRounds = 5;
+    const pause = createPrestartPhase('BREAK', 12);
+    pause.breakKind = 'until';
+    pause.breakUntil = '14:30';
+    phases.splice(1, 0, pause);
+    expect(validatePrestartPhases(phases, 12)).toEqual([]);
+    pause.breakUntil = '25:99';
+    expect(validatePrestartPhases(phases, 12)).toContain('Phase 2: Für „Pause bis“ ist eine gültige Uhrzeit (HH:MM) erforderlich.');
+    pause.breakUntil = '14:30';
+    expect(validatePrestartPhases(phases, 12)).toEqual([]);
+  });
+
   it('keeps set duration estimates sport aware and blocks edits after start', () => {
     const phases = normalizePrestartPhases(initialPrestartPhases(tournament), 19);
     expect(estimatePrestartDuration(tournament, phases)).toBeGreaterThan(0);
