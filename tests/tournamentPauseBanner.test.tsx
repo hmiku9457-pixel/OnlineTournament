@@ -21,7 +21,7 @@ describe('Sichtbare Pauseninfo für alle Turnierleitungs-Tabs', () => {
     expect(html).toContain('director-pause-banner');
     expect(html).toContain('TURNIERPAUSE LÄUFT');
     expect(html).toContain('Mittagspause');
-    expect(html).toContain('000:00:15:30');
+    expect(html).toContain('15:30');
     expect(html).not.toContain('⏸');
     expect(html).toContain('14:30');
     expect(html).toContain('Nach der Pause startet die K.-o.-Phase');
@@ -46,6 +46,6 @@ describe('Sichtbare Pauseninfo für alle Turnierleitungs-Tabs', () => {
       ready: false, onViewDetails: () => {}, onFinish: () => {},
     }));
     expect(html).toContain('SPIELTAGSENDE AKTIV');
-    expect(html).toContain('000:10:00:00');
+    expect(html).toContain('10:00:00');
   });
 });

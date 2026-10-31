@@ -111,7 +111,7 @@ describe('steuerbare Pause', () => {
     const resume = getBreakResumeAt(t, t.stages[1])!;
     expect(resume.getTime() - started).toBeGreaterThanOrEqual(25 * 60000 - 10000);
     expect(resume.getTime() - started).toBeLessThanOrEqual(25 * 60000 + 10000);
-    expect(formatBreakCountdown(resume, resume.getTime() - 61000)).toBe('000:00:01:01');
+    expect(formatBreakCountdown(resume, resume.getTime() - 61000)).toBe('01:01');
     expect(canFinishBreak(t, t.stages[1])).toBe(false);
     expect(completeStage(t, t.stages[1])).toBe(false);
     expect(getBreakResumeAt(t, t.stages[1])?.getTime()).toBe(resume.getTime());

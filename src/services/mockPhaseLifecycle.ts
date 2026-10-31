@@ -269,17 +269,21 @@ export function canFinishBreak(tournament: DemoTournament, stage: TournamentStag
   return Boolean(resume && (early || at.getTime() >= resume.getTime()));
 }
 
-/** Stable-width countdown: DDD:HH:MM:SS, including zero values.
- * The displayed range is capped at 999 days so every colon remains fixed. */
+/** Show only relevant leading units; keep the final MM:SS always two digits.
+ * Right-aligned monospace layout keeps the remaining colons in place.
+ * The displayed range is capped at 999 days to fit the existing timer width. */
 export function formatBreakCountdown(resume: Date | null, now = Date.now()): string {
-  if (!resume || Number.isNaN(resume.getTime())) return '---:--:--:--';
+  if (!resume || Number.isNaN(resume.getTime())) return '--:--';
   const maxSeconds = 1000 * 86400 - 1;
   const totalSeconds = Math.min(maxSeconds, Math.max(0, Math.ceil((resume.getTime() - now) / 1000)));
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  return `${String(days).padStart(3, '0')}:${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const suffix = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  if (days > 0) return `${String(days).padStart(3, '0')}:${String(hours).padStart(2, '0')}:${suffix}`;
+  if (hours > 0) return `${String(hours).padStart(2, '0')}:${suffix}`;
+  return suffix;
 }
 
 /** Reopen a completed stage if a correction invalidates a previously resolved

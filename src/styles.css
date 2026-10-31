@@ -4643,7 +4643,8 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   display: block;
   width: 12ch;
   min-width: 12ch;
-  text-align: center;
+  /* Keep the rightmost MM:SS and all remaining colons stationary as hours/days disappear. */
+  text-align: right;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;
   font-size: clamp(1.15rem, 1.8vw, 1.7rem);
