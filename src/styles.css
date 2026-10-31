@@ -1227,6 +1227,7 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 
 /* Elimination status, placement and third-place controls */
 .participant-inline-status.eliminated { color: #6941c6; background: #f4f3ff; }
+.participant-inline-status.reserve { color: #8a5a13; background: #fff7e6; border: 1px solid #f5d491; white-space: normal; }
 .participant-placement { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 8px; color: #344054; background: #f2f4f7; font-size: .78rem; font-weight: 700; white-space: nowrap; }
 .third-place-skip { white-space: normal; text-align: center; }
 
@@ -3132,7 +3133,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   margin-top: 12px;
 }
 .participant-summary-toolbar .participant-statistics {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   align-self: stretch;
   gap: 7px;
   margin: 0;

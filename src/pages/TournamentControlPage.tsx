@@ -534,7 +534,7 @@ export function TournamentControlPage() {
   const [phaseVersion, setPhaseVersion] = useState(0);
   const [participantPanel, setParticipantPanel] = useState<{ name: string; mode: 'edit' | 'games' } | null>(null);
   const [participantQuery, setParticipantQuery] = useState('');
-  const [participantStatusFilter, setParticipantStatusFilter] = useState<'all' | 'active' | 'playing' | 'eliminated' | 'withdrawn'>('all');
+  const [participantStatusFilter, setParticipantStatusFilter] = useState<'all' | 'active' | 'playing' | 'reserve' | 'eliminated' | 'withdrawn'>('all');
   const participantModalRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!participantPanel) return;
@@ -655,7 +655,8 @@ export function TournamentControlPage() {
       switch (participantStatusFilter) {
         case 'active': return progress.status === 'Aktiv';
         case 'playing': return isPlaying;
-        case 'eliminated': return progress.status === 'Ausgeschieden' || progress.status.startsWith('Nicht für Phase ');
+        case 'reserve': return progress.status.startsWith('Nicht für Phase ');
+        case 'eliminated': return progress.status === 'Ausgeschieden';
         case 'withdrawn': return progress.status === 'Zurückgezogen';
         default: return true;
       }
@@ -1546,6 +1547,7 @@ export function TournamentControlPage() {
             <div className="participant-statistics" role="group" aria-label="Teilnehmerstatistik">
               <div><strong>{participantStatistics.total}</strong><span>Teilnehmer gesamt</span></div>
               <div><strong>{participantStatistics.remaining}</strong><span>Noch im Turnier</span></div>
+              <div><strong>{participantStatistics.reserves}</strong><span>Nachrücker möglich</span></div>
               <div><strong>{participantStatistics.eliminated}</strong><span>Ausgeschieden</span></div>
               <div><strong>{participantStatistics.withdrawn}</strong><span>Zurückgezogen</span></div>
             </div>
@@ -1558,6 +1560,7 @@ export function TournamentControlPage() {
                   <option value="all">Alle Teilnehmer</option>
                   <option value="active">Aktiv</option>
                   <option value="playing">Spielt gerade</option>
+                  <option value="reserve">Nicht qualifiziert / Nachrücker</option>
                   <option value="eliminated">Ausgeschieden</option>
                   <option value="withdrawn">Zurückgezogen</option>
                 </select>
@@ -1603,7 +1606,7 @@ export function TournamentControlPage() {
               return (
                 <article className={isWithdrawn ? 'participant-control-row withdrawn' : 'participant-control-row'} key={`${participant}-${index}`}>
                   <span className="participant-list-number">{index + 1}</span>
-                  <div className="participant-control-identity"><strong>{participant}</strong><span className={`participant-inline-status${statusText === 'Spielt gerade' ? ' playing' : statusText === 'Aktiv' ? 'active' : isWithdrawn ? ' withdrawn' : progress.status === 'Ausgeschieden' || progress.status.startsWith('Nicht für Phase ') ? ' eliminated' : ''}`}>{statusText}</span>{progress.placement && <span className="participant-placement">{progress.placement}</span>}</div>
+                  <div className="participant-control-identity"><strong>{participant}</strong><span className={`participant-inline-status${statusText === 'Spielt gerade' ? ' playing' : statusText === 'Aktiv' ? 'active' : isWithdrawn ? ' withdrawn' : progress.status.startsWith('Nicht für Phase ') ? ' reserve' : progress.status === 'Ausgeschieden' ? ' eliminated' : ''}`}>{statusText}</span>{progress.placement && <span className="participant-placement">{progress.placement}</span>}</div>
                   <code>{tournament.participantCodes?.[participant] ?? String(4100 + index).slice(-4)}</code>
                   <div className="participant-row-actions">
                     <button className="btn small" type="button" onClick={() => setParticipantPanel({ name: participant, mode: 'edit' })}>Daten bearbeiten</button>

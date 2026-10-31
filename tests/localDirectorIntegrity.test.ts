@@ -234,7 +234,7 @@ describe('local director integrity', () => {
     });
     firstQualifiers.forEach(name => expect(getMockParticipantProgress(t, name).status).toBe('Aktiv'));
     const statistics = summarizeParticipantStatuses(t.participantNames!.map(name => getMockParticipantProgress(t, name).status));
-    expect(statistics).toMatchObject({ remaining: 2, eliminated: 2 });
+    expect(statistics).toMatchObject({ remaining: 2, eliminated: 0, reserves: 2 });
 
     expect(withdrawMockParticipant(t, firstQualifiers[0])).toBe(true);
     const promoted = getStageEntrants(t, t.stages[1]).find(name => reserves.includes(name));
