@@ -4891,3 +4891,21 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .wizard-steps .wizard-step { transition: none; }
 }
+
+/* Turnier erstellen · Pflichtfelder und Spielflächenplan-Schalter */
+.wizard-workspace .wizard-required-mark { color: #b42318; font-weight: 800; }
+.wizard-workspace .wizard-venue-choice-head .wizard-venue-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 11px;
+  border: 1px solid #d4dfec;
+  border-radius: 9px;
+  background: #fff;
+  white-space: nowrap;
+}
+.wizard-workspace .wizard-venue-choice-head .wizard-venue-toggle:hover { border-color: #9ab9e5; background: #f5f9ff; }
+.wizard-workspace .wizard-venue-choice-head .wizard-venue-toggle input { flex: 0 0 auto; }
+@media (max-width: 480px) {
+  .wizard-workspace .wizard-venue-choice-head .wizard-venue-toggle { margin-left: auto; }
+}
