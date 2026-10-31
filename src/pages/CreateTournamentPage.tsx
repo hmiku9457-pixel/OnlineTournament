@@ -282,13 +282,15 @@ function NumberChoice({
   }
 
   return (
-    <div className="number-choice" aria-label={ariaLabel}>
+    <div className="number-choice" role="group" aria-label={ariaLabel}>
       <div className="number-choice-buttons">
         {presets.map((preset) => (
           <button
             className={`number-choice-button ${!custom && value === preset ? 'active' : ''}`}
             key={preset}
             type="button"
+            aria-pressed={!custom && value === preset}
+            title={`${preset} auswählen`}
             onClick={() => onPreset(preset)}
           >
             {preset}
@@ -297,9 +299,11 @@ function NumberChoice({
         <button
           className={`number-choice-button custom ${custom ? 'active' : ''}`}
           type="button"
+          aria-pressed={custom}
+          title="Eigenen Wert eingeben"
           onClick={onCustom}
         >
-          Custom
+          Eigene
         </button>
         {custom && (
           <input
@@ -901,25 +905,25 @@ export function CreateTournamentPage() {
         {step === 1 && (
           <section>
             <h2>Grunddaten</h2>
-            <p className="muted">Zuerst nur die Daten, die für die Teilnehmererfassung und spätere Empfehlung benötigt werden.</p>
+            <p className="muted">Lege die Eckdaten für dein Turnier fest. Mit <span className="wizard-required-mark" aria-hidden="true">*</span> gekennzeichnete Felder sind Pflichtfelder.</p>
             <div className="form-grid">
               <div className="field full">
-                <label htmlFor="name">Turniername</label>
-                <input id="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Vereinsmeisterschaft 2027" autoFocus />
+                <label htmlFor="name">Turniername <span className="wizard-required-mark" aria-hidden="true">*</span></label>
+                <input id="name" required value={name} onChange={(event) => setName(event.target.value)} placeholder="Turniername eingeben" autoFocus />
               </div>
               <div className="field">
-                <label htmlFor="tournament-date">Turnierdatum *</label>
+                <label htmlFor="tournament-date">Turnierdatum <span className="wizard-required-mark" aria-hidden="true">*</span></label>
                 <input id="tournament-date" type="date" required value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} />
-                <span className="field-hint">Dient der Planung und Ankündigung. Du kannst das Turnier auch vor diesem Datum starten.</span>
+                <span className="field-hint">Geplantes Datum für die Ankündigung und den Zeitplan. Den tatsächlichen Turnierstart legt die Turnierleitung fest.</span>
               </div>
               <div className="field">
-                <label htmlFor="tournament-start-time">Geplanter Turnierbeginn *</label>
-                <ClockTimePicker id="tournament-start-time" value={scheduledTime} onChange={setScheduledTime} />
-                <span className="field-hint">Uhrzeit über das Zifferblatt wählen. Sie dient der Ankündigung – der tatsächliche Start bleibt jederzeit bei der Turnierleitung.</span>
+                <label htmlFor="tournament-start-time">Geplanter Turnierbeginn <span className="wizard-required-mark" aria-hidden="true">*</span></label>
+                <ClockTimePicker id="tournament-start-time" value={scheduledTime} onChange={setScheduledTime} label="Geplanter Turnierbeginn" />
+                <span className="field-hint">Startzeit für die Ankündigung und die Zeitplanung. Der tatsächliche Start wird später durch die Turnierleitung ausgelöst.</span>
               </div>
               <div className="field">
-                <label htmlFor="sport">Sportart</label>
-                <select id="sport" value={sport} onChange={(event) => {
+                <label htmlFor="sport">Sportart <span className="wizard-required-mark" aria-hidden="true">*</span></label>
+                <select id="sport" required value={sport} onChange={(event) => {
                   const selectedSport = event.target.value;
                   const allowed = disciplineOptionsForSport(selectedSport);
                   const nextDiscipline = allowed.some((option) => option.value === discipline)
@@ -947,10 +951,11 @@ export function CreateTournamentPage() {
                   <option value="" disabled>Sportart auswählen</option>
                   {sportOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
+                <span className="field-hint">Bestimmt die verfügbaren Disziplinen und die Grundlagen der Zeitplanung.</span>
               </div>
               <div className="field">
-                <label htmlFor="discipline">Disziplin</label>
-                <select id="discipline" value={sport ? discipline : ''} disabled={!sport}
+                <label htmlFor="discipline">Disziplin <span className="wizard-required-mark" aria-hidden="true">*</span></label>
+                <select id="discipline" required={Boolean(sport)} value={sport ? discipline : ''} disabled={!sport}
                   onChange={(event) => {
                     const nextDiscipline = event.target.value as Discipline;
                     if (nextDiscipline === discipline) return;
@@ -964,7 +969,7 @@ export function CreateTournamentPage() {
                 </select>
               </div>
               <div className="field full">
-                <label>Anzahl {sport ? venue.plural : 'Spielflächen'}</label>
+                <label>Anzahl {sport ? venue.plural : 'Spielflächen'} <span className="wizard-required-mark" aria-hidden="true">*</span></label>
                 <NumberChoice
                   ariaLabel={`Anzahl ${sport ? venue.plural : 'Spielflächen'}`}
                   value={tables}
@@ -975,15 +980,19 @@ export function CreateTournamentPage() {
                   onCustom={() => { setCustomTables(true); setTables((current) => current > 12 ? current : 13); }}
                   onCustomValue={setTables}
                 />
+                <span className="field-hint">Wie viele Spielflächen können gleichzeitig genutzt werden? Die Anzahl beeinflusst die geschätzte Turnierdauer.</span>
               </div>
             </div>
             <div className="venue-optional wizard-venue-choice">
               <div className="wizard-venue-choice-head">
                 <div>
                   <h3>Spielflächenplan <span className="wizard-optional-tag">Optional</span></h3>
-                  <p className="muted">Ohne Hallenplan werden die {venue.plural} automatisch nummeriert und zugewiesen. Einen individuellen Aufbau kannst du bei Bedarf aktivieren.</p>
+                  <p className="muted">Ohne eigenen Plan werden die {venue.plural} automatisch nummeriert und den Spielen zugewiesen. Aktiviere den Plan, wenn du ihre Anordnung festlegen möchtest.</p>
                 </div>
-                <label className="format-toggle"><input type="checkbox" role="switch" checked={venueLayoutEnabled} onChange={(event) => { setVenueLayoutEnabled(event.target.checked); if (event.target.checked) setVenueLayoutEditorOpen(true); }} /> <strong>{venueLayoutEnabled ? 'Aktiv' : 'Aus'}</strong></label>
+                <label className="format-toggle wizard-venue-toggle" title={venueLayoutEnabled ? 'Individuellen Spielflächenplan deaktivieren' : 'Individuellen Spielflächenplan aktivieren'}>
+                  <strong>{venueLayoutEnabled ? 'Aktiviert' : 'Aktivieren'}</strong>
+                  <input type="checkbox" role="switch" aria-label="Individuellen Spielflächenplan aktivieren" checked={venueLayoutEnabled} onChange={(event) => { setVenueLayoutEnabled(event.target.checked); if (event.target.checked) setVenueLayoutEditorOpen(true); }} />
+                </label>
               </div>
               {venueLayoutEnabled && (
                 <>
@@ -1001,11 +1010,11 @@ export function CreateTournamentPage() {
             <div className="wizard-game-settings">
               <div className="wizard-game-settings-heading">
                 <h3>Spieldaten</h3>
-                <p className="muted">Die Mindestspielzahl steuert die Turnierempfehlungen. Die Best-of-Werte stellst du später je Phase ein.</p>
+                <p className="muted">Die gewünschte Spielanzahl hilft bei der Turnierempfehlung. Das Best-of-Format legst du später für jede Phase fest.</p>
               </div>
             <div className="spieldaten-layout">
               <div className="field">
-                <label>Gewünschte Mindestspiele pro Teilnehmer</label>
+                <label>Gewünschte Mindestspiele pro Teilnehmer <span className="wizard-required-mark" aria-hidden="true">*</span></label>
                 <NumberChoice
                   ariaLabel="Gewünschte Mindestspiele pro Teilnehmer"
                   value={minimumMatches}
@@ -1016,16 +1025,18 @@ export function CreateTournamentPage() {
                   onCustom={() => { setCustomMinimumMatches(true); setMinimumMatches((current) => current > 5 ? current : 6); }}
                   onCustomValue={setMinimumMatches}
                 />
+                <span className="field-hint">Zielwert für die Empfehlungen. Die tatsächliche Spielanzahl hängt von Turnierform und Verlauf ab.</span>
               </div>
               <div className="field match-timing-fields">
-                <label htmlFor="match-duration">{timedSport ? 'Spieldauer (Minuten) *' : 'Satzdauer (Minuten)'}</label>
+                <label htmlFor="match-duration">{timedSport ? <>Spieldauer (Minuten) <span className="wizard-required-mark" aria-hidden="true">*</span></> : 'Satzdauer (Minuten)'}</label>
                 <input id="match-duration" type="number" min="1" step="1" required={timedSport} value={timedSport ? timedMatchMinutes : planningMinutesPerSet(sport)} disabled={!timedSport} placeholder={timedSport ? 'Pflichtfeld – z. B. 12' : undefined} onChange={(event) => setTimedMatchMinutes(event.target.value)} />
-                {!timedSport && <span className="field-hint">Planungswert: {planningMinutesPerSet(sport)} Minuten pro Satz (oberer Wert der üblichen Dauer).</span>}
+                {!timedSport && <span className="field-hint">Automatischer Planungswert: {planningMinutesPerSet(sport)} Minuten pro Satz. Dieser Wert wird für die Dauerprognose verwendet.</span>}
                 {timedSport && <>
-                  <label htmlFor="venue-turnover">Pause zwischen Spielen auf derselben Spielfläche (Minuten)</label>
+                  <span className="field-hint">Geplante Dauer eines Spiels in vollen Minuten. Sie wird für die Zeitprognose verwendet.</span>
+                  <label htmlFor="venue-turnover">Zeitpuffer zwischen Spielen (Minuten) <span className="wizard-optional-tag">Optional</span></label>
                   <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => setVenueTurnoverMinutes(event.target.value)} />
-                  <span className="field-hint">Die Pause wird in der groben Spielplan-Dauer berücksichtigt; leer bedeutet 0 Minuten.</span>
-                  {(!validMatchDuration || !validTurnover) && <span className="field-error">Bitte gültige ganze Minutenwerte angeben. Die Spieldauer ist erforderlich.</span>}
+                  <span className="field-hint">Zusätzliche Zeit zwischen zwei Spielen auf derselben Spielfläche. Ein leeres Feld entspricht 0 Minuten.</span>
+                  {(!validMatchDuration || !validTurnover) && <span className="field-error">Die Spieldauer muss eine positive ganze Zahl sein; der optionale Zeitpuffer darf nicht negativ sein.</span>}
                 </>}
               </div>
             </div>
