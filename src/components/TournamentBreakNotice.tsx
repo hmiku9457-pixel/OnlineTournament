@@ -10,9 +10,10 @@ export function TournamentBreakNotice({ tournament }: { tournament: DemoTourname
 
   const overnight = stage.settings.breakKind === 'overnight';
   const resume = getBreakResumeAt(tournament, stage);
-  const planned = overnight
-    ? `Fortsetzung am Folgetag um ${String(stage.settings.nextDayStart ?? '09:00')} Uhr`
-    : `${Number(stage.settings.breakMinutes) || 15} Minuten Pause`;
+  const planned = resume ? 'Pause läuft'
+    : overnight
+      ? `Fortsetzung am Folgetag um ${String(stage.settings.nextDayStart ?? '09:00')} Uhr`
+      : `${Number(stage.settings.breakMinutes) || 15} Minuten Pause (vor dem Start anpassbar)`;
 
   return (
     <section className="tournament-break-notice" role="status" aria-label="Aktuelle Turnierunterbrechung">
@@ -20,7 +21,7 @@ export function TournamentBreakNotice({ tournament }: { tournament: DemoTourname
         <span className="badge">{overnight ? 'Spieltagsende' : 'Turnierpause'}</span>
         <strong>{stage.name}</strong>
       </div>
-      <p>{planned}{resume ? ` · Früheste Fortsetzung: ${resume.toLocaleString('de-DE')}` : ''}</p>
+      <p>{planned}{resume ? ` · Geplante Fortsetzung: ${resume.toLocaleString('de-DE')}` : ''}</p>
       {Boolean(stage.settings.note) && <p className="tournament-break-note">{String(stage.settings.note)}</p>}
     </section>
   );

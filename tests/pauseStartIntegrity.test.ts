@@ -95,7 +95,7 @@ describe('turnierweite Sperren und verbindliche Platzierungen', () => {
 describe('steuerbare Pause', () => {
   it('berechnet eine präzise lokale Uhrzeit und schiebt vergangene Uhrzeiten auf morgen', () => {
     const start = new Date(2026, 9, 31, 14, 5, 0);
-    expect(computeBreakResumeAt(start, { kind: 'minutes', minutes: 25 })?.getTime() - start.getTime()).toBe(25 * 60000);
+    expect(computeBreakResumeAt(start, { kind: 'minutes', minutes: 25 })!.getTime() - start.getTime()).toBe(25 * 60000);
     expect(computeBreakResumeAt(start, { kind: 'minutes', minutes: 0 })).toBeNull();
     expect(computeBreakResumeAt(start, { kind: 'clock', time: '15:30' })?.getDate()).toBe(31);
     expect(computeBreakResumeAt(start, { kind: 'clock', time: '12:00' })?.getDate()).toBe(1);

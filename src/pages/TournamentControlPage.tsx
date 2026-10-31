@@ -1478,9 +1478,11 @@ export function TournamentControlPage() {
             <section className="card tournament-break-panel" aria-label="Turnierunterbrechung">
               <span className="badge">{selectedStage.settings.breakKind === 'overnight' ? 'Spieltagsende' : 'Turnierpause'}</span>
               <h3>{selectedStage.name}</h3>
-              <p>{selectedStage.settings.breakKind === 'overnight'
-                ? `Geplante Fortsetzung am Folgetag um ${selectedStage.settings.nextDayStart} Uhr`
-                : `Dauer: ${selectedStage.settings.breakMinutes} Minuten`}</p>
+              <p>{isStageStarted(tournament, selectedStage)
+                ? 'Die Pause läuft. Die beim Start festgelegte Uhrzeit ist verbindlich, kann aber durch die Turnierleitung vorzeitig freigegeben werden.'
+                : selectedStage.settings.breakKind === 'overnight'
+                  ? `Geplante Fortsetzung am Folgetag um ${selectedStage.settings.nextDayStart} Uhr`
+                  : `Voreinstellung: ${selectedStage.settings.breakMinutes} Minuten (beim Pausenstart anpassbar)`}</p>
               {Boolean(selectedStage.settings.note) && <p className="tournament-break-note">{String(selectedStage.settings.note)}</p>}
               {isStageCompleted(tournament, selectedStage) ? (
                 <strong className="tournament-break-finished">Pause abgeschlossen</strong>
