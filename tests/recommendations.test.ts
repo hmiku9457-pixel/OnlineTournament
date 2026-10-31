@@ -52,17 +52,29 @@ describe('format recommendations', () => {
     expect(result.every((item) => item.estimatedDurationMinutes <= 210)).toBe(true);
   });
 
-  it('does not recommend a 96-match format on six tables when the baseline exceeds the duration limit', () => {
-    const result = recommendTournamentFormats(
-      { playerCount: 24, tableCount: 6, minimumMatches: 4 },
-      {
-        maxSwissRounds: 3,
-        enabledSystems: { knockout: false, groups: true, swiss: true },
-        maxRecommendedDurationMinutes: 210,
-      },
-    );
-    expect(result.some((item) => item.id === 'groups-swiss')).toBe(false);
+  it('recommends a 78-match groups-to-Swiss format when qualification brings it within the duration limit', () => {
+    const input = { playerCount: 24, tableCount: 6, minimumMatches: 4 };
+    const settings = {
+      maxSwissRounds: 3,
+      enabledSystems: { knockout: false, groups: true, swiss: true },
+      maxRecommendedDurationMinutes: 210,
+    };
+
+    const result = recommendTournamentFormats(input, settings);
+    const groupSwiss = result.find((item) => item.id === 'groups-swiss');
+    expect(groupSwiss).toBeDefined();
+    expect(groupSwiss?.phases.map((phase) => phase.entrantCount)).toEqual([24, 12]);
+    expect(groupSwiss?.estimatedMatches).toBe(78); // 60 group fixtures + 3 × 6 Swiss fixtures.
+    expect(groupSwiss?.estimatedDurationMinutes).toBe(195); // 150 group + 45 Swiss minutes.
     expect(result.every((item) => item.estimatedDurationMinutes <= 210)).toBe(true);
+
+    // A genuinely tighter limit must still exclude this combination.
+    const shorter = recommendTournamentFormats(input, {
+      ...settings,
+      maxRecommendedDurationMinutes: 180,
+    });
+    expect(shorter.some((item) => item.id === 'groups-swiss')).toBe(false);
+    expect(shorter.every((item) => item.estimatedDurationMinutes <= 180)).toBe(true);
   });
 
 });
