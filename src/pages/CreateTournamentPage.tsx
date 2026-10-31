@@ -1085,52 +1085,52 @@ export function CreateTournamentPage() {
 
                 <div className="participant-editor-fields-row">
                   <div className="participant-mask">
-                  <div className="field">
-                    <label htmlFor="participant-first">{discipline === 'TEAMS' ? 'Mannschaftsname' : discipline === 'DOUBLES' ? 'Spieler 1 · Vorname' : 'Vorname'}</label>
-                    <input
-                      id="participant-first"
-                      className={participantErrors.firstName ? 'input-error' : ''}
-                      value={participantForm.firstName}
-                      onChange={(event) => updateParticipantForm('firstName', event.target.value)}
-                      aria-invalid={Boolean(participantErrors.firstName)}
-                      autoFocus
-                    />
+                    <div className="field">
+                      <label htmlFor="participant-first">{discipline === 'TEAMS' ? 'Mannschaftsname' : discipline === 'DOUBLES' ? 'Spieler 1 · Vorname' : 'Vorname'}</label>
+                      <input
+                        id="participant-first"
+                        className={participantErrors.firstName ? 'input-error' : ''}
+                        value={participantForm.firstName}
+                        onChange={(event) => updateParticipantForm('firstName', event.target.value)}
+                        aria-invalid={Boolean(participantErrors.firstName)}
+                        autoFocus
+                      />
+                    </div>
+                    {discipline !== 'TEAMS' && <div className="field">
+                      <label htmlFor="participant-last">{discipline === 'DOUBLES' ? 'Spieler 1 · Nachname' : 'Nachname'}</label>
+                      <input
+                        id="participant-last"
+                        className={participantErrors.lastName ? 'input-error' : ''}
+                        value={participantForm.lastName}
+                        onChange={(event) => updateParticipantForm('lastName', event.target.value)}
+                        aria-invalid={Boolean(participantErrors.lastName)}
+                      />
+                    </div>}
+                    {discipline === 'DOUBLES' && (
+                      <>
+                        <div className="field">
+                          <label htmlFor="participant-partner-first">Spieler 2 · Vorname</label>
+                          <input
+                            id="participant-partner-first"
+                            className={participantErrors.partnerFirstName ? 'input-error' : ''}
+                            value={participantForm.partnerFirstName}
+                            onChange={(event) => updateParticipantForm('partnerFirstName', event.target.value)}
+                            aria-invalid={Boolean(participantErrors.partnerFirstName)}
+                          />
+                        </div>
+                        <div className="field">
+                          <label htmlFor="participant-partner-last">Spieler 2 · Nachname</label>
+                          <input
+                            id="participant-partner-last"
+                            className={participantErrors.partnerLastName ? 'input-error' : ''}
+                            value={participantForm.partnerLastName}
+                            onChange={(event) => updateParticipantForm('partnerLastName', event.target.value)}
+                            aria-invalid={Boolean(participantErrors.partnerLastName)}
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
-                  {discipline !== 'TEAMS' && <div className="field">
-                    <label htmlFor="participant-last">{discipline === 'DOUBLES' ? 'Spieler 1 · Nachname' : 'Nachname'}</label>
-                    <input
-                      id="participant-last"
-                      className={participantErrors.lastName ? 'input-error' : ''}
-                      value={participantForm.lastName}
-                      onChange={(event) => updateParticipantForm('lastName', event.target.value)}
-                      aria-invalid={Boolean(participantErrors.lastName)}
-                    />
-                  </div>}
-                  {discipline === 'DOUBLES' && (
-                    <>
-                      <div className="field">
-                        <label htmlFor="participant-partner-first">Spieler 2 · Vorname</label>
-                        <input
-                          id="participant-partner-first"
-                          className={participantErrors.partnerFirstName ? 'input-error' : ''}
-                          value={participantForm.partnerFirstName}
-                          onChange={(event) => updateParticipantForm('partnerFirstName', event.target.value)}
-                          aria-invalid={Boolean(participantErrors.partnerFirstName)}
-                        />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="participant-partner-last">Spieler 2 · Nachname</label>
-                        <input
-                          id="participant-partner-last"
-                          className={participantErrors.partnerLastName ? 'input-error' : ''}
-                          value={participantForm.partnerLastName}
-                          onChange={(event) => updateParticipantForm('partnerLastName', event.target.value)}
-                          aria-invalid={Boolean(participantErrors.partnerLastName)}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
 
                   <div className="participant-editor-actions">
                     <button className="btn primary" type="button" onClick={saveParticipant}>
