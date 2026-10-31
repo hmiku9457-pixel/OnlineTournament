@@ -110,8 +110,9 @@ export function isStageEditable(tournament: DemoTournament, stage: TournamentSta
   const index = getStageIndex(tournament, stage);
   if (index < 0 || isStageStarted(tournament, stage)) return false;
   if (index === 0) return !tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status);
-  const previous = tournament.stages[index - 1];
-  return Boolean(previous && isStageCompleted(tournament, previous));
+  // A corrected competition can be reopened while a scheduled break is
+  // already active; do not start later phases until it is reapproved.
+  return tournament.stages.slice(0, index).every((previous) => isStageCompleted(tournament, previous));
 }
 
 export function isStageLockedWaiting(tournament: DemoTournament, stage: TournamentStage) {
@@ -152,7 +153,12 @@ export function completeStage(tournament: DemoTournament, stage: TournamentStage
   const stageIndex = getStageIndex(tournament, stage);
   const nextStage = tournament.stages[stageIndex + 1];
   const stageEntrants = { ...(state.stageEntrants ?? {}) };
-  if (nextStage && qualifiedForNext.length) stageEntrants[nextStage.id] = [...qualifiedForNext];
+  if (qualifiedForNext.length) {
+    for (const following of tournament.stages.slice(stageIndex + 1)) {
+      stageEntrants[following.id] = [...qualifiedForNext];
+      if (following.type !== 'BREAK') break;
+    }
+  }
 
   saveState(tournament, {
     ...state,
@@ -201,10 +207,14 @@ export function canFinishBreak(tournament: DemoTournament, stage: TournamentStag
 export function reopenStageForQualification(tournament: DemoTournament, stage: TournamentStage): boolean {
   const state = getPhaseLifecycle(tournament);
   if (!state.completedStageIds.includes(stage.id)) return false;
-  const next = tournament.stages[getStageIndex(tournament, stage) + 1];
-  if (!next || state.startedStageIds.includes(next.id)) return false;
+  const nextCompetition = getNextCompetitionStage(tournament, stage);
+  if (!nextCompetition || state.startedStageIds.includes(nextCompetition.id)) return false;
   const entrants = { ...(state.stageEntrants ?? {}) };
-  delete entrants[next.id];
+  // Running breaks retain their snapshot until the competition is reapproved.
+  for (const next of tournament.stages.slice(getStageIndex(tournament, stage) + 1)) {
+    if (!state.startedStageIds.includes(next.id)) delete entrants[next.id];
+    if (next.type !== 'BREAK') break;
+  }
   saveState(tournament, {
     ...state,
     completedStageIds: state.completedStageIds.filter((id) => id !== stage.id),
@@ -245,10 +255,13 @@ export function revokeSwissRoundApprovals(tournament: DemoTournament, stage: Tou
 export function reopenStageAfterCorrection(tournament: DemoTournament, stage: TournamentStage): boolean {
   const state = getPhaseLifecycle(tournament);
   if (!state.completedStageIds.includes(stage.id)) return false;
-  const next = tournament.stages[getStageIndex(tournament, stage) + 1];
-  if (next && state.startedStageIds.includes(next.id)) return false;
+  const nextCompetition = getNextCompetitionStage(tournament, stage);
+  if (nextCompetition && state.startedStageIds.includes(nextCompetition.id)) return false;
   const entrants = { ...(state.stageEntrants ?? {}) };
-  if (next) delete entrants[next.id];
+  for (const next of tournament.stages.slice(getStageIndex(tournament, stage) + 1)) {
+    if (!state.startedStageIds.includes(next.id)) delete entrants[next.id];
+    if (next.type !== 'BREAK') break;
+  }
   saveState(tournament, {
     ...state,
     completedStageIds: state.completedStageIds.filter((id) => id !== stage.id),
