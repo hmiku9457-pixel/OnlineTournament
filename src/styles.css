@@ -4909,3 +4909,8 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 @media (max-width: 480px) {
   .wizard-workspace .wizard-venue-choice-head .wizard-venue-toggle { margin-left: auto; }
 }
+/* Turnier erstellen · Gleich hohe Hinweise für Sportart und Wettbewerbsart */
+.wizard-workspace #sport + .field-hint,
+.wizard-workspace #competition-type-hint {
+  min-height: 3em; /* zwei Zeilen bei der bestehenden Zeilenhöhe von 1.5 */
+}
