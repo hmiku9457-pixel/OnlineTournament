@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
+import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { createMockTournament, getMockTournament } from '@/services/mockTournamentStore';
 
 const storage = new Map<string, string>();
@@ -104,6 +105,33 @@ describe('optionaler vorläufiger Zeitplan', () => {
     const withAwards = [...corrected.items, { id: 'award-ceremony', at: corrected.estimatedEnd, title: 'Siegerehrung', type: 'other' as const }];
     expect(withAwards.at(-1)).toMatchObject({ title: 'Siegerehrung', at: '2026-11-01T15:30' });
     expect(validatePlannedSchedule(withAwards)).toEqual([]);
+  });
+
+  it('beschriftet Phasen korrekt und bietet eine Siegerehrung am berechneten Ende an', () => {
+    const timeline = buildPlannedTimeline('2026-11-01T10:00', [
+      { label: 'Schweizer System', type: 'SWISS', estimatedMinutes: 150 },
+      { label: 'Pause', type: 'BREAK', estimatedMinutes: 0, breakKind: 'until', breakUntil: '13:30' },
+      { label: 'K.-o.-Phase', type: 'KNOCKOUT', estimatedMinutes: 120 },
+    ]);
+    const ui = renderToStaticMarkup(createElement(PlannedScheduleEditor, {
+      scheduledStart: '2026-11-01T10:00', timeline,
+      awardsEnabled: false, awardsAt: timeline.estimatedEnd,
+      onToggleAwards: () => {}, onAwardsAtChange: () => {},
+    }));
+    expect(ui).toContain('Turnierbeginn');
+    expect(ui).toContain('Schweizer System');
+    expect(ui).toContain('K.-o.-Phase');
+    expect(ui).toContain('Voraussichtliches Turnierende');
+    expect(ui).toContain('Siegerehrung hinzufügen');
+    expect(ui).not.toContain('Programmpunkt');
+    const withAwards = renderToStaticMarkup(createElement(PlannedScheduleEditor, {
+      scheduledStart: '2026-11-01T10:00', timeline,
+      awardsEnabled: true, awardsAt: timeline.estimatedEnd,
+      onToggleAwards: () => {}, onAwardsAtChange: () => {},
+    }));
+    expect(withAwards).toContain('value="2026-11-01T15:30"');
+    expect(withAwards).toContain('min="2026-11-01T15:30"');
+    expect(withAwards).toContain('Siegerehrung entfernen');
   });
 
   it('lässt leere Pläne zu, prüft aber unvollständige Einträge und Duplikate', () => {

@@ -1351,6 +1351,8 @@ export function CreateTournamentPage() {
                                 {timedSport ? `${matchDurationMinutes} Min. pro Spiel` : `Best-of-${phase.bestOf}`}
                                 {phaseEstimates[index] && ` · ca. ${formatCompactDuration(phaseEstimates[index].estimatedDurationMinutes)}`}</>}
                               </p>
+                              {plannedTimeline.warnings.some((warning) => warning.phaseIndex === index) &&
+                                <span className="phase-warning-chip" role="status">⚠ Pause bis liegt vor dem geschätzten Pausenbeginn</span>}
                             </div>
                             <div className="phase-order-actions">
                               <button

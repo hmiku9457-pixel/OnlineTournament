@@ -4751,3 +4751,6 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .planned-schedule-ceremony-actions input { padding: 8px; border: 1px solid #d0d5dd; border-radius: 8px; min-height: 37px; }
 .planned-schedule-ceremony-actions .planned-schedule-phase-warning { width: 100%; }
 @media (max-width: 650px) { .planned-schedule-phase-row { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 11px 12px; } }
+
+/* Warning visible also while a problematic Pause-bis stage is collapsed. */
+.phase-warning-chip { display: inline-block; margin: 5px 0 0; padding: 4px 8px; border-radius: 7px; background: #fff0cf; color: #93470b; border: 1px solid #f2bb66; font-size: .7rem; font-weight: 750; line-height: 1.4; }
