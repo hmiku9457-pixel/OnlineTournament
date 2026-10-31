@@ -1,7 +1,7 @@
 import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
-import { startFirstStage, getStageEntrants, isStageCompleted } from '@/services/mockPhaseLifecycle';
+import { startFirstStage, startStage, getStageEntrants, isStageCompleted } from '@/services/mockPhaseLifecycle';
 import { completeMockMatch, getMockStageMatches } from '@/services/mockRuntime';
 import { buildRoundRobinStandings } from '@/services/mockCompetitionViews';
 import { getMockConfirmedFinalStandings, getMockFinalStandings } from '@/services/mockParticipantProgress';
@@ -69,6 +69,8 @@ describe('Geteilte Endplatzierung, aber alphabetische Qualifikation', () => {
     const names = getStageEntrants(t, stage).sort((a, b) => a.localeCompare(b, 'de'));
     expect(getStageEntrants(t, t.stages[1])).toEqual(names.slice(0, 2));
     expect(buildRoundRobinStandings(t, stage).map((row) => row.rank)).toEqual([1, 1, 1, 1]);
+    expect(getMockConfirmedFinalStandings(t)).toEqual([]);
+    expect(startStage(t, t.stages[1])).toBe(true);
     const eliminated = getMockConfirmedFinalStandings(t);
     expect(eliminated).toHaveLength(2);
     expect(eliminated.every((row) => row.placement === 'Platz 3–4')).toBe(true);

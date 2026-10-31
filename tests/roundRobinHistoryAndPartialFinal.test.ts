@@ -83,13 +83,15 @@ describe('Endplatzierungen vor dem Turnierende', () => {
       expect(t.status).not.toBe('FINISHED');
       const survivors = new Set(getStageEntrants(t, t.stages[1]));
       expect(survivors.size).toBe(4);
+      // Before the next competition starts, these players can still be promoted.
+      expect(getMockConfirmedFinalStandings(t)).toEqual([]);
+      expect(startStage(t, t.stages[1])).toBe(true);
       const placements = getMockConfirmedFinalStandings(t);
       expect(placements).toHaveLength(4);
       expect(placements.every((row) => !survivors.has(row.name))).toBe(true);
       expect(placements.every((row) => row.status === 'Ausgeschieden')).toBe(true);
       expect(placements[0].placementNumber).toBe(5);
       expect(placements.every((row) => /^Platz [5-8](?:–[5-8])?/.test(row.placement ?? ''))).toBe(true);
-      expect(startStage(t, t.stages[1])).toBe(true);
       expect(getMockConfirmedFinalStandings(t)).toEqual(placements);
     });
   }
