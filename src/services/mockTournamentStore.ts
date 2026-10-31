@@ -209,7 +209,8 @@ export function getAllMockTournaments(): DemoTournament[] {
 export function getMockTournament(tournamentId?: string): DemoTournament {
   const local = readLocalTournaments().find((item) => item.id === tournamentId);
   if (local) return local;
-  const firstLocal = readLocalTournaments()[0];
+  // A supplied but unknown ID must never silently open a different event.
+  const firstLocal = tournamentId ? undefined : readLocalTournaments()[0];
   if (firstLocal) return firstLocal;
   return {
     id: tournamentId ?? 'local-empty',
@@ -278,7 +279,16 @@ export function updateMockParticipantName(tournamentId: string, oldName: string,
   if (name !== oldName) {
     const configKeys = ['online-tournament:mock-draw-config:v1', 'online-tournament:mock-phase-lifecycle:v1', 'online-tournament:swiss-round-fixtures:v1'];
     const renameValue = (value: unknown): unknown => {
-      if (typeof value === 'string') return value === oldName ? name : value;
+      if (typeof value === 'string') {
+        if (value === oldName) return name;
+        // Swiss cutoff fingerprints are JSON strings containing participant
+        // names. Keep their saved decision keys aligned after renaming.
+        if (value.startsWith('{') || value.startsWith('[')) {
+          try { return JSON.stringify(renameValue(JSON.parse(value) as unknown)); }
+          catch { /* Ordinary text is not a serialized fingerprint. */ }
+        }
+        return value;
+      }
       if (Array.isArray(value)) return value.map(renameValue);
       if (value && typeof value === 'object') {
         return Object.fromEntries(Object.entries(value).map(([key, item]) => [key === oldName ? name : key, renameValue(item)]));
@@ -293,6 +303,31 @@ export function updateMockParticipantName(tournamentId: string, oldName: string,
         window.localStorage.setItem(key, JSON.stringify(renamed));
       } catch { /* Alte, fehlerhafte Testdaten nicht übernehmen. */ }
     });
+
+    // Match IDs stay unchanged, but walkover winners contain the display name.
+    const resultKey = 'online-tournament:mock-match-results:v2';
+    try {
+      const results: unknown = JSON.parse(window.localStorage.getItem(resultKey) ?? '[]');
+      if (Array.isArray(results)) {
+        const prefixes = tournament.stages.map((stage) => `${stage.id}-`);
+        window.localStorage.setItem(resultKey, JSON.stringify(results.map((result: { matchId?: string }) =>
+          prefixes.some((prefix) => result.matchId?.startsWith(prefix)) ? renameValue(result) : result)));
+      }
+    } catch { /* Broken local test records are ignored. */ }
+
+    // Unlike draw arrays, cutoff decisions and their archived round robins
+    // are keyed by tournamentId:stageId.
+    for (const key of ['online-tournament:swiss-cutoff-decisions:v1', 'online-tournament:swiss-round-robin-history:v1']) {
+      try {
+        const all: unknown = JSON.parse(window.localStorage.getItem(key) ?? '{}');
+        if (!all || typeof all !== 'object' || Array.isArray(all)) continue;
+        const records = all as Record<string, unknown>;
+        for (const recordKey of Object.keys(records)) {
+          if (recordKey.startsWith(`${tournamentId}:`)) records[recordKey] = renameValue(records[recordKey]);
+        }
+        window.localStorage.setItem(key, JSON.stringify(records));
+      } catch { /* Broken local test records are ignored. */ }
+    }
   }
 
   if (name !== oldName) {
@@ -336,6 +371,11 @@ export function updateMockParticipantName(tournamentId: string, oldName: string,
     participantCodes: { ...restCodes, [name]: code.trim() },
   };
   writeLocalTournaments(tournaments.map((entry) => entry.id === tournamentId ? updated : entry));
+  if (oldName !== name || oldCodes[oldName] !== code.trim()) {
+    recordMockAudit({ tournamentId, actor: 'Turnierleitung (lokal)', action: 'PARTICIPANT_UPDATED',
+      description: oldName !== name ? `Teilnehmer umbenannt: ${oldName} → ${name}` : `Teilnehmercode von ${name} geändert`,
+      before: oldName, after: name });
+  }
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
   return true;
 }
@@ -391,6 +431,8 @@ export function addMockParticipant(
   };
   writeLocalTournaments(tournaments.map((entry) => entry.id === tournamentId ? updated : entry));
   reconcilePrestartDraws(updated);
+  recordMockAudit({ tournamentId, actor: 'Turnierleitung (lokal)', action: 'PARTICIPANT_ADDED',
+    description: `Teilnehmer nachgemeldet: ${displayName}`, after: displayName });
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
   return { ok: true };
 }

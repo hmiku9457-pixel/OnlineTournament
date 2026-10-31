@@ -1,4 +1,5 @@
 import type { DemoTournament } from '@/data/demoTournaments';
+import { recordMockAudit } from '@/services/mockAudit';
 
 // Local-only prototype setting. Keys are tournament IDs so that separate
 // tournaments can use the same table labels independently.
@@ -35,10 +36,16 @@ export function setMockTableBlocked(tournament: DemoTournament, table: string, b
   if (!isValidTable(tournament, table) || typeof window === 'undefined') return false;
   const all = readTableLocks();
   const current = new Set(getBlockedMockTables(tournament));
+  const wasBlocked = current.has(table);
   if (blocked) current.add(table);
   else current.delete(table);
   all[tournament.id] = [...current];
   window.localStorage.setItem(TABLE_LOCK_KEY, JSON.stringify(all));
+  if (wasBlocked !== blocked) {
+    recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)',
+      action: blocked ? 'TABLE_BLOCKED' : 'TABLE_UNBLOCKED',
+      description: `${table} ${blocked ? 'gesperrt' : 'freigegeben'}`, after: table });
+  }
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
   return true;
 }

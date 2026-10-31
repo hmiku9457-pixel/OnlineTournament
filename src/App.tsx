@@ -9,6 +9,7 @@ import { ScoringPage } from '@/pages/ScoringPage';
 import { SpectatorPage } from '@/pages/SpectatorPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { getAllMockTournaments } from '@/services/mockTournamentStore';
 
 /** Force a fresh controller instance when navigating from tournament A to B.
  * React Router otherwise reuses the same component for the parameterized
@@ -17,6 +18,9 @@ import { NotFoundPage } from '@/pages/NotFoundPage';
  */
 function TournamentControlRoute() {
   const { tournamentId } = useParams();
+  if (!tournamentId || !getAllMockTournaments().some((entry) => entry.id === tournamentId)) {
+    return <Navigate to="/404" replace />;
+  }
   return <TournamentControlPage key={tournamentId} />;
 }
 
