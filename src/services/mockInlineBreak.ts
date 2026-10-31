@@ -1,6 +1,6 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
-import { computeBreakResumeAt, getPhaseLifecycle, isStageStarted, isSwissRoundApproved, type BreakStartOptions } from '@/services/mockPhaseLifecycle';
+import { computeBreakResumeAt, isStageStarted, isSwissRoundApproved, type BreakStartOptions } from '@/services/mockPhaseLifecycle';
 
 const STORAGE_KEY = 'online-tournament:mock-inline-breaks:v1';
 
