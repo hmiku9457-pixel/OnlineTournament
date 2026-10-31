@@ -96,6 +96,7 @@ export function AppShell() {
             <nav className="nav sidebar-navigation" aria-label="Hauptnavigation">
               <NavLink to="/" end><SidebarIcon name="grid"/><span>Turniere</span></NavLink>
               <NavLink to="/tournaments/new"><SidebarIcon name="plus"/><span>Turnier erstellen</span></NavLink>
+              <NavLink to="/login" className="sidebar-mobile-login"><SidebarIcon name="user"/><span>Anmelden</span></NavLink>
             </nav>
           </div>
 
