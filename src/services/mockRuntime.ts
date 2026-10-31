@@ -1276,7 +1276,6 @@ function computeStageQualifiers(tournament: DemoTournament, stage: TournamentSta
 
 export function refreshCompletedStageQualifiers(tournament: DemoTournament, stage: TournamentStage) {
   if (!isStageCompleted(tournament, stage)) return false;
-  const stageIndex = tournament.stages.findIndex((item) => item.id === stage.id);
   const nextStage = getNextCompetitionStage(tournament, stage);
   if (!nextStage || isStageStarted(tournament, nextStage)) return false;
   const qualified = computeStageQualifiers(tournament, stage, readResults());
