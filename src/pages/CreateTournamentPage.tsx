@@ -1067,13 +1067,20 @@ export function CreateTournamentPage() {
             <div className="participant-entry-layout">
               <div className="participant-editor">
                 <div className="participant-editor-head">
-                  <div>
-                    <span className="badge">{editingParticipantId ? 'Bearbeiten' : 'Neuer Eintrag'}</span>
+                  <div className="participant-editor-title">
                     <h3>{discipline === 'TEAMS' ? 'Mannschaft' : discipline === 'SINGLES' ? 'Spieler' : 'Doppel'} erfassen</h3>
+                    <span className="badge">{editingParticipantId ? 'Bearbeiten' : 'Neuer Eintrag'}</span>
                   </div>
-                  {editingParticipantId && (
-                    <button className="btn" type="button" onClick={resetParticipantEditor}>Abbrechen</button>
-                  )}
+                  <div className="participant-editor-head-actions">
+                    {editingParticipantId && (
+                      <button className="btn small" type="button" onClick={resetParticipantEditor}>Abbrechen</button>
+                    )}
+                    <button className="btn small wizard-test-player-button" type="button" onClick={generateTestParticipants}
+                      disabled={participantCount >= 19}
+                      title={participantCount >= 19 ? 'Bereits mindestens 19 Teilnehmer gespeichert.' : 'Teilnehmerliste mit Testeinträgen auf 19 ergänzen'}>
+                      {discipline === 'TEAMS' ? '19 Testmannschaften erzeugen' : discipline === 'SINGLES' ? '19 Testspieler erzeugen' : '19 Testdoppel erzeugen'}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="participant-mask">
@@ -1135,20 +1142,12 @@ export function CreateTournamentPage() {
                   </div>
                 </div>
               </div>
-              <aside className="wizard-test-tools" aria-label="Testdaten">
-                <button className="btn wizard-test-player-button" type="button" onClick={generateTestParticipants} disabled={participantCount >= 19}>
-                  {discipline === 'TEAMS' ? '19 Testmannschaften erzeugen' : discipline === 'SINGLES' ? '19 Testspieler erzeugen' : '19 Testdoppel erzeugen'}
-                </button>
-              </aside>
             </div>
 
             <aside className="participant-roster participant-roster-grid-card" aria-label="Gespeicherte Teilnehmer">
                 <div className="participant-roster-head">
-                  <div>
-                    <h3>Teilnehmerliste</h3>
-                    <span className="muted">{participantCount} gespeichert</span>
-                  </div>
-                  <span className="badge">{participantCount}</span>
+                  <h3>Teilnehmerliste</h3>
+                  <span className="badge" aria-label={`${participantCount} Teilnehmer gespeichert`}>{participantCount}</span>
                 </div>
 
                 <div className="participant-roster-list participant-roster-multi">
@@ -1159,14 +1158,31 @@ export function CreateTournamentPage() {
                   ) : participants.map((participant, index) => (
                     <article className={`participant-roster-row ${editingParticipantId === participant.id ? 'editing' : ''}`} key={participant.id}>
                       <span className="participant-list-number">{index + 1}</span>
-                      <div className="participant-list-name">
-                        <strong>{participantDisplayName(participant, discipline)}</strong>
-                        {!participantIsComplete(participant, discipline) && <span className="field-error">Eintrag muss ergänzt werden.</span>}
-                      </div>
-                      <div className="participant-list-actions">
-                        <button className="btn small" type="button" onClick={() => editParticipant(participant)}>Bearbeiten</button>
-                        <button className="btn small" type="button" onClick={() => removeParticipant(participant.id)}>Entfernen</button>
-                      </div>
+                      <div className="participant-list-name" title={participantDisplayName(participant, discipline)}>
+                         <strong>{participantDisplayName(participant, discipline)}</strong>
+                         {!participantIsComplete(participant, discipline) && (
+                           <span className="participant-incomplete" role="img" aria-label="Eintrag unvollständig" title="Eintrag muss ergänzt werden.">!</span>
+                         )}
+                       </div>
+                       <div className="participant-list-actions">
+                         <button className="participant-icon-button" type="button"
+                           aria-label={`${participantDisplayName(participant, discipline)} bearbeiten`}
+                           title={`${participantDisplayName(participant, discipline)} bearbeiten`}
+                           onClick={() => editParticipant(participant)}>
+                           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                             <path d="M12 20h9" />
+                             <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4L16.5 3.5Z" />
+                           </svg>
+                         </button>
+                         <button className="participant-icon-button participant-icon-delete" type="button"
+                           aria-label={`${participantDisplayName(participant, discipline)} entfernen`}
+                           title={`${participantDisplayName(participant, discipline)} entfernen`}
+                           onClick={() => removeParticipant(participant.id)}>
+                           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                             <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v7m4-7v7" />
+                           </svg>
+                         </button>
+                       </div>
                     </article>
                   ))}
                 </div>
