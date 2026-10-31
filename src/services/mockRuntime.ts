@@ -178,6 +178,9 @@ export function canEditMockMatch(tournament: DemoTournament, matchId: string) {
   const latestTournament = getAllMockTournaments().find((item) => item.id === tournament.id) ?? tournament;
   if (latestTournament.status === 'ABORTED' || latestTournament.status === 'FINISHED' || !stage || !isStageStarted(latestTournament, stage)
     || !canEditFinishedResults(latestTournament, stage)) return false;
+  // A future KO result cannot be entered through direct score APIs while
+  // the round-boundary break is still pending or running.
+  if (blocksInlineBreakRound(latestTournament, stage, matchId)) return false;
   const cutoffIndex = Number(matchId.match(/-sw-cutoff-set-m(\d+)$/)?.[1] ?? 0);
   if (stage.type === 'SWISS' && cutoffIndex > 0) {
     const prefix = `${stage.id}-sw-cutoff-set-m`;
@@ -1631,7 +1634,8 @@ export function skipMockThirdPlaceMatch(tournament: DemoTournament, matchId: str
   const latest = getAllMockTournaments().find((item) => item.id === tournament.id);
   if (['ABORTED', 'FINISHED'].includes(latest?.status ?? tournament.status) || !isMockThirdPlaceMatch(matchId)) return false;
   const stage = tournament.stages.find((item) => `${item.id}-third-place` === matchId);
-  if (!stage || stage.type !== 'KNOCKOUT' || !isStageStarted(tournament, stage)) return false;
+  if (!stage || stage.type !== 'KNOCKOUT' || !isStageStarted(tournament, stage)
+    || blocksInlineBreakRound(latest ?? tournament, stage, matchId)) return false;
   const match = getMockStageMatches(tournament, stage).find((item) => item.id === matchId);
   if (!match || !['WAITING', 'LIVE', 'READY'].includes(match.status)) return false;
   const existing = readResults().find((item) => item.matchId === matchId);
