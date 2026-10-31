@@ -11,6 +11,8 @@ import {
 } from '@/services/mockRuntime';
 import { buildSwissStandings } from '@/services/mockCompetitionViews';
 import { getMockAudit } from '@/services/mockAudit';
+import { getMockStoredResult } from '@/services/mockRuntime';
+import { estimateRemainingTournamentMinutes } from '@/services/mockDuration';
 import { equalSwissSportingRank, findSwissCutoffTie } from '@/domain/swissCutoffTie';
 import type { RankedParticipant } from '@/domain/standingRankings';
 
@@ -93,6 +95,7 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(isStageCompleted(t, t.stages[0])).toBe(true);
     expect(getPendingSwissCutoff(t)).toBeNull();
     expect(getStageEntrants(t, t.stages[1])).toEqual([pending.tie.players[0]]);
+    expect(getMockStoredResult(match.id)?.adminConfirmed).toBe(true);
     expect(getSwissCutoffSetMatches(t, t.stages[0])).toHaveLength(1);
     expect(getSwissCutoffHistory(t, t.stages[0])?.sets[0]).toMatchObject({
       sideA: pending.tie.players[0], sideB: pending.tie.players[1], pointsA: 11, pointsB: 7,
@@ -295,6 +298,40 @@ describe('Stichentscheid nach letzter Schweizer Runde', () => {
     expect(getSwissRoundRobinMatches(t, t.stages[0]).find((game) => game.id === first.id)?.score)
       .toBe(firstResult.sideAScore > firstResult.sideBScore ? '0:1' : '1:0');
     expect(buildSwissStandings(t, t.stages[0]).reduce((sum, row) => sum + row.played, 0)).toBe(6);
+  });
+
+
+  it('includes newly scheduled extra Swiss rounds in remaining duration but not beforehand', () => {
+    const t = create(6, 2);
+    completeRound(t);
+    const planned = estimateRemainingTournamentMinutes(t);
+    expect(planned).not.toBeNull();
+    expect(beginSwissCutoffPlayoff(t, 'ROUND')).toBeNull();
+    const scheduled = estimateRemainingTournamentMinutes(t);
+    expect(scheduled).toBeGreaterThan(planned!);
+    const added = getMockStageMatches(t, t.stages[0]).filter(m => m.round === 'Runde 2');
+    expect(added).toHaveLength(3);
+    added.forEach(m => completeMockMatch(m.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]));
+    expect(estimateRemainingTournamentMinutes(t)).toBeLessThan(scheduled!);
+  });
+
+  it('keeps obsolete round-robin tie-break games visible without using their winners in current standings', () => {
+    const t = create(6, 2);
+    completeRound(t);
+    expect(beginSwissCutoffPlayoff(t, 'ROUND_ROBIN')).toBeNull();
+    const playoff = getPendingSwissCutoff(t)!.decision!.extraRounds![0].matches;
+    const favorites = getPendingSwissCutoff(t)!.tie.players;
+    playoff.forEach((match, i) => {
+      const preferred = favorites.indexOf(match.sideA) < favorites.indexOf(match.sideB);
+      expect(recordSwissCutoffPlayoffResult(t, i, preferred ? 11 : 7, preferred ? 7 : 11)).toBeNull();
+    });
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(getSwissCutoffHistory(t, t.stages[0])?.winners).toHaveLength(2);
+    const game = getMockStageMatches(t, t.stages[0])[0];
+    completeMockMatch(game.id, [{ number: 1, sideAScore: 11, sideBScore: 8 }], 'FINISHED', true);
+    const history = getSwissCutoffHistory(t, t.stages[0]);
+    expect(history?.extraRounds?.[0].matches).toHaveLength(3);
+    expect(history?.winners).toBeUndefined();
   });
 
   it('gibt keine weitere Schweizer Runde frei, bevor alle angesetzten Spiele fertig sind', () => {

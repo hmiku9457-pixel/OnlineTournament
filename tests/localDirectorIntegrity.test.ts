@@ -2,7 +2,9 @@ import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { createMockTournament, updateMockTournamentStatus, getMockTournament, updateMockParticipantName } from '@/services/mockTournamentStore';
 import { startFirstStage, startStage, isStageCompleted, getStageEntrants, getStageStartIssue } from '@/services/mockPhaseLifecycle';
 import { approveMockProgress, getPendingMockApproval, getMockStageMatches, canEditMockMatch, completeMockMatch, assignMockMatchToTable, getMockStoredResult, withdrawMockParticipant, restoreMockParticipant, canRestoreMockParticipant, saveMockMatchSets, abortMockTournament, canWithdrawMockParticipant } from '@/services/mockRuntime';
-import { getGroupAssignments, setParticipantGroup, toggleBracketPin, getPinnedBracketSlots, getBracketSlots } from '@/services/mockDrawStore';
+import { getGroupAssignments, setParticipantGroup, toggleBracketPin, getPinnedBracketSlots, getBracketSlots, randomizeSwissOrder, getSwissOrder } from '@/services/mockDrawStore';
+import { getMockParticipantProgress } from '@/services/mockParticipantProgress';
+import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
 import { getMockAudit } from '@/services/mockAudit';
 import { setMockTableBlocked } from '@/services/mockTableLocks';
 import type { MockPhaseInput } from '@/services/mockTournamentStore';
@@ -214,6 +216,70 @@ describe('local director integrity', () => {
     completeMockMatch(first.id, lose, 'FINISHED', true);
     expect(getMockTournament(t.id).status).toBe('PAUSED');
     expect(isStageCompleted(t, t.stages[0])).toBe(false);
+  });
+
+
+  it('marks non-qualifiers as reserves and promotes them after a qualifier withdraws', () => {
+    const t = create([phase('GROUPS', 4), phase('KNOCKOUT', 2)]);
+    start(t);
+    getMockStageMatches(t, t.stages[0]).forEach(m => completeMockMatch(m.id, win));
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    const firstQualifiers = getStageEntrants(t, t.stages[1]);
+    const reserves = t.participantNames!.filter(n => !firstQualifiers.includes(n));
+    expect(reserves).toHaveLength(2);
+    const upcoming = t.stages[1].name;
+    reserves.forEach(name => {
+      expect(getMockParticipantProgress(t, name).status).toBe(`Nicht für Phase ${upcoming} qualifiziert`);
+      expect(canWithdrawMockParticipant(t, name)).toBe(false);
+    });
+    firstQualifiers.forEach(name => expect(getMockParticipantProgress(t, name).status).toBe('Aktiv'));
+    const statistics = summarizeParticipantStatuses(t.participantNames!.map(name => getMockParticipantProgress(t, name).status));
+    expect(statistics).toMatchObject({ remaining: 2, eliminated: 2 });
+
+    expect(withdrawMockParticipant(t, firstQualifiers[0])).toBe(true);
+    const promoted = getStageEntrants(t, t.stages[1]).find(name => reserves.includes(name));
+    expect(promoted).toBeDefined();
+    expect(getMockParticipantProgress(t, promoted!).status).toBe('Aktiv');
+    expect(startStage(t, t.stages[1])).toBe(true);
+    expect(getMockParticipantProgress(t, reserves.find(name => name !== promoted)!).status).toBe('Ausgeschieden');
+  });
+
+  it('keeps the reserve status visible during a planned break', () => {
+    const t = create([phase('GROUPS', 4), phase('BREAK', 4), phase('KNOCKOUT', 2)]);
+    start(t);
+    getMockStageMatches(t, t.stages[0]).forEach(m => completeMockMatch(m.id, win));
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(startStage(t, t.stages[1])).toBe(true);
+    const finalists = getStageEntrants(t, t.stages[2]);
+    const reserve = t.participantNames!.find(name => !finalists.includes(name))!;
+    expect(getMockParticipantProgress(t, reserve).status).toBe('Nicht für Phase KNOCKOUT qualifiziert');
+    expect(getMockParticipantProgress(t, finalists[0]).status).toBe('Aktiv');
+  });
+
+  it('preserves a prepared Swiss ordering but adapts entrants after a correction', () => {
+    const t = create([phase('GROUPS', 4), phase('SWISS', 2)]);
+    start(t);
+    const games = getMockStageMatches(t, t.stages[0]);
+    games.forEach(m => completeMockMatch(m.id, win));
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    const previous = getStageEntrants(t, t.stages[1]);
+    expect(randomizeSwissOrder(t, t.stages[1])).toBe(true);
+    expect(getMockAudit(t.id).some(e => e.action === 'DRAW_CHANGED')).toBe(true);
+    completeMockMatch(games[0].id, lose, 'FINISHED', true);
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    const next = getStageEntrants(t, t.stages[1]);
+    expect(next).not.toEqual(previous);
+    expect(new Set(getSwissOrder(t, t.stages[1]))).toEqual(new Set(next));
+    expect(getMockAudit(t.id).some(e => e.action === 'FOLLOWUP_DRAW_ADJUSTED')).toBe(true);
+  });
+
+  it('audits manual group moves independently from match results', () => {
+    const t = create([phase('GROUPS', 4)]);
+    const stage = t.stages[0];
+    const participant = t.participantNames![0];
+    const original = getGroupAssignments(t, stage)[participant];
+    expect(setParticipantGroup(t, stage, participant, original === 0 ? 1 : 0)).toBe(true);
+    expect(getMockAudit(t.id).some(e => e.action === 'DRAW_CHANGED' && e.description.includes(participant))).toBe(true);
   });
 
   it('updates Swiss decisions and walkover references after a participant rename', () => {
