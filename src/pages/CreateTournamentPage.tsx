@@ -28,6 +28,7 @@ import type { Discipline, StageType } from '@/domain/types';
 import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/recommendations';
 import { createMockTournament } from '@/services/mockTournamentStore';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
+import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { buildPlannedTimeline, isValidLocalDateTime, plannedTimelineDurationMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
@@ -883,11 +884,12 @@ export function CreateTournamentPage() {
               <div className="field">
                 <label htmlFor="tournament-date">Turnierdatum *</label>
                 <input id="tournament-date" type="date" required value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} />
+                <span className="field-hint">Dient der Planung und Ankündigung. Du kannst das Turnier auch vor diesem Datum starten.</span>
               </div>
               <div className="field">
                 <label htmlFor="tournament-start-time">Geplanter Turnierbeginn *</label>
-                <input id="tournament-start-time" type="time" required value={scheduledTime} onChange={(event) => setScheduledTime(event.target.value)} />
-                <span className="field-hint">Vorabinformation: Der tatsächliche Turnierstart erfolgt weiterhin durch die Turnierleitung.</span>
+                <ClockTimePicker id="tournament-start-time" value={scheduledTime} onChange={setScheduledTime} />
+                <span className="field-hint">Uhrzeit über das Zifferblatt wählen. Sie dient der Ankündigung – der tatsächliche Start bleibt jederzeit bei der Turnierleitung.</span>
               </div>
               <div className="field">
                 <label htmlFor="sport">Sportart</label>
