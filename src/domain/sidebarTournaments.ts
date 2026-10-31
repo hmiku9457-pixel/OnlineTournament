@@ -1,11 +1,20 @@
 import type { DemoTournament } from '@/data/demoTournaments';
+import type { TournamentStatus } from '@/domain/types';
 import { getActiveStage, getNextStartableStage, getPhaseLifecycle } from '@/services/mockPhaseLifecycle';
 import { getPendingMockApproval } from '@/services/mockRuntime';
 
-export interface SidebarLiveTournament {
+const sidebarStatuses = {
+  DRAFT: { label: 'Entwurf', order: 5 },
+  REGISTRATION: { label: 'Anmeldung', order: 4 },
+  READY: { label: 'Bereit', order: 3 },
+  RUNNING: { label: 'Läuft', order: 1 },
+  PAUSED: { label: 'Pausiert', order: 2 },
+} as const;
+
+export interface SidebarTournament {
   id: string;
   name: string;
-  status: 'RUNNING' | 'PAUSED';
+  status: keyof typeof sidebarStatuses;
   statusLabel: string;
   phaseLabel: string;
   completedPhases: number;
@@ -14,28 +23,30 @@ export interface SidebarLiveTournament {
   needsApproval: boolean;
 }
 
-/** The sidebar deliberately lists only tournaments that have started but are
- * still active or paused. Ready, finished and aborted tournaments stay on the
- * dashboard. Use the live lifecycle instead of stored UI placeholder counters.
+/** Relevant, not yet finished tournaments from this browser. Completed,
+ * archived and aborted events are still reachable through "Alle Turniere".
  */
-export function sidebarLiveTournaments(tournaments: DemoTournament[]): SidebarLiveTournament[] {
+export function sidebarTournaments(tournaments: DemoTournament[]): SidebarTournament[] {
   return tournaments.flatMap((tournament) => {
-    if (tournament.status !== 'RUNNING' && tournament.status !== 'PAUSED') return [];
+    if (!(tournament.status in sidebarStatuses)) return [];
+    const status = tournament.status as keyof typeof sidebarStatuses;
     const lifecycle = getPhaseLifecycle(tournament);
     const activeStage = getActiveStage(tournament);
     const nextStage = activeStage ? undefined : getNextStartableStage(tournament);
-    const stage = activeStage ?? nextStage;
+    const stage = activeStage ?? nextStage
+      ?? (!tournament.hasStarted ? tournament.stages[0] : undefined);
     const stageNumber = stage ? tournament.stages.findIndex((item) => item.id === stage.id) + 1 : 0;
     const completedPhases = tournament.stages.filter((item) => lifecycle.completedStageIds.includes(item.id)).length;
     const totalPhases = tournament.stages.length;
+    const beforeStart = status === 'DRAFT' || status === 'REGISTRATION' || status === 'READY';
     return [{
       id: tournament.id,
       name: tournament.name,
-      status: tournament.status,
-      statusLabel: tournament.status === 'PAUSED' ? 'Pausiert' : 'Läuft',
+      status,
+      statusLabel: sidebarStatuses[status].label,
       phaseLabel: stageNumber > 0
-        ? `${activeStage ? 'Phase' : 'Als Nächstes'} ${stageNumber}: ${stage?.name ?? ''}`
-        : 'Nächster Schritt in der Turnierleitung',
+        ? `${beforeStart ? 'Startphase' : activeStage ? 'Phase' : 'Als Nächstes'} ${stageNumber}: ${stage?.name ?? ''}`
+        : beforeStart ? 'Noch keine Phase eingerichtet' : 'Nächster Schritt in der Turnierleitung',
       completedPhases,
       totalPhases,
       progressPercent: totalPhases ? Math.round(completedPhases / totalPhases * 100) : 0,
@@ -43,5 +54,5 @@ export function sidebarLiveTournaments(tournaments: DemoTournament[]): SidebarLi
     }];
   }).sort((a, b) =>
     Number(b.needsApproval) - Number(a.needsApproval)
-    || Number(a.status === 'PAUSED') - Number(b.status === 'PAUSED'));
+    || sidebarStatuses[a.status].order - sidebarStatuses[b.status].order);
 }
