@@ -1382,6 +1382,14 @@ export function approveMockProgress(tournament: DemoTournament): MockProgressApp
   } else {
     const qualified = computeStageQualifiers(latest, stage, readResults());
     if (!completeStage(latest, stage, qualified)) return null;
+    // Reapproval after a corrected group/Swiss result may replace qualifiers
+    // just as a withdrawal does. Never attach old pins to their replacements.
+    const followingCompetition = getNextCompetitionStage(latest, stage);
+    if (followingCompetition && reconcileQualifiedBracket(latest, followingCompetition)) {
+      recordMockAudit({ tournamentId: latest.id, actor: 'Turnierleitung (lokal)',
+        action: 'KNOCKOUT_DRAW_REBUILT',
+        description: 'Neue Qualifikanten nach Phasenkorrektur: KO-Auslosung neu aufgebaut und Startplatz-Fixierungen aufgehoben.' });
+    }
     updateMockTournamentStatus(latest.id, pending.isLastStage ? 'FINISHED' : 'PAUSED');
     recordMockAudit({ tournamentId: latest.id, actor: 'Turnierleitung', action: 'STAGE_APPROVED',
       description: `Phase ${stage.name} nach Ergebniskontrolle freigegeben`,

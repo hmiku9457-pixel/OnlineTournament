@@ -187,6 +187,22 @@ describe('local director integrity', () => {
     expect(getMockAudit(t.id).some(e => e.action === 'KNOCKOUT_DRAW_REBUILT')).toBe(true);
   });
 
+  it('rechecks pinned knockout positions after a corrected phase is reapproved', () => {
+    const t = create([phase('GROUPS', 4), phase('KNOCKOUT', 2)]);
+    start(t);
+    const matches = getMockStageMatches(t, t.stages[0]);
+    matches.forEach(m => completeMockMatch(m.id, win));
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(toggleBracketPin(t, t.stages[1], 0)).toBe(true);
+    expect(getPinnedBracketSlots(t, t.stages[1])).toEqual([0]);
+    const previous = getStageEntrants(t, t.stages[1]);
+    completeMockMatch(matches[0].id, lose, 'FINISHED', true);
+    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(getStageEntrants(t, t.stages[1])).not.toEqual(previous);
+    expect(getPinnedBracketSlots(t, t.stages[1])).toEqual([]);
+    expect(getMockAudit(t.id).some(e => e.action === 'KNOCKOUT_DRAW_REBUILT')).toBe(true);
+  });
+
   it('keeps a manually paused tournament paused after correcting an approved stage', () => {
     const t = create([phase('ROUND_ROBIN', 4), phase('KNOCKOUT', 2)]);
     start(t);
