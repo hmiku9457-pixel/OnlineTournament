@@ -1734,7 +1734,9 @@ export function TournamentControlPage() {
             <h2 id="control-approval-title">{pendingApproval.kind === 'ROUND'
               ? `Schweizer Runde ${pendingApproval.round} freigeben?`
               : `${pendingApproval.stageName} abschließen?`}</h2>
-            <p>Bitte kontrolliere die folgenden {reviewMatches.length} Begegnungen. Mit der Freigabe bestätigt die Turnierleitung deren Ergebnisse verbindlich.</p>
+            <p>{reviewMatches.length > 0
+              ? `Bitte kontrolliere die folgenden ${reviewMatches.length} Begegnungen. Mit der Freigabe bestätigt die Turnierleitung deren Ergebnisse verbindlich.`
+              : 'In dieser Runde gibt es keine regulären Begegnungen (nur Freilose). Die Turnierleitung muss auch diese Runde ausdrücklich freigeben.'}</p>
             <div className="control-approval-results">
               {reviewMatches.map((match) => (
                 <div className="control-approval-result" key={match.id}>

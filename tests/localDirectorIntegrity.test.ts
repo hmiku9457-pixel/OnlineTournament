@@ -53,6 +53,23 @@ describe('local director integrity', () => {
     expect(getMockStageMatches(b, b.stages[0]).find(m => m.id === semifinalB.id)?.table).toBe('Tisch 1');
   });
 
+  it('isolates Swiss pairing approval from another tournament already in its next round', () => {
+    const a = create([phase('SWISS', 4)], 'SwissA');
+    const b = create([phase('SWISS', 4)], 'SwissB');
+    start(a); start(b);
+    const firstA = getMockStageMatches(a, a.stages[0]);
+    const firstB = getMockStageMatches(b, b.stages[0]);
+    firstA.forEach(m => completeMockMatch(m.id, win));
+    firstB.forEach(m => completeMockMatch(m.id, win));
+    expect(approveMockProgress(a)?.kind).toBe('ROUND');
+    expect(approveMockProgress(b)?.kind).toBe('ROUND');
+    const bNext = getMockStageMatches(b, b.stages[0]).find(m => m.round === 'Runde 2')!;
+    expect(assignMockMatchToTable(b, bNext.id, 'Tisch 2')).toBe(true);
+    expect(canEditMockMatch(a, firstA[0].id)).toBe(true);
+    completeMockMatch(firstA[0].id, lose, 'FINISHED', true);
+    expect(getMockStageMatches(b, b.stages[0]).find(m => m.id === bNext.id)?.table).toBe('Tisch 2');
+  });
+
   it('reapproves a correction during a break and updates next phase entrants', () => {
     const t = create([phase('GROUPS', 4), phase('BREAK', 2), phase('KNOCKOUT', 2)]);
     start(t);
