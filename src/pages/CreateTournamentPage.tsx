@@ -951,11 +951,11 @@ export function CreateTournamentPage() {
                   <option value="" disabled>Sportart auswählen</option>
                   {sportOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
-                <span className="field-hint">Bestimmt die verfügbaren Disziplinen und die Grundlagen der Zeitplanung.</span>
+                <span className="field-hint">Bestimmt die verfügbaren Wettbewerbsarten und die Planungswerte für die Turnierdauer.</span>
               </div>
               <div className="field">
-                <label htmlFor="discipline">Disziplin <span className="wizard-required-mark" aria-hidden="true">*</span></label>
-                <select id="discipline" required={Boolean(sport)} value={sport ? discipline : ''} disabled={!sport}
+                <label htmlFor="discipline">Wettbewerbsart <span className="wizard-required-mark" aria-hidden="true">*</span></label>
+                <select id="discipline" required={availableDisciplines.length > 1} aria-describedby="competition-type-hint" value={sport ? discipline : ''} disabled={availableDisciplines.length <= 1}
                   onChange={(event) => {
                     const nextDiscipline = event.target.value as Discipline;
                     if (nextDiscipline === discipline) return;
@@ -967,6 +967,13 @@ export function CreateTournamentPage() {
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
+                <span id="competition-type-hint" className="field-hint">
+                  {!sport
+                    ? 'Wähle zuerst eine Sportart aus. Danach kannst du die Wettbewerbsart festlegen.'
+                    : availableDisciplines.length === 1
+                      ? `Für diese Sportart ist nur „${availableDisciplines[0].label}“ verfügbar. Die Auswahl erfolgt automatisch.`
+                      : 'Wähle zwischen Einzel und Doppel. Die Wettbewerbsart bestimmt, wie du Teilnehmer erfasst.'}
+                </span>
               </div>
               <div className="field full">
                 <label>Anzahl {sport ? venue.plural : 'Spielflächen'} <span className="wizard-required-mark" aria-hidden="true">*</span></label>
@@ -1747,7 +1754,7 @@ export function CreateTournamentPage() {
           <button type="button" className="wizard-side-fact" onClick={() => navigateToStep(1)}>
             <span>Grunddaten <span aria-hidden="true">↗</span></span>
             <strong>{name.trim() || 'Noch kein Name'}</strong>
-            <small>{sportOptions.find((item) => item.id === sport)?.label ?? 'Sportart auswählen'} · {sport ? disciplineLabel(discipline) : 'Disziplin offen'} · {tables} {venue.plural} · mindestens {minimumMatches} Spiele</small>
+            <small>{sportOptions.find((item) => item.id === sport)?.label ?? 'Sportart auswählen'} · {sport ? disciplineLabel(discipline) : 'Wettbewerbsart offen'} · {tables} {venue.plural} · mindestens {minimumMatches} Spiele</small>
             <small>{isValidLocalDateTime(scheduledStart) ? `Geplanter Beginn: ${scheduledDate} · ${scheduledTime} Uhr` : 'Turnierdatum noch offen'}</small>
           </button>
           <button type="button" className="wizard-side-fact" disabled={maxReachedStep < 2} onClick={() => navigateToStep(2)}>
