@@ -1,6 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
+import { getGroupAssignments } from '@/services/mockDrawStore';
 import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
 
 const PHASE_KEY = 'online-tournament:mock-phase-lifecycle:v1';
@@ -122,10 +123,27 @@ export function isStageLockedWaiting(tournament: DemoTournament, stage: Tourname
   return Boolean(previous && !isStageCompleted(tournament, previous));
 }
 
+/** A group may be empty while arranging the draw; a singleton group
+ * cannot play any fixture and must never be started. */
+export function getStageStartIssue(tournament: DemoTournament, stage: TournamentStage): string | null {
+  const entrants = getStageEntrants(tournament, stage);
+  if (entrants.length < 2) return 'Zum Starten müssen mindestens zwei aktive Teilnehmer vorhanden sein. Bitte Teilnehmer oder Phasenplanung prüfen; andernfalls kann das Turnier abgebrochen werden.';
+  if (stage.type === 'GROUPS') {
+    const assignments = getGroupAssignments(tournament, stage);
+    const counts = Array<number>(Math.max(1, Number(stage.settings.groups) || 1)).fill(0);
+    entrants.forEach((participant) => { counts[assignments[participant] ?? 0] += 1; });
+    const singleton = counts.findIndex((count) => count === 1);
+    if (singleton !== -1) {
+      return `Gruppe ${String.fromCharCode(65 + singleton)} enthält nur einen Teilnehmer. Leere Gruppen sind erlaubt; bitte den einzelnen Teilnehmer einer anderen Gruppe zuordnen.`;
+    }
+  }
+  return null;
+}
+
 export function startStage(tournament: DemoTournament, stage: TournamentStage) {
   if (tournament.status === 'ABORTED' || tournament.status === 'FINISHED' || !isStageEditable(tournament, stage)) return false;
+  if (getStageStartIssue(tournament, stage)) return false;
   const entrants = getStageEntrants(tournament, stage);
-  if (entrants.length < 2) return false;
   const state = getPhaseLifecycle(tournament);
   // Die vor dem Start gültige Auslosung einfrieren. Ansonsten würden bei
   // einem späteren Lesen die ursprüngliche Teilnehmerzahl aus dem Wizard

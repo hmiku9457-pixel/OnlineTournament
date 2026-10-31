@@ -244,7 +244,12 @@ export function applySeededBracketSlots(tournament: DemoTournament, stage: Tourn
 
 export function getPinnedBracketSlots(tournament: DemoTournament, stage: TournamentStage): number[] {
   const slots = getBracketSlots(tournament, stage);
-  return (findConfig(tournament.id, stage.id)?.pinnedBracketSlots ?? [])
+  const config = findConfig(tournament.id, stage.id);
+  // Stale pin indexes must never attach to a different participant after a
+  // change of qualifiers, even before the reconciling write has completed.
+  if (!config?.bracketSlots || !validBracketConstraints(getStageEntrants(tournament, stage), config.bracketSlots)
+    || config.bracketSlots.some((name, index) => name !== slots[index])) return [];
+  return (config.pinnedBracketSlots ?? [])
     .filter((index) => Number.isInteger(index) && index >= 0 && index < slots.length && slots[index] !== 'Freilos');
 }
 
@@ -256,6 +261,19 @@ export function toggleBracketPin(tournament: DemoTournament, stage: TournamentSt
   const pinned = new Set(getPinnedBracketSlots(tournament, stage));
   if (pinned.has(index)) pinned.delete(index); else pinned.add(index);
   upsert({ ...old, tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots, pinnedBracketSlots: [...pinned] });
+  return true;
+}
+
+/** A changed qualifying field invalidates manually pinned positions only when
+ * the old bracket no longer contains exactly the current qualifiers. */
+export function reconcileQualifiedBracket(tournament: DemoTournament, stage: TournamentStage): boolean {
+  if (stage.type !== 'KNOCKOUT' || isStageCompleted(tournament, stage)) return false;
+  const config = findConfig(tournament.id, stage.id);
+  if (!config?.bracketSlots) return false;
+  const entrants = getStageEntrants(tournament, stage);
+  const size = nextPowerOfTwo(Math.max(2, entrants.length));
+  if (config.bracketSlots.length === size && validBracketConstraints(entrants, config.bracketSlots)) return false;
+  upsert({ ...config, bracketSlots: balancedBracketSlots(entrants), pinnedBracketSlots: [] });
   return true;
 }
 
