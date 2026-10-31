@@ -46,6 +46,7 @@ import { addMockParticipant, updateMockParticipantName, getMockTournament, updat
 import { generateUniquePlayerCode } from '@/services/mockPlayerCodes';
 import { getStageEntrants, getStageStartIssue, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage, completeStage, canFinishBreak, getBreakResumeAt, formatBreakCountdown, type BreakStartOptions } from '@/services/mockPhaseLifecycle';
 import { TournamentPauseBanner } from '@/components/TournamentPauseBanner';
+import { getInlineBreakStatus, startInlineBreak, finishInlineBreak, canFinishInlineBreak } from '@/services/mockInlineBreak';
 import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
 import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration } from '@/services/mockDuration';
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
@@ -679,14 +680,18 @@ export function TournamentControlPage() {
   const activeStage = useMemo(() => getActiveStage(phaseSource.tournament), [phaseSource]);
   const pendingApproval = useMemo(() => getPendingMockApproval(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   const activeBreak = activeStage?.type === 'BREAK' ? activeStage : null;
+  const inlineBreak = activeStage ? getInlineBreakStatus(tournament, activeStage, getMockStageMatches(tournament, activeStage)) : null;
+  const inlineBreakRunning = inlineBreak?.state === 'running' ? inlineBreak : null;
+  const inlineBreakReady = inlineBreak?.state === 'ready' ? inlineBreak : null;
+  const inlineBreakCanFinish = activeStage && inlineBreakRunning ? canFinishInlineBreak(tournament, activeStage) : false;
   const breakReady = activeBreak ? canFinishBreak(tournament, activeBreak, new Date()) : false;
   const activeBreakResume = activeBreak ? getBreakResumeAt(tournament, activeBreak) : null;
   void pauseClockTick;
   useEffect(() => {
-    if (!activeBreak || tournament.status === 'ABORTED') return;
+    if ((!activeBreak && !inlineBreakRunning) || tournament.status === 'ABORTED') return;
     const timer = window.setInterval(() => setPauseClockTick((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
-  }, [activeBreak?.id, tournament.status]);
+  }, [activeBreak?.id, inlineBreakRunning?.resumeAt?.getTime(), tournament.status]);
   const reviewMatches = pendingApproval && activeStage
     ? getMockStageMatches(tournament, activeStage).filter((match) => pendingApproval.kind === 'STAGE'
       || Number(match.id.match(/-sw-r(\d+)-m\d+$/)?.[1] ?? 0) === pendingApproval.round)
@@ -894,6 +899,28 @@ export function TournamentControlPage() {
   function requestStartTournament() {
     const firstStage = tournament.stages[0];
     if (firstStage) setStartModal({ kind: 'tournament', stageName: firstStage.name });
+  }
+
+  function beginCurrentInlineBreak() {
+    if (!activeStage || !inlineBreakReady
+      || !startInlineBreak(tournament, activeStage, getMockStageMatches(tournament, activeStage))) {
+      setAssignmentMessage('Die Zwischenpause kann noch nicht beginnen. Bitte die vorherige Runde abschließen und freigeben.');
+      return;
+    }
+    recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)',
+      action: 'BREAK_STARTED', description: `Zwischenpause nach Runde ${inlineBreakReady.config.afterRound} in „${activeStage.name}“ gestartet` });
+    setStatus('PAUSED');
+    refreshRuntime();
+  }
+
+  function finishCurrentInlineBreak(early = false) {
+    if (!activeStage || !finishInlineBreak(tournament, activeStage, early)) return;
+    recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)',
+      action: early ? 'BREAK_FINISHED_EARLY' : 'BREAK_FINISHED',
+      description: `Zwischenpause nach Runde ${inlineBreak?.config.afterRound} in „${activeStage.name}“ beendet` });
+    setConfirmEarlyBreak(false);
+    setStatus('RUNNING');
+    refreshRuntime();
   }
 
   function finishCurrentBreak(early = false) {
@@ -1150,6 +1177,24 @@ export function TournamentControlPage() {
         </div>
       </header>
 
+      {inlineBreakReady && activeStage && !['ABORTED', 'FINISHED'].includes(tournament.status) && (
+        <div className="control-review-alert inline-break-required no-print" role="status">
+          <strong>Zwischenpause nach Runde {inlineBreakReady.config.afterRound} von „{activeStage.name}“</strong>
+          <span>Die Runde ist freigegeben. Die nächste Runde bleibt gesperrt, bis du diese Zwischenpause gestartet und beendet hast.</span>
+          <button className="btn primary" type="button" onClick={beginCurrentInlineBreak}>Zwischenpause starten</button>
+        </div>
+      )}
+      {inlineBreakRunning && activeStage && !['ABORTED', 'FINISHED'].includes(tournament.status) && (
+        <TournamentPauseBanner
+          stageName={`Zwischenpause nach Runde ${inlineBreakRunning.config.afterRound} · ${activeStage.name}`}
+          overnight={false}
+          resumeAt={inlineBreakRunning.resumeAt}
+          ready={inlineBreakCanFinish}
+          now={Date.now()}
+          onViewDetails={() => { setSelectedStageId(activeStage.id); setTab('flow'); }}
+          onFinish={() => inlineBreakCanFinish ? finishCurrentInlineBreak() : setConfirmEarlyBreak(true)}
+        />
+      )}
       {activeBreak && !['ABORTED', 'FINISHED'].includes(tournament.status) && (
         <TournamentPauseBanner
           stageName={activeBreak.name}
@@ -1878,13 +1923,13 @@ export function TournamentControlPage() {
           </section>
         </div>
       )}
-      {confirmEarlyBreak && activeBreak && (
+      {confirmEarlyBreak && (activeBreak || inlineBreakRunning) && (
         <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setConfirmEarlyBreak(false)}>
           <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="break-early-title" onMouseDown={(event) => event.stopPropagation()}>
             <h2 id="break-early-title">Pause vorzeitig beenden?</h2>
-            <p>Die geplante Fortsetzung ist {getBreakResumeAt(tournament, activeBreak)?.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })} Uhr. Du kannst die Pause jetzt freigeben. Der Vorgang wird protokolliert.</p>
+            <p>Die geplante Fortsetzung ist {(activeBreak ? getBreakResumeAt(tournament, activeBreak) : inlineBreakRunning?.resumeAt)?.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })} Uhr. Du kannst die Pause jetzt freigeben. Der Vorgang wird protokolliert.</p>
             <div className="actions">
-              <button className="btn primary" type="button" onClick={() => finishCurrentBreak(true)}>Jetzt vorzeitig beenden</button>
+              <button className="btn primary" type="button" onClick={() => activeBreak ? finishCurrentBreak(true) : finishCurrentInlineBreak(true)}>Jetzt vorzeitig beenden</button>
               <button className="btn" type="button" onClick={() => setConfirmEarlyBreak(false)}>Weiter pausieren</button>
             </div>
           </section>
