@@ -43,7 +43,7 @@ import type { ControlHelpTopic } from '@/domain/controlGuide';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { generateUniquePlayerCode } from '@/services/mockPlayerCodes';
-import { getStageEntrants, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage, completeStage, canFinishBreak, getBreakResumeAt } from '@/services/mockPhaseLifecycle';
+import { getStageEntrants, getStageStartIssue, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage, completeStage, canFinishBreak, getBreakResumeAt } from '@/services/mockPhaseLifecycle';
 import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
 import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration } from '@/services/mockDuration';
 import { getMockAudit } from '@/services/mockAudit';
@@ -684,6 +684,8 @@ export function TournamentControlPage() {
   const swissSource = useMemo(() => ({ ...runtimeSource, activeStage }), [runtimeSource, activeStage]);
   const swissRecordFor = useMemo(() => getActiveSwissRecordLookup(swissSource.tournament), [swissSource]);
   const nextStartableStage = useMemo(() => getNextStartableStage(phaseSource.tournament), [phaseSource]);
+  const pendingStartStage = startModal?.kind === 'tournament' ? tournament.stages[0] : nextStartableStage;
+  const pendingStartIssue = pendingStartStage ? getStageStartIssue(tournament, pendingStartStage) : 'Keine startbare Phase vorhanden.';
   const editableStage = useMemo(() => phaseSource.tournament.stages.find((stage) => isStageEditable(phaseSource.tournament, stage)), [phaseSource]);
   const selectedRoundRobinStage = tournament.stages.find((stage) => selectedStageId === `${stage.id}::rr`);
   const selectedRoundRobinDecision = selectedRoundRobinStage ? getSwissCutoffHistory(tournament, selectedRoundRobinStage) : null;
@@ -745,6 +747,8 @@ export function TournamentControlPage() {
         setCorrectionNotice({ key: entry.id, message: 'Endergebnis korrigiert.', undoAuditId: entry.id });
       } else if (entry.action === 'RESULT_RESTORED') {
         setCorrectionNotice({ key: entry.id, message: 'Die Ergebniskorrektur wurde zurückgenommen.' });
+      } else if (entry.action === 'KNOCKOUT_DRAW_REBUILT') {
+        setCorrectionNotice({ key: entry.id, message: 'Die Qualifikanten haben sich geändert. Ungültige KO-Startplatz-Fixierungen wurden aufgehoben; bitte die neue Auslosung kontrollieren.' });
       }
     };
     window.addEventListener('mock-audit-change', onAuditChange);
@@ -835,7 +839,10 @@ export function TournamentControlPage() {
 
   function performStartTournament() {
     const firstStage = tournament.stages[0];
-    if (!firstStage || !startFirstStage(tournament)) return;
+    if (!firstStage || !startFirstStage(tournament)) {
+      setAssignmentMessage(firstStage ? getStageStartIssue(tournament, firstStage) ?? 'Der Turnierstart ist derzeit nicht möglich.' : 'Es ist keine Startphase vorhanden.');
+      return;
+    }
     setStartModal(null);
     setPhaseVersion((value) => value + 1);
     setStatus('RUNNING');
@@ -844,7 +851,10 @@ export function TournamentControlPage() {
   }
 
   function performStartNextPhase() {
-    if (!nextStartableStage || !startStage(tournament, nextStartableStage)) return;
+    if (!nextStartableStage || !startStage(tournament, nextStartableStage)) {
+      setAssignmentMessage(nextStartableStage ? getStageStartIssue(tournament, nextStartableStage) ?? 'Diese Phase kann derzeit nicht starten.' : 'Es ist keine startbare Phase vorhanden.');
+      return;
+    }
     const startedId = nextStartableStage.id;
     setStartModal(null);
     setPhaseVersion((value) => value + 1);
@@ -857,9 +867,7 @@ export function TournamentControlPage() {
 
   function requestStartTournament() {
     const firstStage = tournament.stages[0];
-    if (firstStage && getStageEntrants(tournament, firstStage).length >= 2) {
-      setStartModal({ kind: 'tournament', stageName: firstStage.name });
-    }
+    if (firstStage) setStartModal({ kind: 'tournament', stageName: firstStage.name });
   }
 
   function finishCurrentBreak() {
@@ -1784,8 +1792,9 @@ export function TournamentControlPage() {
             <h2>{startModal.kind === 'tournament' ? 'Turnier starten?' : 'Nächste Phase starten?'}</h2>
             <p>„{startModal.stageName}“ wird gestartet. Die aktuelle Auslosung bzw. Setzung dieser Phase wird damit eingefroren.</p>
             <p className="muted">Nach dem Start können die Platzierungen dieser Phase nicht mehr per Drag & Drop verändert werden.</p>
+            {pendingStartIssue && <p className="field-error" role="alert">{pendingStartIssue}</p>}
             <div className="actions">
-              <button className="btn primary" type="button" onClick={startModal.kind === 'tournament' ? performStartTournament : performStartNextPhase}>Jetzt starten</button>
+              <button className="btn primary" type="button" disabled={Boolean(pendingStartIssue)} onClick={startModal.kind === 'tournament' ? performStartTournament : performStartNextPhase}>Jetzt starten</button>
               <button className="btn" type="button" onClick={() => setStartModal(null)}>Abbrechen</button>
             </div>
           </section>
