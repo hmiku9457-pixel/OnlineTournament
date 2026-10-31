@@ -357,6 +357,7 @@ export function CreateTournamentPage() {
   const [phaseDrafts, setPhaseDrafts] = useState<PhaseDraft[]>([]);
   const [editingPhaseTypeId, setEditingPhaseTypeId] = useState<string | null>(null);
   const [expandedPhaseId, setExpandedPhaseId] = useState<string | null>(null);
+  const [expandedInlineBreakIds, setExpandedInlineBreakIds] = useState<string[]>([]);
   const [phaseInsertIndex, setPhaseInsertIndex] = useState<number | null>(null);
   const [draggingPhaseId, setDraggingPhaseId] = useState<string | null>(null);
   const [dropTargetPhaseId, setDropTargetPhaseId] = useState<string | null>(null);
@@ -1606,14 +1607,33 @@ export function CreateTournamentPage() {
                             const totalRounds = phase.type === 'SWISS' ? phase.swissRounds : knockoutRoundLabels(phase.entrantCount).length;
                             return totalRounds > 1 ? (
                               <section className="phase-inline-break">
-                                <label className="phase-inline-break-toggle">
-                                  <input type="checkbox" checked={phase.inlineBreakAfterRound > 0}
-                                    onChange={(event) => updatePhase(phase.id, { inlineBreakAfterRound: event.target.checked ? Math.min(2, totalRounds - 1) : 0 })} />
-                                  <strong>Pause innerhalb dieser Phase einplanen</strong>
-                                  <span className="muted">Beispielsweise nach Runde 2, ohne die Schweizer Wertung oder die K.-o.-Auslosung zu unterbrechen.</span>
-                                </label>
-                                {phase.inlineBreakAfterRound > 0 && (
-                                  <div className="phase-inline-break-settings">
+                                <div className="phase-inline-break-header">
+                                  <label className="phase-inline-break-toggle">
+                                    <input type="checkbox" checked={phase.inlineBreakAfterRound > 0}
+                                      onChange={(event) => {
+                                        const enabled = event.target.checked;
+                                        updatePhase(phase.id, { inlineBreakAfterRound: enabled ? Math.min(2, totalRounds - 1) : 0 });
+                                        setExpandedInlineBreakIds((current) => enabled
+                                          ? [...new Set([...current, phase.id])]
+                                          : current.filter((id) => id !== phase.id));
+                                      }} />
+                                    <strong>Pause innerhalb dieser Phase</strong>
+                                    <span className="muted">{phase.inlineBreakAfterRound > 0
+                                      ? `Nach Runde ${phase.inlineBreakAfterRound} · ${phase.inlineBreakKind === 'minutes' ? `${phase.inlineBreakMinutes} Min.` : `bis ${phase.inlineBreakUntil} Uhr`}`
+                                      : 'Optional · zwischen zwei Runden'}</span>
+                                  </label>
+                                  {phase.inlineBreakAfterRound > 0 && (
+                                    <button className="btn small phase-inline-break-expand" type="button"
+                                      aria-controls={`inline-break-settings-${phase.id}`}
+                                      aria-expanded={expandedInlineBreakIds.includes(phase.id)}
+                                      onClick={() => setExpandedInlineBreakIds((current) => current.includes(phase.id)
+                                        ? current.filter((id) => id !== phase.id) : [...current, phase.id])}>
+                                      {expandedInlineBreakIds.includes(phase.id) ? 'Einklappen −' : 'Einstellungen öffnen +'}
+                                    </button>
+                                  )}
+                                </div>
+                                {phase.inlineBreakAfterRound > 0 && expandedInlineBreakIds.includes(phase.id) && (
+                                  <div id={`inline-break-settings-${phase.id}`} className="phase-inline-break-settings">
                                     <label className="field">Unterbrechung nach
                                       <select value={Math.min(phase.inlineBreakAfterRound, totalRounds - 1)}
                                         onChange={(event) => updatePhase(phase.id, { inlineBreakAfterRound: Number(event.target.value) })}>
@@ -1642,6 +1662,7 @@ export function CreateTournamentPage() {
                                     <p className="field-hint">Nach der gewählten Runde muss die Turnierleitung die Zwischenpause freigeben, bevor die nächste Runde startet.</p>
                                   </div>
                                 )}
+                                {!phase.inlineBreakAfterRound && <p className="phase-inline-break-help">Bei Bedarf nach einer Schweizer oder K.-o.-Runde eine zusätzliche Pause einplanen.</p>}
                               </section>
                             ) : null;
                           })()}
