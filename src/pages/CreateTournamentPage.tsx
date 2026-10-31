@@ -290,7 +290,7 @@ function NumberChoice({
             key={preset}
             type="button"
             aria-pressed={!custom && value === preset}
-            title={`${preset} auswählen`}
+            title={`${ariaLabel}: ${preset} auswählen`}
             onClick={() => onPreset(preset)}
           >
             {preset}
@@ -300,7 +300,7 @@ function NumberChoice({
           className={`number-choice-button custom ${custom ? 'active' : ''}`}
           type="button"
           aria-pressed={custom}
-          title="Eigenen Wert eingeben"
+          title={`${ariaLabel}: eigenen Wert eingeben`}
           onClick={onCustom}
         >
           Eigene
@@ -971,7 +971,7 @@ export function CreateTournamentPage() {
               <div className="field full">
                 <label>Anzahl {sport ? venue.plural : 'Spielflächen'} <span className="wizard-required-mark" aria-hidden="true">*</span></label>
                 <NumberChoice
-                  ariaLabel={`Anzahl ${sport ? venue.plural : 'Spielflächen'}`}
+                  ariaLabel={`Anzahl ${sport ? venue.plural : 'Spielflächen'} (Pflichtfeld)`}
                   value={tables}
                   presets={Array.from({ length: 12 }, (_, index) => index + 1)}
                   custom={customTables}
@@ -991,7 +991,7 @@ export function CreateTournamentPage() {
                 </div>
                 <label className="format-toggle wizard-venue-toggle" title={venueLayoutEnabled ? 'Individuellen Spielflächenplan deaktivieren' : 'Individuellen Spielflächenplan aktivieren'}>
                   <strong>{venueLayoutEnabled ? 'Aktiviert' : 'Aktivieren'}</strong>
-                  <input type="checkbox" role="switch" aria-label="Individuellen Spielflächenplan aktivieren" checked={venueLayoutEnabled} onChange={(event) => { setVenueLayoutEnabled(event.target.checked); if (event.target.checked) setVenueLayoutEditorOpen(true); }} />
+                  <input type="checkbox" role="switch" aria-label="Individueller Spielflächenplan" checked={venueLayoutEnabled} onChange={(event) => { setVenueLayoutEnabled(event.target.checked); if (event.target.checked) setVenueLayoutEditorOpen(true); }} />
                 </label>
               </div>
               {venueLayoutEnabled && (
@@ -1016,7 +1016,7 @@ export function CreateTournamentPage() {
               <div className="field">
                 <label>Gewünschte Mindestspiele pro Teilnehmer <span className="wizard-required-mark" aria-hidden="true">*</span></label>
                 <NumberChoice
-                  ariaLabel="Gewünschte Mindestspiele pro Teilnehmer"
+                  ariaLabel="Gewünschte Mindestspiele pro Teilnehmer (Pflichtfeld)"
                   value={minimumMatches}
                   presets={[1, 2, 3, 4, 5]}
                   custom={customMinimumMatches}
