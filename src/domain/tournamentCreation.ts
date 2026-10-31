@@ -44,7 +44,7 @@ export interface TournamentDurationPhaseInput {
   swissRounds?: number;
   knockoutBestOf?: number[];
   breakMinutes?: number;
-  breakKind?: 'minutes' | 'overnight';
+  breakKind?: 'minutes' | 'until' | 'overnight';
 }
 
 const MINUTES_PER_SET = 15;
@@ -199,7 +199,7 @@ export function estimatePhaseMetrics(
 ): PhaseEstimate {
   const tables = Math.max(1, Math.trunc(tableCount));
   const entrants = Math.max(2, Math.trunc(phase.entrantCount));
-  if (phase.type === 'BREAK') return { estimatedMatches: 0, estimatedDurationMinutes: phase.breakKind === 'overnight' ? 0 : Math.max(0, Math.round(phase.breakMinutes ?? 0)), approximate: false };
+  if (phase.type === 'BREAK') return { estimatedMatches: 0, estimatedDurationMinutes: phase.breakKind === 'minutes' || !phase.breakKind ? Math.max(0, Math.round(phase.breakMinutes ?? 0)) : 0, approximate: phase.breakKind === 'until' };
   // Timed sports use one match duration per fixture, plus a preparation break between slots.
   const gameMinutes = timing?.matchDurationMinutes ? Math.max(1, timing.matchDurationMinutes) + Math.max(0, timing.venueTurnoverMinutes ?? 0) : 0;
   const waveDurationForPhase = (count: number, bo: number) => timing?.matchDurationMinutes

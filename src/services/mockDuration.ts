@@ -114,7 +114,8 @@ export function estimateRemainingTournamentMinutes(tournament: DemoTournament): 
   const pauseMinutes = tournament.stages
     .filter((stage) => stage.type === 'BREAK' && !isStageCompleted(tournament, stage) && stage.settings.breakKind !== 'overnight')
     .reduce((sum, stage) => {
-      const configured = Math.max(0, Number(stage.settings.breakMinutes) || 0);
+      // A clock-target break has no fixed duration before its actual start.
+      const configured = stage.settings.breakKind === 'until' ? 0 : Math.max(0, Number(stage.settings.breakMinutes) || 0);
       if (!isStageStarted(tournament, stage)) return sum + configured;
       const resume = getBreakResumeAt(tournament, stage);
       return sum + (resume ? Math.max(0, Math.ceil((resume.getTime() - Date.now()) / 60000)) : configured);

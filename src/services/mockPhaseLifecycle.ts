@@ -174,7 +174,9 @@ export function startStage(tournament: DemoTournament, stage: TournamentStage, p
   if (stage.type === 'BREAK') {
     const options: BreakStartOptions = pauseOptions ?? (stage.settings.breakKind === 'overnight'
       ? { kind: 'clock', time: String(stage.settings.nextDayStart ?? '09:00') }
-      : { kind: 'minutes', minutes: Number(stage.settings.breakMinutes) || 15 });
+      : stage.settings.breakKind === 'until'
+        ? { kind: 'clock', time: String(stage.settings.breakUntil ?? '12:00') }
+        : { kind: 'minutes', minutes: Number(stage.settings.breakMinutes) || 15 });
     pauseResume = computeBreakResumeAt(startDate, options);
     if (!pauseResume) return false;
     if (stage.settings.breakKind === 'overnight' && !pauseOptions) {
@@ -258,6 +260,9 @@ export function getBreakResumeAt(tournament: DemoTournament, stage: TournamentSt
     resume.setDate(resume.getDate() + 1);
     resume.setHours(hours, minutes, 0, 0);
     return resume;
+  }
+  if (stage.settings.breakKind === 'until') {
+    return computeBreakResumeAt(start, { kind: 'clock', time: String(stage.settings.breakUntil ?? '12:00') });
   }
   return new Date(start.getTime() + Math.max(1, Number(stage.settings.breakMinutes) || 15) * 60000);
 }

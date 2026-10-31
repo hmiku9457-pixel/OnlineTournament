@@ -20,9 +20,10 @@ export interface MockPhaseInput {
   groupCount: number;
   swissRounds: number;
   knockoutBestOf: number[];
-  breakKind?: 'minutes' | 'overnight';
+  breakKind?: 'minutes' | 'until' | 'overnight';
   breakMinutes?: number;
   nextDayStart?: string;
+  breakUntil?: string;
   note?: string;
 }
 
@@ -77,6 +78,7 @@ function toStage(tournamentId: string, phase: MockPhaseInput, index: number, nex
     settings.breakKind = phase.breakKind ?? 'minutes';
     settings.breakMinutes = phase.breakMinutes ?? 15;
     settings.nextDayStart = phase.nextDayStart ?? '09:00';
+    settings.breakUntil = phase.breakUntil ?? '12:00';
     settings.note = phase.note ?? '';
   }
   if (phase.type === 'SWISS') settings.rounds = phase.swissRounds;
@@ -169,7 +171,7 @@ export function updatePrestartTournamentPhases(
     groupCount: phase.groupCount, swissRounds: phase.swissRounds,
     bestOf: phase.bestOf, knockoutBestOf: [...phase.knockoutBestOf],
     breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
-    nextDayStart: phase.nextDayStart, note: phase.note,
+    nextDayStart: phase.nextDayStart, breakUntil: phase.breakUntil, note: phase.note,
   }));
   const stages = phases.map((phase, index) => {
     const nextPlaying = phases.slice(index + 1).find((item) => item.type !== 'BREAK');

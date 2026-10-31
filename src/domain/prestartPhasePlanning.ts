@@ -20,9 +20,10 @@ export interface PrestartPhaseDraft {
   groupCount: number;
   swissRounds: number;
   knockoutBestOf: number[];
-  breakKind: 'minutes' | 'overnight';
+  breakKind: 'minutes' | 'until' | 'overnight';
   breakMinutes: number;
   nextDayStart: string;
+  breakUntil: string;
   note: string;
 }
 
@@ -40,9 +41,10 @@ export function initialPrestartPhases(tournament: DemoTournament): PrestartPhase
     swissRounds: Number(stage.settings.rounds) || 1,
     knockoutBestOf: String(stage.settings.roundBestOf ?? '').split(',')
       .map(Number).filter((value) => Number.isInteger(value) && value > 0),
-    breakKind: stage.settings.breakKind === 'overnight' ? 'overnight' : 'minutes',
+    breakKind: stage.settings.breakKind === 'overnight' ? 'overnight' : stage.settings.breakKind === 'until' ? 'until' : 'minutes',
     breakMinutes: Number(stage.settings.breakMinutes) || 15,
     nextDayStart: String(stage.settings.nextDayStart ?? '09:00'),
+    breakUntil: String(stage.settings.breakUntil ?? '12:00'),
     note: String(stage.settings.note ?? ''),
   }));
 }
@@ -96,8 +98,12 @@ export function validatePrestartPhases(phases: PrestartPhaseDraft[], activeCount
       if (phase.note.length > 600) errors.push(`${label}: Hinweistext darf maximal 600 Zeichen enthalten.`);
       if (phase.breakKind === 'overnight') {
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(phase.nextDayStart)) errors.push(`${label}: Gültige Startzeit (HH:MM) erforderlich.`);
-      } else if (!Number.isInteger(phase.breakMinutes) || phase.breakMinutes < 1 || phase.breakMinutes > 1440) {
-        errors.push(`${label}: Pausendauer muss zwischen 1 und 1440 Minuten liegen.`);
+      } else if (phase.breakKind === 'until') {
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(phase.breakUntil)) errors.push(`${label}: Für „Pause bis“ ist eine gültige Uhrzeit (HH:MM) erforderlich.`);
+      } else if (phase.breakKind === 'minutes') {
+        if (!Number.isInteger(phase.breakMinutes) || phase.breakMinutes < 1 || phase.breakMinutes > 1440) errors.push(`${label}: Pausendauer muss zwischen 1 und 1440 Minuten liegen.`);
+      } else {
+        errors.push(`${label}: Unbekannte Unterbrechungsart.`);
       }
       return;
     }
@@ -150,7 +156,7 @@ export function createPrestartPhase(type: StageType, participants: number, next?
     groupCount: recommendGroupCount(entrants, next?.entrantCount),
     swissRounds: recommendedSwissRounds(entrants),
     knockoutBestOf: Array.from({ length: knockoutRoundLabels(entrants).length }, () => bestOf),
-    breakKind: 'minutes', breakMinutes: 15, nextDayStart: '09:00', note: '',
+    breakKind: 'minutes', breakMinutes: 15, nextDayStart: '09:00', breakUntil: '12:00', note: '',
   };
 }
 
