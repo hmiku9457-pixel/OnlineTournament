@@ -110,7 +110,7 @@ export function getMockParticipantProgress(tournament: DemoTournament, name: str
     break;
   }
 
-  if (latest.type !== 'BREAK' && !getStageEntrants(tournament, latest).includes(name)) {
+  if (!getStageEntrants(tournament, latest).includes(name)) {
     // Teilnehmer hat sich nicht für die gestartete Folgephase qualifiziert.
     const previous = [...started].reverse().find((stage) => getStageEntrants(tournament, stage).includes(name));
     return { status: 'Ausgeschieden', placement: previous ? placementInStage(tournament, previous, name) : undefined };
