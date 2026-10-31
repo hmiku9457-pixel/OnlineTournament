@@ -871,8 +871,8 @@ export function reconcileWithdrawalsForTournament(tournament: DemoTournament) {
  * als Rückzug behandelt werden. Halbfinalverlierer können noch am Spiel um
  * Platz 3 teilnehmen, bis dieses entschieden wurde. */
 export function canWithdrawMockParticipant(tournament: DemoTournament, name: string): boolean {
-  const latest = getAllMockTournaments().find((item) => item.id === tournament.id);
-  if (['ABORTED', 'FINISHED'].includes(latest?.status ?? tournament.status)) return false;
+  const currentTournament = getAllMockTournaments().find((item) => item.id === tournament.id);
+  if (['ABORTED', 'FINISHED'].includes(currentTournament?.status ?? tournament.status)) return false;
   if (!getRuntimeParticipantNames(tournament).includes(name) || isMockParticipantWithdrawn(tournament, name)) return false;
   const started = tournament.stages.filter((stage) => isStageStarted(tournament, stage));
   const latest = started[started.length - 1];
