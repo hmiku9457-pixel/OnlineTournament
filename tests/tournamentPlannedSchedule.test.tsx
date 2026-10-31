@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, formatPlannedBreakDuration, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, formatPlannedBreakDuration, groupPlannedScheduleDays, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
@@ -137,7 +137,7 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(ui).toContain('Voraussichtliches Turnierende');
     expect(ui).toContain('Siegerehrung hinzufügen');
     expect(ui).toContain('ca. 1 Std.');
-    expect(ui).toContain('Geschätzte Pausendauer');
+    expect(ui).toContain('Pause · geschätzte Dauer');
     expect(ui).toContain('class="planned-schedule-duration"');
     expect(ui).not.toContain('Geplanter Pausenbeginn');
     expect(ui).not.toContain('Programmpunkt');
@@ -194,6 +194,76 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(html).toContain('13:30 Uhr');
     expect(html).toContain('Geplanter Turnierbeginn');
     expect(html.indexOf('Mittagspause')).toBeLessThan(html.indexOf('Hauptrunde'));
+  });
+
+
+  it('zeigt an einem Turniertag in beiden Zeitplänen ausschließlich Uhrzeiten', () => {
+    const start = '2026-11-01T10:00';
+    const timeline = buildPlannedTimeline(start, [
+      { label: 'Vorrunde', type: 'SWISS', estimatedMinutes: 60 },
+      { label: 'Mittagspause', type: 'BREAK', estimatedMinutes: 15, breakKind: 'minutes', breakMinutes: 15 },
+      { label: 'Finale', type: 'KNOCKOUT', estimatedMinutes: 45 },
+    ]);
+    expect(groupPlannedScheduleDays(timeline.items, start)).toMatchObject({ multipleDays: false });
+    const editor = renderToStaticMarkup(createElement(PlannedScheduleEditor, {
+      scheduledStart: start, timeline, awardsEnabled: true, awardsAt: timeline.estimatedEnd,
+      onToggleAwards: () => {}, onAwardsAtChange: () => {},
+    }));
+    const publicView = renderToStaticMarkup(createElement(TournamentPlannedSchedule, {
+      scheduledStart: start, items: timeline.items,
+    }));
+    expect(editor).toContain('10:00 Uhr');
+    expect(editor).toContain('Pause · geplante Dauer');
+    expect(editor).not.toContain('planned-schedule-day-heading');
+    expect(editor).not.toContain('01.11.2026,');
+    expect(publicView).not.toContain('planned-schedule-day-heading');
+    expect(publicView).toContain('<time dateTime="2026-11-01T10:00">10:00 Uhr</time>');
+    expect(publicView).not.toContain('01.11.2026,');
+  });
+
+  it('gruppiert mehrtägige Abläufe je Datum und zeigt innerhalb nur Uhrzeiten', () => {
+    const start = '2026-10-31T17:00';
+    const timeline = buildPlannedTimeline(start, [
+      { label: 'Gruppenphase', type: 'GROUPS', estimatedMinutes: 60 },
+      { label: 'Spieltagsende', type: 'BREAK', estimatedMinutes: 0, breakKind: 'overnight', nextDayStart: '09:00' },
+      { label: 'Finalrunde', type: 'KNOCKOUT', estimatedMinutes: 45 },
+    ]);
+    const awards = '2026-11-02T10:00';
+    const items: PlannedScheduleItem[] = [
+      ...timeline.items, { id: 'awards-ceremony', at: awards, title: 'Siegerehrung', type: 'other' },
+    ];
+    const groups = groupPlannedScheduleDays(items, start);
+    expect(groups.multipleDays).toBe(true);
+    expect(groups.days.map((day) => day.date)).toEqual(['2026-10-31', '2026-11-01', '2026-11-02']);
+    const editor = renderToStaticMarkup(createElement(PlannedScheduleEditor, {
+      scheduledStart: start, timeline, awardsEnabled: true, awardsAt: awards,
+      onToggleAwards: () => {}, onAwardsAtChange: () => {},
+    }));
+    const publicView = renderToStaticMarkup(createElement(TournamentPlannedSchedule, { scheduledStart: start, items }));
+    for (const html of [editor, publicView]) {
+      expect((html.match(/planned-schedule-day-heading/g) ?? []).length).toBe(3);
+      expect(html).toContain('Samstag');
+      expect(html).toContain('Sonntag');
+      expect(html).toContain('Montag');
+      expect(html).toContain('17:00 Uhr');
+      expect(html).toContain('09:00 Uhr');
+      expect(html).toContain('Siegerehrung');
+      expect(html).not.toContain('31.10.2026, 17:00');
+      expect(html).not.toContain('01.11.2026, 09:00');
+    }
+  });
+
+  it('gruppiert über Mitternacht korrekt, auch bei einer Zwischenpause', () => {
+    const start = '2026-11-01T23:10';
+    const timeline = buildPlannedTimeline(start, [{
+      label: 'Schweizer System', type: 'SWISS', estimatedMinutes: 120, roundCount: 4,
+      inlineBreakAfterRound: 2, inlineBreakKind: 'minutes', inlineBreakMinutes: 15,
+    }]);
+    const groups = groupPlannedScheduleDays(timeline.items, start);
+    expect(groups.multipleDays).toBe(true);
+    expect(groups.days.map((day) => day.date)).toEqual(['2026-11-01', '2026-11-02']);
+    expect(groups.days[1].items.map((item) => item.title)).toContain('Pause nach Runde 2 · Schweizer System');
+    expect(groups.days[1].items.map((item) => item.title)).toContain('Fortsetzung Runde 3 · Schweizer System');
   });
 
   it('lässt leere Pläne zu, prüft aber unvollständige Einträge und Duplikate', () => {
