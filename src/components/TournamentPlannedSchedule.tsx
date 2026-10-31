@@ -26,7 +26,6 @@ export function TournamentPlannedSchedule({ scheduledStart, items = [], title = 
           <li className={`planned-schedule-item planned-schedule-${item.type}`} key={item.id}>
             <time dateTime={item.at}>{formatPlannedDateTime(item.at)}</time>
             <div><strong>{item.title}</strong>{item.note && <p>{item.note}</p>}</div>
-            <span className="planned-schedule-kind">{item.type === 'break' ? 'Pause' : item.type === 'competition' ? 'Wettkampf' : 'Info'}</span>
           </li>
         ))}
       </ol>}

@@ -4708,13 +4708,11 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .planned-schedule-start strong { font-size: .94rem; }
 .planned-schedule-disclaimer { margin: 10px 0; max-width: 92ch; font-size: .81rem; line-height: 1.5; }
 .planned-schedule-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
-.planned-schedule-item { display: grid; grid-template-columns: minmax(125px, 165px) minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 12px 2px; border-top: 1px solid #eaecf0; }
+.planned-schedule-item { display: grid; grid-template-columns: minmax(125px, 165px) minmax(0, 1fr); align-items: start; gap: 12px; padding: 12px 2px; border-top: 1px solid #eaecf0; }
 .planned-schedule-item time { font-variant-numeric: tabular-nums; font-weight: 800; font-size: .82rem; color: #344054; }
 .planned-schedule-item > div { min-width: 0; }
 .planned-schedule-item strong { display: block; overflow-wrap: anywhere; }
 .planned-schedule-item p { margin: 4px 0 0; font-size: .78rem; color: #667085; overflow-wrap: anywhere; }
-.planned-schedule-kind { font-size: .7rem; font-weight: 750; color: #475467; background: #f2f4f7; padding: 4px 7px; border-radius: 999px; white-space: nowrap; }
-.planned-schedule-break .planned-schedule-kind { background: #fffaeb; color: #b54708; }
 .planned-schedule-empty { margin: 8px 0 0; }
 .wizard-side-navigation:has(.wizard-skip-schedule) { display: flex; flex-wrap: wrap; }
 .wizard-side-navigation .wizard-skip-schedule { flex: 1 1 150px; width: auto; }
@@ -4739,8 +4737,9 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .planned-schedule-phase-row strong { display: block; font-size: .92rem; overflow-wrap: anywhere; }
 .planned-schedule-phase-row small { display: block; margin-top: 3px; color: #667085; font-size: .74rem; }
 .planned-schedule-phase-row.is-start { background: #eef8f3; border-left: 4px solid #079455; }
-.planned-schedule-phase-row.is-break { background: #fffaeb; border-left: 4px solid #dc9800; }
+.planned-schedule-phase-row.is-break { background: #edf5ff; border-left: 4px solid #5c84ba; }
 .planned-schedule-phase-row.is-finish { background: #f2f4f7; border-left: 4px solid #667085; }
+.planned-schedule-phase-row.is-ceremony { background: #f7f5ff; border-left: 4px solid #8a77b9; }
 .planned-schedule-phase-warning { grid-column: 1 / -1; margin: 8px 0 0; padding: 10px 12px; border: 1px solid #f2bb66; border-radius: 8px; background: #fff3d6; color: #8d4205; font-size: .81rem; line-height: 1.45; }
 .planned-schedule-ceremony { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 15px 17px; border: 1px solid #e4e7ec; border-radius: 12px; background: #f8fafc; }
 .planned-schedule-ceremony > div:first-child { max-width: 65ch; }

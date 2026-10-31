@@ -23,6 +23,14 @@ export function isValidLocalDateTime(value: string): boolean {
   return parseLocalDateTime(value) !== null;
 }
 
+/** Total planned wall-clock span including scheduled pauses and multi-day breaks. */
+export function plannedTimelineDurationMinutes(start: string, end: string): number | null {
+  const first = parseLocalDateTime(start);
+  const last = parseLocalDateTime(end);
+  if (!first || !last || last.getTime() < first.getTime()) return null;
+  return Math.max(0, Math.round((last.getTime() - first.getTime()) / 60000));
+}
+
 export function toLocalDateTime(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;

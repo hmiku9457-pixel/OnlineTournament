@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { createMockTournament, getMockTournament } from '@/services/mockTournamentStore';
@@ -102,6 +102,9 @@ describe('optionaler vorläufiger Zeitplan', () => {
       ['K.-o.-Phase', '2026-11-01T13:30'],
     ]);
     expect(corrected.estimatedEnd).toBe('2026-11-01T15:30');
+    // The sidebar duration must match the entire time span, not only the
+    // match workload (this includes the one-hour Pause-bis window).
+    expect(plannedTimelineDurationMinutes('2026-11-01T10:00', corrected.estimatedEnd)).toBe(330);
     const withAwards = [...corrected.items, { id: 'award-ceremony', at: corrected.estimatedEnd, title: 'Siegerehrung', type: 'other' as const }];
     expect(withAwards.at(-1)).toMatchObject({ title: 'Siegerehrung', at: '2026-11-01T15:30' });
     expect(validatePlannedSchedule(withAwards)).toEqual([]);
@@ -132,6 +135,11 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(withAwards).toContain('value="2026-11-01T15:30"');
     expect(withAwards).toContain('min="2026-11-01T15:30"');
     expect(withAwards).toContain('Siegerehrung entfernen');
+    expect(withAwards).toContain('class="planned-schedule-phase-row is-ceremony"');
+    expect(withAwards).toContain('<strong>Siegerehrung</strong>');
+    const list = withAwards.indexOf('class="planned-schedule-phase-row is-ceremony"');
+    expect(list).toBeGreaterThan(withAwards.indexOf('Voraussichtliches Turnierende'));
+    expect(list).toBeLessThan(withAwards.indexOf('class="planned-schedule-ceremony"'));
   });
 
   it('lässt leere Pläne zu, prüft aber unvollständige Einträge und Duplikate', () => {
@@ -171,6 +179,9 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(markup.indexOf('Gruppenphase')).toBeLessThan(markup.indexOf('Mittagspause'));
     expect(markup.indexOf('Mittagspause')).toBeLessThan(markup.indexOf('Siegerehrung'));
     expect(markup).toContain('Verpflegung im Foyer');
+    expect(markup).not.toContain('planned-schedule-kind');
+    expect(markup).not.toContain('>Wettkampf</span>');
+    expect(markup).not.toContain('>Info</span>');
     expect(renderToStaticMarkup(createElement(TournamentPlannedSchedule, {}))).toBe('');
   });
 });

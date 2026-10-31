@@ -10,7 +10,6 @@ import {
   createPhaseTemplate,
   defaultBestOfForStage,
   estimatePhaseMetrics,
-  estimateTournamentDurationMinutes,
   formatGroupDistribution,
   hasValidTerminalStageOrder,
   hasValidBreakStageOrder,
@@ -30,7 +29,7 @@ import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/
 import { createMockTournament } from '@/services/mockTournamentStore';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
-import { buildPlannedTimeline, isValidLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, isValidLocalDateTime, plannedTimelineDurationMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
@@ -794,24 +793,6 @@ export function CreateTournamentPage() {
     navigate(`/tournaments/${tournament.id}/control`, { replace: true });
   }
 
-  const estimatedTournamentDurationMinutes = useMemo(
-    () => estimateTournamentDurationMinutes(
-      phaseDrafts.map((phase) => ({
-        type: phase.type,
-        entrantCount: phase.entrantCount,
-        bestOf: phase.bestOf,
-        groupCount: phase.groupCount,
-        swissRounds: phase.swissRounds,
-        knockoutBestOf: phase.knockoutBestOf,
-        breakKind: phase.breakKind,
-        breakMinutes: phase.breakMinutes,
-      })),
-      tables,
-      timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : { minutesPerSet: planningMinutesPerSet(sport) },
-    ),
-    [phaseDrafts, tables, timedSport, matchDurationMinutes, breakMinutes],
-  );
-
   const phaseEstimates = useMemo(
     () => phaseDrafts.map((phase) => estimatePhaseMetrics({
       type: phase.type,
@@ -822,8 +803,8 @@ export function CreateTournamentPage() {
       knockoutBestOf: phase.knockoutBestOf,
       breakKind: phase.breakKind,
       breakMinutes: phase.breakMinutes,
-    }, tables, timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : undefined)),
-    [phaseDrafts, tables, timedSport, matchDurationMinutes, breakMinutes],
+    }, tables, timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : { minutesPerSet: planningMinutesPerSet(sport) })),
+    [phaseDrafts, tables, timedSport, matchDurationMinutes, breakMinutes, sport],
   );
 
   // The timetable is derived on every phase/date edit. No manual "generate"
@@ -837,6 +818,11 @@ export function CreateTournamentPage() {
     breakUntil: phase.breakUntil,
     nextDayStart: phase.nextDayStart,
   }))), [scheduledStart, phaseDrafts, phaseEstimates]);
+  // The creation overview shows the same elapsed span as the timeline
+  // (including "Pause bis", duration pauses and overnight interruptions).
+  // This estimate also becomes the tournament's stored original estimate.
+  const estimatedTournamentDurationMinutes = plannedTimelineDurationMinutes(scheduledStart, plannedTimeline.estimatedEnd)
+    ?? phaseEstimates.reduce((total, item) => total + item.estimatedDurationMinutes, 0);
   const awardsAt = awardsAtOverride ?? plannedTimeline.estimatedEnd;
   const plannedSchedule: PlannedScheduleItem[] = [
     ...plannedTimeline.items,
@@ -1699,9 +1685,8 @@ export function CreateTournamentPage() {
         <div className="wizard-side-duration">
           <span>Voraussichtliche Dauer</span>
           <strong>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : 'Noch offen'}</strong>
-          {phaseDrafts.length > 0 && <small>Schätzung · verändert sich mit den Phasen und {venue.dativePlural}.</small>}
-          {phaseDrafts.some((phase) => phase.type === 'BREAK' && phase.breakKind === 'until') &&
-            <small>„Pause bis“ wird erst beim tatsächlichen Pausenstart zeitlich berechnet und ist nicht in der Dauerprognose enthalten.</small>}
+          {phaseDrafts.length > 0 && <small>Zeitraum vom geplanten Beginn bis zum theoretischen Turnierende, einschließlich geplanter Pausen. Schätzung anhand der Phasen und {venue.dativePlural}.</small>}
+          {plannedTimeline.warnings.length > 0 && <small>⚠ Eine „Pause bis“-Uhrzeit liegt vor dem geschätzten Beginn der Pause. Bitte Phasenplanung prüfen.</small>}
         </div>
         {maxReachedStep >= 4 && !canCreate && (
           <div className="wizard-side-validation" role="status">

@@ -49,6 +49,12 @@ export function PlannedScheduleEditor({
           <time dateTime={timeline.estimatedEnd}>{formatPlannedDateTime(timeline.estimatedEnd)}</time>
           <div><strong>Voraussichtliches Turnierende</strong><small>Nach der letzten Turnierphase</small></div>
         </li>}
+        {awardsEnabled && (
+          <li className="planned-schedule-phase-row is-ceremony">
+            <time dateTime={awardsAt}>{formatPlannedDateTime(awardsAt)}</time>
+            <div><strong>Siegerehrung</strong><small>Optionaler Abschluss · geplante Uhrzeit</small></div>
+          </li>
+        )}
       </ol>
       <section className="planned-schedule-ceremony">
         <div>
