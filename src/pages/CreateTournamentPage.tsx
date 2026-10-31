@@ -803,8 +803,8 @@ export function CreateTournamentPage() {
       knockoutBestOf: phase.knockoutBestOf,
       breakKind: phase.breakKind,
       breakMinutes: phase.breakMinutes,
-    }, tables, timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : { minutesPerSet: planningMinutesPerSet(sport) })),
-    [phaseDrafts, tables, timedSport, matchDurationMinutes, breakMinutes, sport],
+    }, tables, timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : undefined)),
+    [phaseDrafts, tables, timedSport, matchDurationMinutes, breakMinutes],
   );
 
   // The timetable is derived on every phase/date edit. No manual "generate"

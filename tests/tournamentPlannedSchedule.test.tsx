@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
+import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { createMockTournament, getMockTournament } from '@/services/mockTournamentStore';
 
@@ -140,6 +141,23 @@ describe('optionaler vorläufiger Zeitplan', () => {
     const list = withAwards.indexOf('class="planned-schedule-phase-row is-ceremony"');
     expect(list).toBeGreaterThan(withAwards.indexOf('Voraussichtliches Turnierende'));
     expect(list).toBeLessThan(withAwards.indexOf('class="planned-schedule-ceremony"'));
+  });
+
+  it('zeigt in der Seitenkarte dieselbe Gesamtdauer wie im Zeitplan, inklusive Pause bis', () => {
+    const swiss = estimatePhaseMetrics({ type: 'SWISS', entrantCount: 8, bestOf: 3, swissRounds: 4 }, 9);
+    const groups = estimatePhaseMetrics({ type: 'GROUPS', entrantCount: 8, groupCount: 2, bestOf: 1 }, 9);
+    expect(swiss.estimatedDurationMinutes).toBe(150);
+    expect(groups.estimatedDurationMinutes).toBe(15);
+    const time = buildPlannedTimeline('2026-11-01T10:00', [
+      { label: 'Schweizer System', type: 'SWISS', estimatedMinutes: swiss.estimatedDurationMinutes },
+      { label: 'Pause', type: 'BREAK', estimatedMinutes: 0, breakKind: 'until', breakUntil: '14:00' },
+      { label: 'Gruppenphase', type: 'GROUPS', estimatedMinutes: groups.estimatedDurationMinutes },
+    ]);
+    expect(time.items[1].at).toBe('2026-11-01T12:30');
+    expect(time.items[2].at).toBe('2026-11-01T14:00');
+    expect(time.estimatedEnd).toBe('2026-11-01T14:15');
+    expect(plannedTimelineDurationMinutes('2026-11-01T10:00', time.estimatedEnd)).toBe(255);
+    expect(time.warnings).toEqual([]);
   });
 
   it('lässt leere Pläne zu, prüft aber unvollständige Einträge und Duplikate', () => {
