@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { sidebarLiveTournaments, type SidebarLiveTournament } from '@/domain/sidebarTournaments';
+import { sidebarTournaments, type SidebarTournament } from '@/domain/sidebarTournaments';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
 
 type SidebarIconName = 'trophy' | 'grid' | 'plus' | 'user' | 'calendar' | 'chart' | 'settings';
@@ -19,23 +19,21 @@ function SidebarIcon({ name }: { name: SidebarIconName }) {
   }
 }
 
-const MAX_SIDEBAR_TOURNAMENTS = 4;
-
-function SidebarLiveList({ tournaments }: { tournaments: SidebarLiveTournament[] }) {
+function SidebarTournamentList({ tournaments }: { tournaments: SidebarTournament[] }) {
   if (tournaments.length === 0) {
     return <div className="sidebar-live-empty"><span className="sidebar-live-empty-dot" aria-hidden="true"/>
-      <span>Derzeit läuft kein Turnier.</span></div>;
+      <span>Noch keine offenen Turniere vorhanden.</span></div>;
   }
 
   return (
     <div className="sidebar-live-items">
-      {tournaments.slice(0, MAX_SIDEBAR_TOURNAMENTS).map((tournament) => (
+      {tournaments.map((tournament) => (
         <Link key={tournament.id} className="sidebar-live-item"
           to={`/tournaments/${tournament.id}/control`}
           title={`${tournament.name} – ${tournament.statusLabel}. Turnierleitung öffnen`}>
           <span className="sidebar-live-item-top">
             <strong>{tournament.name}</strong>
-            <span className={`sidebar-live-badge ${tournament.status === 'PAUSED' ? 'paused' : 'running'}`}>
+            <span className={`sidebar-live-badge ${tournament.status === 'PAUSED' ? 'paused' : tournament.status === 'RUNNING' ? 'running' : 'before'}`}>
               <span className="sidebar-live-status-dot" aria-hidden="true"/>{tournament.statusLabel}
             </span>
           </span>
@@ -47,9 +45,6 @@ function SidebarLiveList({ tournaments }: { tournaments: SidebarLiveTournament[]
           <span className="sidebar-live-progress-label">{tournament.completedPhases}/{tournament.totalPhases} Phasen abgeschlossen</span>
         </Link>
       ))}
-      {tournaments.length > MAX_SIDEBAR_TOURNAMENTS && (
-        <p className="sidebar-live-overflow">{tournaments.length - MAX_SIDEBAR_TOURNAMENTS} weitere aktive Turniere im Dashboard</p>
-      )}
     </div>
   );
 }
@@ -77,8 +72,8 @@ export function AppShell() {
     };
   }, []);
 
-  const activeTournaments = useMemo(
-    () => sidebarLiveTournaments(getAllMockTournaments()),
+  const yourTournaments = useMemo(
+    () => sidebarTournaments(getAllMockTournaments()),
     [revision, location.key],
   );
 
@@ -91,31 +86,28 @@ export function AppShell() {
             <span className="sidebar-brand-copy"><strong>OnlineTournament</strong><small>Turnierverwaltung</small></span>
           </Link>
 
-          <div className="sidebar-navigation-group">
-            <p className="sidebar-section-label">WORKSPACE</p>
-            <nav className="nav sidebar-navigation" aria-label="Hauptnavigation">
-              <NavLink to="/" end><SidebarIcon name="grid"/><span>Turniere</span></NavLink>
+          <section className="sidebar-tournament-section" aria-labelledby="sidebar-tournaments-heading">
+            <h2 id="sidebar-tournaments-heading" className="sidebar-tournament-heading">Turniere</h2>
+            <nav className="nav sidebar-navigation" aria-label="Turniernavigation">
+              <NavLink to="/" end><SidebarIcon name="grid"/><span>Alle Turniere anzeigen</span></NavLink>
               <NavLink to="/tournaments/new"><SidebarIcon name="plus"/><span>Turnier erstellen</span></NavLink>
               <NavLink to="/login" className="sidebar-mobile-login"><SidebarIcon name="user"/><span>Anmelden</span></NavLink>
             </nav>
-          </div>
-
-          <section className="sidebar-live-section" aria-label="Aktuelle Turniere">
-            <div className="sidebar-section-heading">
-              <h2>Aktuelle Turniere</h2>
-              <span className="sidebar-live-total" aria-label={`${activeTournaments.length} laufende oder pausierte Turniere`}>
-                {activeTournaments.length}
-              </span>
+            <div className="sidebar-live-section" aria-label="Deine Turniere">
+              <div className="sidebar-section-heading">
+                <h3>Deine Turniere</h3>
+                <span className="sidebar-live-total" aria-label={`${yourTournaments.length} offene Turniere`}>
+                  {yourTournaments.length}
+                </span>
+              </div>
+              <SidebarTournamentList tournaments={yourTournaments}/>
             </div>
-            <SidebarLiveList tournaments={activeTournaments}/>
-            <Link to="/" className="sidebar-live-all">Alle Turniere anzeigen <span aria-hidden="true">→</span></Link>
           </section>
 
           <details className="sidebar-mobile-live">
-            <summary><span className="sidebar-mobile-live-title"><span className="sidebar-live-status-dot" aria-hidden="true"/>Aktuelle Turniere</span>
-              <span className="sidebar-live-total">{activeTournaments.length}</span></summary>
-            <SidebarLiveList tournaments={activeTournaments}/>
-            <Link className="sidebar-live-all" to="/">Alle Turniere anzeigen →</Link>
+            <summary><span className="sidebar-mobile-live-title"><span className="sidebar-live-status-dot" aria-hidden="true"/>Deine Turniere</span>
+              <span className="sidebar-live-total">{yourTournaments.length}</span></summary>
+            <SidebarTournamentList tournaments={yourTournaments}/>
           </details>
 
           <section className="sidebar-future" aria-label="Geplante Funktionen">
