@@ -24,6 +24,7 @@ export interface MockPhaseInput {
   breakKind?: 'minutes' | 'until' | 'overnight';
   breakMinutes?: number;
   nextDayStart?: string;
+  nextDayDate?: string;
   breakUntil?: string;
   note?: string;
   inlineBreakAfterRound?: number;
@@ -85,6 +86,7 @@ function toStage(tournamentId: string, phase: MockPhaseInput, index: number, nex
     settings.breakKind = phase.breakKind ?? 'minutes';
     settings.breakMinutes = phase.breakMinutes ?? 15;
     settings.nextDayStart = phase.nextDayStart ?? '09:00';
+    settings.nextDayDate = phase.nextDayDate ?? '';
     settings.breakUntil = phase.breakUntil ?? '12:00';
     settings.note = phase.note ?? '';
   }
@@ -192,7 +194,7 @@ export function updatePrestartTournamentPhases(
     groupCount: phase.groupCount, swissRounds: phase.swissRounds,
     bestOf: phase.bestOf, knockoutBestOf: [...phase.knockoutBestOf],
     breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
-    nextDayStart: phase.nextDayStart, breakUntil: phase.breakUntil, note: phase.note,
+    nextDayStart: phase.nextDayStart, nextDayDate: phase.nextDayDate, breakUntil: phase.breakUntil, note: phase.note,
     inlineBreakAfterRound: phase.inlineBreakAfterRound, inlineBreakKind: phase.inlineBreakKind,
     inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
   }));
