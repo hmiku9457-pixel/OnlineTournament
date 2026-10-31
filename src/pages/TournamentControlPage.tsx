@@ -43,10 +43,10 @@ import type { ControlHelpTopic } from '@/domain/controlGuide';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { generateUniquePlayerCode } from '@/services/mockPlayerCodes';
-import { getStageEntrants, getStageStartIssue, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage, completeStage, canFinishBreak, getBreakResumeAt } from '@/services/mockPhaseLifecycle';
+import { getStageEntrants, getStageStartIssue, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage, completeStage, canFinishBreak, getBreakResumeAt, formatBreakCountdown, type BreakStartOptions } from '@/services/mockPhaseLifecycle';
 import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
 import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration } from '@/services/mockDuration';
-import { getMockAudit } from '@/services/mockAudit';
+import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
 import type { MockAuditEntry } from '@/services/mockAudit';
 
 type ControlTab = 'summary' | 'overview' | 'flow' | 'matches' | 'participants' | 'final' | 'audit';
@@ -581,6 +581,11 @@ export function TournamentControlPage() {
   const [selectedStageId, setSelectedStageId] = useState<string>(() => initialTournament.stages[0]?.id ?? '');
   const [phaseCompletedModal, setPhaseCompletedModal] = useState<{ stageName: string; nextStageName?: string } | null>(null);
   const [startModal, setStartModal] = useState<{ kind: 'tournament' | 'phase'; stageName: string } | null>(null);
+  const [pauseMode, setPauseMode] = useState<'minutes' | 'clock'>('minutes');
+  const [pauseMinutes, setPauseMinutes] = useState(15);
+  const [pauseTime, setPauseTime] = useState('12:00');
+  const [pauseClockTick, setPauseClockTick] = useState(0);
+  const [confirmEarlyBreak, setConfirmEarlyBreak] = useState(false);
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
   const [abortModalOpen, setAbortModalOpen] = useState(false);
   const [abortReason, setAbortReason] = useState('');
@@ -622,6 +627,8 @@ export function TournamentControlPage() {
   const participants = useMemo(() => getRuntimeParticipantNames(participantSource.tournament), [participantSource]);
   const activePrestartParticipants = participants.filter((name) => !isParticipantWithdrawn(tournament, name)).length;
   const originalFirstField = tournament.stages.find((stage) => stage.type !== 'BREAK')?.settings.entrants;
+  // Registration changes are a warning, not an implicit requirement to
+  // reopen and reapprove the wizard. The actual draw remains authoritative.
   const prestartPlanNeedsReview = !tournament.hasStarted && (
     Number(originalFirstField) !== activePrestartParticipants
     || validatePrestartPhases(
@@ -671,6 +678,13 @@ export function TournamentControlPage() {
   const pendingApproval = useMemo(() => getPendingMockApproval(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   const activeBreak = activeStage?.type === 'BREAK' ? activeStage : null;
   const breakReady = activeBreak ? canFinishBreak(tournament, activeBreak, new Date()) : false;
+  const activeBreakResume = activeBreak ? getBreakResumeAt(tournament, activeBreak) : null;
+  void pauseClockTick;
+  useEffect(() => {
+    if (!activeBreak || tournament.status === 'ABORTED') return;
+    const timer = window.setInterval(() => setPauseClockTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [activeBreak?.id, tournament.status]);
   const reviewMatches = pendingApproval && activeStage
     ? getMockStageMatches(tournament, activeStage).filter((match) => pendingApproval.kind === 'STAGE'
       || Number(match.id.match(/-sw-r(\d+)-m\d+$/)?.[1] ?? 0) === pendingApproval.round)
@@ -687,6 +701,10 @@ export function TournamentControlPage() {
   const nextStartableStage = useMemo(() => getNextStartableStage(phaseSource.tournament), [phaseSource]);
   const pendingStartStage = startModal?.kind === 'tournament' ? tournament.stages[0] : nextStartableStage;
   const pendingStartIssue = pendingStartStage ? getStageStartIssue(tournament, pendingStartStage) : 'Keine startbare Phase vorhanden.';
+  const pendingPauseIssue = pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind !== 'overnight'
+    ? pauseMode === 'minutes' ? (!Number.isInteger(pauseMinutes) || pauseMinutes < 1 || pauseMinutes > 1440 ? 'Bitte eine Dauer zwischen 1 und 1440 Minuten angeben.' : null)
+      : !/^([01]\d|2[0-3]):[0-5]\d$/.test(pauseTime) ? 'Bitte eine gültige Uhrzeit (HH:MM) angeben.' : null
+    : null;
   const editableStage = useMemo(() => phaseSource.tournament.stages.find((stage) => isStageEditable(phaseSource.tournament, stage)), [phaseSource]);
   const selectedRoundRobinStage = tournament.stages.find((stage) => selectedStageId === `${stage.id}::rr`);
   const selectedRoundRobinDecision = selectedRoundRobinStage ? getSwissCutoffHistory(tournament, selectedRoundRobinStage) : null;
@@ -854,7 +872,10 @@ export function TournamentControlPage() {
   }
 
   function performStartNextPhase() {
-    if (!nextStartableStage || !startStage(tournament, nextStartableStage)) {
+    const options: BreakStartOptions | undefined = nextStartableStage?.type === 'BREAK' && nextStartableStage.settings.breakKind !== 'overnight'
+      ? pauseMode === 'clock' ? { kind: 'clock', time: pauseTime } : { kind: 'minutes', minutes: pauseMinutes }
+      : undefined;
+    if (!nextStartableStage || !startStage(tournament, nextStartableStage, options)) {
       setAssignmentMessage(nextStartableStage ? getStageStartIssue(tournament, nextStartableStage) ?? 'Diese Phase kann derzeit nicht starten.' : 'Es ist keine startbare Phase vorhanden.');
       return;
     }
@@ -873,17 +894,28 @@ export function TournamentControlPage() {
     if (firstStage) setStartModal({ kind: 'tournament', stageName: firstStage.name });
   }
 
-  function finishCurrentBreak() {
-    if (!activeBreak || !canFinishBreak(tournament, activeBreak)) return;
+  function finishCurrentBreak(early = false) {
+    if (!activeBreak || !canFinishBreak(tournament, activeBreak, new Date(), early)) return;
     const preservedEntrants = getStageEntrants(tournament, activeBreak);
-    if (!completeStage(tournament, activeBreak, preservedEntrants)) return;
+    if (!completeStage(tournament, activeBreak, preservedEntrants, early)) return;
+    if (early) recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)',
+      action: 'BREAK_FINISHED_EARLY', description: `Pause „${activeBreak.name}“ vorzeitig beendet` });
+    setConfirmEarlyBreak(false);
     refreshRuntime();
     setSelectedStageId(activeBreak.id);
     setTab('flow');
   }
 
   function requestStartNextPhase() {
-    if (nextStartableStage) setStartModal({ kind: 'phase', stageName: nextStartableStage.name });
+    if (!nextStartableStage) return;
+    if (nextStartableStage.type === 'BREAK') {
+      const minutes = Number(nextStartableStage.settings.breakMinutes) || 15;
+      setPauseMinutes(minutes);
+      setPauseMode('minutes');
+      const future = new Date(Date.now() + minutes * 60000);
+      setPauseTime(`${String(future.getHours()).padStart(2, '0')}:${String(future.getMinutes()).padStart(2, '0')}`);
+    }
+    setStartModal({ kind: 'phase', stageName: nextStartableStage.name });
   }
 
   function toggleTableLock(table: string) {
@@ -1080,8 +1112,8 @@ export function TournamentControlPage() {
             )}
             {!tournament.hasStarted && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
               <button className="btn primary control-start-tournament" type="button" onClick={requestStartTournament}
-                disabled={prestartPlanNeedsReview || showPrestartPhaseEditor || !tournament.stages[0] || getStageEntrants(tournament, tournament.stages[0]).length < 2}
-                title={prestartPlanNeedsReview ? 'Vor dem Start die Phasenplanung an die aktuelle Teilnehmerzahl anpassen.' : showPrestartPhaseEditor ? 'Bitte die Phasenbearbeitung zuerst abschließen.' : tournament.stages[0] && getStageEntrants(tournament, tournament.stages[0]).length < 2 ? 'Mindestens zwei aktive Teilnehmer erforderlich' : undefined}>Turnier starten</button>
+                disabled={showPrestartPhaseEditor || !tournament.stages[0]}
+                title={showPrestartPhaseEditor ? 'Bitte die Phasenbearbeitung zuerst abschließen.' : undefined}>Turnier starten</button>
             )}
             {tournament.hasStarted && activeStage && activeStage.type !== 'BREAK' && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
               <>
@@ -1092,7 +1124,12 @@ export function TournamentControlPage() {
                 )}
               </>
             )}
-            {activeBreak && <button className="btn primary" type="button" onClick={finishCurrentBreak} disabled={!breakReady} title={breakReady ? undefined : 'Die geplante Pausenzeit ist noch nicht erreicht.'}>{activeBreak.settings.breakKind === 'overnight' ? 'Folgetag freigeben' : 'Pause beenden'}</button>}
+            {activeBreak && tournament.status !== 'ABORTED' && <>
+              <span className="badge" role="timer" aria-label="Verbleibende Pausenzeit">{formatBreakCountdown(activeBreakResume)}</span>
+              <button className="btn primary" type="button" onClick={() => breakReady ? finishCurrentBreak() : setConfirmEarlyBreak(true)}>
+                {breakReady ? 'Pause beenden' : 'Pause vorzeitig beenden'}
+              </button>
+            </>}
             {tournament.hasStarted && !activeStage && nextStartableStage && !['FINISHED', 'ABORTED'].includes(tournament.status) && (
               <button className="btn primary" type="button" onClick={requestStartNextPhase}>{nextStartableStage.type === 'BREAK' ? 'Pause starten' : 'Nächste Phase starten'}</button>
             )}
@@ -1449,11 +1486,14 @@ export function TournamentControlPage() {
                 <strong className="tournament-break-finished">Pause abgeschlossen</strong>
               ) : isStageStarted(tournament, selectedStage) ? (
                 <>
-                  <p className="muted">Früheste Fortsetzung: {getBreakResumeAt(tournament, selectedStage)?.toLocaleString('de-DE') ?? 'Noch nicht bekannt'}</p>
-                  <button className="btn primary" type="button" disabled={!breakReady} onClick={finishCurrentBreak}>
-                    {selectedStage.settings.breakKind === 'overnight' ? 'Folgetag freigeben' : 'Pause beenden'}
-                  </button>
-                  {!breakReady && <p className="muted">Die Turnierleitung kann nach Ablauf der geplanten Unterbrechung fortsetzen.</p>}
+                  <div className="break-live-clock" role="timer" aria-label="Countdown bis zur Fortsetzung">
+                    <span className="muted">Verbleibende Zeit</span>
+                    <strong>{formatBreakCountdown(getBreakResumeAt(tournament, selectedStage))}</strong>
+                    <span>Geplante Fortsetzung: {getBreakResumeAt(tournament, selectedStage)?.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) ?? 'Noch nicht bekannt'} Uhr</span>
+                  </div>
+                  {tournament.status !== 'ABORTED' && <button className="btn primary" type="button" onClick={() => breakReady ? finishCurrentBreak() : setConfirmEarlyBreak(true)}>
+                    {breakReady ? 'Pause beenden und nächste Phase freigeben' : 'Pause vorzeitig beenden'}
+                  </button>}
                 </>
               ) : <p className="muted">{isStageEditable(tournament, selectedStage) ? 'Die Pause ist bereit. Starte sie über den Header.' : 'Diese Pause beginnt nach dem Abschluss der vorherigen Phase.'}</p>}
             </section>
@@ -1797,10 +1837,38 @@ export function TournamentControlPage() {
             <h2>{startModal.kind === 'tournament' ? 'Turnier starten?' : 'Nächste Phase starten?'}</h2>
             <p>„{startModal.stageName}“ wird gestartet. Die aktuelle Auslosung bzw. Setzung dieser Phase wird damit eingefroren.</p>
             <p className="muted">Nach dem Start können die Platzierungen dieser Phase nicht mehr per Drag & Drop verändert werden.</p>
+            {pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind !== 'overnight' && (
+              <div className="break-start-settings">
+                <strong>Wann soll die Pause enden?</strong>
+                <div className="actions" role="group" aria-label="Pausenplanung">
+                  <button className={pauseMode === 'minutes' ? 'btn small primary' : 'btn small'} type="button" aria-pressed={pauseMode === 'minutes'} onClick={() => setPauseMode('minutes')}>Dauer in Minuten</button>
+                  <button className={pauseMode === 'clock' ? 'btn small primary' : 'btn small'} type="button" aria-pressed={pauseMode === 'clock'} onClick={() => setPauseMode('clock')}>Uhrzeit wählen</button>
+                </div>
+                {pauseMode === 'minutes'
+                  ? <label>Dauer (1–1440 Minuten)<input type="number" min={1} max={1440} step={1} value={pauseMinutes} onChange={(event) => setPauseMinutes(Number(event.target.value))}/></label>
+                  : <label>Geplante Fortsetzung um<input type="time" value={pauseTime} onChange={(event) => setPauseTime(event.target.value)}/></label>}
+                <p className="muted">{pauseMode === 'clock' ? 'Die nächste zukünftige Uhrzeit zählt; liegt sie heute bereits zurück, ist morgen gemeint.' : 'Die Zeit läuft ab dem tatsächlichen Start der Pause.'}</p>
+              </div>
+            )}
+            {pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind === 'overnight' && <p className="muted">Der nächste Spieltag beginnt planmäßig morgen um {pendingStartStage.settings.nextDayStart} Uhr.</p>}
+            {prestartPlanNeedsReview && startModal.kind === 'tournament' && <p className="break-prestart-warning" role="status">Hinweis: Die Teilnehmerzahl hat sich geändert. Bitte prüfe Auslosung und Folgephasen. Ein erneutes Bestätigen der Phasenplanung ist für gültige Konstellationen nicht erforderlich.</p>}
+            {pendingPauseIssue && <p className="field-error" role="alert">{pendingPauseIssue}</p>}
             {pendingStartIssue && <p className="field-error" role="alert">{pendingStartIssue}</p>}
             <div className="actions">
-              <button className="btn primary" type="button" disabled={Boolean(pendingStartIssue)} onClick={startModal.kind === 'tournament' ? performStartTournament : performStartNextPhase}>Jetzt starten</button>
+              <button className="btn primary" type="button" disabled={Boolean(pendingStartIssue || pendingPauseIssue)} onClick={startModal.kind === 'tournament' ? performStartTournament : performStartNextPhase}>Jetzt starten</button>
               <button className="btn" type="button" onClick={() => setStartModal(null)}>Abbrechen</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {confirmEarlyBreak && activeBreak && (
+        <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setConfirmEarlyBreak(false)}>
+          <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="break-early-title" onMouseDown={(event) => event.stopPropagation()}>
+            <h2 id="break-early-title">Pause vorzeitig beenden?</h2>
+            <p>Die geplante Fortsetzung ist {getBreakResumeAt(tournament, activeBreak)?.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })} Uhr. Du kannst die Pause jetzt freigeben. Der Vorgang wird protokolliert.</p>
+            <div className="actions">
+              <button className="btn primary" type="button" onClick={() => finishCurrentBreak(true)}>Jetzt vorzeitig beenden</button>
+              <button className="btn" type="button" onClick={() => setConfirmEarlyBreak(false)}>Weiter pausieren</button>
             </div>
           </section>
         </div>

@@ -155,7 +155,7 @@ export function TournamentSummaryPanel({
       {beforeStart && phasesNeedReview && onEditPhases && (
         <div className="tournament-summary-prestart-warning" role="status">
           <div><strong>Phasenplanung nach Teilnehmeränderung prüfen</strong>
-            <p>{activeParticipants ?? 0} aktive Teilnehmer · {withdrawnParticipants ?? 0} zurückgezogen. Bitte die Phasenplanung für das aktuelle Teilnehmerfeld prüfen und bestätigen, bevor das Turnier startet.</p>
+            <p>{activeParticipants ?? 0} aktive Teilnehmer · {withdrawnParticipants ?? 0} zurückgezogen. Prüfe bitte die Auslosung und die Folgephasen. Bei gültiger Konstellation kannst du das Turnier ohne erneute Bestätigung der Phasenplanung starten.</p>
           </div>
           <button type="button" className="btn small" onClick={onEditPhases}>Phasen anpassen</button>
         </div>
