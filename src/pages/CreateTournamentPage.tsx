@@ -1204,8 +1204,17 @@ export function CreateTournamentPage() {
 
         {step === 3 && (
           <section className="format-step">
-            <h2>Turnierform auswählen</h2>
-            <p className="muted">Wähle eine Empfehlung oder stelle deine Turnierphasen im nächsten Schritt selbst zusammen.</p>
+            <div className="format-step-header">
+              <div>
+                <h2>Turnierform auswählen</h2>
+                <p className="muted">Wähle eine Empfehlung oder stelle deine Turnierphasen im nächsten Schritt selbst zusammen.</p>
+              </div>
+              <span className="format-info-tag" title="Dieser Planungswert wird zur Schätzung der Turnierdauer verwendet.">
+                {timedSport
+                  ? `Planungswert: ${matchDurationMinutes} Min./Spiel${breakMinutes ? ` + ${breakMinutes} Min. Wechselzeit` : ''}`
+                  : `Planungswert: ${planningMinutesPerSet(sport)} Min./Satz`}
+              </span>
+            </div>
 
             <div className="format-step-layout">
               <div className="recommendation-list">
@@ -1220,22 +1229,40 @@ export function CreateTournamentPage() {
                     onClick={() => selectRecommendation(item)}
                   >
                     <div className="recommendation-heading">
-                      <h3>{item.label}</h3>
+                      <h3 className="recommendation-phase-heading">
+                        {item.phases.map((phase, phaseIndex) => {
+                          const entrants = phase.entrantCount ?? participantCount;
+                          const previousEntrants = phaseIndex > 0
+                            ? item.phases[phaseIndex - 1].entrantCount ?? participantCount
+                            : null;
+                          const phaseName = phase.type === 'GROUPS'
+                            ? `${phase.groupCount ?? 2} Gruppen`
+                            : phase.type === 'SWISS'
+                              ? `${phase.swissRounds ?? 1} Runden Schweizer System`
+                              : phase.label;
+                          return (
+                            <span className="recommendation-phase-segment" key={phase.key}>
+                              {phaseIndex > 0 && <span className="recommendation-phase-arrow" aria-hidden="true">→</span>}
+                              <span className="recommendation-phase-name">{phaseName}</span>
+                              <span className="recommendation-phase-count"
+                                title={previousEntrants === null
+                                  ? `${entrants} Teilnehmer starten in dieser Phase.`
+                                  : `${entrants} von ${previousEntrants} Teilnehmern kommen in diese Phase weiter.`}>
+                                {previousEntrants === null ? entrants : `${entrants}/${previousEntrants}`}
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </h3>
                       <div className="recommendation-labels">
                         <span className="badge">{index === 0 ? 'Empfohlen' : 'Alternative'}</span>
                         {selectedRecommendationId === item.id && <span className="badge selected-badge">Ausgewählt</span>}
                       </div>
                     </div>
                     <p>{item.description}</p>
-                    {item.phases.length > 1 && (
-                      <p className="recommendation-progression">
-                        Teilnehmer je Phase: {item.phases.map((phase) => phase.entrantCount ?? participantCount).join(' → ')}
-                      </p>
-                    )}
                     <div className="recommendation-metrics">
-                      <span>{item.estimatedMatches} Spiele</span>
-                      <span>ca. {formatDuration(item.estimatedDurationMinutes)}</span>
-                      <span>{timedSport ? `${matchDurationMinutes} Min./Spiel${breakMinutes ? ` + ${breakMinutes} Min. Wechselzeit` : ''}` : `${planningMinutesPerSet(sport)} Min./Satz`}</span>
+                      <span className="recommendation-metric-tag">{item.estimatedMatches} Spiele</span>
+                      <span className="recommendation-metric-tag">ca. {formatDuration(item.estimatedDurationMinutes)}</span>
                     </div>
                   </button>
                 ))}
