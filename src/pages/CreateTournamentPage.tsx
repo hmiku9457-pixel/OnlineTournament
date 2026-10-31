@@ -822,8 +822,10 @@ export function CreateTournamentPage() {
       knockoutBestOf: phase.knockoutBestOf,
       breakKind: phase.breakKind,
       breakMinutes: phase.breakMinutes,
-    }, tables, timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : undefined)),
-    [phaseDrafts, tables, timedSport, matchDurationMinutes, breakMinutes],
+    }, tables, timedSport
+      ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes }
+      : { minutesPerSet: planningMinutesPerSet(sport) })),
+    [phaseDrafts, tables, timedSport, matchDurationMinutes, breakMinutes, sport],
   );
 
   // The timetable is derived on every phase/date edit. No manual "generate"
@@ -1187,7 +1189,7 @@ export function CreateTournamentPage() {
                     <h3>{item.label}</h3>
                     <p>{item.description}</p>
                     <p className="muted">Geschätzte Spiele insgesamt: {item.estimatedMatches}</p>
-                    <p className="muted">Basisdauer: ca. {formatDuration(item.estimatedDurationMinutes)} · {timedSport ? `${matchDurationMinutes} Min. Spieldauer + ${breakMinutes} Min. Wechselzeit` : '15 Min. pro Satz und mindestens 1 Satz pro Spiel'}.</p>
+                    <p className="muted">Basisdauer: ca. {formatDuration(item.estimatedDurationMinutes)} · {timedSport ? `${matchDurationMinutes} Min. Spieldauer + ${breakMinutes} Min. Wechselzeit` : `${planningMinutesPerSet(sport)} Min. pro Satz (sportartspezifisch)`}.</p>
                   </button>
                 ))}
               </div>
@@ -1195,7 +1197,7 @@ export function CreateTournamentPage() {
               <aside className="format-settings-panel">
                 <div className="format-settings-head">
                   <h3>Vorgaben für Vorschläge</h3>
-                  <p className="muted">Diese Grenzen beeinflussen nur die Empfehlung. Vorschläge werden zusätzlich auf eine Basisdauer von maximal ca. 3,5 Stunden begrenzt (15 Min. pro Satz, mindestens 1 Satz pro Spiel). Im nächsten Schritt kannst du alles frei ändern.</p>
+                  <p className="muted">Diese Grenzen beeinflussen nur die Empfehlung. Die Dauerschätzung richtet sich nach der Sportart; sie berücksichtigt parallele Spiele, aber keine zusätzlichen Verzögerungen durch die Rundenauswertung. Im nächsten Schritt kannst du alles frei ändern.</p>
                 </div>
 
                 <div className="format-setting-fields">
@@ -1755,7 +1757,7 @@ export function CreateTournamentPage() {
         <div className="wizard-side-duration">
           <span>Voraussichtliche Dauer</span>
           <strong>{phaseDrafts.length > 0 ? `ca. ${formatDuration(estimatedTournamentDurationMinutes)}` : 'Noch offen'}</strong>
-          {phaseDrafts.length > 0 && <small>Zeitraum vom geplanten Beginn bis zum theoretischen Turnierende, einschließlich geplanter Pausen. Schätzung anhand der Phasen und {venue.dativePlural}.</small>}
+          {phaseDrafts.length > 0 && <small>Zeitraum vom geplanten Beginn bis zum theoretischen Turnierende, einschließlich geplanter Pausen. Spielzeit mit {planningMinutesPerSet(sport)} Min. pro Satz (soweit anwendbar); ohne zusätzliche Verzögerungen bei der Rundenfreigabe.</small>}
           {plannedTimeline.warnings.length > 0 && <small>⚠ Eine „Pause bis“-Uhrzeit liegt vor dem geschätzten Beginn der Pause. Bitte Phasenplanung prüfen.</small>}
         </div>
         {maxReachedStep >= 4 && !canCreate && (

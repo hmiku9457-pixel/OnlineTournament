@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { planningMinutesPerSet } from '@/domain/sports';
 import {
   bestOfOptions,
   createPhaseTemplate,
@@ -61,6 +62,18 @@ describe('tournament creation phase model', () => {
     expect(estimateTournamentDurationMinutes([
       { type: 'SWISS', entrantCount: 8, bestOf: 3, swissRounds: 3 },
     ], 4)).toBe(113);
+  });
+
+  it('uses the actual table-tennis set duration for parallel Swiss rounds', () => {
+    const swiss = { type: 'SWISS' as const, entrantCount: 8, bestOf: 3, swissRounds: 4 };
+    // Four matches in parallel on at least four tables: four waves of
+    // 2.5 expected sets at 5 minutes each = 50 rather than 150 minutes.
+    expect(planningMinutesPerSet('table_tennis')).toBe(5);
+    expect(estimatePhaseMetrics(swiss, 9, { minutesPerSet: planningMinutesPerSet('table_tennis') }))
+      .toMatchObject({ estimatedMatches: 16, estimatedDurationMinutes: 50 });
+    expect(estimatePhaseMetrics(swiss, 4, { minutesPerSet: 5 }).estimatedDurationMinutes).toBe(50);
+    expect(estimatePhaseMetrics(swiss, 2, { minutesPerSet: 5 }).estimatedDurationMinutes).toBe(100);
+    expect(estimatePhaseMetrics(swiss, 9).estimatedDurationMinutes).toBe(150);
   });
 
   it('uses round-specific best-of settings for knockout duration estimates', () => {

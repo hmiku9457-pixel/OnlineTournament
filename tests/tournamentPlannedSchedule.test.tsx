@@ -147,19 +147,19 @@ describe('optionaler vorläufiger Zeitplan', () => {
   });
 
   it('zeigt in der Seitenkarte dieselbe Gesamtdauer wie im Zeitplan, inklusive Pause bis', () => {
-    const swiss = estimatePhaseMetrics({ type: 'SWISS', entrantCount: 8, bestOf: 3, swissRounds: 4 }, 9);
-    const groups = estimatePhaseMetrics({ type: 'GROUPS', entrantCount: 8, groupCount: 2, bestOf: 1 }, 9);
-    expect(swiss.estimatedDurationMinutes).toBe(150);
-    expect(groups.estimatedDurationMinutes).toBe(30);
+    const swiss = estimatePhaseMetrics({ type: 'SWISS', entrantCount: 8, bestOf: 3, swissRounds: 4 }, 9, { minutesPerSet: 5 });
+    const groups = estimatePhaseMetrics({ type: 'GROUPS', entrantCount: 8, groupCount: 2, bestOf: 1 }, 9, { minutesPerSet: 5 });
+    expect(swiss.estimatedDurationMinutes).toBe(50);
+    expect(groups.estimatedDurationMinutes).toBe(10);
     const time = buildPlannedTimeline('2026-11-01T10:00', [
       { label: 'Schweizer System', type: 'SWISS', estimatedMinutes: swiss.estimatedDurationMinutes },
       { label: 'Pause', type: 'BREAK', estimatedMinutes: 0, breakKind: 'until', breakUntil: '14:00' },
       { label: 'Gruppenphase', type: 'GROUPS', estimatedMinutes: groups.estimatedDurationMinutes },
     ]);
-    expect(time.items[1].at).toBe('2026-11-01T12:30');
+    expect(time.items[1].at).toBe('2026-11-01T10:50');
     expect(time.items[2].at).toBe('2026-11-01T14:00');
-    expect(time.estimatedEnd).toBe('2026-11-01T14:30');
-    expect(plannedTimelineDurationMinutes('2026-11-01T10:00', time.estimatedEnd)).toBe(270);
+    expect(time.estimatedEnd).toBe('2026-11-01T14:10');
+    expect(plannedTimelineDurationMinutes('2026-11-01T10:00', time.estimatedEnd)).toBe(250);
     expect(time.warnings).toEqual([]);
   });
 
