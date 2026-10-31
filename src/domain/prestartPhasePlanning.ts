@@ -130,7 +130,7 @@ export function validatePrestartPhases(phases: PrestartPhaseDraft[], activeCount
       if (!Number.isInteger(phase.inlineBreakAfterRound) || phase.inlineBreakAfterRound < 1 || phase.inlineBreakAfterRound >= rounds) {
         errors.push(`${label}: Zwischenpause muss vor der letzten Runde liegen.`);
       }
-      if (phase.inlineBreakKind === 'until' && !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(phase.inlineBreakUntil)) {
+      if (phase.inlineBreakKind === 'until' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(phase.inlineBreakUntil)) {
         errors.push(`${label}: Gültige Uhrzeit für die Zwischenpause erforderlich.`);
       }
       if (phase.inlineBreakKind === 'minutes' && (!Number.isInteger(phase.inlineBreakMinutes) || phase.inlineBreakMinutes < 1 || phase.inlineBreakMinutes > 1440)) {

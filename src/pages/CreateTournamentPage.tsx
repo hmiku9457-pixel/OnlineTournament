@@ -422,7 +422,7 @@ export function CreateTournamentPage() {
         const rounds = phase.type === 'SWISS' ? phase.swissRounds : knockoutRoundLabels(phase.entrantCount).length;
         if (phase.inlineBreakAfterRound >= rounds || phase.inlineBreakAfterRound < 1
           || (phase.inlineBreakKind === 'until'
-            ? !/^([01]\\d|2[0-3]):[0-5]\\d$/.test(phase.inlineBreakUntil)
+            ? !/^([01]\d|2[0-3]):[0-5]\d$/.test(phase.inlineBreakUntil)
             : !Number.isInteger(phase.inlineBreakMinutes) || phase.inlineBreakMinutes < 1 || phase.inlineBreakMinutes > 1440)) return false;
       }
       return phase.type !== 'BREAK'
