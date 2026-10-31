@@ -1499,7 +1499,11 @@ export function CreateTournamentPage() {
                                 <span className="phase-quick-tag phase-quick-tag-end">Ende ca. {estimatedPhaseEnd}</span>
                               </div>
                               {plannedTimeline.warnings.some((warning) => warning.phaseIndex === index) &&
-                                <span className="phase-warning-chip" role="status">⚠ Pausenuhrzeit liegt vor dem geschätzten Pausenbeginn</span>}
+                                <span className="phase-warning-chip" role="status">
+                                  {phase.breakKind === 'overnight' && phase.type === 'BREAK'
+                                    ? '⚠ Fortsetzungsdatum muss nach der vorherigen Phase liegen'
+                                    : '⚠ Pausenuhrzeit liegt vor dem geschätzten Pausenbeginn'}
+                                </span>}
                               {phase.inlineBreakAfterRound > 0 && (phase.type === 'SWISS' || phase.type === 'KNOCKOUT') &&
                                 <span className="phase-inline-break-badge">· Zwischenpause nach Runde {phase.inlineBreakAfterRound} {phase.inlineBreakKind === 'minutes'
                                   ? `für ${phase.inlineBreakMinutes} Minuten`
@@ -1639,6 +1643,11 @@ export function CreateTournamentPage() {
                                 {phase.breakKind === 'until' && (
                                   <p className="field-hint break-phase-time-hint">
                                     Der Zeitpunkt ist eine Planungshilfe und sollte nach dem geschätzten Pausenbeginn liegen. Die Turnierleitung gibt die Fortsetzung tatsächlich frei.
+                                  </p>
+                                )}
+                                {phase.breakKind === 'overnight' && (
+                                  <p className="field-hint break-phase-time-hint">
+                                    Die Fortsetzung darf auch mehrere Tage später stattfinden. Das Datum muss nach dem Ende der vorherigen Phase liegen.
                                   </p>
                                 )}
                               </div>
