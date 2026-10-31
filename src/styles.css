@@ -5105,3 +5105,90 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
     justify-content: flex-start;
   }
 }
+
+/* Turniererstellung · Schritt 3: dichte Empfehlungen mit nachvollziehbarer Qualifikation */
+.wizard-workspace .format-step > h2 { margin-bottom: 3px; }
+.wizard-workspace .format-step > p.muted { margin: 3px 0 11px; line-height: 1.4; }
+.wizard-workspace .format-step .format-step-layout {
+  margin-top: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+  gap: 12px;
+}
+.wizard-workspace .format-step .recommendation-list { gap: 7px; align-content: start; }
+.wizard-workspace .format-step .recommendation-select {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+.wizard-workspace .format-step .recommendation-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  margin-bottom: 3px;
+}
+.wizard-workspace .format-step .recommendation-heading h3 {
+  flex: 1 1 220px;
+  min-width: 0;
+  margin: 0;
+  font-size: .88rem;
+  line-height: 1.3;
+}
+.wizard-workspace .format-step .recommendation-labels {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+.wizard-workspace .format-step .recommendation-labels .badge {
+  padding: 3px 7px;
+  font-size: .66rem;
+}
+.wizard-workspace .format-step .recommendation-select > p {
+  margin: 3px 0;
+  font-size: .78rem;
+  line-height: 1.35;
+}
+.wizard-workspace .format-step .recommendation-select > p.recommendation-progression {
+  color: #175cd3;
+  font-weight: 650;
+  font-size: .73rem;
+}
+.wizard-workspace .format-step .recommendation-metrics {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 13px;
+  margin-top: 5px;
+  color: #667085;
+  font-size: .7rem;
+  line-height: 1.35;
+}
+.wizard-workspace .format-step .format-settings-panel {
+  min-width: 0;
+  padding: 12px 13px;
+}
+.wizard-workspace .format-step .format-settings-head h3 { font-size: .95rem; margin: 0 0 5px; }
+.wizard-workspace .format-step .format-settings-head p { font-size: .77rem; line-height: 1.4; }
+.wizard-workspace .format-step .format-setting-fields { margin-top: 11px; gap: 10px; }
+.wizard-workspace .format-step .format-setting-fields .field { gap: 4px; }
+.wizard-workspace .format-step .format-setting-fields .field label { font-size: .77rem; }
+.wizard-workspace .format-step .format-setting-fields input { padding: 7px 9px; min-height: 35px; }
+.wizard-workspace .format-step .format-setting-fields .field-hint { font-size: .7rem; line-height: 1.35; }
+.wizard-workspace .format-step .format-toggle-group { margin-top: 12px; padding-top: 10px; gap: 6px; }
+.wizard-workspace .format-step .format-toggle-group legend { margin-bottom: 4px; font-size: .84rem; }
+.wizard-workspace .format-step .format-toggle-group .format-toggle { font-size: .8rem; }
+.wizard-workspace .format-step .format-settings-footnote {
+  margin: 11px 0 0;
+  padding-top: 9px;
+  border-top: 1px solid #e4e7ec;
+  color: #667085;
+  font-size: .7rem;
+  line-height: 1.4;
+}
+@media (max-width: 850px) {
+  .wizard-workspace .format-step .format-step-layout { grid-template-columns: minmax(0, 1fr); }
+  .wizard-workspace .format-step .format-settings-panel { position: static; }
+}
