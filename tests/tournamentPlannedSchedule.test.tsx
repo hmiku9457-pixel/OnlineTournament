@@ -70,6 +70,35 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(totalMinutes! - playingMinutes).toBe(90);
   });
 
+  it('setzt Spieltagsende auf frei gewähltes späteres Datum statt automatisch auf morgen', () => {
+    const timeline = buildPlannedTimeline('2026-11-01T10:00', [
+      { label: 'Gruppenphase', type: 'GROUPS', estimatedMinutes: 30 },
+      { label: 'Spieltagsende', type: 'BREAK', estimatedMinutes: 0, breakKind: 'overnight',
+        nextDayDate: '2026-11-04', nextDayStart: '09:30' },
+      { label: 'Finale', type: 'KNOCKOUT', estimatedMinutes: 60 },
+    ]);
+    expect(timeline.items.map((item) => item.at)).toEqual([
+      '2026-11-01T10:00', '2026-11-01T10:30', '2026-11-04T09:30',
+    ]);
+    expect(timeline.items[1]).toMatchObject({ durationMinutes: 4260, durationApproximate: true });
+    expect(timeline.estimatedEnd).toBe('2026-11-04T10:30');
+    expect(timeline.warnings).toEqual([]);
+  });
+
+  it('warnt vor einem Fortsetzungsdatum am oder vor dem vorherigen Spieltag', () => {
+    const before = [{ label: 'Phase 1', type: 'GROUPS', estimatedMinutes: 60 },
+      { label: 'Spieltagsende', type: 'BREAK', estimatedMinutes: 0, breakKind: 'overnight' as const,
+        nextDayDate: '2026-11-01', nextDayStart: '09:00' }];
+    const invalid = buildPlannedTimeline('2026-11-01T10:00', before);
+    expect(invalid.warnings).toHaveLength(1);
+    expect(invalid.warnings[0].message).toContain('Fortsetzungsdatum');
+    expect(invalid.estimatedEnd).toBe('2026-11-02T09:00');
+    const legacy = buildPlannedTimeline('2026-11-01T10:00',
+      before.map((phase) => ({ ...phase, nextDayDate: '' })));
+    expect(legacy.warnings).toEqual([]);
+    expect(legacy.estimatedEnd).toBe('2026-11-02T09:00');
+  });
+
   it('erzeugt nach den Phasendauern einen editierbaren Ablauf mit Dauer- und Uhrzeitpause', () => {
     const suggestion = suggestPlannedSchedule(start, [
       { label: 'Gruppenphase', type: 'GROUPS', estimatedMinutes: 120 },
