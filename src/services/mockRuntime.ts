@@ -103,6 +103,13 @@ export function canEditFinishedResults(tournament: DemoTournament, stage: Tourna
   return !next || !isStageStarted(tournament, next);
 }
 
+/** Preserve scheduled breaks when an earlier competition needs reapproval. */
+function statusAfterReopening(tournament: DemoTournament): 'PAUSED' | 'RUNNING' {
+  return tournament.stages.some((stage) => stage.type === 'BREAK'
+    && isStageStarted(tournament, stage) && !isStageCompleted(tournament, stage))
+    ? 'PAUSED' : 'RUNNING';
+}
+
 /** Real KO / Swiss round index, excluding separate cutoff fixtures.
  * The bronze match is in the same round as the final. */
 function competitionRoundIndex(tournament: DemoTournament, stage: TournamentStage, matchId: string): number | null {
@@ -952,7 +959,7 @@ export function restoreMockParticipant(tournament: DemoTournament, name: string)
   else {
     const upcoming = tournament.stages.find((stage) => stage.id === record.phaseId);
     if (upcoming) {
-      const previous = tournament.stages[tournament.stages.indexOf(upcoming) - 1];
+      const previous = getPreviousCompetitionStage(tournament, upcoming);
       if (previous) refreshCompletedStageQualifiers(tournament, previous);
     }
   }
@@ -1432,7 +1439,7 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
           action: 'APPROVAL_REVOKED', description: `Freigabe der Schweizer Runde ${round} wegen Ergebniskorrektur zurueckgenommen` });
       }
       if (reopenStageAfterCorrection(tournament, stageForCorrection)) {
-        updateMockTournamentStatus(tournament.id, 'RUNNING');
+        updateMockTournamentStatus(tournament.id, statusAfterReopening(tournament));
         recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Turnierleitung',
           action: 'APPROVAL_REVOKED', description: `Freigabe der Phase ${stageForCorrection.name} wegen Ergebniskorrektur zurueckgenommen` });
       }
@@ -1500,7 +1507,7 @@ export function restoreMockCorrectedResult(tournament: DemoTournament, auditId: 
     invalidateUnstartedLaterRounds(tournament, stage, event.matchId);
     const round = competitionRoundIndex(tournament, stage, event.matchId);
     if (round !== null && stage.type === 'SWISS') revokeSwissRoundApprovals(tournament, stage, round);
-    if (reopenStageAfterCorrection(tournament, stage)) updateMockTournamentStatus(tournament.id, 'RUNNING');
+    if (reopenStageAfterCorrection(tournament, stage)) updateMockTournamentStatus(tournament.id, statusAfterReopening(tournament));
     else refreshCompletedStageQualifiers(tournament, stage);
   }
   recordMockAudit({ tournamentId: tournament.id, matchId: event.matchId, actor: 'Turnierleitung (lokal)', action: 'RESULT_RESTORED', description: 'Letzte Ergebniskorrektur rückgängig gemacht', before: event.after, after: event.before });

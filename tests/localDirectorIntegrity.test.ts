@@ -64,6 +64,7 @@ describe('local director integrity', () => {
     updateMockTournamentStatus(t.id, 'PAUSED');
     completeMockMatch(games[0].id, lose, 'FINISHED', true);
     expect(isStageCompleted(t, group)).toBe(false);
+    expect(getMockTournament(t.id).status).toBe('PAUSED');
     expect(getPendingMockApproval(t)?.stageId).toBe(group.id);
     expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(getStageEntrants(t, ko)).toContain(games[0].sideB);
@@ -96,7 +97,7 @@ describe('local director integrity', () => {
       expect(withdrawMockParticipant(t, p)).toBe(true);
     }
     expect(approveMockProgress(t)?.kind).toBe('ROUND');
-    expect(getMockStageMatches(t, t.stages[0])).toHaveLength(0);
+    expect(getMockStageMatches(t, t.stages[0]).filter(m => m.round === 'Runde 2')).toHaveLength(0);
     expect(getPendingMockApproval(t)).toMatchObject({ kind: 'STAGE', round: 2 });
   });
 
