@@ -1522,7 +1522,7 @@ function computeStageQualifiers(tournament: DemoTournament, stage: TournamentSta
   if (targetCount <= 0) return [];
   const matches = baseStageMatches(tournament, stage, results);
 
-  if (stage.type === 'GROUPS') {
+  if (stage.type === 'GROUPS' || stage.type === 'ROUND_ROBIN') {
     return qualificationCutoffResult(tournament, stage, results).qualified;
   }
 
