@@ -339,6 +339,19 @@ try {
   assert.equal(await draftPage.locator('.sidebar-draft-item').count(), 1);
   await draftPage.reload();
   assert.equal(await draftPage.locator('#name').inputValue(), 'Entwurf A');
+  // Saving an already saved draft adds a status line, but must not move
+  // any of the three header buttons horizontally.
+  const headerButtons = draftPage.locator('.creation-draft-buttons button');
+  assert.equal(await headerButtons.count(), 3);
+  const beforeSave = await Promise.all([0, 1, 2].map((index) => headerButtons.nth(index).boundingBox()));
+  await draftPage.getByRole('button', { name: 'Entwurf speichern' }).click();
+  await draftPage.getByText('Entwurf gespeichert.', { exact: true }).waitFor();
+  const afterSave = await Promise.all([0, 1, 2].map((index) => headerButtons.nth(index).boundingBox()));
+  for (let index = 0; index < 3; index++) {
+    assert.ok(beforeSave[index] && afterSave[index]);
+    assert.ok(Math.abs(beforeSave[index].x - afterSave[index].x) < 1,
+      `Draft button ${index} shifted after saving an existing draft`);
+  }
   await draftPage.getByRole('button', { name: 'Entwurf kopieren' }).click();
   await draftPage.waitForFunction(() => document.querySelectorAll('.sidebar-draft-item').length === 2);
   assert.match(await draftPage.locator('#name').inputValue(), /Kopie/);
