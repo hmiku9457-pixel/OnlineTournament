@@ -10,6 +10,7 @@ import {
   createPhaseTemplate,
   defaultBestOfForStage,
   estimatePhaseMetrics,
+  minimumPlayedMatches,
   formatGroupDistribution,
   hasValidTerminalStageOrder,
   hasValidBreakStageOrder,
@@ -32,8 +33,9 @@ import { formatPhaseOverview } from '@/domain/creationOverview';
 import { loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence } from '@/domain/creationDraft';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { SportChangeDialog } from '@/components/SportChangeDialog';
+import { DisciplineChangeDialog } from '@/components/DisciplineChangeDialog';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
-import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedActiveBreakMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedActiveBreakMinutes, plannedTimelineConflicts, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
@@ -282,7 +284,7 @@ function NumberChoice({
   ariaLabel: string;
 }) {
   function clampCustomValue(rawValue: number): number {
-    const minimumApplied = Math.max(customMinimum, rawValue || customMinimum);
+    const minimumApplied = Math.max(customMinimum, Number.isFinite(rawValue) ? Math.trunc(rawValue) || customMinimum : customMinimum);
     return customMaximum === undefined ? minimumApplied : Math.min(customMaximum, minimumApplied);
   }
 
@@ -350,6 +352,7 @@ export function CreateTournamentPage() {
   const [awardsAtOverride, setAwardsAtOverride] = useState<string | null>(restoredDraft?.awardsAtOverride ?? null);
   const [sport, setSport] = useState(restoredDraft?.sport ?? '');
   const [pendingSport, setPendingSport] = useState<string | null>(null);
+  const [pendingDiscipline, setPendingDiscipline] = useState<Discipline | null>(null);
   const sportSelectRef = useRef<HTMLSelectElement>(null);
   const availableDisciplines = disciplineOptionsForSport(sport);
   const venue = getVenueTerminology(sport);
@@ -428,14 +431,14 @@ export function CreateTournamentPage() {
   const participantErrorMessages = uniqueErrorMessages(participantErrors);
 
   const defaultMaxGroups = Math.max(2, Math.ceil(participantCount / (participantCount >= 20 ? 5 : 4)));
-  const defaultMaxSwissRounds = Math.max(minimumMatches, Math.ceil(Math.log2(Math.max(2, participantCount))));
+  const defaultMaxSwissRounds = Math.min(30, Math.max(minimumMatches + (participantCount % 2), Math.ceil(Math.log2(Math.max(2, participantCount)))));
   const defaultKnockoutQualifierCount = Math.max(
     2,
     Math.min(participantCount, participantCount >= 16 ? 8 : 4),
   );
-  const effectiveMaxGroups = maxGroups ?? defaultMaxGroups;
-  const effectiveMaxSwissRounds = maxSwissRounds ?? defaultMaxSwissRounds;
-  const effectiveKnockoutQualifierCount = knockoutQualifierCount ?? defaultKnockoutQualifierCount;
+  const effectiveMaxGroups = Math.min(Math.max(2, Math.floor(participantCount / 2)), maxGroups ?? defaultMaxGroups);
+  const effectiveMaxSwissRounds = Math.min(30, Math.max(1, maxSwissRounds ?? defaultMaxSwissRounds));
+  const effectiveKnockoutQualifierCount = Math.min(Math.max(2, participantCount), Math.max(2, knockoutQualifierCount ?? defaultKnockoutQualifierCount));
 
   const recommendations = useMemo(
     () => recommendTournamentFormats(
@@ -466,6 +469,16 @@ export function CreateTournamentPage() {
     [recommendations, selectedRecommendationId],
   );
 
+  /** The editable phase plan is authoritative even when inputs change. */
+  const recommendationPlanMatches = Boolean(selectedRecommendation
+    && phaseDrafts.length === selectedRecommendation.phases.length
+    && phaseDrafts.every((phase, index) => {
+      const original = selectedRecommendation.phases[index];
+      return original && phase.type === original.type
+        && phase.entrantCount === (original.entrantCount ?? participantCount)
+        && (phase.type !== 'GROUPS' || phase.groupCount === (original.groupCount ?? 2))
+        && (phase.type !== 'SWISS' || phase.swissRounds === (original.swissRounds ?? 1));
+    }));
   // Frühere Einstellungen dürfen vorhandene manuell angepasste Phasen nicht
   // unbemerkt löschen oder eine Empfehlung erneut über die Änderungen legen.
   useEffect(() => {
@@ -493,8 +506,8 @@ export function CreateTournamentPage() {
             ? /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.breakUntil)
             : phase.breakKind === 'overnight' && /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.nextDayStart)));
     });
-  const gameSettingsValid = minimumMatches >= 1 && validMatchDuration && validTurnover;
-  const basicsValid = Boolean(name.trim()) && Boolean(sport) && selectedDisciplineValid && isValidLocalDateTime(scheduledStart) && tables >= 1 && gameSettingsValid;
+  const gameSettingsValid = Number.isInteger(minimumMatches) && minimumMatches >= 1 && minimumMatches <= 100 && validMatchDuration && validTurnover;
+  const basicsValid = Boolean(name.trim()) && name.trim().length <= 120 && Boolean(sport) && selectedDisciplineValid && isValidLocalDateTime(scheduledStart) && Number.isSafeInteger(tables) && tables >= 1 && tables <= 9999 && gameSettingsValid;
   const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
     const maximum = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
     return phase.entrantCount >= 2 && phase.entrantCount <= maximum
@@ -563,6 +576,7 @@ export function CreateTournamentPage() {
   }
 
   function generateTestParticipants() {
+    if (!window.confirm('Testteilnehmer ergänzen? Die Einträge sind nur für Testturniere gedacht und können anschließend entfernt werden.')) return;
     const targetCount = 19;
     setParticipants((current) => {
       const next = [...current];
@@ -590,11 +604,8 @@ export function CreateTournamentPage() {
   }
 
   function selectRecommendation(recommendation: FormatRecommendation) {
-    if (selectedRecommendationId === recommendation.id) {
-      setSelectedRecommendationId(null);
-      setPhaseDrafts([]);
-      return;
-    }
+    // Second clicks must never erase a fully configured tournament.
+    if (selectedRecommendationId === recommendation.id && recommendationPlanMatches) return;
     setSelectedRecommendationId(recommendation.id);
     setPhaseDrafts(recommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
     setExpandedPhaseId(null);
@@ -839,6 +850,13 @@ export function CreateTournamentPage() {
     navigateToStep((step - 1) as WizardStep);
   }
 
+  function confirmDisciplineChange() {
+    if (!pendingDiscipline) return;
+    setDiscipline(pendingDiscipline);
+    resetParticipantEditor();
+    setPendingDiscipline(null);
+  }
+
   function applySportChange(nextSport: string) {
     const allowed = disciplineOptionsForSport(nextSport);
     const nextDiscipline = allowed.some((option) => option.value === discipline)
@@ -973,7 +991,7 @@ export function CreateTournamentPage() {
   const ceremonyIssue = awardsEnabled && (!isValidLocalDateTime(awardsAt)
     || (plannedTimeline.estimatedEnd && awardsAt < plannedTimeline.estimatedEnd))
     ? 'Die Siegerehrung muss am oder nach dem voraussichtlichen Turnierende liegen.' : null;
-  const scheduleIssues = [...validatePlannedSchedule(plannedSchedule), ...(ceremonyIssue ? [ceremonyIssue] : [])];
+  const scheduleIssues = [...validatePlannedSchedule(plannedSchedule), ...plannedTimelineConflicts(plannedTimeline), ...(ceremonyIssue ? [ceremonyIssue] : [])];
   const overnightDatesValid = phaseDrafts.every((phase, index) => {
     if (phase.type !== 'BREAK' || phase.breakKind !== 'overnight') return true;
     const plannedStart = plannedTimeline.items.find((item) => item.id === 'phase-' + (index + 1))?.at;
@@ -981,7 +999,12 @@ export function CreateTournamentPage() {
       && phase.nextDayDate > plannedStart!.slice(0, 10));
   });
   const canCreate = basicsValid && participantsValid && gameSettingsValid
-    && phaseConfigurationValid && phaseEntrantsValid && overnightDatesValid && hasVisitedPhaseStep;
+    && phaseConfigurationValid && phaseEntrantsValid && overnightDatesValid && hasVisitedPhaseStep
+    && scheduleIssues.length === 0;
+  const firstCompetition = phaseDrafts.find((phase) => phase.type !== 'BREAK');
+  const actualMinimumMatches = firstCompetition ? minimumPlayedMatches(firstCompetition.type, firstCompetition.entrantCount, firstCompetition.groupCount, firstCompetition.swissRounds) : 0;
+  const minimumMatchesShortfall = firstCompetition ? Math.max(0, minimumMatches - actualMinimumMatches) : 0;
+  const dateIsPast = isValidLocalDateTime(scheduledStart) && scheduledStart < toLocalDateTime(new Date());
   const canContinue =
     (step === 1 && basicsValid) ||
     (step === 2 && participantsValid) ||
@@ -1009,8 +1032,8 @@ export function CreateTournamentPage() {
         {stepLabels.map((label, index) => {
           const stepNumber = (index + 1) as WizardStep;
           const reached = stepNumber <= maxReachedStep;
-          const stepValid = [basicsValid, participantsValid, maxReachedStep >= 4,
-            phaseConfigurationValid && phaseEntrantsValid, scheduleIssues.length === 0][index];
+          const stepValid = [basicsValid, participantsValid, maxReachedStep >= 4 && phaseDrafts.length > 0 && phaseConfigurationValid,
+            phaseConfigurationValid && phaseEntrantsValid && scheduleIssues.length === 0, canCreate][index];
           const current = step === stepNumber;
           const complete = reached && !current && stepValid;
           const needsReview = reached && !current && !stepValid;
@@ -2069,7 +2092,7 @@ export function CreateTournamentPage() {
           <button type="button" className="wizard-side-fact" disabled={maxReachedStep < 3} onClick={() => navigateToStep(3)}>
             <span>Turnierform {maxReachedStep >= 3 && <span aria-hidden="true">↗</span>}</span>
             <strong>{phaseDrafts.length ? `${phaseDrafts.length} ${phaseDrafts.length === 1 ? 'Phase' : 'Phasen'} konfiguriert` : 'Noch keine Form gewählt'}</strong>
-            <small>{selectedRecommendation ? 'Empfehlung übernommen – frei anpassbar' : 'Individuelle Phasenauswahl'}</small>
+            <small>{selectedRecommendation ? recommendationPlanMatches ? 'Empfehlung übernommen – frei anpassbar' : 'Individuell angepasst – ursprüngliche Empfehlung weicht ab' : 'Individuelle Phasenauswahl'}</small>
           </button>
         </div>
         <div className="wizard-side-phase-summary">
