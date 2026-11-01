@@ -514,6 +514,42 @@ try {
   await blockedPage.getByText('IndexedDB ist in diesem Browser nicht verfügbar.', { exact: false }).waitFor();
   await blockedContext.close();
 
+  // A damaged current-format tournament must be quarantined, not crash the
+  // entire catalog. The original bytes stay in IndexedDB until confirmation.
+  const damagedContext = await browser.newContext();
+  const damagedPage = await damagedContext.newPage();
+  await damagedPage.goto(base + '/#/tournaments/new');
+  await damagedPage.locator('.creation-page-container').waitFor();
+  await damagedPage.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('online-tournament:local-state:v1', 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('values', 'readwrite');
+      const values = tx.objectStore('values');
+      values.put({ key: 'online-tournament:local-prototype-tournaments:v1:index:v3',
+        value: JSON.stringify(['damaged-tournament']) });
+      values.put({ key: 'online-tournament:local-prototype-tournaments:v1:record:damaged-tournament',
+        value: '{not valid json' });
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    db.close();
+  });
+  await damagedPage.reload();
+  await damagedPage.getByRole('heading', { name: 'Turnierspeicher überprüfen' }).waitFor();
+  assert.equal(await damagedPage.getByRole('button', { name: 'Datensatz zurücksetzen' }).count(), 1);
+  damagedPage.once('dialog', (dialog) => dialog.accept());
+  await damagedPage.getByRole('button', { name: 'Datensatz zurücksetzen' }).click();
+  await damagedPage.getByRole('heading', { name: 'Turnierspeicher überprüfen' }).waitFor({ state: 'hidden' });
+  await damagedPage.reload();
+  await damagedPage.locator('.creation-page-container').waitFor();
+  assert.equal(await damagedPage.getByRole('heading', { name: 'Turnierspeicher überprüfen' }).count(), 0);
+  await damagedContext.close();
+
   process.stdout.write('Creation wizard browser smoke tests passed.\n');
 } finally {
   await browser.close();
