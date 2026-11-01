@@ -359,6 +359,21 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                                   (_, index) => <option key={index + 1} value={index + 1}>Runde {index + 1}</option>)}
                               </select>
                             </label>
+                            <label>Unterbrechungsart
+                              <select value={phase.inlineBreakKind} onChange={(event) => edit(phase.id, { inlineBreakKind: event.target.value as 'minutes' | 'until' })}>
+                                <option value="minutes">Pause für X Minuten</option>
+                                <option value="until">Pause bis Uhrzeit</option>
+                              </select>
+                            </label>
+                            {phase.inlineBreakKind === 'minutes'
+                              ? <label>Dauer in Minuten
+                                  <input type="number" min={1} max={1440} value={phase.inlineBreakMinutes}
+                                    onChange={(event) => edit(phase.id, { inlineBreakMinutes: Number(event.target.value) })} />
+                                </label>
+                              : <label>Pause bis
+                                  <ClockTimePicker id={`prestart-inline-${phase.id}`} label="Pause bis" value={phase.inlineBreakUntil}
+                                    onChange={(value) => edit(phase.id, { inlineBreakUntil: value })} />
+                                </label>}
                           </div>}
                         </div>
                       )}
