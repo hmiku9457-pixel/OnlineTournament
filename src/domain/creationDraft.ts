@@ -62,6 +62,8 @@ export interface CreationDraft {
   maxGroups: number | null;
   maxSwissRounds: number | null;
   knockoutQualifierCount: number | null;
+  /** Chosen soft time target, in minutes (older drafts default to 210). */
+  preferredDurationMinutes?: number;
   awardsEnabled: boolean;
   awardsAtOverride: string | null;
 }
@@ -108,6 +110,9 @@ function validDraft(value: unknown): value is CreationDraft {
       typeof (data.enabledSystems as unknown as Record<string, unknown>)[key] === 'boolean')
     && [data.maxGroups, data.maxSwissRounds, data.knockoutQualifierCount]
       .every((v) => v === null || (typeof v === 'number' && Number.isInteger(v)))
+    && (data.preferredDurationMinutes === undefined
+      || (Number.isInteger(data.preferredDurationMinutes) && data.preferredDurationMinutes >= 15
+        && data.preferredDurationMinutes <= 1439))
     && (data.selectedRecommendationId === null || typeof data.selectedRecommendationId === 'string')
     && typeof data.awardsEnabled === 'boolean'
     && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string');
