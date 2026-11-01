@@ -64,7 +64,11 @@ describe('Zwischenpause innerhalb einer Wettkampfphase', () => {
     expect(markup).toContain('Fortsetzung Runde 3 · Schweizer System');
     expect(markup).toContain('ca. 1 Std.');
     expect(markup).not.toContain('Geplanter Pausenbeginn');
-    expect(markup).toContain('Siegerehrung hinzufügen');
+    expect(markup).toContain('Siegerehrung');
+    expect(markup).toContain('+ Hinzufügen');
+    expect(markup).toContain('class="planned-schedule-phase-row is-ceremony"');
+    expect(markup).toContain('aria-expanded="false"');
+    expect(markup).not.toContain('id="planned-ceremony-settings"');
   });
 
   it('warnt, falls Pause bis vor dem voraussichtlichen Ende der zweiten Runde liegt', () => {
