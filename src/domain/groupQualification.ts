@@ -29,3 +29,28 @@ export function getGroupQualificationHints(
 
   return { projected, possible };
 }
+
+/** Streichungsregel: Bei unterschiedlich großen Gruppen zählen für einen
+ * gruppenübergreifenden Rangvergleich nur Partien gegen Gegner bis zum
+ * letzten Rang der kleinsten Gruppe. Gruppentabellen bleiben unverändert. */
+export function discardedGroupOpponents(
+  fullRanking: readonly { name: string }[],
+  smallestGroupSize: number,
+): Set<string> {
+  return new Set(fullRanking.slice(Math.max(0, smallestGroupSize)).map((row) => row.name));
+}
+
+export function recommendedEqualGroupQualifiers(
+  entrants: number, groupCount: number, requested: number,
+): number | null {
+  const count = Math.trunc(entrants);
+  const groups = Math.trunc(groupCount);
+  if (count < 4 || groups < 2 || groups > Math.floor(count / 2)) return null;
+  const candidates = Array.from({ length: Math.floor((count - 1) / groups) }, (_, i) => (i + 1) * groups)
+    .filter((value) => value >= 2 && value < count);
+  return candidates.sort((a, b) => Math.abs(a - requested) - Math.abs(b - requested) || b - a)[0] ?? null;
+}
+
+export function needsGroupStreichungsregel(entrants: number, groups: number, qualifiers: number): boolean {
+  return groups >= 2 && entrants % groups !== 0 && qualifiers < entrants && qualifiers % groups !== 0;
+}
