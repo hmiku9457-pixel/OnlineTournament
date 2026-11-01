@@ -6870,16 +6870,32 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .wizard-start-past-banner-copy { min-width: 0; flex: 1; }
 .wizard-start-past-banner-copy strong { display: block; font-size: .86rem; }
 .wizard-start-past-banner-copy p { margin: 3px 0 0; font-size: .79rem; line-height: 1.5; }
+.wizard-start-past-banner-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+  margin-left: auto;
+}
 .wizard-start-past-banner .btn {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   color: #92400e;
   background: #fff;
   border-color: #fbbf24;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.35;
 }
 .wizard-start-past-banner .btn:hover { background: #fef3c7; }
 .wizard-start-past-banner .btn:focus-visible { outline: 2px solid #b45309; outline-offset: 2px; }
+@media (max-width: 1350px) {
+  .wizard-start-past-banner { flex-wrap: wrap; }
+  .wizard-start-past-banner-actions { width: calc(100% - 38px); margin-left: 38px; justify-content: flex-start; }
+}
 @media (max-width: 600px) {
-  .wizard-start-past-banner { flex-wrap: wrap; align-items: flex-start; }
-  .wizard-start-past-banner .btn { margin-left: 38px; }
+  .wizard-start-past-banner { align-items: flex-start; }
+  .wizard-start-past-banner-actions { align-items: stretch; }
+  .wizard-start-past-banner-actions .btn { flex: 1 1 240px; }
 }
