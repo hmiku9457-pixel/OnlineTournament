@@ -219,6 +219,27 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(list).toBeLessThan(withAwards.indexOf('class="planned-schedule-ceremony-details"'));
   });
 
+  it('zeigt im Ablauf die Phasenstruktur rechts neben dem Phasennamen, auch über Pausen hinweg', () => {
+    const timeline = buildPlannedTimeline('2026-11-01T10:00', [
+      { type: 'GROUPS', label: 'Gruppenphase', estimatedMinutes: 30 },
+      { type: 'BREAK', label: 'Pause', estimatedMinutes: 20, breakKind: 'minutes', breakMinutes: 20 },
+      { type: 'SWISS', label: 'Schweizer System', estimatedMinutes: 50 },
+      { type: 'KNOCKOUT', label: 'K.-o.-Phase', estimatedMinutes: 60 },
+    ]);
+    const markup = renderToStaticMarkup(createElement(PlannedScheduleEditor, {
+      scheduledStart: '2026-11-01T10:00', timeline,
+      phaseSummaries: ['3 Gruppen · 9 Qualifikationsplätze', '', '9 Spieler · 4 Runden · 4 Qualifikationsplätze', '4 Spieler · 2 Runden'],
+      awardsEnabled: false, awardsAt: timeline.estimatedEnd,
+      onToggleAwards: () => {}, onAwardsAtChange: () => {},
+    }));
+    expect(markup).toContain('3 Gruppen · 9 Qualifikationsplätze');
+    expect(markup).toContain('9 Spieler · 4 Runden · 4 Qualifikationsplätze');
+    expect(markup).toContain('4 Spieler · 2 Runden');
+    expect((markup.match(/class="planned-schedule-phase-summary"/g) ?? [])).toHaveLength(3);
+    expect(markup).toContain('Siegerehrung');
+    expect(markup).toContain('aria-expanded="false"');
+  });
+
   it('zeigt beim Spieltagswechsel statt der mehrtägigen Pausendauer das Tagesende', () => {
     const start = '2026-11-01T10:00';
     const timeline = buildPlannedTimeline(start, [
