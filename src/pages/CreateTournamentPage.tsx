@@ -28,6 +28,7 @@ import type { Discipline, StageType } from '@/domain/types';
 import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/recommendations';
 import { createMockTournament } from '@/services/mockTournamentStore';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
+import { formatPhaseOverview } from '@/domain/creationOverview';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedTimelineDurationMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
@@ -70,7 +71,7 @@ type PhaseDraft = {
   inlineBreakUntil: string;
 };
 
-const stepLabels = ['Grunddaten', 'Teilnehmer', 'Turnierform', 'Phasen', 'Zeitplan'];
+const stepLabels = ['Grunddaten', 'Teilnehmer', 'Turnierform', 'Phasen', 'Zusammenfassung'];
 const initialEnabledSystems = Object.fromEntries(
   tournamentSystemOptions.map((option) => [option.id, true]),
 ) as Record<TournamentSystemId, boolean>;
@@ -908,7 +909,7 @@ export function CreateTournamentPage() {
           const current = step === stepNumber;
           const complete = reached && !current && stepValid;
           const needsReview = reached && !current && !stepValid;
-          const stateLabel = current ? 'Aktuell' : complete ? (stepNumber === 5 && plannedSchedule.length === 0 ? 'Optional' : 'Erledigt') : needsReview ? 'Prüfen' : 'Offen';
+          const stateLabel = current ? 'Aktuell' : complete ? 'Erledigt' : needsReview ? 'Prüfen' : 'Offen';
           return (
             <button
               className={`wizard-step ${current ? 'active' : complete ? 'completed' : needsReview ? 'needs-attention' : 'upcoming'}`}
@@ -926,7 +927,7 @@ export function CreateTournamentPage() {
         })}
       </nav>
 
-      <div className="wizard-workspace">
+      <div className={`wizard-workspace ${step === 5 ? 'wizard-workspace-review' : ''}`}>
       <div className="card wizard-card">
         {step === 1 && (
           <section>
@@ -1892,11 +1893,42 @@ export function CreateTournamentPage() {
 
         {step === 5 && (
           <section className="schedule-wizard-step">
-            <h2>Zeitplan <span className="wizard-optional-tag">Optional</span></h2>
-            <p className="muted">Automatisch erstellt und unverbindlich – der tatsächliche Ablauf bleibt bei der Turnierleitung.</p>
+            <div className="creation-review-heading">
+              <div>
+                <h2>Zusammenfassung</h2>
+                <p className="muted">Prüfe deine Turnierdaten. Über die bisherigen Schritte kannst du Angaben jederzeit korrigieren.</p>
+              </div>
+              <div className="creation-review-edit-actions" aria-label="Einstellungen bearbeiten">
+                <button className="btn small" type="button" onClick={() => navigateToStep(1)}>Grunddaten</button>
+                <button className="btn small" type="button" onClick={() => navigateToStep(2)}>Teilnehmer</button>
+                <button className="btn small" type="button" onClick={() => navigateToStep(4)}>Phasen</button>
+              </div>
+            </div>
+            <div className="creation-review-overview" aria-label="Turnierdaten im Überblick">
+              <div className="creation-review-identity">
+                <span>Dein Turnier</span>
+                <strong>{name.trim() || 'Turniername offen'}</strong>
+                <small>{sportOptions.find((option) => option.id === sport)?.label ?? 'Sportart offen'} · {disciplineLabel(discipline)}</small>
+              </div>
+              <dl className="creation-review-facts">
+                <div><dt>Geplanter Beginn</dt><dd>{isValidLocalDateTime(scheduledStart) ? formatPlannedDateTime(scheduledStart) : 'Noch offen'}</dd></div>
+                <div><dt>Teilnehmer</dt><dd>{participantCount} {discipline === 'TEAMS' ? 'Mannschaften' : discipline === 'DOUBLES' ? 'Doppel' : 'Spieler'}</dd></div>
+                <div><dt>Spielflächen</dt><dd>{tables} {venue.plural}</dd></div>
+                <div><dt>Mindestspiele</dt><dd>{minimumMatches} pro Teilnehmer</dd></div>
+                <div><dt>Wettkampfphasen</dt><dd>{phaseDrafts.filter((phase) => phase.type !== 'BREAK').length} · {phaseDrafts.filter((phase) => phase.type === 'BREAK').length} separate Pausen</dd></div>
+                <div><dt>Geplante Spiele</dt><dd>{phaseEstimates.reduce((total, estimate) => total + estimate.estimatedMatches, 0)}</dd></div>
+              </dl>
+              <div className="creation-review-timing">
+                <div><span>Voraussichtliche Spielzeit</span><strong>ca. {formatDuration(estimatedPlayingMinutes)}</strong></div>
+                <div><span>Geplante Unterbrechungen</span><strong>{formatDuration(estimatedBreakMinutes)}</strong></div>
+                <div><span>Gesamtdauer inkl. Pausen</span><strong>{formatDuration(estimatedTournamentDurationMinutes)}</strong></div>
+                <div><span>Voraussichtliches Ende</span><strong>{plannedTimeline.estimatedEnd ? formatPlannedDateTime(plannedTimeline.estimatedEnd) : 'Noch offen'}</strong></div>
+              </div>
+            </div>
             <PlannedScheduleEditor
               scheduledStart={scheduledStart}
               timeline={plannedTimeline}
+              phaseSummaries={phaseDrafts.map((_, index) => formatPhaseOverview(phaseDrafts, index, discipline))}
               awardsEnabled={awardsEnabled}
               awardsAt={awardsAt}
               onToggleAwards={(enabled) => { setAwardsEnabled(enabled); setAwardsAtOverride(null); }}
@@ -1911,7 +1943,7 @@ export function CreateTournamentPage() {
       </div>
 
       <div className="wizard-sidebar-column">
-      <aside className="wizard-side-summary" aria-label="Aktuelle Einstellungen">
+      {step !== 5 && <aside className="wizard-side-summary" aria-label="Aktuelle Einstellungen">
         <div className="wizard-side-summary-heading">
           <div>
             <span className="wizard-side-kicker">Während der Erstellung</span>
@@ -1985,7 +2017,7 @@ export function CreateTournamentPage() {
           </div>
         )}
         <p className="wizard-side-footnote">Klicke auf eine bereits erreichte Einstellung, um sie direkt zu ändern.</p>
-      </aside>
+      </aside>}
       <div className="wizard-side-actions">
         {step === 2 && !participantsValid && (
           <span className="wizard-validation-message">
@@ -1999,7 +2031,7 @@ export function CreateTournamentPage() {
           <button className="btn" type="button" onClick={goBack} disabled={step === 1}>← Zurück</button>
         {step === 4 && <button className="btn wizard-skip-schedule" type="button" onClick={() => submitTournament(true)} disabled={!canCreate}>Ohne Zeitplan erstellen</button>}
         {step < 5 ? (
-          <button className="btn primary wizard-continue-button" type="button" onClick={goNext} disabled={!canContinue}>{step === 4 ? 'Weiter zum Zeitplan →' : 'Weiter →'}</button>
+          <button className="btn primary wizard-continue-button" type="button" onClick={goNext} disabled={!canContinue}>{step === 4 ? 'Weiter zur Zusammenfassung →' : 'Weiter →'}</button>
         ) : (
           <button className="btn primary wizard-continue-button" type="button" onClick={() => submitTournament(false)} disabled={!canCreate || scheduleIssues.length > 0}>Turnier erstellen</button>
         )}
