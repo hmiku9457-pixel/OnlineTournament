@@ -70,8 +70,31 @@ try {
   assert.equal(await page.locator('.participant-roster-row').count(), 4, 'draft survives browser reload');
   await next(page);
   await page.waitForSelector('.format-step');
+  // Recommendation settings are directly editable and expose bounded
+  // + / - actions. The duration is a soft preference, not a hard filter.
+  assert.equal(await page.locator('#preferred-duration').innerText(), '03:30');
+  await page.getByRole('button', { name: 'Geplante Turnierdauer um 15 Minuten erhöhen' }).click();
+  assert.equal(await page.locator('#preferred-duration').innerText(), '03:45');
+  await page.getByRole('button', { name: 'Geplante Turnierdauer um 15 Minuten verringern' }).click();
+  assert.equal(await page.locator('#preferred-duration').innerText(), '03:30');
+  await page.locator('#preferred-duration').click();
+  const durationDialog = page.getByRole('dialog', { name: 'Geplante Turnierdauer' });
+  await durationDialog.waitFor();
+  await durationDialog.getByLabel('Stunden (0–23)').fill('2');
+  await durationDialog.getByLabel('Minuten (0–59)').fill('10');
+  await durationDialog.getByRole('button', { name: 'Übernehmen' }).click();
+  assert.equal(await page.locator('#preferred-duration').innerText(), '02:10');
+  const swissBefore = Number(await page.locator('#max-swiss-rounds').inputValue());
+  await page.getByRole('button', { name: 'Maximale Schweizer Runden erhöhen' }).click();
+  assert.equal(Number(await page.locator('#max-swiss-rounds').inputValue()), swissBefore + 1);
+  await page.getByRole('button', { name: 'Maximale Schweizer Runden verringern' }).click();
+  assert.equal(Number(await page.locator('#max-swiss-rounds').inputValue()), swissBefore);
+  await page.reload();
+  await page.waitForSelector('.format-step');
+  assert.equal(await page.locator('#preferred-duration').innerText(), '02:10',
+    'chosen duration must persist in the saved creation draft');
   assert.match(await page.locator('.format-settings-head').innerText(),
-    /Vorschläge bis 3,5 Stunden werden bevorzugt/,
+    /Passe die Vorschläge an deine Veranstaltung an/,
     'the general recommendation policy belongs in the settings panel');
   const firstSuggestion = page.locator('.recommendation-list .recommendation').first();
   assert.doesNotMatch(await firstSuggestion.innerText(),
