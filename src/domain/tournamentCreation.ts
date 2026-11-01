@@ -134,7 +134,8 @@ export function isValidSwissRoundCount(rounds: number, entrantCount: number): bo
 
 export function recommendedSwissRounds(entrantCount: number, minimumMatches = 1): number {
   const entrants = Math.max(2, Math.trunc(entrantCount));
-  const desired = Math.max(Math.ceil(Math.log2(entrants)), Math.max(1, Math.trunc(minimumMatches)));
+  const desired = Math.max(Math.ceil(Math.log2(entrants)),
+    Math.max(1, Math.trunc(minimumMatches)) + entrants % 2);
   // Repeated pairings become unavoidable past n-1 rounds; the editor allows 30.
   return Math.max(1, Math.min(30, entrants - 1, desired));
 }
