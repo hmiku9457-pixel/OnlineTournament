@@ -240,6 +240,20 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
   return { items, estimatedEnd: toLocalDateTime(cursor), warnings };
 }
 
+/**
+ * Pause time that occupies a scheduled tournament day.
+ * Overnight/day-change gaps only separate calendar days; they do not count
+ * toward the planned tournament duration or its break total.
+ * Includes both standalone breaks and breaks between rounds.
+ */
+export function plannedActiveBreakMinutes(timeline: PlannedTimeline): number {
+  return timeline.items.reduce((total, item) => {
+    if (item.type !== 'break' || item.breakKind === 'overnight'
+      || !Number.isFinite(item.durationMinutes) || item.durationMinutes === undefined) return total;
+    return total + Math.max(0, Math.round(item.durationMinutes));
+  }, 0);
+}
+
 /** Backwards-compatible helper for templates and external callers. */
 export function suggestPlannedSchedule(start: string, phases: SchedulePhaseProposal[]): PlannedScheduleItem[] {
   return buildPlannedTimeline(start, phases).items;
