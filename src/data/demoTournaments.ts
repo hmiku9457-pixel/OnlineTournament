@@ -34,6 +34,8 @@ export interface DemoTournament {
   venueLayout?: VenueLayout;
   matchDurationMinutes?: number;
   venueTurnoverMinutes?: number;
+  /** Planning target carried into later pre-start changes. */
+  minimumMatches?: number;
   /** Local wall-clock date/time, YYYY-MM-DDTHH:mm (not a UTC instant). */
   scheduledStart?: string;
   /** Optional, non-binding public itinerary; never controls stage starts. */
