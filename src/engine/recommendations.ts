@@ -237,6 +237,8 @@ export function recommendTournamentFormats(
   const tripleSwissRounds = calculateSwissPlan(tripleSwissEntrants, minimumMatches, settings.maxSwissRounds);
 
   function addRecommendation(candidate: Omit<FormatRecommendation, 'estimatedDurationMinutes' | 'estimatedMatches'>) {
+    // A group stage requires at least two real groups with two participants each.
+    if (candidate.phases.some((phase) => phase.type === 'GROUPS' && (phase.entrantCount ?? playerCount) < 4)) return;
     // Any change of competition system must eliminate at least one participant.
     if (candidate.phases.length > 1 && candidate.phases.some((phase, index) =>
       index > 0 && (phase.entrantCount ?? playerCount) >= (candidate.phases[index - 1].entrantCount ?? playerCount))) return;
