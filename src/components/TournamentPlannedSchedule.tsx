@@ -30,9 +30,11 @@ export function TournamentPlannedSchedule({ scheduledStart, items = [], title = 
             {grouped.multipleDays && <h3 className="planned-schedule-day-heading">{day.label}</h3>}
             <ol className="planned-schedule-day-entries">{day.items.map((item) => (
               <li className={`planned-schedule-item planned-schedule-${item.type}`} key={item.id}>
-                {item.type === 'break'
-                  ? <span className="planned-schedule-duration">{formatPlannedBreakDuration(item)}</span>
-                  : <time dateTime={item.at}>{formatPlannedClockTime(item.at)}</time>}
+                {item.type === 'break' && item.breakKind === 'overnight'
+                  ? <span className="planned-schedule-duration">Ende ca. {formatPlannedClockTime(item.at)}</span>
+                  : item.type === 'break'
+                    ? <span className="planned-schedule-duration">{formatPlannedBreakDuration(item)}</span>
+                    : <time dateTime={item.at}>{formatPlannedClockTime(item.at)}</time>}
                 <div><strong>{item.title}</strong>{item.note && <p>{item.note}</p>}</div>
               </li>
             ))}</ol>
