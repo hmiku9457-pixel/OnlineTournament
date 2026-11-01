@@ -422,6 +422,10 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     }
     return draft;
   });
+  const [prestartRecovered] = useState(() => {
+    if (!prestart || typeof window === 'undefined') return false;
+    return Boolean(loadCreationDraft(window.sessionStorage, `online-tournament:prestart-recovery:${prestart.tournament.id}`));
+  });
   const [creationError, setCreationError] = useState<string | null>(null);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   const [namedDraftMessage, setNamedDraftMessage] = useState('');
@@ -1399,6 +1403,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
         <div className="creation-page-heading">
           <h1>Phasen vor Turnierstart bearbeiten</h1>
           <p className="muted">Dieselben Einstellungen wie bei der Turniererstellung. Die neue Planung übernimmt alle {prestart.activeParticipants} aktiven Teilnehmer.</p>
+          {prestartRecovered && <p className="callout" role="status">Deine zuvor ungespeicherte Phasenplanung wurde aus dieser Browsersitzung wiederhergestellt. Sie ist noch nicht endgültig gespeichert.</p>}
         </div>
         <button className="btn" type="button" onClick={() => prestartDirty
           ? setConfirmPrestartDiscard(true) : discardPrestartEditing()}>Bearbeitung schließen</button>
@@ -2691,7 +2696,8 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       {overwriteTournamentId && <div className="prototype-modal-backdrop" role="presentation">
         <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="overwrite-tournament-title">
           <h2 id="overwrite-tournament-title">Vorhandenes Turnier überschreiben?</h2>
-          <p>Ein noch nicht gestartetes Turnier mit dem Namen „{name.trim()}“ ist bereits gespeichert. Beim Überschreiben wird das bisherige Turnier durch die neue Planung ersetzt. Vorstart-Auslosungen und frühere Einstellungen werden verworfen.</p>
+          <p>Ein noch nicht gestartetes Turnier mit dem Namen „{name.trim()}“ ist bereits gespeichert. Beim Überschreiben wird das alte Turnier durch ein <strong>neues Turnier mit neuer Kennung</strong> ersetzt.</p>
+          <p>Die alte Teilnehmerliste, individuell vergebenen Spielercodes, Auslosungen, gespeicherten Vorstart-Einstellungen und der bisherige Direktlink werden dabei nicht übernommen. Alte lokale Turnierdaten werden bereinigt. Andere Turniere bleiben unverändert.</p>
           <div className="actions">
             <button className="btn danger" type="button" onClick={() => {
               const id = overwriteTournamentId;
