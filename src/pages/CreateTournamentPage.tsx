@@ -29,7 +29,10 @@ import {
 } from '@/domain/tournamentCreation';
 import type { Discipline, StageType } from '@/domain/types';
 import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/recommendations';
-import { createMockTournament } from '@/services/mockTournamentStore';
+import { createMockTournament, updatePrestartTournamentPhases } from '@/services/mockTournamentStore';
+import type { DemoTournament } from '@/data/demoTournaments';
+import { initialPrestartPhases, validatePrestartPhases, type PrestartPhaseDraft } from '@/domain/prestartPhasePlanning';
+import { findSportOption } from '@/domain/sports';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { formatPhaseOverview } from '@/domain/creationOverview';
 import { CREATION_DRAFT_KEY, loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence, getSavedCreationDraft, saveNamedCreationDraft, removeSavedCreationDraft, type CreationDraft } from '@/domain/creationDraft';
@@ -349,12 +352,53 @@ function NumberChoice({
   );
 }
 
-export function CreateTournamentPage() {
+export interface PrestartPhaseMode {
+  tournament: DemoTournament;
+  activeParticipants: number;
+  withdrawnParticipants: number;
+  onSaved: () => void;
+  onCancel: () => void;
+}
+
+/** The same creation phase editor is used by the pre-start director.
+ * Its surrounding wizard and summary card are hidden in pre-start mode. */
+export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMode } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const savedDraftId = new URLSearchParams(location.search).get('draft');
   const sessionDraftKey = `${CREATION_DRAFT_KEY}:${savedDraftId ?? 'new'}`;
   const [restoredDraft] = useState(() => {
+    if (prestart) {
+      const t = prestart.tournament;
+      const phases = initialPrestartPhases(t);
+      const sportId = findSportOption(t.sport)?.id ?? 'table_tennis';
+      const players = Array.from({ length: prestart.activeParticipants }, (_, index) => ({
+        id: `participant-${index + 1}`, firstName: 'Teilnehmer',
+        lastName: String(index + 1), partnerFirstName: 'Partner', partnerLastName: String(index + 1),
+        teamName: `Mannschaft ${index + 1}`,
+      }));
+      phaseSequence = Math.max(phaseSequence, phases.length);
+      const initial: CreationDraft = {
+        step: 4, maxReachedStep: 5, hasVisitedPhaseStep: true,
+        name: t.name, scheduledDate: t.scheduledStart?.slice(0, 10) ?? '',
+        scheduledTime: t.scheduledStart?.slice(11, 16) ?? '09:00',
+        useCurrentTime: false, sport: sportId, discipline: t.discipline,
+        timedMatchMinutes: String(t.matchDurationMinutes ?? 15),
+        venueTurnoverMinutes: String(t.venueTurnoverMinutes ?? 0),
+        tables: t.tables, customTables: true, venueLayoutEnabled: Boolean(t.venueLayout),
+        venueLayout: t.venueLayout ?? createVenueLayout(t.tables),
+        participants: players, participantForm: emptyParticipantFields(), editingParticipantId: null,
+        minimumMatches: t.minimumMatches ?? 1, customMinimumMatches: true,
+        phaseDrafts: phases.map((phase, index) => ({
+          ...phase, nextDayDate: phase.nextDayDate ?? '',
+          customEntrants: index > 0 && !knockoutEntrantPresets(phases[index - 1].entrantCount).includes(phase.entrantCount),
+        })),
+        selectedRecommendationId: null, enabledSystems: initialEnabledSystems,
+        maxGroups: null, maxSwissRounds: null, knockoutQualifierCount: null,
+        preferredDurationMinutes: DEFAULT_RECOMMENDATION_DURATION, awardsEnabled: false, awardsAtOverride: null,
+      };
+      return initial;
+    }
     const draft = loadCreationDraft(typeof window !== 'undefined' ? window.sessionStorage : undefined, sessionDraftKey)
       ?? (savedDraftId ? getSavedCreationDraft(savedDraftId)?.draft ?? null : loadCreationDraft());
     if (draft) {
@@ -366,6 +410,9 @@ export function CreateTournamentPage() {
   const [creationError, setCreationError] = useState<string | null>(null);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   const [namedDraftMessage, setNamedDraftMessage] = useState('');
+  const [confirmPrestartSave, setConfirmPrestartSave] = useState(false);
+  const [confirmPrestartDiscard, setConfirmPrestartDiscard] = useState(false);
+  const [prestartSaveError, setPrestartSaveError] = useState('');
   const [step, setStep] = useState<WizardStep>((restoredDraft?.step ?? 1) as WizardStep);
   const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>((restoredDraft?.maxReachedStep ?? 1) as WizardStep);
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(restoredDraft?.hasVisitedPhaseStep ?? false);
@@ -492,8 +539,32 @@ export function CreateTournamentPage() {
     knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
   ]);
   useEffect(() => {
+    if (prestart) return; // Never save a director's prestart edits as a new tournament draft.
     setDraftSaveFailed(!saveCreationDraft(draftSnapshot, window.sessionStorage, sessionDraftKey));
-  }, [draftSnapshot, sessionDraftKey]);
+  }, [draftSnapshot, sessionDraftKey, prestart]);
+
+  const originalPrestartPhases = useRef(prestart ? JSON.stringify(initialPrestartPhases(prestart.tournament)) : '');
+  const prestartPhaseDrafts: PrestartPhaseDraft[] = phaseDrafts.map((phase) => ({
+    id: phase.id, type: phase.type, label: phase.label, entrantCount: phase.entrantCount,
+    bestOf: phase.bestOf, groupCount: phase.groupCount, swissRounds: phase.swissRounds,
+    knockoutBestOf: phase.knockoutBestOf, breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
+    nextDayDate: phase.nextDayDate, nextDayStart: phase.nextDayStart, breakUntil: phase.breakUntil,
+    note: phase.note, inlineBreakAfterRound: phase.inlineBreakAfterRound,
+    inlineBreakKind: phase.inlineBreakKind, inlineBreakMinutes: phase.inlineBreakMinutes,
+    inlineBreakUntil: phase.inlineBreakUntil,
+  }));
+  const prestartDirty = Boolean(prestart && JSON.stringify(prestartPhaseDrafts) !== originalPrestartPhases.current);
+  function savePrestartPhases() {
+    if (!prestart || prestartIssues.length) return;
+    if (!confirmPrestartSave) { setConfirmPrestartSave(true); return; }
+    const result = updatePrestartTournamentPhases(prestart.tournament.id, prestartPhaseDrafts);
+    if (!result.ok) {
+      setPrestartSaveError(result.error ?? 'Die Phasen konnten nicht gespeichert werden.');
+      setConfirmPrestartSave(false);
+      return;
+    }
+    prestart.onSaved();
+  }
 
   function saveNamedDraft(copy = false) {
     try {
@@ -1165,6 +1236,9 @@ export function CreateTournamentPage() {
     || (plannedTimeline.estimatedEnd && awardsAt < plannedTimeline.estimatedEnd))
     ? 'Die Siegerehrung muss am oder nach dem voraussichtlichen Turnierende liegen.' : null;
   const scheduleIssues = [...validatePlannedSchedule(plannedSchedule), ...plannedTimelineConflicts(plannedTimeline), ...(ceremonyIssue ? [ceremonyIssue] : [])];
+  const prestartIssues = prestart
+    ? [...validatePrestartPhases(prestartPhaseDrafts, prestart.activeParticipants), ...plannedTimelineConflicts(plannedTimeline)]
+    : [];
   const overnightDatesValid = phaseDrafts.every((phase, index) => {
     if (phase.type !== 'BREAK' || phase.breakKind !== 'overnight') return true;
     const plannedStart = plannedTimeline.items.find((item) => item.id === 'phase-' + (index + 1))?.at;
