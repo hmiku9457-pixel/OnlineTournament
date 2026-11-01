@@ -1118,14 +1118,14 @@ export function CreateTournamentPage() {
                 <label htmlFor="tournament-date">Turnierdatum <span className="wizard-required-mark" aria-hidden="true">*</span></label>
                 <CalendarDatePicker id="tournament-date" label="Turnierdatum" required value={scheduledDate} minDate={currentLocalMinute.slice(0, 10)} onChange={setScheduledDate} />
                 {dateIsPast && <span className="field-hint wizard-review-warning" role="status">Der Turnierstart darf nicht in der Vergangenheit liegen. Wähle eine spätere Uhrzeit oder verwende „Jetzt“.</span>}
-                <span className="field-hint">Geplantes Datum für die Ankündigung und den Zeitplan. Den tatsächlichen Turnierstart legt die Turnierleitung fest.</span>
+                <span className="field-hint wizard-date-hint">Geplantes Datum für die Ankündigung und den Zeitplan. Den tatsächlichen Turnierstart legt die Turnierleitung fest.</span>
               </div>
               <div className="field">
                 <label htmlFor="tournament-start-time">Geplanter Turnierbeginn <span className="wizard-required-mark" aria-hidden="true">*</span></label>
                 <ClockTimePicker id="tournament-start-time" value={scheduledTime} onChange={setScheduledTime}
                   label="Geplanter Turnierbeginn" minTime={scheduledDate === currentLocalMinute.slice(0, 10) ? currentLocalMinute.slice(11, 16) : undefined}
                   nowTime={currentLocalMinute.slice(11, 16)} nowActive={useCurrentTime} onNow={selectCurrentTime} />
-                <span className="field-hint">„Jetzt“ aktualisiert die Uhrzeit laufend. Vergangene Startzeiten sind gesperrt.</span>
+                <span className="field-hint wizard-start-hint">Frühere Uhrzeiten sind am heutigen Tag gesperrt. „Jetzt“ übernimmt die aktuelle Uhrzeit und aktualisiert sie fortlaufend. Den tatsächlichen Spielstart löst später die Turnierleitung aus.</span>
               </div>
               <div className="field">
                 <label htmlFor="sport">Sportart <span className="wizard-required-mark" aria-hidden="true">*</span></label>
