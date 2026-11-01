@@ -10,6 +10,7 @@ const INDEX_KEY = `${STORAGE_KEY}:index:v3`;
 const DRAW_KEY = 'online-tournament:mock-draw-config:v1';
 const data = new Map<string, string>();
 let failDrawOnce = false;
+let failIndexOnce = false;
 let injectExternalDraw: (() => void) | null = null;
 const storage = {
   get length() { return data.size; },
@@ -17,6 +18,10 @@ const storage = {
   getItem(key: string) { return data.get(key) ?? null; },
   removeItem(key: string) { data.delete(key); },
   setItem(key: string, value: string) {
+    if (key === INDEX_KEY && failIndexOnce) {
+      failIndexOnce = false;
+      throw new Error('Simulierter Index-Speicherfehler');
+    }
     if (key === DRAW_KEY && failDrawOnce) {
       failDrawOnce = false;
       injectExternalDraw?.();
@@ -28,6 +33,7 @@ const storage = {
 beforeEach(() => {
   data.clear();
   failDrawOnce = false;
+  failIndexOnce = false;
   injectExternalDraw = null;
   vi.stubGlobal('window', Object.assign(new EventTarget(), { localStorage: storage }));
   vi.stubGlobal('CustomEvent', class<T> extends Event {
@@ -78,6 +84,18 @@ describe('sharded local tournament storage', () => {
     removeLocalPrototypeTournaments();
     expect(getAllMockTournaments()).toEqual([]);
     expect(data.has(`${STORAGE_KEY}:record:${a.id}`)).toBe(false);
+  });
+
+  it('retains the original tournament when replacing it fails before the new index can be saved', () => {
+    const original = createMockTournament(input('Mein Testturnier'));
+    const originalKey = `${STORAGE_KEY}:record:${original.id}`;
+    const originalData = data.get(originalKey);
+    failIndexOnce = true;
+    expect(() => createMockTournament({ ...input('Mein Testturnier'), overwriteTournamentId: original.id }))
+      .toThrow('Simulierter Index-Speicherfehler');
+    expect(data.get(originalKey)).toBe(originalData);
+    expect(getAllMockTournaments().map((item) => item.id)).toEqual([original.id]);
+    expect([...data.keys()].filter((key) => key.startsWith(`${STORAGE_KEY}:record:`))).toEqual([originalKey]);
   });
 
   it('rolls back only the failing tournament while preserving external draw edits for another event', () => {
