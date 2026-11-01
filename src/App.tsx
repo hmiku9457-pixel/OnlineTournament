@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { CreateTournamentPage } from '@/pages/CreateTournamentPage';
@@ -24,13 +24,19 @@ function TournamentControlRoute() {
   return <TournamentControlPage key={tournamentId} />;
 }
 
+function CreateTournamentRoute() {
+  const location = useLocation();
+  const draftId = new URLSearchParams(location.search).get('draft');
+  return <CreateTournamentPage key={draftId ?? 'new'} />;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route element={<AppShell />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/tournaments/new" element={<CreateTournamentPage />} />
+        <Route path="/tournaments/new" element={<CreateTournamentRoute />} />
         <Route path="/tournaments/:tournamentId" element={<TournamentPage />} />
         <Route path="/tournaments/:tournamentId/control" element={<TournamentControlRoute />} />
         <Route path="/404" element={<NotFoundPage />} />
