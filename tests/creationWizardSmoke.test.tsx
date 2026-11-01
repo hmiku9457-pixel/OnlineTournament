@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { CreateTournamentPage } from '@/pages/CreateTournamentPage';
 import { SportChangeDialog } from '@/components/SportChangeDialog';
+import { TestParticipantsDialog } from '@/components/TestParticipantsDialog';
 import { CREATION_DRAFT_KEY, type CreationDraft } from '@/domain/creationDraft';
 import { createVenueLayout } from '@/domain/venueLayout';
 
@@ -45,6 +46,25 @@ describe('five-step tournament creation smoke test', () => {
     expect(modal).toContain('>Abbrechen</button>');
     expect(modal).toContain('class="btn danger"');
     expect(modal).toContain('>Sportart wechseln</button>');
+  });
+
+  it('shows an accessible test-player modal with accurate additions and confirm/cancel actions', () => {
+    const markup = renderToStaticMarkup(createElement(TestParticipantsDialog, {
+      discipline: 'SINGLES', existingCount: 4, onCancel: () => {}, onConfirm: () => {},
+    }));
+    expect(markup).toContain('role="dialog"');
+    expect(markup).toContain('aria-modal="true"');
+    expect(markup).toContain('19 Testspieler erzeugen?');
+    expect(markup).toContain('Werden ergänzt: ');
+    expect(markup).toContain('<strong>15</strong>');
+    expect(markup).toContain('15 Testspieler hinzufügen');
+    expect(markup).toContain('>Abbrechen</button>');
+    expect(markup).not.toContain('window.confirm');
+
+    const doubles = renderToStaticMarkup(createElement(TestParticipantsDialog, {
+      discipline: 'DOUBLES', existingCount: 0, onCancel: () => {}, onConfirm: () => {},
+    }));
+    expect(doubles).toContain('19 Testdoppel erzeugen?');
   });
 
   it('only mentions affected data in the sport-change dialog', () => {
@@ -95,5 +115,14 @@ describe('five-step tournament creation smoke test', () => {
     expect(html).toContain('Jeder gegen jeden');
     expect(html).toContain('Turnier erstellen');
     expect(html).not.toContain('Während der Erstellung');
+    // This warning is displayed as a separate, highlighted card in the
+    // persistent summary rather than as a plain note below the duration.
+    draft.step = 4;
+    draft.minimumMatches = 4;
+    const phaseMarkup = renderWizard();
+    expect(phaseMarkup).toContain('class="wizard-side-minimum-warning"');
+    expect(phaseMarkup).toContain('Mindestspielzahl nicht erreicht');
+    expect(phaseMarkup).toContain('Garantiert <b>1</b> von gewünschten <b>4</b>');
+    expect(phaseMarkup).toContain('Phasenplanung prüfen');
   });
 });
