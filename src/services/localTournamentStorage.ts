@@ -223,6 +223,7 @@ async function refreshCanonical(): Promise<void> {
   quarantine = canonical.quarantined;
   const valid = await quarantineInvalidEntries(canonical.entries);
   replaceLocalSnapshot(valid);
+  window.dispatchEvent(new Event('tournament-canonical-refresh'));
   window.dispatchEvent(new Event('mock-runtime-change'));
   window.dispatchEvent(new Event('mock-draw-change'));
   window.dispatchEvent(new Event('mock-phase-change'));
