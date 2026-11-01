@@ -471,19 +471,15 @@ export function CreateTournamentPage() {
       Math.max(MIN_RECOMMENDATION_DURATION, value + delta)));
   }
 
-  // Drafts are restored synchronously on first render, so the first autosave
-  // cannot replace a valid draft with the wizard's empty initial values.
-  useEffect(() => {
-    const saved = saveCreationDraft({
-      step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
-      sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
-      customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
-      editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts,
-      selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
-      knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
-    });
-    setDraftSaveFailed(!saved);
-  }, [
+  // Temporary recovery stays per tab. Saved, named drafts live separately.
+  const draftSnapshot = useMemo<CreationDraft>(() => ({
+    step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
+    sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
+    customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
+    editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts,
+    selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
+    knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
+  }), [
     step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
     sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
     customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
@@ -491,6 +487,25 @@ export function CreateTournamentPage() {
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
     knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
   ]);
+  useEffect(() => {
+    setDraftSaveFailed(!saveCreationDraft(draftSnapshot, window.sessionStorage, sessionDraftKey));
+  }, [draftSnapshot, sessionDraftKey]);
+
+  function saveNamedDraft(copy = false) {
+    try {
+      const data = copy
+        ? { ...draftSnapshot, name: draftSnapshot.name.trim() ? `${draftSnapshot.name.trim()} (Kopie)` : 'Turnierentwurf (Kopie)' }
+        : draftSnapshot;
+      const id = saveNamedCreationDraft(data, copy ? null : savedDraftId);
+      setNamedDraftMessage(copy ? 'Kopie als neuer Entwurf gespeichert.' : 'Entwurf gespeichert.');
+      if (copy || id !== savedDraftId) {
+        clearCreationDraft(window.sessionStorage, sessionDraftKey);
+        navigate(`/tournaments/new?draft=${encodeURIComponent(id)}`, { replace: !copy });
+      }
+    } catch (error) {
+      setNamedDraftMessage(error instanceof Error ? error.message : 'Entwurf konnte nicht gespeichert werden.');
+    }
+  }
 
   const editingSavedParticipant = participants.find((participant) => participant.id === editingParticipantId);
   const participantEditorDirty = Object.keys(emptyParticipantFields()).some((field) => {
