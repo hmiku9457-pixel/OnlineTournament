@@ -72,6 +72,30 @@ describe('creation review regressions', () => {
     expect(getAllMockTournaments().map((t) => t.id)).toEqual([replacement.id]);
   });
 
+  it('cleans replaced tournament snapshots but preserves all other events', () => {
+    const first = createMockTournament(input);
+    const second = createMockTournament({ ...input, name: 'Anderes Turnier' });
+    const fixturesKey = 'online-tournament:mock-draw-config:v1';
+    const resultsKey = 'online-tournament:mock-match-results:v2';
+    const withdrawKey = 'online-tournament:withdrawn-participants:v1';
+    data.set(fixturesKey, JSON.stringify([
+      { tournamentId: first.id, stageId: first.stages[0].id },
+      { tournamentId: second.id, stageId: second.stages[0].id },
+    ]));
+    data.set(resultsKey, JSON.stringify([
+      { matchId: `${first.stages[0].id}-sw-r1-m1`, status: 'FINISHED' },
+      { matchId: `${second.stages[0].id}-sw-r1-m1`, status: 'WAITING' },
+    ]));
+    data.set(withdrawKey, JSON.stringify({ [first.id]: ['Anna A'], [second.id]: ['Bert B'] }));
+    createMockTournament({ ...input, overwriteTournamentId: first.id });
+    expect(JSON.parse(data.get(fixturesKey) ?? '[]')).toEqual([{ tournamentId: second.id, stageId: second.stages[0].id }]);
+    expect(JSON.parse(data.get(resultsKey) ?? '[]')).toEqual([
+      { matchId: `${second.stages[0].id}-sw-r1-m1`, status: 'WAITING' },
+    ]);
+    expect(JSON.parse(data.get(withdrawKey) ?? '{}')).toEqual({ [second.id]: ['Bert B'] });
+    expect(getAllMockTournaments()).toHaveLength(2);
+  });
+
   it('never overwrites a started tournament, even when an overwrite ID was confirmed earlier', () => {
     const original = createMockTournament(input);
     updateMockTournamentStatus(original.id, 'RUNNING');
