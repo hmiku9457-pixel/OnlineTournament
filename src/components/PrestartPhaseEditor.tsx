@@ -223,7 +223,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                       <span className="prestart-editor-number">{index + 1}</span>
                       <span className="prestart-editor-title"><strong>{phase.label || stageLabel(phase.type)}</strong>
                         <small>{phase.type === 'BREAK'
-                          ? phase.breakKind === 'overnight' ? `Spieltagsende · morgen ${phase.nextDayStart} Uhr` : phase.breakKind === 'until' ? `Pause bis ${phase.breakUntil} Uhr` : `${phase.breakMinutes} Minuten`
+                          ? phase.breakKind === 'overnight' ? `Spieltagsende · ${phase.nextDayDate || 'Folgetag'} ${phase.nextDayStart} Uhr` : phase.breakKind === 'until' ? `Pause bis ${phase.breakUntil} Uhr` : `${phase.breakMinutes} Minuten`
                           : `${phase.entrantCount} Teilnehmer${phase.type === 'GROUPS' ? ` · ${phase.groupCount} Gruppen` : ''}${phase.type === 'SWISS' ? ` · ${phase.swissRounds} Runden` : ''}`}
                         </small>
                       </span>
