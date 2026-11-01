@@ -55,7 +55,7 @@ import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration }
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
 import type { MockAuditEntry } from '@/services/mockAudit';
 
-type ControlTab = 'summary' | 'overview' | 'flow' | 'matches' | 'participants' | 'final' | 'audit';
+type ControlTab = 'summary' | 'overview' | 'flow' | 'matches' | 'participants' | 'final' | 'audit' | 'prestart';
 
 const tabs: Array<{ id: ControlTab; label: string }> = [
   { id: 'summary', label: 'Übersicht' },
@@ -1221,7 +1221,7 @@ export function TournamentControlPage() {
       )}
 
       <nav className="control-tabs" aria-label="Turnierleitungsbereiche">
-        {(anyCompletedPhase ? [...tabs, { id: 'final' as const, label: 'Endplatzierungen' }] : tabs).map((item) => (
+        {([...tabs, ...(showPrestartPhaseEditor && !tournament.hasStarted ? [{ id: 'prestart' as const, label: 'Phasen bearbeiten' }] : []), ...(anyCompletedPhase ? [{ id: 'final' as const, label: 'Endplatzierungen' }] : [])]).map((item) => (
           <button className={tab === item.id ? 'control-tab active' : 'control-tab'} key={item.id} type="button" aria-current={tab === item.id ? 'page' : undefined} onClick={() => setTab(item.id)}>{item.label}</button>
         ))}
       </nav>
@@ -1281,12 +1281,16 @@ export function TournamentControlPage() {
           onStage={(stage) => { setSelectedStageId(stage.id); setTab('flow'); }}
           onFinalStandings={() => setTab('final')}
           onEditPhases={!tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status)
-            ? () => setShowPrestartPhaseEditor((value) => !value) : undefined}
+            ? () => { setShowPrestartPhaseEditor(true); setTab('prestart'); } : undefined}
           activeParticipants={activePrestartParticipants}
           withdrawnParticipants={participants.length - activePrestartParticipants}
           phasesNeedReview={Boolean(firstPhaseRecommendationWarning)}
         />
-        {showPrestartPhaseEditor && !tournament.hasStarted && (
+
+        </>
+      )}
+
+        {tab === 'prestart' && showPrestartPhaseEditor && !tournament.hasStarted && (
           <PrestartPhaseEditor
             key={tournament.id}
             tournament={tournament}
@@ -1294,15 +1298,14 @@ export function TournamentControlPage() {
             withdrawnParticipants={participants.length - activePrestartParticipants}
             onSaved={() => {
               setShowPrestartPhaseEditor(false);
+              setTab('summary');
               setSelectedStageId(tournament.stages[0]?.id ?? '');
               setDrawVersion((value) => value + 1);
               refreshRuntime();
             }}
-            onCancel={() => setShowPrestartPhaseEditor(false)}
+            onCancel={() => { setShowPrestartPhaseEditor(false); setTab('summary'); }}
           />
         )}
-        </>
-      )}
 
       {tab === 'overview' && (
         <section className="control-overview-stack">
@@ -1520,7 +1523,7 @@ export function TournamentControlPage() {
             </div>
             {!tournament.hasStarted && ['DRAFT', 'REGISTRATION', 'READY'].includes(tournament.status) && (
               <button type="button" className="btn small no-print"
-                onClick={() => { setTab('summary'); setShowPrestartPhaseEditor(true); }}>
+                onClick={() => { setShowPrestartPhaseEditor(true); setTab('prestart'); }}>
                 Phasen vor Start bearbeiten
               </button>
             )}
