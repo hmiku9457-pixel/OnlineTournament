@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { DashboardPage } from '@/pages/DashboardPage';
@@ -10,6 +11,8 @@ import { SpectatorPage } from '@/pages/SpectatorPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
+import { getSavedCreationDraftAtomic } from '@/domain/savedCreationDraftStore';
+import type { SavedCreationDraft } from '@/domain/creationDraft';
 
 /** Force a fresh controller instance when navigating from tournament A to B.
  * React Router otherwise reuses the same component for the parameterized
@@ -24,10 +27,29 @@ function TournamentControlRoute() {
   return <TournamentControlPage key={tournamentId} />;
 }
 
+function DraftEditorLoader({ draftId }: { draftId: string }) {
+  const [saved, setSaved] = useState<SavedCreationDraft | null | undefined>();
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    getSavedCreationDraftAtomic(draftId).then((draft) => {
+      if (!cancelled) setSaved(draft);
+    }).catch(() => {
+      if (!cancelled) setError('Die gespeicherten Entwürfe konnten nicht geöffnet werden. Bitte Browser-Speicher prüfen.');
+    });
+    return () => { cancelled = true; };
+  }, [draftId]);
+  if (error) return <div className="card" role="alert">{error}</div>;
+  if (saved === undefined) return <p role="status">Gespeicherten Entwurf öffnen …</p>;
+  if (saved === null) return <div className="card" role="alert">Dieser Entwurf ist nicht mehr vorhanden. Bitte einen anderen Entwurf auswählen.</div>;
+  return <CreateTournamentPage key={draftId} initialNamedDraft={saved} />;
+}
+
 function CreateTournamentRoute() {
   const location = useLocation();
   const draftId = new URLSearchParams(location.search).get('draft');
-  return <CreateTournamentPage key={draftId ?? 'new'} />;
+  return draftId ? <DraftEditorLoader key={draftId} draftId={draftId} />
+    : <CreateTournamentPage key="new" />;
 }
 
 export default function App() {
