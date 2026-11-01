@@ -219,11 +219,9 @@ export function recommendTournamentFormats(
   if (playerCount < 2 || tableCount < 1) return [];
 
   const recommendations: FormatRecommendation[] = [];
-  // Preserve comparable format suggestions for sports with much longer sets.
-  // Explicitly configured duration limits remain absolute minutes.
-  const durationScale = Math.max(1, Math.max(1, input.matchDurationMinutes ?? MINUTES_PER_SET) / MINUTES_PER_SET);
-  const maxDuration = settings.maxRecommendedDurationMinutes
-    ?? Math.round(DEFAULT_MAX_RECOMMENDED_DURATION_MINUTES * durationScale);
+  // Prefer formats within 3.5 hours, but fill the list to five with longer
+  // feasible alternatives if the primary window does not yield enough.
+  const maxDuration = settings.maxRecommendedDurationMinutes ?? DEFAULT_MAX_RECOMMENDED_DURATION_MINUTES;
   const group = calculateGroupPlan(playerCount, minimumMatches, settings.maxGroups);
   const swiss = calculateSwissPlan(playerCount, minimumMatches, settings.maxSwissRounds);
   const defaultQualifiers = playerCount >= 16 ? 8 : 4;
@@ -264,7 +262,7 @@ export function recommendTournamentFormats(
       : Math.round(baselineDuration * (Math.max(1, input.matchDurationMinutes ?? 15) + Math.max(0, input.venueTurnoverMinutes ?? 0)) / MINUTES_PER_SET);
     const estimatedMatches = totalEstimatedMatches(candidate.phases, playerCount);
 
-    if (estimatedDurationMinutes > maxDuration) return;
+    if (settings.maxRecommendedDurationMinutes !== undefined && estimatedDurationMinutes > maxDuration) return;
 
     // Byes are rankings credits, not played matches. Eliminated players
     // cannot rely on fixtures in subsequent phases.
@@ -395,5 +393,12 @@ export function recommendTournamentFormats(
     });
   }
 
-  return recommendations.sort((a, b) => b.score - a.score || a.estimatedDurationMinutes - b.estimatedDurationMinutes);
+  const byPreference = (a: FormatRecommendation, b: FormatRecommendation) =>
+    b.score - a.score || a.estimatedDurationMinutes - b.estimatedDurationMinutes;
+  const withinWindow = recommendations.filter((item) => item.estimatedDurationMinutes <= maxDuration).sort(byPreference);
+  const longer = recommendations.filter((item) => item.estimatedDurationMinutes > maxDuration)
+    .sort((a, b) => a.estimatedDurationMinutes - b.estimatedDurationMinutes || byPreference(a, b));
+  return settings.maxRecommendedDurationMinutes === undefined
+    ? [...withinWindow, ...longer.slice(0, Math.max(0, 5 - withinWindow.length))].slice(0, 5)
+    : withinWindow;
 }
