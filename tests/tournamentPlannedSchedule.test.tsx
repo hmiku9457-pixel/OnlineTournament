@@ -50,7 +50,7 @@ describe('optionaler vorläufiger Zeitplan', () => {
     const group = estimatePhaseMetrics({ type: 'GROUPS', entrantCount: 19, groupCount: 3, bestOf: 1 }, tables, timing);
     const swiss = estimatePhaseMetrics({ type: 'SWISS', entrantCount: 9, swissRounds: 4, bestOf: 3 }, tables, timing);
     const knockout = estimatePhaseMetrics({ type: 'KNOCKOUT', entrantCount: 8, bestOf: 5 }, tables, timing);
-    expect([group.estimatedDurationMinutes, swiss.estimatedDurationMinutes, knockout.estimatedDurationMinutes]).toEqual([30, 50, 60]);
+    expect([group.estimatedDurationMinutes, swiss.estimatedDurationMinutes, knockout.estimatedDurationMinutes]).toEqual([35, 50, 60]);
 
     const timeline = buildPlannedTimeline('2026-11-01T10:00', [
       { type: 'GROUPS', label: 'Gruppenphase', estimatedMinutes: group.estimatedDurationMinutes },
@@ -60,15 +60,15 @@ describe('optionaler vorläufiger Zeitplan', () => {
     ]);
 
     expect(timeline.items.filter((item) => item.id.startsWith('phase-')).map((item) => item.at)).toEqual([
-      '2026-11-01T10:00', '2026-11-01T10:30', '2026-11-01T12:00', '2026-11-01T12:50',
+      '2026-11-01T10:00', '2026-11-01T10:35', '2026-11-01T12:00', '2026-11-01T12:50',
     ]);
     expect(timeline.estimatedEnd).toBe('2026-11-01T13:50');
     expect(timeline.warnings).toEqual([]);
     const playingMinutes = group.estimatedDurationMinutes + swiss.estimatedDurationMinutes + knockout.estimatedDurationMinutes;
     const totalMinutes = plannedTimelineDurationMinutes('2026-11-01T10:00', timeline.estimatedEnd);
-    expect(playingMinutes).toBe(140);
+    expect(playingMinutes).toBe(145);
     expect(totalMinutes).toBe(230);
-    expect(totalMinutes! - playingMinutes).toBe(90);
+    expect(totalMinutes! - playingMinutes).toBe(85);
   });
 
   it('zählt Spieltagswechsel nicht zur Spielzeit, Pausenzeit oder Gesamtdauer', () => {
@@ -416,7 +416,7 @@ describe('optionaler vorläufiger Zeitplan', () => {
     const swiss = estimatePhaseMetrics({ type: 'SWISS', entrantCount: 8, bestOf: 3, swissRounds: 4 }, 9, { minutesPerSet: 5 });
     const groups = estimatePhaseMetrics({ type: 'GROUPS', entrantCount: 8, groupCount: 2, bestOf: 1 }, 9, { minutesPerSet: 5 });
     expect(swiss.estimatedDurationMinutes).toBe(50);
-    expect(groups.estimatedDurationMinutes).toBe(10);
+    expect(groups.estimatedDurationMinutes).toBe(15);
     const time = buildPlannedTimeline('2026-11-01T10:00', [
       { label: 'Schweizer System', type: 'SWISS', estimatedMinutes: swiss.estimatedDurationMinutes },
       { label: 'Pause', type: 'BREAK', estimatedMinutes: 0, breakKind: 'until', breakUntil: '14:00' },
@@ -424,7 +424,7 @@ describe('optionaler vorläufiger Zeitplan', () => {
     ]);
     expect(time.items[1].at).toBe('2026-11-01T10:50');
     expect(time.items[2].at).toBe('2026-11-01T14:00');
-    expect(time.estimatedEnd).toBe('2026-11-01T14:10');
+    expect(time.estimatedEnd).toBe('2026-11-01T14:15');
     expect(plannedTimelineDurationMinutes('2026-11-01T10:00', time.estimatedEnd)).toBe(250);
     expect(time.warnings).toEqual([]);
   });
