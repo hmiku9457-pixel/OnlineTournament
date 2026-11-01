@@ -417,7 +417,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       return initial;
     }
     const draft = loadCreationDraft(typeof window !== 'undefined' ? window.sessionStorage : undefined, sessionDraftKey)
-      ?? (savedDraftId ? initialNamedDraft?.draft ?? null : loadCreationDraft());
+      ?? (savedDraftId ? initialNamedDraft?.draft ?? null : null);
     if (draft) {
       participantSequence = Math.max(participantSequence, highestDraftSequence(draft.participants, 'participant'));
       phaseSequence = Math.max(phaseSequence, highestDraftSequence(draft.phaseDrafts, 'phase'));
@@ -1289,7 +1289,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     try {
       if (savedDraftId) await removeSavedCreationDraftAtomic(savedDraftId, savedDraftRevision.current ?? undefined);
       clearCreationDraft(window.sessionStorage, sessionDraftKey);
-      clearCreationDraft(); // Clear any legacy single-draft recovery copy.
       if (savedDraftId) navigate('/tournaments/new', { replace: true });
       else window.location.reload();
     } catch (error) {
@@ -1354,7 +1353,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
     });
     clearCreationDraft(window.sessionStorage, sessionDraftKey);
-    clearCreationDraft();
     if (savedDraftId) {
       try {
         await removeSavedCreationDraftAtomic(savedDraftId, savedDraftRevision.current ?? undefined);
