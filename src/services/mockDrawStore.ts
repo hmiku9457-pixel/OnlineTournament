@@ -6,7 +6,7 @@ import { isStageCompleted, getPreviousCompetitionStage } from '@/services/mockPh
 import { getPhaseLifecycle, getStageEntrants, isStageEditable } from '@/services/mockPhaseLifecycle';
 import { buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
 import { recordMockAudit } from '@/services/mockAudit';
-import { refreshPrestartSchedule } from '@/services/mockTournamentStore';
+import { refreshPrestartSchedule, persistStartedGroupCount } from '@/services/mockTournamentStore';
 
 const DRAW_KEY = 'online-tournament:mock-draw-config:v1';
 
@@ -141,6 +141,29 @@ export function getGroupAssignments(tournament: DemoTournament, stage: Tournamen
   }
 
   return Object.fromEntries(participants.map((name, index) => [name, index % groupCount]));
+}
+
+/** Close empty groups at phase start and renumber the surviving groups.
+ * Assignment mapping is stored *before* reducing the configured group
+ * count, so game identifiers and displayed groups remain consistent. */
+export function compactStartedGroupAssignments(
+  tournament: DemoTournament, stage: TournamentStage, entrants: string[],
+): number {
+  if (stage.type !== 'GROUPS') return 0;
+  const assignments = getGroupAssignments(tournament, stage);
+  const count = Math.max(1, Number(stage.settings.groups) || 1);
+  const occupied = Array.from({ length: count }, (_, i) => i)
+    .filter((i) => entrants.some((name) => assignments[name] === i));
+  if (occupied.length === count) return count;
+  const offsets = new Map(occupied.map((original, index) => [original, index]));
+  const compact = Object.fromEntries(entrants.map((name) =>
+    [name, offsets.get(assignments[name] ?? 0) ?? 0]));
+  const existing = findConfig(tournament.id, stage.id);
+  upsert({ ...existing, tournamentId: tournament.id, stageId: stage.id, groupAssignments: compact });
+  stage.settings.groups = occupied.length;
+  persistStartedGroupCount(tournament.id, stage.id, occupied.length);
+  auditDraw(tournament, stage, `Leere Gruppen beim Phasenstart entfernt: ${count} → ${occupied.length} Gruppen`);
+  return occupied.length;
 }
 
 export function setParticipantGroup(tournament: DemoTournament, stage: TournamentStage, participant: string, groupIndex: number) {
