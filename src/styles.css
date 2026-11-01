@@ -5814,3 +5814,184 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .calendar-picker-grid { gap: 3px; }
   .calendar-picker-month-nav { grid-template-columns: 32px minmax(0, 1fr) 72px 32px; gap: 5px; }
 }
+
+/* Erstellung Schritt 5: verdichteter Ablauf mit integrierter Siegerehrung */
+.wizard-workspace .schedule-wizard-step {
+  display: grid;
+  gap: 9px;
+}
+.wizard-workspace .schedule-wizard-step > h2 {
+  margin: 0;
+  line-height: 1.25;
+}
+.wizard-workspace .schedule-wizard-step > p.muted {
+  margin: 0 0 2px;
+  max-width: none;
+  line-height: 1.4;
+  font-size: .8rem;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-editor {
+  gap: 8px;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-editor-intro {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 3px 14px;
+  flex-wrap: wrap;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-editor-intro h3 {
+  margin: 0;
+  font-size: .95rem;
+  line-height: 1.3;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-editor-intro p {
+  margin: 0;
+  max-width: none;
+  font-size: .74rem;
+  line-height: 1.35;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-phase-row {
+  padding: 9px 12px;
+  gap: 6px 12px;
+  grid-template-columns: minmax(125px, 175px) minmax(0, 1fr);
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-phase-row strong {
+  font-size: .83rem;
+  line-height: 1.3;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-phase-row small {
+  font-size: .7rem;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-phase-row time,
+.wizard-workspace .schedule-wizard-step .planned-schedule-phase-row .planned-schedule-duration,
+.wizard-workspace .schedule-wizard-step .planned-schedule-day-end {
+  color: #284569;
+  font-weight: 800;
+  font-size: .8rem;
+  font-variant-numeric: tabular-nums;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-day-heading {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: .78rem;
+  line-height: 1.35;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-phase-row.is-ceremony {
+  display: block;
+  padding: 0;
+  background: #f7f5ff;
+  border-left: 4px solid #8a77b9;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-toggle {
+  display: grid;
+  grid-template-columns: minmax(125px, 175px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 9px 12px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #223854;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-toggle:hover { background: #f0ecff; }
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-toggle:focus-visible {
+  outline: 3px solid #baa8ee;
+  outline-offset: -3px;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-clock {
+  font-size: .8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-name {
+  min-width: 0;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-name strong { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-name small { display: block; margin-top: 3px; }
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-chevron {
+  color: #634ca4;
+  font-weight: 800;
+  font-size: .8rem;
+  white-space: nowrap;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-details {
+  padding: 11px 12px 13px;
+  border-top: 1px solid #ddd7f3;
+  background: #faf9ff;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 9px 11px;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-fields .field {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-fields label {
+  font-size: .74rem;
+  font-weight: 750;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-fields .calendar-picker-trigger,
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-fields .clock-picker-trigger,
+.wizard-workspace .schedule-wizard-step .planned-ceremony-remove {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  min-height: 46px;
+  max-height: 46px;
+}
+.wizard-workspace .schedule-wizard-step .planned-ceremony-remove {
+  width: auto;
+  padding: 8px 12px;
+  white-space: nowrap;
+  border-color: #e99188;
+  background: #fff4f2;
+  color: #b42318;
+}
+.wizard-workspace .schedule-wizard-step .planned-ceremony-remove:hover {
+  background: #fee4e2;
+  color: #912018;
+}
+.wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-details .planned-schedule-phase-warning {
+  margin: 9px 0 0;
+  font-size: .74rem;
+}
+@media (max-width: 850px) {
+  .wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wizard-workspace .schedule-wizard-step .planned-ceremony-remove { grid-column: 1 / -1; width: max-content; }
+}
+@media (max-width: 650px) {
+  .wizard-workspace .schedule-wizard-step .planned-schedule-phase-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+  .wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-toggle {
+    grid-template-columns: minmax(85px, auto) minmax(0, 1fr) auto;
+    gap: 7px;
+  }
+}
+@media (max-width: 460px) {
+  .wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-fields { grid-template-columns: minmax(0, 1fr); }
+  .wizard-workspace .schedule-wizard-step .planned-ceremony-remove { grid-column: 1; }
+  .wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-toggle {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .wizard-workspace .schedule-wizard-step .planned-schedule-ceremony-clock { grid-column: 1 / -1; }
+}
