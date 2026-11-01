@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { sidebarTournaments, type SidebarTournament } from '@/domain/sidebarTournaments';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
-import { listSavedCreationDrafts, type SavedCreationDraft } from '@/domain/creationDraft';
+import type { SavedCreationDraft } from '@/domain/creationDraft';
 import { listSavedCreationDraftsAtomic } from '@/domain/savedCreationDraftStore';
 
 type SidebarIconName = 'trophy' | 'grid' | 'plus' | 'user' | 'calendar' | 'chart' | 'settings';
@@ -76,15 +76,14 @@ export function AppShell() {
     };
   }, []);
 
-  const [savedDrafts, setSavedDrafts] = useState<SavedCreationDraft[]>(() => listSavedCreationDrafts());
+  const [savedDrafts, setSavedDrafts] = useState<SavedCreationDraft[]>([]);
   const [savedDraftStorageUnavailable, setSavedDraftStorageUnavailable] = useState(false);
   useEffect(() => {
     let cancelled = false;
     listSavedCreationDraftsAtomic().then((entries) => {
       if (!cancelled) { setSavedDrafts(entries); setSavedDraftStorageUnavailable(false); }
     }).catch(() => {
-      // Keep showing imported legacy drafts if database access was denied.
-      if (!cancelled) { setSavedDrafts(listSavedCreationDrafts()); setSavedDraftStorageUnavailable(true); }
+      if (!cancelled) { setSavedDrafts([]); setSavedDraftStorageUnavailable(true); }
     });
     return () => { cancelled = true; };
   }, [revision, location.key]);
@@ -109,7 +108,7 @@ export function AppShell() {
               <NavLink to="/tournaments/new"><SidebarIcon name="plus"/><span>Turnier erstellen</span></NavLink>
               <NavLink to="/login" className="sidebar-mobile-login"><SidebarIcon name="user"/><span>Anmelden</span></NavLink>
             </nav>
-            {savedDrafts.length > 0 && (
+            {(savedDrafts.length > 0 || savedDraftStorageUnavailable) && (
               <div className="sidebar-live-section sidebar-drafts-section" aria-label="Turnierentwürfe">
                 <div className="sidebar-section-heading">
                   <h3>Turnierentwürfe</h3>
@@ -117,7 +116,7 @@ export function AppShell() {
                 </div>
                 {savedDraftStorageUnavailable && <p className="sidebar-storage-warning" role="alert">
                   Gespeicherte Entwürfe sind momentan nicht verfügbar: Der Browser blockiert IndexedDB.
-                  Die angezeigten Einträge sind nur eine lokale Übersicht und lassen sich erst nach Freigabe des Browserspeichers wieder bearbeiten.
+                  Die Entwurfsliste lässt sich erst nach Freigabe des Browserspeichers wieder öffnen.
                 </p>}
                 <div className="sidebar-live-items">
                   {savedDrafts.map((item) => {
@@ -126,12 +125,9 @@ export function AppShell() {
                       <span className="sidebar-live-phase">{item.draft.participants.length} Teilnehmer · Schritt {item.draft.step}/5</span>
                       <span className="sidebar-live-progress-label">Zuletzt gespeichert: {new Date(item.savedAt).toLocaleString('de-DE')}</span>
                     </>;
-                    return savedDraftStorageUnavailable
-                      ? <div key={item.id} className="sidebar-live-item sidebar-draft-item is-unavailable" aria-disabled="true"
-                          title="Entwurf derzeit nicht verfügbar">{content}</div>
-                      : <Link key={item.id} className="sidebar-live-item sidebar-draft-item"
-                          to={`/tournaments/new?draft=${encodeURIComponent(item.id)}`}
-                          title="Gespeicherten Turnierentwurf bearbeiten">{content}</Link>;
+                    return <Link key={item.id} className="sidebar-live-item sidebar-draft-item"
+                      to={`/tournaments/new?draft=${encodeURIComponent(item.id)}`}
+                      title="Gespeicherten Turnierentwurf bearbeiten">{content}</Link>;
                   })}
                 </div>
               </div>
