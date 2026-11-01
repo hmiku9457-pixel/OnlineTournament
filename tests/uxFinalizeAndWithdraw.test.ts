@@ -108,11 +108,11 @@ describe('Pre-phase withdrawal restoration', () => {
 describe('Hallenraster und zeitbasierte Sportarten', () => {
   it('toggles intentional empty spaces without a separate blank-button', () => {
     const layout = createVenueLayout(8);
-    expect(layout.columns).toBe(10);
+    expect(layout.columns).toBe(3);
     expect(layout.rows).toBe(3);
-    const marked = placeVenueCell(layout, 'space', 18);
-    expect(marked.cells[18]).toBe('space');
-    expect(placeVenueCell(marked, 'space', 18).cells[18]).toBe('');
+    const marked = placeVenueCell(layout, 'space', 8);
+    expect(marked.cells[8]).toBe('space');
+    expect(placeVenueCell(marked, 'space', 8).cells[8]).toBe('');
   });
   it('applies game duration and turnover for a time-based tournament', () => {
     expect(estimatePhaseMetrics({ type: 'ROUND_ROBIN', entrantCount: 4, bestOf: 5 }, 2, {
