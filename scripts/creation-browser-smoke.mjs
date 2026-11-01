@@ -81,6 +81,7 @@ try {
   await page.locator('.wizard-step').nth(1).click();
   assert.equal(await page.locator('#participant-first').inputValue(), '');
   await page.reload();
+  await page.locator('.participant-roster-row').first().waitFor();
   assert.equal(await page.locator('.participant-roster-row').count(), 4, 'draft survives browser reload');
   await next(page);
   await page.waitForSelector('.format-step');
