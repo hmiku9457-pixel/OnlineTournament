@@ -228,7 +228,7 @@ export function recommendTournamentFormats(
   const swiss = calculateSwissPlan(playerCount, minimumMatches, settings.maxSwissRounds);
   const defaultQualifiers = playerCount >= 16 ? 8 : 4;
   // A combined format must cut the field before the K.-o. phase.
-  const qualifiers = clampInteger(settings.knockoutQualifierCount, defaultQualifiers, 2, Math.max(2, playerCount - 1));
+  const qualifiers = clampInteger(settings.knockoutQualifierCount, defaultQualifiers, 2, Math.max(2, playerCount));
   const groupSwissEntrants = playerCount >= 4 ? groupQualifiers(playerCount, group.groupCount) : playerCount;
   const groupSwissRounds = calculateSwissPlan(groupSwissEntrants, minimumMatches, settings.maxSwissRounds);
   // Three-system suggestions need two genuine qualification cuts.
