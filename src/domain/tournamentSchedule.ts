@@ -106,6 +106,13 @@ export function groupPlannedScheduleDays(items: PlannedScheduleItem[], scheduled
   };
 }
 
+/** Pauses specified as absolute clock times must not precede their
+ * estimated start. Otherwise the live scheduler may interpret them as
+ * a next-day break while the planning preview silently omits them. */
+export function plannedTimelineConflicts(timeline: PlannedTimeline): string[] {
+  return timeline.warnings.map((warning) => warning.message);
+}
+
 export function validatePlannedSchedule(items: PlannedScheduleItem[]): string[] {
   if (items.length > 80) return ['Der Zeitplan darf höchstens 80 Einträge enthalten.'];
   const issues: string[] = [];
@@ -116,7 +123,7 @@ export function validatePlannedSchedule(items: PlannedScheduleItem[]): string[] 
     seen.add(item.id);
     if (!isValidLocalDateTime(item.at)) issues.push(`${label}: Gültiges Datum und Uhrzeit erforderlich.`);
     if (!item.title.trim() || item.title.trim().length > 80) issues.push(`${label}: Bezeichnung muss 1 bis 80 Zeichen enthalten.`);
-    if ((item.note?.length ?? 0) > 400) issues.push(`${label}: Hinweis darf höchstens 400 Zeichen enthalten.`);
+    if ((item.note?.length ?? 0) > 600) issues.push(`${label}: Hinweis darf höchstens 600 Zeichen enthalten.`);
     if (!['competition', 'break', 'other'].includes(item.type)) issues.push(`${label}: Unbekannter Eintragstyp.`);
   });
   return issues;
