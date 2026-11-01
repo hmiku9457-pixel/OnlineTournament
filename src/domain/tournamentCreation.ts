@@ -124,7 +124,7 @@ export function recommendedSwissRounds(entrantCount: number, minimumMatches = 1)
   const entrants = Math.max(2, Math.trunc(entrantCount));
   const desired = Math.max(Math.ceil(Math.log2(entrants)),
     Math.max(1, Math.trunc(minimumMatches)) + entrants % 2);
-  // Repeated pairings become unavoidable past n-1 rounds; the editor allows 30.
+  // Repeated pairings become unavoidable past n-1 rounds; no artificial 30-round cap.
   return Math.max(2, Math.min(entrants - 1, desired));
 }
 
@@ -248,6 +248,8 @@ export function estimatePhaseMetrics(
   const entrants = Math.max(2, Math.trunc(phase.entrantCount));
   if (phase.type === 'BREAK') return { estimatedMatches: 0, estimatedDurationMinutes: phase.breakKind === 'minutes' || !phase.breakKind ? Math.max(0, Math.round(phase.breakMinutes ?? 0)) : 0, approximate: phase.breakKind === 'until' };
   // Timed sports use one match duration per fixture, plus a preparation break between slots.
+  // The turnover buffer deliberately remains after the last game in each wave:
+  // participants still clear the playing area and often talk with opponents.
   const gameMinutes = timing?.matchDurationMinutes ? Math.max(1, timing.matchDurationMinutes) + Math.max(0, timing.venueTurnoverMinutes ?? 0) : 0;
   const waveDurationForPhase = (count: number, bo: number) => timing?.matchDurationMinutes
     ? Math.ceil(count / tables) * gameMinutes
