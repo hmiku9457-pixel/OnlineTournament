@@ -1,5 +1,6 @@
 import type { Discipline, StageType } from './types';
 import type { TournamentSystemId } from './tournamentCreation';
+import type { VenueLayout } from './venueLayout';
 
 export const CREATION_DRAFT_KEY = 'online-tournament:creation-draft:v1';
 
@@ -47,7 +48,7 @@ export interface CreationDraft {
   tables: number;
   customTables: boolean;
   venueLayoutEnabled: boolean;
-  venueLayout: unknown;
+  venueLayout: VenueLayout;
   participants: CreationDraftParticipant[];
   participantForm: Omit<CreationDraftParticipant, 'id'>;
   editingParticipantId: string | null;
@@ -76,6 +77,12 @@ function validDraft(value: unknown): value is CreationDraft {
     && typeof data.timedMatchMinutes === 'string' && typeof data.venueTurnoverMinutes === 'string'
     && Number.isInteger(data.tables) && Number(data.tables) >= 1 && Number(data.tables) <= 9999
     && typeof data.customTables === 'boolean' && typeof data.venueLayoutEnabled === 'boolean'
+    && Boolean(data.venueLayout && Number.isInteger(data.venueLayout.columns)
+      && data.venueLayout.columns > 0 && Number.isInteger(data.venueLayout.rows)
+      && data.venueLayout.rows > 0 && Array.isArray(data.venueLayout.cells)
+      && data.venueLayout.cells.length === data.venueLayout.columns * data.venueLayout.rows
+      && data.venueLayout.cells.every((cell) => typeof cell === 'string')
+      && ['none', 'top', 'right', 'bottom', 'left'].includes(data.venueLayout.deskDock))
     && Array.isArray(data.participants) && data.participants.length <= 10000
     && data.participants.every((entry) => entry && typeof entry.id === 'string'
       && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
