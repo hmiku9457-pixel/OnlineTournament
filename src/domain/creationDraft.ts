@@ -73,7 +73,7 @@ export interface CreationDraft {
   awardsAtOverride: string | null;
 }
 
-function validDraft(value: unknown): value is CreationDraft {
+export function validDraft(value: unknown): value is CreationDraft {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const data = value as Partial<CreationDraft>;
   const allowedTypes = ['ROUND_ROBIN', 'GROUPS', 'SWISS', 'KNOCKOUT', 'BREAK'];
