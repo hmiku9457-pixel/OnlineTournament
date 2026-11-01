@@ -1,13 +1,15 @@
-import { validatePlannedSchedule, isValidLocalDateTime, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, plannedActiveBreakMinutes, validatePlannedSchedule, isValidLocalDateTime, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { getPhaseLifecycle, resetPrestartPhaseLifecycle } from '@/services/mockPhaseLifecycle';
 import { generatePlayerCodes, generateUniquePlayerCode } from '@/services/mockPlayerCodes';
 import { recordMockAudit } from '@/services/mockAudit';
-import { hasStartedAnyStage, validatePrestartPhases, estimatePrestartDuration, type PrestartPhaseDraft } from '@/domain/prestartPhasePlanning';
+import { hasStartedAnyStage, validatePrestartPhases, estimatePrestartDuration, normalizePrestartPhases, initialPrestartPhases, type PrestartPhaseDraft } from '@/domain/prestartPhasePlanning';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
 import { reconcilePrestartDraws, clearPrestartTournamentDraws } from '@/services/mockDrawStore';
 import type { VenueLayout } from '@/domain/venueLayout';
-import { disciplineLabel, getSportLabel } from '@/domain/sports';
+import { disciplineLabel, getSportLabel, planningMinutesPerSet } from '@/domain/sports';
+import { sportScoring } from '@/domain/sportScoring';
+import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
 import { type DemoTournament } from '@/data/demoTournaments';
 import type { Discipline, StageType, TournamentStage, TournamentStatus } from '@/domain/types';
 
@@ -169,6 +171,67 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
   return tournament;
 }
 
+/** Reconstruct all planned phase timestamps from the actual phase plan.
+ * The plan is indicative and remains separate from live phase lifecycle.
+ * A custom awards time is retained unless the rebuilt program would finish
+ * later than the ceremony; an automatic ceremony follows the new finish. */
+function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPhaseDraft[]) {
+  if (!tournament.scheduledStart || !isValidLocalDateTime(tournament.scheduledStart)
+    || !tournament.plannedSchedule?.length) return null;
+  const scoring = sportScoring(tournament.sport);
+  const timed = scoring.mode === 'score';
+  const timing = timed
+    ? { matchDurationMinutes: tournament.matchDurationMinutes ?? 15, venueTurnoverMinutes: tournament.venueTurnoverMinutes ?? 0 }
+    : { minutesPerSet: planningMinutesPerSet(tournament.sport) };
+  const scheduleFor = (stages: PrestartPhaseDraft[]) => {
+    const minutes = stages.map((phase) => estimatePhaseMetrics(phase, tournament.tables, timing).estimatedDurationMinutes);
+    const timeline = buildPlannedTimeline(tournament.scheduledStart!, stages.map((phase, index) => ({
+      label: phase.label, note: phase.type === 'BREAK' ? phase.note : undefined,
+      type: phase.type, estimatedMinutes: minutes[index],
+      breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
+      breakUntil: phase.breakUntil, nextDayStart: phase.nextDayStart,
+      nextDayDate: phase.nextDayDate,
+      roundCount: phase.type === 'SWISS' ? phase.swissRounds
+        : phase.type === 'KNOCKOUT' ? Math.ceil(Math.log2(phase.entrantCount)) : undefined,
+      inlineBreakAfterRound: phase.inlineBreakAfterRound,
+      inlineBreakKind: phase.inlineBreakKind,
+      inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
+    })));
+    const playing = minutes.reduce((total, value, index) => total + (stages[index].type === 'BREAK' ? 0 : value), 0);
+    return { timeline, duration: playing + plannedActiveBreakMinutes(timeline) };
+  };
+  const old = scheduleFor(initialPrestartPhases(tournament));
+  const recalculated = scheduleFor(phases);
+  const awards = tournament.plannedSchedule.find((entry) => entry.id === 'award-ceremony');
+  const oldWasAutomatic = awards?.at === old.timeline.estimatedEnd;
+  const ceremonyAt = awards && (oldWasAutomatic || awards.at < recalculated.timeline.estimatedEnd)
+    ? recalculated.timeline.estimatedEnd : awards?.at;
+  const otherEntries = tournament.plannedSchedule.filter((entry) =>
+    entry.type === 'other' && entry.id !== 'award-ceremony');
+  const plannedSchedule = [
+    ...recalculated.timeline.items,
+    ...otherEntries,
+    ...(awards && ceremonyAt ? [{ ...awards, at: ceremonyAt }] : []),
+  ];
+  return { ...recalculated, plannedSchedule };
+}
+
+/** Call after a pre-start registration or withdrawal changes the active field.
+ * No tournament format, group setting, or Swiss round count is rewritten. */
+export function refreshPrestartSchedule(tournamentId: string): void {
+  const all = readLocalTournaments();
+  const tournament = all.find((item) => item.id === tournamentId);
+  if (!tournament || tournament.hasStarted) return;
+  const activeCount = getRuntimeParticipantNames(tournament)
+    .filter((name) => !isParticipantWithdrawn(tournament, name)).length;
+  const phases = normalizePrestartPhases(initialPrestartPhases(tournament), activeCount);
+  const plan = recalculatedPrestartPlan(tournament, phases);
+  if (!plan) return;
+  const updated = { ...tournament, plannedSchedule: plan.plannedSchedule,
+    estimatedDuration: durationLabel(plan.duration) };
+  writeLocalTournaments(all.map((item) => item.id === tournamentId ? updated : item));
+}
+
 /** Reconfigure a local tournament only until its very first start.
  * Active participants are computed again at save-time to reject stale edits.
  * Draws and lifecycle snapshots are discarded, but registration/codes/withdrawals
@@ -189,6 +252,9 @@ export function updatePrestartTournamentPhases(
   const errors = validatePrestartPhases(drafts, active.length);
   if (errors.length) return { ok: false, error: errors[0] };
 
+  const newPlan = recalculatedPrestartPlan(previous, drafts);
+  if (newPlan?.timeline.warnings.length) return { ok: false, error: newPlan.timeline.warnings[0].message };
+
   const phases: MockPhaseInput[] = drafts.map((phase) => ({
     type: phase.type, label: phase.label.trim(), entrantCount: phase.entrantCount,
     groupCount: phase.groupCount, swissRounds: phase.swissRounds,
@@ -208,7 +274,8 @@ export function updatePrestartTournamentPhases(
     stages,
     phasesLabel: label,
     subtitle: `${disciplineLabel(previous.discipline)} · ${label}`,
-    estimatedDuration: durationLabel(estimatePrestartDuration(previous, drafts)),
+    estimatedDuration: durationLabel(newPlan?.duration ?? estimatePrestartDuration(previous, drafts)),
+    ...(newPlan ? { plannedSchedule: newPlan.plannedSchedule } : {}),
     lastUpdate: 'gerade eben',
   };
 
@@ -457,6 +524,7 @@ export function addMockParticipant(
     lastUpdate: 'gerade eben',
   };
   writeLocalTournaments(tournaments.map((entry) => entry.id === tournamentId ? updated : entry));
+  refreshPrestartSchedule(tournamentId);
   reconcilePrestartDraws(updated);
   recordMockAudit({ tournamentId, actor: 'Turnierleitung (lokal)', action: 'PARTICIPANT_ADDED',
     description: `Teilnehmer nachgemeldet: ${displayName}`, after: displayName });
