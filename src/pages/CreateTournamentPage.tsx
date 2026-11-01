@@ -373,11 +373,18 @@ export function CreateTournamentPage() {
   }, []);
   function setScheduledDate(value: string) {
     const clock = toLocalDateTime(new Date());
-    const previousTime = scheduledTime;
-    setUseCurrentTime(false);
     setFixedDate(value);
-    setFixedTime(value === clock.slice(0, 10) && previousTime < clock.slice(11, 16)
-      ? clock.slice(11, 16) : previousTime);
+    if (value === clock.slice(0, 10)) {
+      // Selecting "Heute" (via the shortcut or its calendar day) means
+      // using the live current minute until a fixed time is chosen.
+      setCurrentLocalMinute(clock);
+      setFixedTime(clock.slice(11, 16));
+      setUseCurrentTime(true);
+      return;
+    }
+    // Future dates retain a fixed start time and must not follow the clock.
+    setFixedTime(scheduledTime);
+    setUseCurrentTime(false);
   }
   function setScheduledTime(value: string) {
     setFixedDate(scheduledDate);
@@ -1105,6 +1112,17 @@ export function CreateTournamentPage() {
         })}
       </nav>
 
+      {dateIsPast && (
+        <div className="wizard-start-past-banner" role="alert">
+          <span className="wizard-start-past-banner-icon" aria-hidden="true">!</span>
+          <div className="wizard-start-past-banner-copy">
+            <strong>Der geplante Turnierstart liegt in der Vergangenheit.</strong>
+            <p>Bitte wähle einen zukünftigen Termin oder verwende die aktuelle Uhrzeit.</p>
+          </div>
+          <button type="button" className="btn small" onClick={selectCurrentTime}>Jetzt verwenden</button>
+        </div>
+      )}
+
       <div className={`wizard-workspace ${step === 5 ? 'wizard-workspace-review' : ''}`}>
       <div className="card wizard-card">
         {step === 1 && (
@@ -1119,7 +1137,6 @@ export function CreateTournamentPage() {
               <div className="field">
                 <label htmlFor="tournament-date">Turnierdatum <span className="wizard-required-mark" aria-hidden="true">*</span></label>
                 <CalendarDatePicker id="tournament-date" label="Turnierdatum" required value={scheduledDate} minDate={currentLocalMinute.slice(0, 10)} onChange={setScheduledDate} />
-                {dateIsPast && <span className="field-hint wizard-review-warning" role="status">Der Turnierstart darf nicht in der Vergangenheit liegen. Wähle eine spätere Uhrzeit oder verwende „Jetzt“.</span>}
                 <span className="field-hint wizard-date-hint">Geplantes Datum für die Ankündigung und den Zeitplan. Den tatsächlichen Turnierstart legt die Turnierleitung fest.</span>
               </div>
               <div className="field">
@@ -2105,11 +2122,10 @@ export function CreateTournamentPage() {
                 </div>
               </div>
             </div>
-            {(minimumMatchesShortfall > 0 || dateIsPast || scheduleIssues.length > 0) && (
+            {(minimumMatchesShortfall > 0 || scheduleIssues.length > 0) && (
               <div className="wizard-review-check" role="status">
                 <strong>Vor Erstellung prüfen</strong>
                 {minimumMatchesShortfall > 0 && <p>Die erste Phase garantiert nur {actualMinimumMatches} tatsächlich gespielte Begegnungen pro Teilnehmer, gewünscht sind {minimumMatches}. Freilose zählen nicht als Spiele.</p>}
-                {dateIsPast && <p>Der geplante Turnierbeginn liegt in der Vergangenheit und muss vor der Erstellung geändert werden.</p>}
                 {scheduleIssues.map((issue, index) => <p key={index}>{issue}</p>)}
               </div>
             )}
