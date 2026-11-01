@@ -13,6 +13,8 @@ import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { disciplineLabel } from '@/domain/sports';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { GroupMatchDayList } from '@/components/GroupMatchDayList';
+import { MatchStatusLegend } from '@/components/MatchStatusLegend';
+import { matchVisualClass, matchVisualLabel } from '@/domain/matchVisualStatus';
 import { BracketLiveStatus, BracketScoreCells, BracketSetScores, BracketStageHeader, BracketStageValues } from '@/components/BracketScoreStages';
 import { BracketRoundViewport } from '@/components/BracketRoundViewport';
 import { SwissRoundCard } from '@/components/SwissRoundCard';
@@ -159,6 +161,7 @@ function StageCompetitionView({
             {!stageFinished && <small>Vorläufig bis zum Abschluss der Gruppenphase</small>}
           </div>
         )}
+        <MatchStatusLegend />
         <div className="group-overview-grid">
           {groups.map((group) => (
             <article className="card group-overview-card" key={group.id}>
@@ -201,7 +204,7 @@ function StageCompetitionView({
                     const opponent = match.sideA === selectedGroupPlayer.player ? match.sideB : match.sideA;
                     const displayedResult = resultForMatchParticipant({ ...match, sport: tournament.sport }, selectedGroupPlayer.player);
                     return (
-                      <div className="player-game-row" key={match.id}>
+                      <div className={`player-game-row ${matchVisualClass(match.status)}`} title={matchVisualLabel(match.status)} key={match.id}>
                         <span className="muted">Spieltag {match.matchDay}</span>
                         <strong>vs. {opponent}</strong>
                         <span className="player-game-result-cell">
@@ -305,7 +308,7 @@ function StageCompetitionView({
                   const opponentRecord = getSwissRecordBeforeRound(tournament, stage, opponent, roundNumber);
                   const opponentCurrentRecord = getSwissCurrentRecord(tournament, stage, opponent);
                   const result = resultForMatchParticipant({ ...match, score: match.status === 'FINISHED' ? match.score : '–' }, selectedSwissPlayer);
-                  return <div className="player-game-row swiss-player-game-row" key={match.id}>
+                  return <div className={`player-game-row swiss-player-game-row ${matchVisualClass(match.status)}`} title={matchVisualLabel(match.status)} key={match.id}>
                     <span className="muted swiss-history-round">{match.round}</span>
                     <span className="swiss-history-opponent"><strong>{opponent}</strong><span className="swiss-record" title="Bilanz des Gegners vor der Runde">{opponentRecord}</span><span className="swiss-record swiss-record-current" title="Aktuelle Bilanz des Gegners">{opponentCurrentRecord}</span></span>
                     <PlayerGameOutcome score={result.score} finished={match.status === 'FINISHED'} wonByDecision={match.decisionSide ? match.decisionSide === (match.sideA === selectedSwissPlayer ? 'A' : 'B') : undefined} />
@@ -376,8 +379,10 @@ function StageCompetitionView({
                     const openBracketResult = onEditResult && (match.live || (match.score && match.score !== 'Freilos' && match.score !== 'Beide Platz 3'))
                       ? () => onEditResult(match.id) : undefined;
                     return (
-                      <article className={match.live ? 'bracket-match is-live' : 'bracket-match'} key={match.id}>
+                      <article className={`bracket-match ${matchVisualClass(match.status)}${match.live ? ' is-live' : ''}`}
+                          title={match.score === 'Freilos' ? 'Freilos – abgeschlossen' : matchVisualLabel(match.status)} key={match.id}>
                         <BracketLiveStatus live={match.live} />
+                          {!match.live && <span className="bracket-match-status-line">{match.score === 'Freilos' ? 'Freilos' : matchVisualLabel(match.status)}</span>}
                         {match.score === 'W.O.' && <span className="bracket-walkover-label" title="Kampflos entschiedene Partie (Walkover, z. B. bei Rückzug)">Kampflos</span>}
                         {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz · nicht ausgetragen</span>}
                         <BracketStageHeader stages={scoreStages} />
@@ -431,8 +436,10 @@ function StageCompetitionView({
                       const openBracketResult = onEditResult && (match.live || (match.score && match.score !== 'Freilos' && match.score !== 'Beide Platz 3'))
                         ? () => onEditResult(match.id) : undefined;
                       return (
-                        <article className={match.live ? 'bracket-match is-live' : 'bracket-match'} key={match.id}>
+                        <article className={`bracket-match ${matchVisualClass(match.status)}${match.live ? ' is-live' : ''}`}
+                          title={match.score === 'Freilos' ? 'Freilos – abgeschlossen' : matchVisualLabel(match.status)} key={match.id}>
                           <BracketLiveStatus live={match.live} />
+                          {!match.live && <span className="bracket-match-status-line">{match.score === 'Freilos' ? 'Freilos' : matchVisualLabel(match.status)}</span>}
                           {match.score === 'Beide Platz 3' && <span className="bracket-walkover-label">Gemeinsamer 3. Platz · nicht ausgetragen</span>}
                           <BracketStageHeader stages={scoreStages} />
                           {[match.sideA, match.sideB].map((side, sideIndex) => (
@@ -1378,7 +1385,7 @@ export function TournamentControlPage() {
                     ? getMockAssignmentBlockReason(tournament, match.id, freeTables[0]) : null;
                   return (
                   <article
-                    className={`match-queue-row expanded draggable-match${isBusy ? ' participant-busy' : ''}`}
+                    className={`match-queue-row expanded draggable-match match-state-waiting${isBusy ? ' participant-busy' : ''}`}
                     key={match.id}
                     draggable={canAssign && !isMockThirdPlaceMatch(match.id)}
                     onDragStart={(event) => {
@@ -1581,6 +1588,7 @@ export function TournamentControlPage() {
           <div className="control-section-head"><div><div className="control-help-title"><h2>Alle Spiele</h2><ControlHelpButton topic="matches" onOpen={setHelpTopic} /></div><p className="muted">Partien nach Status, Phase, Spielort oder Teilnehmer eingrenzen.</p></div></div>
           {allTournamentMatches.length === 0 && <p className="muted">Noch keine Spiele verfügbar. Die Paarungen erscheinen hier, sobald du die erste Phase gestartet hast. Die Auslosung kannst du vorher im Turnierverlauf bearbeiten.</p>}
           {allTournamentMatches.length > 0 && <>
+            <MatchStatusLegend />
             <div className="control-match-filters" role="search" aria-label="Spiele filtern">
               <div className="control-match-status-filters" role="group" aria-label="Spielstatus">
                 {matchFilterOptions.map((option) => <button
@@ -1603,8 +1611,8 @@ export function TournamentControlPage() {
             <table>
               <thead><tr><th>Status</th><th>Phase</th><th>Spiel</th><th>Pausenzeit</th><th>{venue.singular}</th><th>Stand</th><th></th></tr></thead>
               <tbody>{filteredTournamentMatches.map((match) => (
-                <tr key={match.id}>
-                  <td><span className={match.status === 'LIVE' ? 'badge live' : match.status === 'READY' ? 'badge ready' : 'badge'}>{matchStatusLabel(match.status)}</span></td>
+                <tr key={match.id} className={matchVisualClass(match.status)} title={matchVisualLabel(match.status)}>
+                  <td><span className={`badge match-status-table-badge ${matchVisualClass(match.status)}`}>{matchStatusLabel(match.status)}</span></td>
                   <td>{match.phase}<div className="muted">{match.round}</div></td>
                   <td><strong>{match.sideA}{swissRecordFor(match, match.sideA) && <span className="swiss-record">{swissRecordFor(match, match.sideA)}</span>}</strong><div>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>}</div></td>
                   <td>{formatMockMatchRest(match, 'A')} / {formatMockMatchRest(match, 'B')}</td>
@@ -1762,7 +1770,7 @@ export function TournamentControlPage() {
                       <thead><tr><th>Phase</th><th>Runde</th><th>Gegner</th><th>Status</th><th>Ergebnis</th><th>Aktion</th></tr></thead>
                       <tbody>{selectedParticipantMatches.map((match) => {
                         const stage = tournament.stages.find((item) => item.id === match.stageId);
-                        return <tr key={match.id}>
+                        return <tr key={match.id} className={matchVisualClass(match.status)} title={matchVisualLabel(match.status)}>
                           <td>{match.phase}</td>
                           <td>{match.round}</td>
                           <td>{match.sideA === participantPanel.name ? match.sideB : match.sideA}</td>
