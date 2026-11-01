@@ -149,6 +149,7 @@ try {
   await page.locator('.wizard-create-button').waitFor();
   const changedDraftTab = await context.newPage();
   await changedDraftTab.goto(page.url());
+  await changedDraftTab.locator('.wizard-step').first().click();
   await changedDraftTab.locator('#name').fill('Browser-Smoke-Turnier – geänderter Entwurf');
   await changedDraftTab.getByRole('button', { name: 'Entwurf speichern' }).click();
   await changedDraftTab.getByText('Entwurf gespeichert.', { exact: true }).waitFor();
