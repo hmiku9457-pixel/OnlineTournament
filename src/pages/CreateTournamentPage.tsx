@@ -1722,6 +1722,13 @@ export function CreateTournamentPage() {
                                   </button>
                                 </>
                               )}
+                              {phase.type === 'GROUPS' && groupQualifiers !== null && (
+                                <p className="phase-qualification-explanation">
+                                  {groupQualifiers % phase.groupCount === 0
+                                    ? `${groupQualifiers / phase.groupCount} Qualifikationsplätze je Gruppe bei ${phase.groupCount} Gruppen.`
+                                    : `${groupQualifiers} Qualifikationsplätze lassen sich nicht gleichmäßig auf ${phase.groupCount} Gruppen verteilen. Den Qualifikationsmodus und mögliche gruppenübergreifende Vergleiche vor Turnierstart prüfen.`}
+                                </p>
+                              )}
                               {recommendedRounds !== null && (
                                 <>
                                   <div>
