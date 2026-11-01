@@ -330,6 +330,20 @@ try {
   assert.equal(await page5.locator('#participant-last').inputValue(), 'Müller');
   await context5.close();
 
+  const draftsContext = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  const draftPage = await draftsContext.newPage();
+  await draftPage.goto(base + '/#/tournaments/new');
+  await draftPage.locator('#name').fill('Entwurf A');
+  await draftPage.getByRole('button', { name: 'Entwurf speichern' }).click();
+  await draftPage.locator('.sidebar-draft-item').first().waitFor();
+  assert.equal(await draftPage.locator('.sidebar-draft-item').count(), 1);
+  await draftPage.reload();
+  assert.equal(await draftPage.locator('#name').inputValue(), 'Entwurf A');
+  await draftPage.getByRole('button', { name: 'Entwurf kopieren' }).click();
+  await draftPage.waitForFunction(() => document.querySelectorAll('.sidebar-draft-item').length === 2);
+  assert.match(await draftPage.locator('#name').inputValue(), /Kopie/);
+  await draftsContext.close();
+
   process.stdout.write('Creation wizard browser smoke tests passed.\n');
 } finally {
   await browser.close();
