@@ -1,5 +1,5 @@
 import {
-  getSavedCreationDraft, listSavedCreationDrafts, SAVED_CREATION_DRAFTS_KEY,
+  getSavedCreationDraft, listSavedCreationDrafts, SAVED_CREATION_DRAFTS_KEY, validDraft,
   type CreationDraft, type SavedCreationDraft,
 } from '@/domain/creationDraft';
 
@@ -35,7 +35,7 @@ function runTransaction<T>(
     let value: T;
     tx.oncomplete = () => resolve(value);
     tx.onerror = () => reject(tx.error ?? new Error('Der Entwurf konnte nicht gespeichert werden.'));
-    tx.onabort = () => reject(tx.error ?? new Error('Die Entwurfsänderung wurde abgebrochen.'));
+    tx.onabort = () => reject(tx.error ?? new DOMException('Die Entwurfsänderung wurde abgebrochen.', 'AbortError'));
     try {
       perform(tx, (result) => { value = result; });
     } catch (error) {
@@ -110,6 +110,7 @@ export async function saveNamedCreationDraftAtomic(
 ): Promise<SavedCreationDraft> {
   // Reuse the existing, strictly validated draft serializer without writing a
   // localStorage entry. Invalid drafts are rejected before a transaction opens.
+  if (!validDraft(draft)) throw new Error('Der Entwurf enthält ungültige Angaben.');
   const normalized = JSON.parse(JSON.stringify(draft)) as CreationDraft;
   const candidate = await withDatabase((db) => runTransaction<SavedCreationDraft>(db, 'readwrite', [STORE], (tx, done) => {
     const store = tx.objectStore(STORE);
