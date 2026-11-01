@@ -294,6 +294,11 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                           <input type="number" min={2} max={available} value={phase.entrantCount}
                             onChange={(event) => edit(phase.id, { entrantCount: Number(event.target.value) })}/>
                         </label>}
+                        {phase.type === 'KNOCKOUT' && index > 0 && <div className="prestart-editor-wide prestart-ko-presets">
+                          {[2, 4, 8, 16, 32, 64].filter((count) => count <= available).map((count) =>
+                            <button type="button" key={count} className={phase.entrantCount === count ? 'btn small primary' : 'btn small'}
+                              onClick={() => edit(phase.id, { entrantCount: count })}>{count} Teilnehmer</button>)}
+                        </div>}
                         {phase.type === 'GROUPS' && <label>Anzahl Gruppen
                           <input type="number" min={2} max={Math.floor(phase.entrantCount / 2)}
                             value={phase.groupCount} onChange={(event) => edit(phase.id, { groupCount: Number(event.target.value) })}/>
