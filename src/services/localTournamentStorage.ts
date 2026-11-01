@@ -166,14 +166,19 @@ async function quarantineInvalidEntries(entries: StoredValue[]) {
   if (corrupt.length || !entries.some((entry) => entry.key === INDEX)) {
     const db = await openDatabase();
     revision = await transaction<number>(db, [VALUES, QUARANTINE, META], 'readwrite', (tx, complete) => {
-      const values = tx.objectStore(VALUES);
-      const invalid = tx.objectStore(QUARANTINE);
-      const validByKey = new Map(valid.map((entry) => [entry.key, entry.value]));
-      for (const entry of entries) if (!validByKey.has(entry.key)) values.delete(entry.key);
-      for (const entry of valid) values.put(entry);
-      for (const item of corrupt) invalid.put(item);
-      tx.objectStore(META).put(revision + 1, 'revision');
-      complete(revision + 1);
+      const stamp = tx.objectStore(META).get('revision');
+      stamp.onsuccess = () => {
+        const current = (stamp.result as number | undefined) ?? 0;
+        if (current !== revision) { tx.abort(); return; }
+        const values = tx.objectStore(VALUES);
+        const invalid = tx.objectStore(QUARANTINE);
+        const validByKey = new Map(valid.map((entry) => [entry.key, entry.value]));
+        for (const entry of entries) if (!validByKey.has(entry.key)) values.delete(entry.key);
+        for (const entry of valid) values.put(entry);
+        for (const item of corrupt) invalid.put(item);
+        tx.objectStore(META).put(current + 1, 'revision');
+        complete(current + 1);
+      };
     });
     quarantine = [...quarantine.filter((item) => !corrupt.some((other) => other.key === item.key)), ...corrupt];
     window.dispatchEvent(new Event('tournament-storage-integrity-change'));
@@ -194,7 +199,12 @@ async function refreshCanonical(): Promise<void> {
 
 export async function initializeLocalTournamentStorage(): Promise<void> {
   if (ready) return;
-  await refreshCanonical();
+  try { await refreshCanonical(); }
+  catch {
+    // A competing tab may have completed the first schema write concurrently.
+    // Reload the authoritative revision once rather than importing stale data.
+    await refreshCanonical();
+  }
   ready = true;
   if (typeof BroadcastChannel !== 'undefined') {
     channel = new BroadcastChannel('online-tournament:canonical-state');

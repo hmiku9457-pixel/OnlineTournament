@@ -7,6 +7,7 @@ import {
   type DashboardFilter, type DashboardSort, type DashboardTournament,
 } from '@/domain/tournamentDashboard';
 import { getAllMockTournaments, removeLocalPrototypeTournaments } from '@/services/mockTournamentStore';
+import { flushPendingLocalTournamentWrites } from '@/services/localTournamentStorage';
 import { getVenueTerminology } from '@/domain/venueTerminology';
 
 const filters: Array<{ value: DashboardFilter; name: string }> = [
@@ -172,13 +173,18 @@ export function DashboardPage() {
   };
   const hasFilter = query.trim() !== '' || filter !== 'all';
 
-  function resetAll() {
-    removeLocalPrototypeTournaments();
-    setResetConfirmOpen(false);
-    setTournaments([]);
-    setRevision((value) => value + 1);
-    setQuery('');
-    setFilter('all');
+  async function resetAll() {
+    try {
+      removeLocalPrototypeTournaments();
+      await flushPendingLocalTournamentWrites();
+      setResetConfirmOpen(false);
+      setTournaments([]);
+      setRevision((value) => value + 1);
+      setQuery('');
+      setFilter('all');
+    } catch {
+      window.alert('Zurücksetzen nicht abgeschlossen: Der Turnierspeicher konnte nicht sicher aktualisiert werden. Bitte die Seite neu laden.');
+    }
   }
 
   return (
