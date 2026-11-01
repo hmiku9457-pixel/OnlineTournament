@@ -172,7 +172,7 @@ function validateParticipant(
   if (discipline === 'TEAMS') {
     const teamName = participant.teamName?.trim() || displayPersonName(participant.firstName, participant.lastName);
     if (!teamName) return { firstName: 'Bitte einen Mannschaftsnamen eingeben.' };
-    if (!isAllowedParticipantName(teamName)) return { firstName: 'Nur Buchstaben, Leerzeichen und Bindestriche sind erlaubt.' };
+    if (!isAllowedParticipantName(teamName)) return { firstName: 'Buchstaben, Zahlen, Punkte, Klammern, Leerzeichen und Bindestriche sind erlaubt.' };
     const occupied = collectSavedPersonNames(participants, discipline, editingParticipantId);
     return occupied.has(teamName.toLocaleLowerCase('de-DE'))
       ? { firstName: 'Diese Mannschaft ist bereits eingetragen.' } : errors;
@@ -186,7 +186,7 @@ function validateParticipant(
 
   for (const field of ['firstName', 'lastName', ...(discipline === 'DOUBLES' ? ['partnerFirstName', 'partnerLastName'] : [])] as ParticipantField[]) {
     if ((participant[field] ?? '').trim() && !isAllowedParticipantName(participant[field] ?? '')) {
-      errors[field] = 'Nur Buchstaben, Leerzeichen und Bindestriche sind erlaubt.';
+      errors[field] = 'Buchstaben, Zahlen, Punkte, Klammern, Leerzeichen und Bindestriche sind erlaubt.';
     }
   }
   if (Object.keys(errors).length > 0) return errors;
