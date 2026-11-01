@@ -4,7 +4,7 @@ import { getVenueTerminology } from '@/domain/venueTerminology';
 import { disciplineLabel, disciplineOptionsForSport, planningMinutesPerSet, sportOptions } from '@/domain/sports';
 import { sportScoring } from '@/domain/sportScoring';
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   bestOfOptions,
   createPhaseTemplate,
@@ -31,7 +31,7 @@ import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/
 import { createMockTournament } from '@/services/mockTournamentStore';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { formatPhaseOverview } from '@/domain/creationOverview';
-import { loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence } from '@/domain/creationDraft';
+import { CREATION_DRAFT_KEY, loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence, getSavedCreationDraft, saveNamedCreationDraft, removeSavedCreationDraft, type CreationDraft } from '@/domain/creationDraft';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { RecommendationDurationPicker, DEFAULT_RECOMMENDATION_DURATION, MIN_RECOMMENDATION_DURATION, MAX_RECOMMENDATION_DURATION, formatRecommendationDuration } from '@/components/RecommendationDurationPicker';
 import { RecommendationNumberStepper } from '@/components/RecommendationNumberStepper';
@@ -350,8 +350,12 @@ function NumberChoice({
 
 export function CreateTournamentPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const savedDraftId = new URLSearchParams(location.search).get('draft');
+  const sessionDraftKey = `${CREATION_DRAFT_KEY}:${savedDraftId ?? 'new'}`;
   const [restoredDraft] = useState(() => {
-    const draft = loadCreationDraft();
+    const draft = loadCreationDraft(window.sessionStorage, sessionDraftKey)
+      ?? (savedDraftId ? getSavedCreationDraft(savedDraftId)?.draft ?? null : loadCreationDraft());
     if (draft) {
       participantSequence = Math.max(participantSequence, highestDraftSequence(draft.participants, 'participant'));
       phaseSequence = Math.max(phaseSequence, highestDraftSequence(draft.phaseDrafts, 'phase'));
@@ -360,6 +364,7 @@ export function CreateTournamentPage() {
   });
   const [creationError, setCreationError] = useState<string | null>(null);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
+  const [namedDraftMessage, setNamedDraftMessage] = useState('');
   const [step, setStep] = useState<WizardStep>((restoredDraft?.step ?? 1) as WizardStep);
   const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>((restoredDraft?.maxReachedStep ?? 1) as WizardStep);
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(restoredDraft?.hasVisitedPhaseStep ?? false);
