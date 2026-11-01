@@ -508,7 +508,7 @@ export function CreateTournamentPage() {
     Math.min(participantCount, participantCount >= 16 ? 8 : 4),
   );
   const effectiveMaxGroups = Math.min(Math.max(2, Math.floor(participantCount / 2)), maxGroups ?? defaultMaxGroups);
-  const effectiveMaxSwissRounds = Math.min(30, Math.max(2, maxSwissRounds ?? defaultMaxSwissRounds));
+  const effectiveMaxSwissRounds = Math.min(Math.max(2, participantCount - 1), Math.max(2, maxSwissRounds ?? defaultMaxSwissRounds));
   const effectiveKnockoutQualifierCount = Math.min(Math.max(2, participantCount), Math.max(2, knockoutQualifierCount ?? defaultKnockoutQualifierCount));
 
   const recommendations = useMemo(
@@ -1556,9 +1556,9 @@ export function CreateTournamentPage() {
                   <div className="field">
                     <label htmlFor="max-swiss-rounds">Max. Schweizer Runden</label>
                     <RecommendationNumberStepper id="max-swiss-rounds" label="Maximale Schweizer Runden"
-                      value={effectiveMaxSwissRounds} min={2} max={30}
+                      value={effectiveMaxSwissRounds} min={2} max={Math.max(2, participantCount - 1)}
                       onChange={setMaxSwissRounds} disabled={!enabledSystems.swiss}/>
-                    <span className="field-hint">Obergrenze für Runden im Schweizer System.</span>
+                    <span className="field-hint">Maximal einmal gegen jeden anderen Teilnehmer, ohne Wiederholung.</span>
                   </div>
 
                   <div className="field">
@@ -1566,7 +1566,7 @@ export function CreateTournamentPage() {
                     <RecommendationNumberStepper id="knockout-qualifiers" label="Teilnehmer einer empfohlenen K.-o.-Phase"
                       value={effectiveKnockoutQualifierCount} min={2} max={Math.max(2, participantCount)}
                       onChange={setKnockoutQualifierCount} disabled={!enabledSystems.knockout}/>
-                    <span className="field-hint">So viele Spieler erreichen die K.-o.-Phase.</span>
+                    <span className="field-hint">Bis zu allen Teilnehmern; bei kombinierten Turnierformen muss zuvor mindestens einer ausscheiden.</span>
                   </div>
                   <div className="field recommendation-duration-field">
                     <label htmlFor="preferred-duration">Geplante Turnierdauer</label>
@@ -1800,7 +1800,6 @@ export function CreateTournamentPage() {
                               <strong>Phasentyp ändern</strong>
                               <div className="phase-type-options">
                                 {tournamentSystemOptions
-                                  .filter((system) => enabledSystems[system.id])
                                   .map((system) => {
                                     const terminalNotAllowed = isTerminalStage(system.stageType) && index !== phaseDrafts.length - 1;
                                     return (
