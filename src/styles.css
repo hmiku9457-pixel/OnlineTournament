@@ -6296,30 +6296,43 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   }
 }
 
-/* Turniererstellung: automatisch gespeicherter Entwurf und Reset-Aktion */
-.page-head .creation-draft-actions {
-  display: flex;
-  align-items: center;
+/* Turniererstellung: destruktive Entwurf-Aktion rechts im Kopfbereich */
+.page-head.creation-page-head {
+  align-items: flex-start;
+  flex-direction: row;
   flex-wrap: wrap;
-  gap: 7px 12px;
-  margin-top: 5px;
-  color: #667085;
-  font-size: .74rem;
+  gap: 10px 16px;
 }
-.page-head .creation-draft-actions [role="alert"] {
+.creation-page-head .creation-page-heading {
+  min-width: 0;
+  flex: 1 1 260px;
+}
+.creation-page-head .creation-discard-button {
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-height: 38px;
+  padding: 8px 13px;
+  background: #b42318;
+  border-color: #b42318;
+  color: #fff;
+}
+.creation-page-head .creation-discard-button:hover {
+  background: #912018;
+  border-color: #912018;
+  color: #fff;
+}
+.creation-page-head .creation-discard-button:focus-visible {
+  outline: 3px solid #fda29b;
+  outline-offset: 2px;
+}
+.creation-page-head .creation-draft-error {
+  margin: 6px 0 0;
   color: #b42318;
-  font-weight: 750;
+  font-size: .78rem;
+  font-weight: 650;
 }
-.page-head .creation-draft-actions .btn {
-  padding: 3px 9px;
-  min-height: 29px;
-  border-color: #d0d5dd;
-  background: #fff;
-  font-size: .72rem;
-  line-height: 1.25;
-}
-.page-head .creation-draft-actions .btn:hover {
-  border-color: #f97066;
-  color: #b42318;
-  background: #fff5f4;
+@media (max-width: 650px) {
+  .page-head.creation-page-head .creation-discard-button {
+    margin-left: auto;
+  }
 }
