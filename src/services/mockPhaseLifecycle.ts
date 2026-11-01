@@ -2,7 +2,7 @@ import { groupLetter } from '@/domain/groupLabels';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
-import { getGroupAssignments } from '@/services/mockDrawStore';
+import { getGroupAssignments, compactStartedGroupAssignments } from '@/services/mockDrawStore';
 import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
 
 const PHASE_KEY = 'online-tournament:mock-phase-lifecycle:v1';
@@ -187,6 +187,7 @@ export function startStage(tournament: DemoTournament, stage: TournamentStage, p
       pauseResume.setHours(hour, minute, 0, 0);
     }
   }
+  if (stage.type === 'GROUPS') compactStartedGroupAssignments(tournament, stage, entrants);
   // Die vor dem Start gültige Auslosung einfrieren. Ansonsten würden bei
   // einem späteren Lesen die ursprüngliche Teilnehmerzahl aus dem Wizard
   // erneut greifen und Nachmeldungen verschwinden / Rückzüge zurückkehren.
