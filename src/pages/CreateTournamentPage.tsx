@@ -1418,7 +1418,7 @@ export function CreateTournamentPage() {
                       <p className="wizard-review-warning">Abweichung: Mindestens {item.minimumGuaranteedMatches} statt der gewünschten {minimumMatches} Begegnungen. Freilose sind nicht eingerechnet.</p>
                     ) : index === 0 && (
                       <p className="recommendation-reason">Warum empfohlen: Der Vorschlag berücksichtigt Teilnehmerzahl, Spielflächen, Spieldauer und das Mindestspielziel.</p>
-                    )
+                    )}
                   </button>
                 ))}
               </div>
