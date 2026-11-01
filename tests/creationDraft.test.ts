@@ -114,6 +114,32 @@ describe('tournament creation draft recovery', () => {
     }
   });
 
+  it('rejects a stale save from another browser tab without modifying the newer entry', () => {
+    const store = fakeStorage();
+    vi.stubGlobal('window', Object.assign(new EventTarget(), { localStorage: store }));
+    try {
+      const id = saveNamedCreationDraft(makeDraft());
+      const firstRevision = getSavedCreationDraft(id)?.revision;
+      expect(firstRevision).toBe(1);
+      saveNamedCreationDraft({ ...makeDraft(), name: 'Von Tab B' }, id, firstRevision);
+      expect(getSavedCreationDraft(id)?.revision).toBe(2);
+      expect(() => saveNamedCreationDraft({ ...makeDraft(), name: 'Veraltete Fassung' }, id, firstRevision))
+        .toThrow('DRAFT_CONFLICT');
+      expect(getSavedCreationDraft(id)?.draft.name).toBe('Von Tab B');
+      const copy = saveNamedCreationDraft({ ...makeDraft(), name: 'Meine Kopie' });
+      expect(copy).not.toBe(id);
+      expect(listSavedCreationDrafts()).toHaveLength(2);
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it('retains the hall layout customization flag even while the individual plan is inactive', () => {
+    const store = fakeStorage();
+    const draft = { ...makeDraft(), venueLayoutCustomized: true, venueLayoutEnabled: false };
+    expect(saveCreationDraft(draft, store)).toBe(true);
+    expect(loadCreationDraft(store)?.venueLayoutCustomized).toBe(true);
+    expect(loadCreationDraft(store)?.venueLayoutEnabled).toBe(false);
+  });
+
   it('allows creation to proceed if the browser refuses a draft write', () => {
     expect(saveCreationDraft(makeDraft(), {
       setItem: () => { throw new Error('Storage quota exceeded'); },
