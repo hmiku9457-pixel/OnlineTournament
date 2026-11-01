@@ -29,6 +29,7 @@ function makeDraft(): CreationDraft {
     selectedRecommendationId: null,
     enabledSystems: { 'round-robin': true, groups: true, swiss: true, knockout: true },
     maxGroups: null, maxSwissRounds: null, knockoutQualifierCount: null,
+    preferredDurationMinutes: 255,
     awardsEnabled: true, awardsAtOverride: '2026-11-01T13:30',
   };
 }
@@ -53,6 +54,7 @@ describe('tournament creation draft recovery', () => {
     expect(restored?.participants).toHaveLength(2);
     expect(restored?.phaseDrafts[0].swissRounds).toBe(1);
     expect(restored?.awardsAtOverride).toBe('2026-11-01T13:30');
+    expect(restored?.preferredDurationMinutes).toBe(255);
     expect(store.values.has(CREATION_DRAFT_KEY)).toBe(true);
     clearCreationDraft(store);
     expect(loadCreationDraft(store)).toBeNull();
@@ -72,6 +74,19 @@ describe('tournament creation draft recovery', () => {
     invalidLayout.venueLayout.cells.length = 2;
     store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft: invalidLayout }));
     expect(loadCreationDraft(store)).toBeNull();
+  });
+
+  it('accepts older drafts without a duration preference and rejects invalid values', () => {
+    const store = fakeStorage();
+    const legacy = makeDraft();
+    delete legacy.preferredDurationMinutes;
+    expect(saveCreationDraft(legacy, store)).toBe(true);
+    expect(loadCreationDraft(store)?.preferredDurationMinutes).toBeUndefined();
+    for (const invalid of [-15, 0, 12.5, 1440, 100000]) {
+      const corrupted = { ...makeDraft(), preferredDurationMinutes: invalid };
+      store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft: corrupted }));
+      expect(loadCreationDraft(store)).toBeNull();
+    }
   });
 
   it('starts new internal identifiers after the highest restored identifier', () => {
