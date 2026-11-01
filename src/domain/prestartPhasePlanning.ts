@@ -2,7 +2,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { StageType } from '@/domain/types';
 import {
   estimateTournamentDurationMinutes, hasValidBreakStageOrder, isValidSwissRoundCount,
-  hasValidTerminalStageOrder, knockoutRoundLabels, recommendGroupCount,
+  hasValidTerminalStageOrder, knockoutRoundLabels, recommendGroupCount, changedGroupRecommendationMessage,
   recommendedSwissRounds, stageLabel, type TournamentDurationPhaseInput,
 } from '@/domain/tournamentCreation';
 import { planningMinutesPerSet } from '@/domain/sports';
@@ -111,10 +111,7 @@ export function getFirstPhaseRecommendationWarning(tournament: DemoTournament, a
   const phase = drafts[index];
   if (phase.type === 'GROUPS') {
     if (activeCount < 4) return 'Eine Gruppenphase benötigt mindestens vier aktive Teilnehmer.';
-    const recommended = recommendedPrestartGroupCount(drafts, index);
-    if (phase.groupCount !== recommended) {
-      return `Für ${activeCount} Teilnehmer werden ${recommended} Gruppen empfohlen (aktuell geplant: ${phase.groupCount}).`;
-    }
+    return changedGroupRecommendationMessage(activeCount, phase.groupCount, drafts.slice(index + 1).find(competitive)?.entrantCount);
   }
   if (phase.type === 'SWISS') {
     const recommended = recommendedSwissRounds(activeCount);
