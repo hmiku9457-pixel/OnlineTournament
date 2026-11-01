@@ -77,13 +77,14 @@ export function AppShell() {
   }, []);
 
   const [savedDrafts, setSavedDrafts] = useState<SavedCreationDraft[]>(() => listSavedCreationDrafts());
+  const [savedDraftStorageUnavailable, setSavedDraftStorageUnavailable] = useState(false);
   useEffect(() => {
     let cancelled = false;
     listSavedCreationDraftsAtomic().then((entries) => {
-      if (!cancelled) setSavedDrafts(entries);
+      if (!cancelled) { setSavedDrafts(entries); setSavedDraftStorageUnavailable(false); }
     }).catch(() => {
       // Keep showing imported legacy drafts if database access was denied.
-      if (!cancelled) setSavedDrafts(listSavedCreationDrafts());
+      if (!cancelled) { setSavedDrafts(listSavedCreationDrafts()); setSavedDraftStorageUnavailable(true); }
     });
     return () => { cancelled = true; };
   }, [revision, location.key]);
@@ -114,16 +115,24 @@ export function AppShell() {
                   <h3>Turnierentwürfe</h3>
                   <span className="sidebar-live-total">{savedDrafts.length}</span>
                 </div>
+                {savedDraftStorageUnavailable && <p className="sidebar-storage-warning" role="alert">
+                  Gespeicherte Entwürfe sind momentan nicht verfügbar: Der Browser blockiert IndexedDB.
+                  Die angezeigten Einträge sind nur eine lokale Übersicht und lassen sich erst nach Freigabe des Browserspeichers wieder bearbeiten.
+                </p>}
                 <div className="sidebar-live-items">
-                  {savedDrafts.map((item) => (
-                    <Link key={item.id} className="sidebar-live-item sidebar-draft-item"
-                      to={`/tournaments/new?draft=${encodeURIComponent(item.id)}`}
-                      title="Gespeicherten Turnierentwurf bearbeiten">
+                  {savedDrafts.map((item) => {
+                    const content = <>
                       <strong>{item.draft.name.trim() || 'Unbenannter Entwurf'}</strong>
                       <span className="sidebar-live-phase">{item.draft.participants.length} Teilnehmer · Schritt {item.draft.step}/5</span>
                       <span className="sidebar-live-progress-label">Zuletzt gespeichert: {new Date(item.savedAt).toLocaleString('de-DE')}</span>
-                    </Link>
-                  ))}
+                    </>;
+                    return savedDraftStorageUnavailable
+                      ? <div key={item.id} className="sidebar-live-item sidebar-draft-item is-unavailable" aria-disabled="true"
+                          title="Entwurf derzeit nicht verfügbar">{content}</div>
+                      : <Link key={item.id} className="sidebar-live-item sidebar-draft-item"
+                          to={`/tournaments/new?draft=${encodeURIComponent(item.id)}`}
+                          title="Gespeicherten Turnierentwurf bearbeiten">{content}</Link>;
+                  })}
                 </div>
               </div>
             )}
