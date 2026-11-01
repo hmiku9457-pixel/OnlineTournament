@@ -31,7 +31,7 @@ import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { formatPhaseOverview } from '@/domain/creationOverview';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
-import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedTimelineDurationMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedActiveBreakMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
@@ -860,14 +860,12 @@ export function CreateTournamentPage() {
     inlineBreakMinutes: phase.inlineBreakMinutes,
     inlineBreakUntil: phase.inlineBreakUntil,
   }))), [scheduledStart, phaseDrafts, phaseEstimates]);
-  // The creation overview shows the same elapsed span as the timeline
-  // (including "Pause bis", duration pauses and overnight interruptions).
-  // This estimate also becomes the tournament's stored original estimate.
+  // Only active competition and pauses during tournament days count toward
+  // estimated duration. Overnight gaps still shift the preview calendar.
   const estimatedPlayingMinutes = phaseEstimates.reduce((total, estimate, index) =>
     total + (phaseDrafts[index]?.type === 'BREAK' ? 0 : estimate.estimatedDurationMinutes), 0);
-  const estimatedTournamentDurationMinutes = plannedTimelineDurationMinutes(scheduledStart, plannedTimeline.estimatedEnd)
-    ?? phaseEstimates.reduce((total, item) => total + item.estimatedDurationMinutes, 0);
-  const estimatedBreakMinutes = Math.max(0, estimatedTournamentDurationMinutes - estimatedPlayingMinutes);
+  const estimatedBreakMinutes = plannedActiveBreakMinutes(plannedTimeline);
+  const estimatedTournamentDurationMinutes = estimatedPlayingMinutes + estimatedBreakMinutes;
   const awardsAt = awardsAtOverride ?? plannedTimeline.estimatedEnd;
   const plannedSchedule: PlannedScheduleItem[] = [
     ...plannedTimeline.items,
@@ -2029,11 +2027,10 @@ export function CreateTournamentPage() {
         {step === 3 && <span className="muted wizard-optional-note">Eine Empfehlung ist optional.</span>}
         <div className="wizard-side-navigation">
           <button className="btn" type="button" onClick={goBack} disabled={step === 1}>← Zurück</button>
-        {step === 4 && <button className="btn wizard-skip-schedule" type="button" onClick={() => submitTournament(true)} disabled={!canCreate}>Ohne Zeitplan erstellen</button>}
         {step < 5 ? (
           <button className="btn primary wizard-continue-button" type="button" onClick={goNext} disabled={!canContinue}>{step === 4 ? 'Weiter zur Zusammenfassung →' : 'Weiter →'}</button>
         ) : (
-          <button className="btn primary wizard-continue-button" type="button" onClick={() => submitTournament(false)} disabled={!canCreate || scheduleIssues.length > 0}>Turnier erstellen</button>
+          <button className="btn primary wizard-continue-button wizard-create-button" type="button" onClick={() => submitTournament(false)} disabled={!canCreate || scheduleIssues.length > 0}>Turnier erstellen</button>
         )}
         </div>
       </div>
