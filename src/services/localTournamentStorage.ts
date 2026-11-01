@@ -25,6 +25,8 @@ let database: IDBDatabase | null = null;
 let ready = false;
 let revision = 0;
 let currentError = '';
+let workingValues = new Map<string, string>();
+let nativeCleared = false;
 let quarantine: CorruptLocalRecord[] = [];
 const pendingChanges = new Map<string, string | null>();
 let outstandingCommits = 0;
@@ -39,9 +41,14 @@ function allLocalKeys(): string[] {
     .filter((key): key is string => Boolean(key && key.startsWith(PREFIX)));
 }
 function replaceLocalSnapshot(entries: StoredValue[]): void {
-  const store = nativeStorage();
-  for (const key of allLocalKeys()) store.removeItem(key);
-  for (const entry of entries) store.setItem(entry.key, entry.value);
+  // A synchronous view is still needed by the existing tournament engine,
+  // but the browser's quota-limited localStorage must not hold a second copy.
+  workingValues = new Map(entries.map((entry) => [entry.key, entry.value]));
+  if (!nativeCleared) {
+    const store = nativeStorage();
+    for (const key of allLocalKeys()) store.removeItem(key);
+    nativeCleared = true;
+  }
 }
 function signalError(message: string): void {
   currentError = message;
@@ -270,25 +277,34 @@ function scheduleWrite(key: string, value: string | null): void {
   });
 }
 
-/** Existing synchronous consumers continue to use the native storage cache.
- * Browser storage is never the durability boundary after bootstrap. */
+/** Existing synchronous consumers use an in-memory working view. The only
+ * durable tournament state is committed transactionally to IndexedDB.
+ * Before bootstrap, unit-test Storage shims continue to work unchanged. */
 export const localTournamentStorage: Storage = {
-  get length() { return nativeStorage().length; },
-  key(index: number) { return nativeStorage().key(index); },
-  getItem(key: string) { return nativeStorage().getItem(key); },
+  get length() { return ready ? workingValues.size : nativeStorage().length; },
+  key(index: number) { return ready ? [...workingValues.keys()][index] ?? null : nativeStorage().key(index); },
+  getItem(key: string) {
+    return ready && key.startsWith(PREFIX) ? workingValues.get(key) ?? null : nativeStorage().getItem(key);
+  },
   setItem(key: string, value: string) {
-    if (ready && currentError && key.startsWith(PREFIX)) throw new Error(currentError);
-    nativeStorage().setItem(key, value);
-    scheduleWrite(key, value);
+    if (ready && key.startsWith(PREFIX)) {
+      if (currentError) throw new Error(currentError);
+      workingValues.set(key, String(value));
+      scheduleWrite(key, String(value));
+    } else nativeStorage().setItem(key, value);
   },
   removeItem(key: string) {
-    if (ready && currentError && key.startsWith(PREFIX)) throw new Error(currentError);
-    nativeStorage().removeItem(key);
-    scheduleWrite(key, null);
+    if (ready && key.startsWith(PREFIX)) {
+      if (currentError) throw new Error(currentError);
+      workingValues.delete(key);
+      scheduleWrite(key, null);
+    } else nativeStorage().removeItem(key);
   },
   clear() {
-    const keys = allLocalKeys();
-    nativeStorage().clear();
+    if (!ready) { nativeStorage().clear(); return; }
+    if (currentError) throw new Error(currentError);
+    const keys = [...workingValues.keys()];
+    workingValues.clear();
     for (const key of keys) scheduleWrite(key, null);
   },
 };
