@@ -37,6 +37,7 @@ import { initialPrestartPhases, validatePrestartPhases, type PrestartPhaseDraft 
 import { findSportOption } from '@/domain/sports';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { formatPhaseOverview } from '@/domain/creationOverview';
+import { needsRosterPhaseReview } from '@/domain/phaseReview';
 import { CREATION_DRAFT_KEY, loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence, getSavedCreationDraft, saveNamedCreationDraft, removeSavedCreationDraft, type CreationDraft } from '@/domain/creationDraft';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { RecommendationDurationPicker, DEFAULT_RECOMMENDATION_DURATION, MIN_RECOMMENDATION_DURATION, MAX_RECOMMENDATION_DURATION, formatRecommendationDuration } from '@/components/RecommendationDurationPicker';
@@ -938,15 +939,8 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     const needsReview = phaseDrafts.flatMap((oldPhase, index) => {
       const nextPhase = normalized[index];
       if (!nextPhase) return [];
-      // The first playing field automatically follows registration; it is not
-      // by itself a change of the organizer's qualification settings.
-      const altered = (index > 0 && oldPhase.type !== 'BREAK' && oldPhase.entrantCount !== nextPhase.entrantCount)
-        || oldPhase.groupCount !== nextPhase.groupCount
-        || JSON.stringify(oldPhase.knockoutBestOf) !== JSON.stringify(nextPhase.knockoutBestOf)
-        // The participant count may invalidate unchanged Swiss rounds or
-        // group settings. These phases must be acknowledged as well.
-        || (nextPhase.type === 'SWISS' && !isValidSwissRoundCount(nextPhase.swissRounds, nextPhase.entrantCount))
-        || (nextPhase.type === 'GROUPS' && nextPhase.entrantCount < 4);
+      // Also mark invalid unchanged Swiss rounds and group counts.
+      const altered = needsRosterPhaseReview(oldPhase, nextPhase, index);
       return altered ? [oldPhase.id] : [];
     });
     if (needsReview.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...needsReview])]);
