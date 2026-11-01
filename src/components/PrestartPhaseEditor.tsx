@@ -188,6 +188,8 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
           const nextPlaying = drafts.slice(index + 1).find((s) => s.type !== 'BREAK');
           const suggestedGroups = phase.type === 'GROUPS' ? recommendedPrestartGroupCount(drafts, index) : 0;
           const suggestedRounds = phase.type === 'SWISS' ? recommendedSwissRounds(phase.entrantCount) : 0;
+          const returnDateMinimum = nextCalendarDate((timeline.items.find((item) => item.id === `phase-${index + 1}`)?.at
+            ?? tournament.scheduledStart ?? toLocalDateTime(new Date())).slice(0, 10));
           const fixed = isKnockoutPhase(phase.type);
           const canMove = (to: number) => {
             if (fixed || to < 0 || to >= drafts.length) return false;
@@ -276,7 +278,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                           </select>
                         </label>
                         {phase.breakKind === 'overnight' && <label>Fortsetzungsdatum
-                          <CalendarDatePicker id={`prestart-date-${phase.id}`} label="Fortsetzungsdatum" value={phase.nextDayDate ?? ''} minDate={nextCalendarDate((tournament.scheduledStart ?? toLocalDateTime(new Date())).slice(0, 10))} onChange={(value) => edit(phase.id, { nextDayDate: value })} />
+                          <CalendarDatePicker id={`prestart-date-${phase.id}`} label="Fortsetzungsdatum" value={phase.nextDayDate ?? ''} minDate={returnDateMinimum} onChange={(value) => edit(phase.id, { nextDayDate: value })} />
                         </label>}
                         <label>{phase.breakKind === 'overnight' ? 'Fortsetzungsuhrzeit' : phase.breakKind === 'until' ? 'Pause bis (Uhrzeit)' : 'Minuten'}
                           {phase.breakKind === 'minutes'
