@@ -616,15 +616,15 @@ export function updatePrestartTournamentPhases(
   return { ok: true, tournament: updated };
 }
 
-/** Serialize prestart writes across tabs, including their fingerprint check and
- * multi-key rollback. The browser's Web Locks API is preferred; IndexedDB
- * provides an equivalent per-tournament cross-tab mutex when unavailable. */
+/** Serialize prestart writes to shared draw/lifecycle/audit arrays across all
+ * tournaments. Tourneys have independent records, but these ancillary arrays
+ * still require a global cross-tab guard. */
 export async function updatePrestartTournamentPhasesSafely(
   tournamentId: string, drafts: PrestartPhaseDraft[], expectedFingerprint: string,
 ): Promise<ReturnType<typeof updatePrestartTournamentPhases>> {
   const perform = () => updatePrestartTournamentPhases(tournamentId, drafts, expectedFingerprint);
   if (typeof navigator !== 'undefined' && navigator.locks?.request) {
-    return navigator.locks.request(`online-tournament:prestart:${tournamentId}`, { mode: 'exclusive' }, perform);
+    return navigator.locks.request('online-tournament:prestart:shared-storage', { mode: 'exclusive' }, perform);
   }
   if (typeof indexedDB === 'undefined') {
     return { ok: false, error: 'Die sichere Speichersperre ist in diesem Browser nicht verfügbar.' };
@@ -642,10 +642,10 @@ export async function updatePrestartTournamentPhasesSafely(
       let result: ReturnType<typeof updatePrestartTournamentPhases> = {
         ok: false, error: 'Die Speichersperre wurde abgebrochen.',
       };
-      const read = store.get(tournamentId);
+      const read = store.get('shared-storage');
       read.onsuccess = () => {
         result = perform();
-        store.put((Number(read.result) || 0) + 1, tournamentId);
+        store.put((Number(read.result) || 0) + 1, 'shared-storage');
       };
       tx.oncomplete = () => { db.close(); resolve(result); };
       tx.onerror = () => { db.close(); resolve({ ok: false, error: 'Fehler beim Sperren des Turnierspeichers.' }); };
