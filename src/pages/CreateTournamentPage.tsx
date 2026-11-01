@@ -13,6 +13,7 @@ import {
   formatGroupDistribution,
   hasValidTerminalStageOrder,
   hasValidBreakStageOrder,
+  isValidSwissRoundCount,
   isTerminalStage,
   knockoutEntrantPresets,
   knockoutRoundLabels,
@@ -29,6 +30,7 @@ import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/
 import { createMockTournament } from '@/services/mockTournamentStore';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { formatPhaseOverview } from '@/domain/creationOverview';
+import { loadCreationDraft, saveCreationDraft, clearCreationDraft } from '@/domain/creationDraft';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedActiveBreakMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
@@ -327,51 +329,85 @@ function NumberChoice({
 
 export function CreateTournamentPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<WizardStep>(1);
-  const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>(1);
-  const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(false);
-  const [name, setName] = useState('');
-  const [scheduledDate, setScheduledDate] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('09:00');
+  const [restoredDraft] = useState(loadCreationDraft);
+  const [creationError, setCreationError] = useState<string | null>(null);
+  const [step, setStep] = useState<WizardStep>((restoredDraft?.step ?? 1) as WizardStep);
+  const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>((restoredDraft?.maxReachedStep ?? 1) as WizardStep);
+  const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(restoredDraft?.hasVisitedPhaseStep ?? false);
+  const [name, setName] = useState(restoredDraft?.name ?? '');
+  const [scheduledDate, setScheduledDate] = useState(restoredDraft?.scheduledDate ?? '');
+  const [scheduledTime, setScheduledTime] = useState(restoredDraft?.scheduledTime ?? '09:00');
   const scheduledStart = `${scheduledDate}T${scheduledTime}`;
-  const [awardsEnabled, setAwardsEnabled] = useState(false);
-  const [awardsAtOverride, setAwardsAtOverride] = useState<string | null>(null);
-  const [sport, setSport] = useState('');
+  const [awardsEnabled, setAwardsEnabled] = useState(restoredDraft?.awardsEnabled ?? false);
+  const [awardsAtOverride, setAwardsAtOverride] = useState<string | null>(restoredDraft?.awardsAtOverride ?? null);
+  const [sport, setSport] = useState(restoredDraft?.sport ?? '');
   const availableDisciplines = disciplineOptionsForSport(sport);
   const venue = getVenueTerminology(sport);
   const timedSport = sportScoring(sport).mode === 'score';
-  const [timedMatchMinutes, setTimedMatchMinutes] = useState('');
-  const [venueTurnoverMinutes, setVenueTurnoverMinutes] = useState('');
+  const [timedMatchMinutes, setTimedMatchMinutes] = useState(restoredDraft?.timedMatchMinutes ?? '');
+  const [venueTurnoverMinutes, setVenueTurnoverMinutes] = useState(restoredDraft?.venueTurnoverMinutes ?? '');
   const validMatchDuration = !timedSport || (timedMatchMinutes.trim() !== '' && Number.isInteger(Number(timedMatchMinutes)) && Number(timedMatchMinutes) > 0);
   const validTurnover = venueTurnoverMinutes.trim() === '' || (Number.isInteger(Number(venueTurnoverMinutes)) && Number(venueTurnoverMinutes) >= 0);
   const matchDurationMinutes = timedSport ? Number(timedMatchMinutes) || 15 : planningMinutesPerSet(sport);
   const breakMinutes = timedSport ? Number(venueTurnoverMinutes) || 0 : 0;
-  const [discipline, setDiscipline] = useState<Discipline>('SINGLES');
+  const [discipline, setDiscipline] = useState<Discipline>(restoredDraft?.discipline ?? 'SINGLES');
   const selectedDisciplineValid = availableDisciplines.some((option) => option.value === discipline);
-  const [tables, setTables] = useState(8);
-  const [customTables, setCustomTables] = useState(false);
-  const [venueLayoutEnabled, setVenueLayoutEnabled] = useState(false);
+  const [tables, setTables] = useState(restoredDraft?.tables ?? 8);
+  const [customTables, setCustomTables] = useState(restoredDraft?.customTables ?? false);
+  const [venueLayoutEnabled, setVenueLayoutEnabled] = useState(restoredDraft?.venueLayoutEnabled ?? false);
   const [venueLayoutEditorOpen, setVenueLayoutEditorOpen] = useState(false);
-  const [venueLayout, setVenueLayout] = useState(() => resizeVenueLayout(createVenueLayout(8), 4, 2, 8));
+  const [venueLayout, setVenueLayout] = useState(() => restoredDraft?.venueLayout ?? resizeVenueLayout(createVenueLayout(8), 4, 2, 8));
   useEffect(() => { setVenueLayout((current) => resizeVenueLayout(current, current.columns, Math.max(current.rows, Math.ceil(tables / current.columns)), tables)); }, [tables]);
-  const [participants, setParticipants] = useState<ParticipantDraft[]>([]);
-  const [participantForm, setParticipantForm] = useState<ParticipantFields>(emptyParticipantFields());
+  const [participants, setParticipants] = useState<ParticipantDraft[]>(restoredDraft?.participants ?? []);
+  const [participantForm, setParticipantForm] = useState<ParticipantFields>(restoredDraft?.participantForm ?? emptyParticipantFields());
   const [participantErrors, setParticipantErrors] = useState<ParticipantErrors>({});
-  const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null);
-  const [minimumMatches, setMinimumMatches] = useState(4);
-  const [customMinimumMatches, setCustomMinimumMatches] = useState(false);
-  const [selectedRecommendationId, setSelectedRecommendationId] = useState<string | null>(null);
-  const [phaseDrafts, setPhaseDrafts] = useState<PhaseDraft[]>([]);
+  const [editingParticipantId, setEditingParticipantId] = useState<string | null>(restoredDraft?.editingParticipantId ?? null);
+  const [minimumMatches, setMinimumMatches] = useState(restoredDraft?.minimumMatches ?? 4);
+  const [customMinimumMatches, setCustomMinimumMatches] = useState(restoredDraft?.customMinimumMatches ?? false);
+  const [selectedRecommendationId, setSelectedRecommendationId] = useState<string | null>(restoredDraft?.selectedRecommendationId ?? null);
+  const [phaseDrafts, setPhaseDrafts] = useState<PhaseDraft[]>(restoredDraft?.phaseDrafts ?? []);
   const [editingPhaseTypeId, setEditingPhaseTypeId] = useState<string | null>(null);
   const [expandedPhaseId, setExpandedPhaseId] = useState<string | null>(null);
   const [expandedInlineBreakIds, setExpandedInlineBreakIds] = useState<string[]>([]);
   const [phaseInsertIndex, setPhaseInsertIndex] = useState<number | null>(null);
   const [draggingPhaseId, setDraggingPhaseId] = useState<string | null>(null);
   const [dropTargetPhaseId, setDropTargetPhaseId] = useState<string | null>(null);
-  const [enabledSystems, setEnabledSystems] = useState<Record<TournamentSystemId, boolean>>(initialEnabledSystems);
-  const [maxGroups, setMaxGroups] = useState<number | null>(null);
-  const [maxSwissRounds, setMaxSwissRounds] = useState<number | null>(null);
-  const [knockoutQualifierCount, setKnockoutQualifierCount] = useState<number | null>(null);
+  const [enabledSystems, setEnabledSystems] = useState<Record<TournamentSystemId, boolean>>(restoredDraft?.enabledSystems ?? initialEnabledSystems);
+  const [maxGroups, setMaxGroups] = useState<number | null>(restoredDraft?.maxGroups ?? null);
+  const [maxSwissRounds, setMaxSwissRounds] = useState<number | null>(restoredDraft?.maxSwissRounds ?? null);
+  const [knockoutQualifierCount, setKnockoutQualifierCount] = useState<number | null>(restoredDraft?.knockoutQualifierCount ?? null);
+
+  // Drafts are restored synchronously on first render, so the first autosave
+  // cannot replace a valid draft with the wizard's empty initial values.
+  useEffect(() => {
+    saveCreationDraft({
+      step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime,
+      sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
+      customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
+      editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts,
+      selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
+      knockoutQualifierCount, awardsEnabled, awardsAtOverride,
+    });
+  }, [
+    step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime,
+    sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
+    customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
+    editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts,
+    selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
+    knockoutQualifierCount, awardsEnabled, awardsAtOverride,
+  ]);
+
+  const editingSavedParticipant = participants.find((participant) => participant.id === editingParticipantId);
+  const participantEditorDirty = Object.keys(emptyParticipantFields()).some((field) => {
+    const key = field as ParticipantField;
+    return participantForm[key] !== (editingSavedParticipant?.[key] ?? '');
+  });
+  function confirmLeaveParticipantEditor(): boolean {
+    if (step !== 2 || !participantEditorDirty) return true;
+    if (!window.confirm('Es gibt noch nicht gespeicherte Teilnehmerdaten. Ohne Speichern zum anderen Schritt wechseln?')) return false;
+    resetParticipantEditor();
+    return true;
+  }
 
   const participantCount = participants.filter((participant) => participantIsComplete(participant, discipline)).length;
   const incompleteSavedParticipants = participants.length - participantCount;
@@ -426,6 +462,7 @@ export function CreateTournamentPage() {
     && hasValidBreakStageOrder(phaseDrafts.map((phase) => phase.type));
   const phaseConfigurationValid = phaseDrafts.some((phase) => phase.type !== 'BREAK') && phaseOrderValid
     && phaseDrafts.every((phase) => {
+      if (phase.type === 'SWISS' && !isValidSwissRoundCount(phase.swissRounds, phase.entrantCount)) return false;
       if ((phase.type === 'SWISS' || phase.type === 'KNOCKOUT') && phase.inlineBreakAfterRound > 0) {
         const rounds = phase.type === 'SWISS' ? phase.swissRounds : knockoutRoundLabels(phase.entrantCount).length;
         if (phase.inlineBreakAfterRound >= rounds || phase.inlineBreakAfterRound < 1
@@ -532,12 +569,9 @@ export function CreateTournamentPage() {
   }
 
   function toggleSystem(systemId: TournamentSystemId) {
-    const disabling = enabledSystems[systemId];
+    // Filters affect recommendations only, never an existing customized phase plan.
     setEnabledSystems((current) => ({ ...current, [systemId]: !current[systemId] }));
-    if (disabling) {
-      setSelectedRecommendationId(null);
-      setPhaseDrafts((current) => current.filter((phase) => phase.type === 'BREAK' || systemIdForStage(phase.type) !== systemId));
-    }
+    setSelectedRecommendationId(null);
   }
 
   function selectRecommendation(recommendation: FormatRecommendation) {
@@ -765,13 +799,13 @@ export function CreateTournamentPage() {
   }
 
   function navigateToStep(target: WizardStep) {
-    if (target > maxReachedStep) return;
+    if (target > maxReachedStep || (target !== step && !confirmLeaveParticipantEditor())) return;
     setStep(target);
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
   function goNext() {
-    if (!canContinue) return;
+    if (!canContinue || !confirmLeaveParticipantEditor()) return;
     const next = (step + 1) as WizardStep;
     if (step === 3) {
       if (phaseDrafts.length === 0 && selectedRecommendation) {
@@ -791,6 +825,8 @@ export function CreateTournamentPage() {
 
   function submitTournament() {
     if (step !== 5 || !canCreate || scheduleIssues.length > 0) return;
+    setCreationError(null);
+    try {
     const tournament = createMockTournament({
       name,
       sport,
@@ -824,7 +860,11 @@ export function CreateTournamentPage() {
       estimatedDurationMinutes: estimatedTournamentDurationMinutes,
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
     });
+    clearCreationDraft();
     navigate(`/tournaments/${tournament.id}/control`, { replace: true });
+    } catch (error) {
+      setCreationError(error instanceof Error ? error.message : 'Das Turnier konnte nicht gespeichert werden. Bitte Speicherplatz prüfen und erneut versuchen.');
+    }
   }
 
   const phaseEstimates = useMemo(
@@ -1939,6 +1979,7 @@ export function CreateTournamentPage() {
               onToggleAwards={(enabled) => { setAwardsEnabled(enabled); setAwardsAtOverride(null); }}
               onAwardsAtChange={setAwardsAtOverride}
             />
+            {creationError && <div className="wizard-schedule-errors" role="alert"><strong>Speichern fehlgeschlagen:</strong> {creationError}</div>}
             {scheduleIssues.length > 0 && <div className="wizard-schedule-errors" role="alert">
               <strong>Bitte diese Zeitplan-Angaben korrigieren:</strong>
               <ul>{scheduleIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
