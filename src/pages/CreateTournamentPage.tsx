@@ -1915,7 +1915,7 @@ export function CreateTournamentPage() {
                 <div><dt>Teilnehmer</dt><dd>{participantCount} {discipline === 'TEAMS' ? 'Mannschaften' : discipline === 'DOUBLES' ? 'Doppel' : 'Spieler'}</dd></div>
                 <div><dt>Spielflächen</dt><dd>{tables} {venue.plural}</dd></div>
                 <div><dt>Mindestspiele</dt><dd>{minimumMatches} pro Teilnehmer</dd></div>
-                <div><dt>Wettkampfphasen</dt><dd>{phaseDrafts.filter((phase) => phase.type !== 'BREAK').length} · {phaseDrafts.filter((phase) => phase.type === 'BREAK').length} separate Pausen</dd></div>
+                <div><dt>Turnierphasen</dt><dd>{phaseDrafts.filter((phase) => phase.type !== 'BREAK').length} Wettkampfphasen · {phaseDrafts.filter((phase) => phase.type === 'BREAK').length} {phaseDrafts.filter((phase) => phase.type === 'BREAK').length === 1 ? 'Pause' : 'Pausen'}</dd></div>
                 <div><dt>Geplante Spiele</dt><dd>{phaseEstimates.reduce((total, estimate) => total + estimate.estimatedMatches, 0)}</dd></div>
               </dl>
               <div className="creation-review-timing">
