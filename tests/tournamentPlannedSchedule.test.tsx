@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, plannedActiveBreakMinutes, formatPlannedBreakDuration, groupPlannedScheduleDays, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { isValidLocalDateTime, isStartAtOrAfterNow, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, plannedActiveBreakMinutes, formatPlannedBreakDuration, groupPlannedScheduleDays, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { TournamentSummaryPanel } from '@/components/TournamentSummaryPanel';
 import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
@@ -32,6 +32,16 @@ describe('optionaler vorläufiger Zeitplan', () => {
     { id: 'lunch', at: '2026-10-31T12:00', title: 'Mittagspause', type: 'break', note: 'Verpflegung im Foyer' },
     { id: 'final', at: '2026-10-31T16:30', title: 'Siegerehrung', type: 'other' },
   ];
+  it('blocks past tournament starts at minute precision, including invalid timestamps', () => {
+    const now = new Date(2030, 10, 21, 12, 34, 59);
+    expect(isStartAtOrAfterNow('2030-11-21T12:34', now)).toBe(true);
+    expect(isStartAtOrAfterNow('2030-11-21T12:33', now)).toBe(false);
+    expect(isStartAtOrAfterNow('2030-11-21T12:35', now)).toBe(true);
+    expect(isStartAtOrAfterNow('2030-11-20T23:59', now)).toBe(false);
+    expect(isStartAtOrAfterNow('2030-11-22T00:00', now)).toBe(true);
+    expect(isStartAtOrAfterNow('2030-02-30T10:00', now)).toBe(false);
+  });
+
   it('validiert Datum und Uhrzeit einschließlich Kalenderfehlern', () => {
     expect(isValidLocalDateTime(start)).toBe(true);
     expect(isValidLocalDateTime('2028-02-29T09:00')).toBe(true);
