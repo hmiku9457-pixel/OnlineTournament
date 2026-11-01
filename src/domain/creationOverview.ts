@@ -30,6 +30,8 @@ export function formatPhaseOverview(
   switch (phase.type) {
     case 'GROUPS':
       parts.push(`${phase.groupCount ?? 2} Gruppen`);
+      // If nobody is eliminated, still state the field size.
+      if (qualifiers === null) parts.push(`${count} ${unit}`);
       break;
     case 'SWISS':
       parts.push(`${count} ${unit}`, `${phase.swissRounds ?? 1} Runden`);
