@@ -478,6 +478,24 @@ try {
   assert.equal(await legacyPage.locator('.sidebar-draft-item').count(), migratedCount);
   await legacyContext.close();
 
+  // A browser which blocks IndexedDB must not offer clickable dead draft
+  // links. The user can still see what is saved and why it is unavailable.
+  const blockedContext = await browser.newContext();
+  await blockedContext.addInitScript((raw) => {
+    Object.defineProperty(window, 'indexedDB', { configurable: true, value: undefined });
+    const key = 'online-tournament:saved-creation-drafts:v1';
+    if (raw && !localStorage.getItem(key)) localStorage.setItem(key, raw);
+  }, legacySnapshot);
+  const blockedPage = await blockedContext.newPage();
+  await blockedPage.goto(base + '/#/tournaments/new');
+  await blockedPage.locator('.sidebar-storage-warning').waitFor();
+  assert.ok(await blockedPage.locator('.sidebar-draft-item.is-unavailable').count() > 0);
+  assert.equal(await blockedPage.locator('a.sidebar-draft-item').count(), 0);
+  await blockedPage.locator('#name').fill('Temporär');
+  await blockedPage.getByRole('button', { name: 'Entwurf speichern' }).click();
+  await blockedPage.getByText('IndexedDB ist in diesem Browser nicht verfügbar.', { exact: false }).waitFor();
+  await blockedContext.close();
+
   process.stdout.write('Creation wizard browser smoke tests passed.\n');
 } finally {
   await browser.close();
