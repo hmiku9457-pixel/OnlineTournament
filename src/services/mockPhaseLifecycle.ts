@@ -169,6 +169,22 @@ export function computeBreakResumeAt(start: Date, options: BreakStartOptions): D
   return target;
 }
 
+/** Respect an explicit return date even for multi-day tournament interruptions.
+ * If play overruns that date, do not silently postpone another full day. */
+function computeDayEndResumeAt(start: Date, dateText: string, timeText: string): Date | null {
+  const time = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(timeText);
+  if (!time) return null;
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateText);
+  const resume = new Date(start);
+  if (dateText && !day) return null;
+  if (day) {
+    resume.setFullYear(Number(day[1]), Number(day[2]) - 1, Number(day[3]));
+    if (resume.getFullYear() !== Number(day[1]) || resume.getMonth() !== Number(day[2]) - 1 || resume.getDate() !== Number(day[3])) return null;
+  } else resume.setDate(resume.getDate() + 1);
+  resume.setHours(Number(time[1]), Number(time[2]), 0, 0);
+  return resume <= start ? new Date(start) : resume;
+}
+
 export function startStage(tournament: DemoTournament, stage: TournamentStage, pauseOptions?: BreakStartOptions) {
   if (tournament.status === 'ABORTED' || tournament.status === 'FINISHED' || !isStageEditable(tournament, stage)) return false;
   if (getStageStartIssue(tournament, stage)) return false;
@@ -185,11 +201,8 @@ export function startStage(tournament: DemoTournament, stage: TournamentStage, p
     pauseResume = computeBreakResumeAt(startDate, options);
     if (!pauseResume) return false;
     if (stage.settings.breakKind === 'overnight' && !pauseOptions) {
-      // Legacy scheduled day-end always resumes on the following calendar day.
-      const [hour, minute] = String(stage.settings.nextDayStart ?? '09:00').split(':').map(Number);
-      pauseResume = new Date(startDate);
-      pauseResume.setDate(pauseResume.getDate() + 1);
-      pauseResume.setHours(hour, minute, 0, 0);
+      pauseResume = computeDayEndResumeAt(startDate, String(stage.settings.nextDayDate ?? ''), String(stage.settings.nextDayStart ?? '09:00'));
+      if (!pauseResume) return false;
     }
   }
   let additionalMinutes = 0;
@@ -280,13 +293,7 @@ export function getBreakResumeAt(tournament: DemoTournament, stage: TournamentSt
   const start = new Date(startedAt);
   if (Number.isNaN(start.getTime())) return null;
   if (stage.settings.breakKind === 'overnight') {
-    const startTime = String(stage.settings.nextDayStart ?? '09:00');
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime)) return null;
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const resume = new Date(start);
-    resume.setDate(resume.getDate() + 1);
-    resume.setHours(hours, minutes, 0, 0);
-    return resume;
+    return computeDayEndResumeAt(start, String(stage.settings.nextDayDate ?? ''), String(stage.settings.nextDayStart ?? '09:00'));
   }
   if (stage.settings.breakKind === 'until') {
     return computeBreakResumeAt(start, { kind: 'clock', time: String(stage.settings.breakUntil ?? '12:00') });
