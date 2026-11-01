@@ -1,16 +1,9 @@
-import {
-  getSavedCreationDraft, listSavedCreationDrafts, SAVED_CREATION_DRAFTS_KEY, validDraft,
-  type CreationDraft, type SavedCreationDraft,
-} from '@/domain/creationDraft';
+import { validDraft, type CreationDraft, type SavedCreationDraft } from '@/domain/creationDraft';
 
-/**
- * Durable, transactional, per-draft storage. The old localStorage array is a
- * backwards-compatible read cache ONLY; IndexedDB is authoritative once opened.
- * Upgrade migrates existing named drafts exactly once in a single transaction.
- */
-const DATABASE = 'online-tournament:named-creation-drafts:v1';
+/** Each saved draft exists only in the current IndexedDB schema.
+ * Development-era localStorage draft lists are intentionally not imported. */
+const DATABASE = 'online-tournament:named-creation-drafts:v2';
 const STORE = 'drafts';
-const META = 'meta';
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -19,7 +12,6 @@ function openDatabase(): Promise<IDBDatabase> {
     request.onupgradeneeded = () => {
       const database = request.result;
       if (!database.objectStoreNames.contains(STORE)) database.createObjectStore(STORE, { keyPath: 'id' });
-      if (!database.objectStoreNames.contains(META)) database.createObjectStore(META);
     };
     request.onerror = () => reject(request.error ?? new Error('Die Entwurfsdatenbank konnte nicht geöffnet werden.'));
     request.onsuccess = () => resolve(request.result);
@@ -47,32 +39,11 @@ function runTransaction<T>(
 
 async function withDatabase<T>(action: (db: IDBDatabase) => Promise<T>): Promise<T> {
   const db = await openDatabase();
-  try {
-    // Only import the legacy localStorage list on the first transaction.
-    // A deleted/renamed IndexedDB entry must never reappear after migration.
-    await runTransaction<void>(db, 'readwrite', [STORE, META], (tx, done) => {
-      const meta = tx.objectStore(META);
-      const check = meta.get('legacy-migrated');
-      check.onsuccess = () => {
-        if (check.result !== true) {
-          for (const draft of listSavedCreationDrafts()) {
-            tx.objectStore(STORE).put({ ...draft, revision: draft.revision ?? 1 });
-          }
-          meta.put(true, 'legacy-migrated');
-        }
-        done(undefined);
-      };
-    });
-    return await action(db);
-  } finally { db.close(); }
+  try { return await action(db); }
+  finally { db.close(); }
 }
 
-function eventAndCache(list: SavedCreationDraft[]): void {
-  try {
-    // Legacy UI readers and older client versions can still display a snapshot.
-    // This cache is never consulted for conflict resolution after migration.
-    window.localStorage.setItem(SAVED_CREATION_DRAFTS_KEY, JSON.stringify(list));
-  } catch { /* IndexedDB remains the source of truth if localStorage is full. */ }
+function emitDraftChange(): void {
   window.dispatchEvent(new Event('creation-drafts-change'));
 }
 
@@ -117,13 +88,13 @@ export async function saveNamedCreationDraftAtomic(
     const request = existingId ? store.get(existingId) : null;
     const apply = (previous: SavedCreationDraft | null) => {
       if (existingId && (!previous || expectedRevision === undefined
-        || (previous.revision ?? 1) !== expectedRevision)) {
+        || previous.revision !== expectedRevision)) {
         tx.abort();
         return;
       }
       const entry: SavedCreationDraft = {
         id: previous?.id ?? freshId(), savedAt: new Date().toISOString(),
-        revision: previous ? (previous.revision ?? 1) + 1 : 1, draft: normalized,
+        revision: previous ? (previous.revision ?? 0) + 1 : 1, draft: normalized,
       };
       store.put(entry);
       done(entry);
@@ -134,7 +105,7 @@ export async function saveNamedCreationDraftAtomic(
     if (existingId && error instanceof DOMException && error.name === 'AbortError') throw new Error('DRAFT_CONFLICT');
     throw error;
   });
-  await refreshLegacyCache();
+  emitDraftChange();
   return candidate;
 }
 
@@ -145,7 +116,7 @@ export async function removeSavedCreationDraftAtomic(id: string, expectedRevisio
     const request = store.get(id);
     request.onsuccess = () => {
       const existing = request.result as SavedCreationDraft | undefined;
-      if (existing && expectedRevision !== undefined && (existing.revision ?? 1) !== expectedRevision) {
+      if (existing && expectedRevision !== undefined && existing.revision !== expectedRevision) {
         tx.abort();
         return;
       }
@@ -156,11 +127,6 @@ export async function removeSavedCreationDraftAtomic(id: string, expectedRevisio
     if (error instanceof DOMException && error.name === 'AbortError') throw new Error('DRAFT_CONFLICT');
     throw error;
   });
-  await refreshLegacyCache();
+  emitDraftChange();
 }
 
-/** Existing synchronous legacy readers are retained for old drafts and tests,
- * but browser flows now use only the atomic database functions above. */
-export function readLegacyDraftOnUnavailableDatabase(id: string): SavedCreationDraft | null {
-  return getSavedCreationDraft(id);
-}
