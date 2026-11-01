@@ -36,10 +36,10 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Hallenlayout und Vorstartteilnehmer', () => {
-  it('zeigt ein 10 x 3 Raster und erweitert bei mehr als 30 Platten nur die Höhe', () => {
+  it('zeigt standardmäßig ein quadratisches Raster', () => {
     const layout = createVenueLayout(5);
-    expect([layout.columns, layout.rows, layout.cells.length]).toEqual([10, 3, 30]);
-    expect(createVenueLayout(31).rows).toBe(4);
+    expect([layout.columns, layout.rows, layout.cells.length]).toEqual([3, 3, 9]);
+    expect(createVenueLayout(31).rows).toBe(6);
     expect(layoutTableNumbers(resizeVenueLayout(layout, 10, 4, 31))).toHaveLength(31);
   });
 
