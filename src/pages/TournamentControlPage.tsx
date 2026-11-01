@@ -34,7 +34,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, getPendingGroupCutoff, resolveGroupCutoff, getPendingMockApproval, approveMockProgress, abortMockTournament, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, getPendingGroupCutoff, getEditableGroupCutoff, resolveGroupCutoff, getPendingMockApproval, approveMockProgress, abortMockTournament, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
 import { canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getStageWithdrawalLabel, getWithdrawalLabel, isParticipantWithdrawn } from '@/services/mockWithdrawals';
 import { getMockConfirmedFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
@@ -685,6 +685,7 @@ export function TournamentControlPage() {
   const activeStage = useMemo(() => getActiveStage(phaseSource.tournament), [phaseSource]);
   const pendingApproval = useMemo(() => getPendingMockApproval(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   const pendingGroupCutoff = useMemo(() => getPendingGroupCutoff(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
+  const editableGroupCutoff = useMemo(() => getEditableGroupCutoff(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   const activeBreak = activeStage?.type === 'BREAK' ? activeStage : null;
   const inlineBreak = activeStage ? getInlineBreakStatus(tournament, activeStage, getMockStageMatches(tournament, activeStage)) : null;
   const inlineBreakRunning = inlineBreak?.state === 'running' ? inlineBreak : null;
@@ -1222,6 +1223,14 @@ export function TournamentControlPage() {
         ))}
       </nav>
 
+      {!pendingGroupCutoff && editableGroupCutoff && (
+        <div className="control-review-alert no-print" role="status">
+          <div><strong>Qualifikations-Stichentscheid dokumentiert</strong>
+            <p>Bis zum Start der nächsten Spielphase kannst du die Entscheidung korrigieren. Die Korrektur wird protokolliert.</p>
+          </div>
+          <button type="button" className="btn" onClick={() => setGroupCutoffModalOpen(true)}>Stichentscheid korrigieren</button>
+        </div>
+      )}
       {pendingGroupCutoff && (
         <div className="control-review-alert no-print" role="status">
           <div>
@@ -1582,7 +1591,7 @@ export function TournamentControlPage() {
               <PrestartDrawEditor
                 tournament={tournament}
                 stage={selectedStage}
-                onChanged={() => setDrawVersion((value) => value + 1)}
+                onChanged={() => { setDrawVersion((value) => value + 1); refreshRuntime(); }}
               />
               {isStageLockedWaiting(tournament, selectedStage) ? (
                 <div className="card locked-stage-placeholder">
@@ -1964,8 +1973,8 @@ export function TournamentControlPage() {
           </section>
         </div>
       )}
-      {pendingGroupCutoff && groupCutoffModalOpen && (
-        <GroupCutoffDecisionModal status={pendingGroupCutoff}
+      {(pendingGroupCutoff || editableGroupCutoff) && groupCutoffModalOpen && (
+        <GroupCutoffDecisionModal key={(pendingGroupCutoff ?? editableGroupCutoff)!.signature} status={(pendingGroupCutoff ?? editableGroupCutoff)!}
           onClose={() => setGroupCutoffModalOpen(false)}
           onResolve={(winners, method, explanation) => {
             const error = resolveGroupCutoff(tournament, winners, method, explanation);
