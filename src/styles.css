@@ -6186,3 +6186,62 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .wizard-workspace-review .planned-schedule-phase-summary { margin-left: 0; text-align: left; }
   .wizard-workspace-review > .wizard-sidebar-column { align-items: stretch; }
 }
+
+/* Kompakte rechte Turnierübersicht und grüne finale Erstellen-Aktion */
+.wizard-sidebar-column .wizard-side-summary-heading {
+  padding: 11px 12px 8px;
+}
+.wizard-sidebar-column .wizard-side-facts {
+  gap: 1px;
+  padding: 0 7px;
+}
+.wizard-sidebar-column .wizard-side-fact {
+  padding: 7px 9px;
+  gap: 2px;
+}
+.wizard-sidebar-column .wizard-side-fact small {
+  line-height: 1.3;
+}
+.wizard-sidebar-column .wizard-side-phase-summary {
+  margin: 7px 12px 0;
+  padding-top: 9px;
+}
+.wizard-sidebar-column .wizard-side-phase-list {
+  gap: 7px;
+  margin-top: 8px;
+}
+.wizard-sidebar-column .wizard-side-phase-list > li > div {
+  gap: 2px;
+}
+.wizard-sidebar-column .wizard-side-duration {
+  margin: 10px 11px 0;
+  padding: 10px 11px;
+  gap: 4px;
+}
+.wizard-sidebar-column .wizard-side-duration-breakdown {
+  padding-top: 7px;
+  gap: 4px;
+}
+.wizard-sidebar-column .wizard-side-footnote {
+  padding: 8px 11px 10px;
+}
+.wizard-sidebar-column .wizard-side-actions {
+  padding: 8px;
+  gap: 6px;
+}
+.wizard-sidebar-column .wizard-side-navigation {
+  gap: 7px;
+}
+.wizard-workspace .wizard-create-button:not(:disabled) {
+  background: #079455;
+  border-color: #067647;
+  color: #fff;
+}
+.wizard-workspace .wizard-create-button:not(:disabled):hover {
+  background: #067647;
+  border-color: #05603a;
+}
+.wizard-workspace .wizard-create-button:focus-visible {
+  outline: 3px solid #75e0a7;
+  outline-offset: 2px;
+}
