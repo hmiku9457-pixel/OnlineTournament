@@ -117,7 +117,7 @@ describe('five-step tournament creation smoke test', () => {
   it('restores a complete five-step configuration into the final review', () => {
     const draft: CreationDraft = {
       step: 5, maxReachedStep: 5, hasVisitedPhaseStep: true,
-      name: 'Vereinsmeisterschaft 2026', scheduledDate: '2026-11-01', scheduledTime: '10:00',
+      name: 'Vereinsmeisterschaft 2026', scheduledDate: '2026-11-01', scheduledTime: '10:00', useCurrentTime: false,
       sport: 'table_tennis', discipline: 'SINGLES',
       timedMatchMinutes: '', venueTurnoverMinutes: '', tables: 3,
       customTables: false, venueLayoutEnabled: false, venueLayout: createVenueLayout(3),
@@ -138,10 +138,10 @@ describe('five-step tournament creation smoke test', () => {
       selectedRecommendationId: null,
       enabledSystems: { 'round-robin': true, groups: true, swiss: true, knockout: true },
       maxGroups: null, maxSwissRounds: null, knockoutQualifierCount: null,
-      awardsEnabled: false, awardsAtOverride: null,
+      preferredDurationMinutes: 210, awardsEnabled: false, awardsAtOverride: null,
     };
-    vi.stubGlobal('window', { localStorage: {
-      getItem: (key: string) => key === CREATION_DRAFT_KEY ? JSON.stringify({ version: 1, draft }) : null,
+    vi.stubGlobal('window', { sessionStorage: {
+      getItem: (key: string) => key === `${CREATION_DRAFT_KEY}:new` ? JSON.stringify({ version: 1, draft }) : null,
     } });
     const html = renderWizard();
     expect(html).toContain('Vereinsmeisterschaft 2026');
