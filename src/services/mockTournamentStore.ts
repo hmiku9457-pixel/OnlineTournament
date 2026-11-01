@@ -238,6 +238,19 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
   return { ...recalculated, plannedSchedule };
 }
 
+/** Persist the effective number of groups once a phase actually starts.
+ * Empty groups cease to exist, so all downstream grouping views see the
+ * same compact stage and no dangling empty group columns. */
+export function persistStartedGroupCount(tournamentId: string, stageId: string, count: number) {
+  const all = readLocalTournaments();
+  const tournament = all.find((item) => item.id === tournamentId);
+  if (!tournament || count < 1) return;
+  const stage = tournament.stages.find((item) => item.id === stageId);
+  if (!stage || stage.type !== 'GROUPS') return;
+  stage.settings.groups = count;
+  writeLocalTournaments(all);
+}
+
 /** Call after a pre-start registration or withdrawal changes the active field.
  * No tournament format, group setting, or Swiss round count is rewritten. */
 export function refreshPrestartSchedule(tournamentId: string): void {
