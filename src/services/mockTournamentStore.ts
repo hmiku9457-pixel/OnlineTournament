@@ -151,6 +151,7 @@ export function cleanupReplacedTournamentData(tournamentId: string): void {
     'online-tournament:swiss-round-fixtures:v1',
     'online-tournament:mock-audit:v1',
     'online-tournament:mock-inline-breaks:v1',
+    'online-tournament:group-cutoff-decisions:v1',
   ];
   const arraysWithMatchId = [
     'online-tournament:mock-match-results:v2',
@@ -161,6 +162,13 @@ export function cleanupReplacedTournamentData(tournamentId: string): void {
     'online-tournament:withdrawal-timing:v1',
     'online-tournament:withdrawal-restore:v1',
     'online-tournament:mock-blocked-tables:v1',
+  ];
+  // Swiss decisions and additional Swiss rounds use composite
+  // "tournamentId:stageId" dictionary keys rather than tournamentId fields.
+  const mapsByCompositeKey = [
+    'online-tournament:swiss-cutoff-decisions:v1',
+    'online-tournament:swiss-round-robin-history:v1',
+    'online-tournament:swiss-extra-rounds:v1',
   ];
   for (const key of arraysWithTournamentId) {
     try {
@@ -184,6 +192,22 @@ export function cleanupReplacedTournamentData(tournamentId: string): void {
         || !(record as { matchId: string }).matchId.startsWith(`${tournamentId}-phase-`));
       if (remaining.length !== entries.length) window.localStorage.setItem(key, JSON.stringify(remaining));
     } catch { /* Do not mutate malformed user data. */ }
+  }
+  for (const key of mapsByCompositeKey) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const records: unknown = JSON.parse(raw);
+      if (!records || typeof records !== 'object' || Array.isArray(records)) continue;
+      const remaining = { ...(records as Record<string, unknown>) };
+      let changed = false;
+      for (const name of Object.keys(remaining)) {
+        if (!name.startsWith(`${tournamentId}:`)) continue;
+        delete remaining[name];
+        changed = true;
+      }
+      if (changed) window.localStorage.setItem(key, JSON.stringify(remaining));
+    } catch { /* Do not mutate malformed data. */ }
   }
   for (const key of mapsByTournament) {
     try {
