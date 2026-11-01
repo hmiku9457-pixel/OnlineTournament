@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { ClockTimeDial, ClockTimePicker, clockDialPosition, formatClockTime, parseClockTime } from '@/components/ClockTimePicker';
+import { ClockTimeDial, ClockTimePicker, clockDialPosition, formatClockTime, isClockTimeAllowed, parseClockTime } from '@/components/ClockTimePicker';
 
 describe('Uhr mit Zifferblatt für die geplante Turnierzeit', () => {
   it('verarbeitet 24-Stunden-Zeiten ohne Zeitzonenänderung', () => {
@@ -42,6 +42,33 @@ describe('Uhr mit Zifferblatt für die geplante Turnierzeit', () => {
     expect(dial).toContain('aria-label="0 Minuten"');
     expect(dial).toContain('aria-label="35 Minuten"');
     expect(dial).toContain('aria-label="55 Minuten"');
+  });
+
+  it('disables past hours and minutes on the selected current date', () => {
+    expect(isClockTimeAllowed('12:34', '12:34')).toBe(true);
+    expect(isClockTimeAllowed('12:33', '12:34')).toBe(false);
+    expect(isClockTimeAllowed('13:00', '12:34')).toBe(true);
+    expect(isClockTimeAllowed('00:00')).toBe(true);
+    expect(isClockTimeAllowed('25:00', '12:34')).toBe(false);
+    const hours = renderToStaticMarkup(createElement(ClockTimeDial, {
+      mode: 'hours', hour: 12, minute: 34, minTime: '12:34', onPickHour: () => {}, onPickMinute: () => {},
+    }));
+    expect(hours).toMatch(/aria-label="11 Uhr"[^>]*disabled=""/);
+    expect(hours).not.toMatch(/aria-label="12 Uhr"[^>]*disabled=""/);
+    const minutes = renderToStaticMarkup(createElement(ClockTimeDial, {
+      mode: 'minutes', hour: 12, minute: 34, minTime: '12:34', onPickHour: () => {}, onPickMinute: () => {},
+    }));
+    expect(minutes).toMatch(/aria-label="30 Minuten"[^>]*disabled=""/);
+    expect(minutes).not.toMatch(/aria-label="35 Minuten"[^>]*disabled=""/);
+  });
+
+  it('marks live Jetzt time in the selection trigger', () => {
+    const markup = renderToStaticMarkup(createElement(ClockTimePicker, {
+      id: 'start', value: '12:34', minTime: '12:34', nowActive: true,
+      nowTime: '12:34', onNow: () => {}, onChange: () => {},
+    }));
+    expect(markup).toContain('Jetzt · 12:34');
+    expect(markup).toContain('aktuell 12:34 Uhr, live');
   });
 
   it('zeigt statt der Dropdown-Auswahl den Dialog-Auslöser', () => {
