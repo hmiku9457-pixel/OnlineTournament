@@ -114,8 +114,9 @@ export function validDraft(value: unknown): value is CreationDraft {
       typeof (data.enabledSystems as unknown as Record<string, unknown>)[key] === 'boolean')
     && [data.maxGroups, data.maxSwissRounds, data.knockoutQualifierCount]
       .every((v) => v === null || (typeof v === 'number' && Number.isInteger(v)))
+    && typeof data.preferredDurationMinutes === 'number'
     && Number.isInteger(data.preferredDurationMinutes) && data.preferredDurationMinutes >= 15
-        && data.preferredDurationMinutes <= 1439
+    && data.preferredDurationMinutes <= 1439
     && (data.selectedRecommendationId === null || typeof data.selectedRecommendationId === 'string')
     && typeof data.awardsEnabled === 'boolean'
     && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string');
