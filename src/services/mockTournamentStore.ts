@@ -494,25 +494,46 @@ function samePrestartPlan(tournament: DemoTournament, drafts: PrestartPhaseDraft
 /** LocalStorage has no multi-key transaction. Keep byte-for-byte snapshots of
  * every key changed by a director phase save, including its audit record.
  * On failure restore the complete previous state or flag restoration failure. */
-const PRESTART_TRANSACTION_KEYS = [
-  STORAGE_KEY,
+const PRESTART_SHARED_RECORD_KEYS = [
   'online-tournament:mock-draw-config:v1',
   'online-tournament:mock-phase-lifecycle:v1',
   'online-tournament:mock-audit:v1',
 ] as const;
 
-function withPrestartRollback(action: () => void): { ok: boolean; rollbackFailed: boolean } {
+function withPrestartRollback(tournamentId: string, action: () => void): { ok: boolean; rollbackFailed: boolean } {
   const storage = window.localStorage;
-  const snapshot = PRESTART_TRANSACTION_KEYS.map((key) => ({ key, original: storage.getItem(key) }));
+  // In actual browsers the tournament record has its own storage key. Legacy
+  // in-memory tests still use the single-array key.
+  const tournamentKey = supportsShardedTournaments(storage) ? recordKey(tournamentId) : STORAGE_KEY;
+  const originalTournament = storage.getItem(tournamentKey);
+  const snapshots = PRESTART_SHARED_RECORD_KEYS.map((key) => {
+    const original = storage.getItem(key);
+    const parsed: unknown = JSON.parse(original ?? '[]');
+    if (!Array.isArray(parsed)) throw new Error('Ungültiger gespeicherter Turnierzustand.');
+    return {
+      key, original, previous: parsed.filter((item) =>
+        item && typeof item === 'object' && (item as { tournamentId?: string }).tournamentId === tournamentId),
+    };
+  });
   try {
     action();
     return { ok: true, rollbackFailed: false };
   } catch {
     let rollbackFailed = false;
-    for (const { key, original } of snapshot) {
+    try {
+      if (originalTournament === null) storage.removeItem(tournamentKey);
+      else storage.setItem(tournamentKey, originalTournament);
+    } catch { rollbackFailed = true; }
+    // Restore only the affected tournament's draw/lifecycle/audit records.
+    // Another tournament's records must survive a rollback.
+    for (const { key, previous } of snapshots) {
       try {
-        if (original === null) storage.removeItem(key);
-        else storage.setItem(key, original);
+        const latest: unknown = JSON.parse(storage.getItem(key) ?? '[]');
+        if (!Array.isArray(latest)) throw new Error('Invalid storage records');
+        const unaffected = latest.filter((item) =>
+          !item || typeof item !== 'object'
+          || (item as { tournamentId?: string }).tournamentId !== tournamentId);
+        storage.setItem(key, JSON.stringify([...previous, ...unaffected]));
       } catch { rollbackFailed = true; }
     }
     window.dispatchEvent(new Event('mock-runtime-change'));
@@ -571,7 +592,7 @@ export function updatePrestartTournamentPhases(
 
   let transaction: { ok: boolean; rollbackFailed: boolean };
   try {
-    transaction = withPrestartRollback(() => {
+    transaction = withPrestartRollback(tournamentId, () => {
       writeLocalTournaments(all.map((item) => item.id === tournamentId ? updated : item));
       clearPrestartTournamentDraws(tournamentId);
       resetPrestartPhaseLifecycle(previous);
