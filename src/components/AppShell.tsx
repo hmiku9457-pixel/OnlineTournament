@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { sidebarTournaments, type SidebarTournament } from '@/domain/sidebarTournaments';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
-import { listSavedCreationDrafts } from '@/domain/creationDraft';
+import { listSavedCreationDrafts, type SavedCreationDraft } from '@/domain/creationDraft';
+import { listSavedCreationDraftsAtomic } from '@/domain/savedCreationDraftStore';
 
 type SidebarIconName = 'trophy' | 'grid' | 'plus' | 'user' | 'calendar' | 'chart' | 'settings';
 
@@ -75,7 +76,17 @@ export function AppShell() {
     };
   }, []);
 
-  const savedDrafts = useMemo(() => listSavedCreationDrafts(), [revision, location.key]);
+  const [savedDrafts, setSavedDrafts] = useState<SavedCreationDraft[]>(() => listSavedCreationDrafts());
+  useEffect(() => {
+    let cancelled = false;
+    listSavedCreationDraftsAtomic().then((entries) => {
+      if (!cancelled) setSavedDrafts(entries);
+    }).catch(() => {
+      // Keep showing imported legacy drafts if database access was denied.
+      if (!cancelled) setSavedDrafts(listSavedCreationDrafts());
+    });
+    return () => { cancelled = true; };
+  }, [revision, location.key]);
   const yourTournaments = useMemo(
     () => sidebarTournaments(getAllMockTournaments()),
     [revision, location.key],
