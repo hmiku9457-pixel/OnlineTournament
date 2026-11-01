@@ -124,7 +124,13 @@ function writeLocalTournaments(tournaments: DemoTournament[]) {
       storage.setItem(TOURNAMENT_INDEX_KEY, JSON.stringify(desiredIds));
     }
     for (const id of beforeIds) {
-      if (!desired.has(id)) storage.removeItem(recordKey(id));
+      if (!desired.has(id)) {
+        // Once the new index is committed, failure to physically remove an
+        // obsolete record is non-fatal. The record is unreachable through the
+        // current catalog; reverting the new record would corrupt the index.
+        try { storage.removeItem(recordKey(id)); }
+        catch { /* Orphaned storage bytes can be removed during a full reset. */ }
+      }
     }
   } catch (error) {
     for (const key of newRecords) {
@@ -875,9 +881,21 @@ export function addMockParticipant(
 
 export function removeLocalPrototypeTournaments() {
   if (typeof window === 'undefined') return;
-  for (const id of readTournamentIds()) window.localStorage.removeItem(recordKey(id));
+  // Clear all current record keys, including unindexed orphans from a
+  // best-effort replacement cleanup. The browser storage API supports this.
+  const store = window.localStorage;
+  if (typeof store.key === 'function' && typeof store.length === 'number') {
+    const recordKeys: string[] = [];
+    for (let index = 0; index < store.length; index++) {
+      const key = store.key(index);
+      if (key?.startsWith(TOURNAMENT_RECORD_PREFIX)) recordKeys.push(key);
+    }
+    for (const key of recordKeys) store.removeItem(key);
+  } else {
+    for (const id of readTournamentIds()) store.removeItem(recordKey(id));
+  }
   previousTournamentRead.clear();
-  window.localStorage.removeItem(TOURNAMENT_INDEX_KEY);
+  store.removeItem(TOURNAMENT_INDEX_KEY);
   window.localStorage.removeItem('online-tournament:mock-audit:v1');
   window.localStorage.removeItem('online-tournament:mock-match-results:v2');
   window.localStorage.removeItem('online-tournament:mock-match-runtime:v1');
