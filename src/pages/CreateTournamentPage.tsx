@@ -951,14 +951,19 @@ export function CreateTournamentPage() {
 
   return (
     <>
-      <header className="page-head">
-        <div>
+      <header className="page-head creation-page-head">
+        <div className="creation-page-heading">
           <h1>Turnier erstellen</h1>
           <p className="muted">Schritt {step} von 5 · Einstellungen bleiben erhalten und können jederzeit über die bereits erreichten Schritte geändert werden.</p>
-          <div className="creation-draft-actions"><span role={draftSaveFailed ? 'alert' : undefined}>{draftSaveFailed
-            ? 'Entwurf konnte nicht automatisch gespeichert werden. Bitte Browser-Speicher prüfen.'
-            : 'Entwurf wird in diesem Browser automatisch gespeichert.'}</span><button className="btn small" type="button" onClick={discardCreationDraft}>Entwurf verwerfen</button></div>
+          {draftSaveFailed && (
+            <p className="creation-draft-error" role="alert">
+              Entwurf konnte nicht automatisch gespeichert werden. Bitte Browser-Speicher prüfen.
+            </p>
+          )}
         </div>
+        <button className="btn danger creation-discard-button" type="button" onClick={discardCreationDraft}>
+          Entwurf verwerfen
+        </button>
       </header>
 
       <nav className="wizard-steps" aria-label="Erstellungsschritte">
