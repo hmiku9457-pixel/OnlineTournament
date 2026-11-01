@@ -93,6 +93,44 @@ export function recommendedPrestartGroupCount(phases: PrestartPhaseDraft[], inde
   return recommendGroupCount(phase.entrantCount, following?.entrantCount);
 }
 
+/**
+ * Warn only when a changed roster calls for different settings in the first
+ * playing phase. The participant field itself follows registration automatically;
+ * its changed number is not by itself a reason to interrupt the director.
+ * Use the same recommendations as the pre-start phase editor.
+ */
+export function getFirstPhaseRecommendationWarning(tournament: DemoTournament, activeCount: number): string | null {
+  if (tournament.hasStarted) return null;
+  const drafts = normalizePrestartPhases(initialPrestartPhases(tournament), activeCount);
+  const index = drafts.findIndex(competitive);
+  if (index < 0) return null;
+  if (activeCount < 2) return 'Mit weniger als zwei aktiven Teilnehmern kann die erste Phase nicht starten.';
+
+  const phase = drafts[index];
+  if (phase.type === 'GROUPS') {
+    if (activeCount < 4) return 'Eine Gruppenphase benötigt mindestens vier aktive Teilnehmer.';
+    const recommended = recommendedPrestartGroupCount(drafts, index);
+    if (phase.groupCount !== recommended) {
+      return `Für ${activeCount} Teilnehmer werden ${recommended} Gruppen empfohlen (aktuell geplant: ${phase.groupCount}).`;
+    }
+  }
+  if (phase.type === 'SWISS') {
+    const recommended = recommendedSwissRounds(activeCount);
+    if (phase.swissRounds !== recommended) {
+      return `Für ${activeCount} Teilnehmer werden ${recommended} Schweizer Runden empfohlen (aktuell geplant: ${phase.swissRounds}).`;
+    }
+  }
+  if (phase.type === 'KNOCKOUT') {
+    const plannedEntrants = Number(tournament.stages[index]?.settings.entrants) || tournament.participants;
+    const plannedRounds = knockoutRoundLabels(plannedEntrants).length;
+    const recommendedRounds = knockoutRoundLabels(activeCount).length;
+    if (plannedRounds !== recommendedRounds) {
+      return `Die K.-o.-Phase benötigt jetzt ${recommendedRounds} statt ${plannedRounds} Runden. Bitte prüfe die Rundeneinstellungen.`;
+    }
+  }
+  return null;
+}
+
 export function validatePrestartPhases(phases: PrestartPhaseDraft[], activeCount: number): string[] {
   const errors: string[] = [];
   if (activeCount < 2) errors.push('Mindestens zwei nicht zurückgezogene Teilnehmer sind erforderlich.');
