@@ -62,20 +62,6 @@ function roundRobinMatchCount(entrantCount: number): number {
   return (entrants * (entrants - 1)) / 2;
 }
 
-function groupMatchCount(entrantCount: number, groupCount: number): number {
-  const entrants = Math.max(2, Math.trunc(entrantCount));
-  const groups = Math.max(1, Math.min(Math.trunc(groupCount), entrants));
-  const baseSize = Math.floor(entrants / groups);
-  const largerGroups = entrants % groups;
-  let total = 0;
-
-  for (let index = 0; index < groups; index += 1) {
-    const size = baseSize + (index < largerGroups ? 1 : 0);
-    total += (size * (size - 1)) / 2;
-  }
-  return total;
-}
-
 /** Minimum number of actual matches per participant; a Swiss bye is a
  * ranking credit, not a played match. In an odd-sized field, any player
  * might receive a bye in the planned rounds. */
