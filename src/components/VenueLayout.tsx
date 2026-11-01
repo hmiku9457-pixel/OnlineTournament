@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import './VenueLayout.css';
 import { getVenueTerminology } from '@/domain/venueTerminology';
 import {
   dockVenueDesk,
   placeVenueCell,
   resizeVenueLayout,
+  MAX_VENUE_GRID_CELLS,
+  MAX_VENUE_GRID_DIMENSION,
   type VenueCell,
   type VenueLayout,
   type DeskDock,
@@ -40,6 +43,8 @@ function HallGrid({ layout, compact, selected, onPlace, onSelect, sport }: {
   const [selectedPage, setSelectedPage] = useState(0);
   const [selectedColumnPage, setSelectedColumnPage] = useState(0);
   const [jumpToTable, setJumpToTable] = useState('');
+  const [jumpTarget, setJumpTarget] = useState<number | null>(null);
+  const jumpTargetRef = useRef<HTMLButtonElement>(null);
   const totalPages = Math.max(1, Math.ceil(layout.rows / rowsPerPage));
   const totalColumnPages = Math.ceil(layout.columns / columnsPerPage);
   const page = Math.max(0, Math.min(selectedPage, totalPages - 1));
@@ -62,7 +67,13 @@ function HallGrid({ layout, compact, selected, onPlace, onSelect, sport }: {
     if (index < 0) return;
     setSelectedPage(Math.floor(Math.floor(index / layout.columns) / rowsPerPage));
     setSelectedColumnPage(Math.floor((index % layout.columns) / columnsPerPage));
+    setJumpTarget(index);
   }
+  useEffect(() => {
+    if (jumpTarget === null) return;
+    // The target can live on a different page, so wait until React renders it.
+    jumpTargetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [jumpTarget, page, columnPage]);
   return (
     <div className="hall-grid-paged">
       {windowed && <nav className="hall-grid-page-navigation" aria-label="Reihen des Hallenplans">
@@ -97,8 +108,10 @@ function HallGrid({ layout, compact, selected, onPlace, onSelect, sport }: {
               <button
                 key={index}
                 type="button"
+                ref={index === jumpTarget ? jumpTargetRef : null}
+                aria-current={index === jumpTarget ? 'location' : undefined}
                 title={tileLabel(token, false, sport) || 'Freier Rasterplatz'}
-                className={`hall-cell ${token.startsWith('table:') ? 'table-cell' : token === 'desk' ? 'desk-cell' : token === 'space' ? 'space-cell' : 'blank-cell'} ${selected && token === selected ? 'selected' : ''}`}
+                className={`hall-cell ${token.startsWith('table:') ? 'table-cell' : token === 'desk' ? 'desk-cell' : token === 'space' ? 'space-cell' : 'blank-cell'} ${selected && token === selected ? 'selected' : ''} ${index === jumpTarget ? 'hall-jump-target' : ''}`}
                 disabled={!onPlace}
                 draggable={Boolean(onPlace && token && token !== 'space')}
                 onDragStart={(event) => { event.dataTransfer.setData('text/venue-token', token); event.dataTransfer.effectAllowed = 'move'; }}
@@ -156,9 +169,12 @@ export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
   const [selected, setSelected] = useState<VenueCell | null>(null);
   const venue = getVenueTerminology(sport);
   const MIN_SIZE = 1;
-  // Manual grids must stay editable even when the venue is larger than 100×40.
-  const MAX_COLUMNS = Math.max(100, tableCount, layout.columns);
-  const MAX_ROWS = Math.max(40, tableCount, layout.rows);
+  const MAX_COLUMNS = MAX_VENUE_GRID_DIMENSION;
+  const MAX_ROWS = MAX_VENUE_GRID_DIMENSION;
+  const canAddColumn = layout.columns < MAX_COLUMNS
+    && (layout.columns + 1) * layout.rows <= MAX_VENUE_GRID_CELLS;
+  const canAddRow = layout.rows < MAX_ROWS
+    && layout.columns * (layout.rows + 1) <= MAX_VENUE_GRID_CELLS;
   // Beim Verkleinern müssen alle Tische und ggf. die Turnierleitung im Raster Platz behalten.
   const requiredCells = tableCount + (layout.cells.includes('desk') ? 1 : 0);
   const canRemoveColumn = layout.columns > MIN_SIZE && (layout.columns - 1) * layout.rows >= requiredCells;
@@ -166,7 +182,7 @@ export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
 
   function adjustGrid(columns: number, rows: number) {
     if (columns < MIN_SIZE || columns > MAX_COLUMNS || rows < MIN_SIZE || rows > MAX_ROWS) return;
-    if (columns * rows < requiredCells) return;
+    if (columns * rows < requiredCells || columns * rows > MAX_VENUE_GRID_CELLS) return;
     onChange(resizeVenueLayout(layout, columns, rows, tableCount));
   }
 
@@ -216,7 +232,7 @@ export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
               disabled={!canRemoveColumn} onClick={() => adjustGrid(layout.columns - 1, layout.rows)}>−</button>
             <output aria-label="Anzahl Spalten">{layout.columns}</output>
             <button type="button" aria-label="Spalte hinzufügen" title="Spalte hinzufügen"
-              disabled={layout.columns >= MAX_COLUMNS} onClick={() => adjustGrid(layout.columns + 1, layout.rows)}>+</button>
+              disabled={!canAddColumn} onClick={() => adjustGrid(layout.columns + 1, layout.rows)}>+</button>
           </div>
         </div>
         <div className="hall-editor-stepper">
@@ -226,10 +242,10 @@ export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
               disabled={!canRemoveRow} onClick={() => adjustGrid(layout.columns, layout.rows - 1)}>−</button>
             <output aria-label="Anzahl Reihen">{layout.rows}</output>
             <button type="button" aria-label="Reihe hinzufügen" title="Reihe hinzufügen"
-              disabled={layout.rows >= MAX_ROWS} onClick={() => adjustGrid(layout.columns, layout.rows + 1)}>+</button>
+              disabled={!canAddRow} onClick={() => adjustGrid(layout.columns, layout.rows + 1)}>+</button>
           </div>
         </div>
-        <span className="hall-editor-grid-size">Raster: {layout.columns} × {layout.rows}</span>
+        <span className="hall-editor-grid-size">Raster: {layout.columns} × {layout.rows} (max. {MAX_VENUE_GRID_CELLS.toLocaleString('de-DE')} Felder, {MAX_VENUE_GRID_DIMENSION} je Seite)</span>
       </div>
       <div className="hall-editor-canvas">
         <HallGrid layout={layout} sport={sport} compact={false} selected={selected} onPlace={place} onSelect={setSelected} />

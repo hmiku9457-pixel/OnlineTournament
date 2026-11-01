@@ -1,4 +1,8 @@
 /** Optional hall plan for the local prototype. Empty slots are intentional walkways. */
+/** Protect layout editing and browser rendering from accidental giant rasters. */
+export const MAX_VENUE_GRID_CELLS = 12_000;
+export const MAX_VENUE_GRID_DIMENSION = 200;
+
 export type DeskDock = 'none' | 'top' | 'right' | 'bottom' | 'left';
 export type VenueCell = '' | 'space' | 'desk' | `table:${number}`;
 
@@ -32,6 +36,8 @@ export function resizeVenueLayout(layout: VenueLayout, columns: number, rows: nu
   const count = Math.max(1, Math.floor(tableCount));
   const width = Math.max(1, Math.floor(columns));
   const height = Math.max(1, Math.floor(rows));
+  if (width > MAX_VENUE_GRID_DIMENSION || height > MAX_VENUE_GRID_DIMENSION
+    || width * height > MAX_VENUE_GRID_CELLS) return layout;
   if (width * height < count + (layout.deskDock === 'none' && layout.cells.includes('desk') ? 1 : 0)) return layout;
   const cells: VenueCell[] = Array.from({ length: width * height }, () => '');
   const overflow: VenueCell[] = [];

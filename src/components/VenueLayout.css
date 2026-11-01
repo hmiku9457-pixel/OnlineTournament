@@ -1,0 +1,8 @@
+/* Jump-to-surface remains visible after navigating between hall pages. */
+.hall-cell.hall-jump-target {
+  outline: 3px solid var(--color-primary, #4877db);
+  outline-offset: -3px;
+  box-shadow: inset 0 0 0 2px var(--color-surface, #fff), 0 0 0 3px rgba(72, 119, 219, .25);
+  position: relative;
+  z-index: 1;
+}

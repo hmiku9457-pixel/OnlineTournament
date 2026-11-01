@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import { VenueLayoutEditor, makeVenuePreset } from '@/components/VenueLayout';
-import { createVenueLayout, dockVenueDesk, layoutTableNumbers, placeVenueCell, resizeVenueLayout } from '@/domain/venueLayout';
+import { createVenueLayout, dockVenueDesk, layoutTableNumbers, placeVenueCell, resizeVenueLayout, MAX_VENUE_GRID_CELLS } from '@/domain/venueLayout';
 
 describe('optional hall layout', () => {
   it('starts with a square grid, accommodating larger tournaments', () => {
@@ -50,15 +50,19 @@ describe('optional hall layout', () => {
     expect(html).toContain('Springen');
   });
 
-  it('keeps extremely wide single-row halls within the 1,200-cell rendering budget', () => {
-    const layout = resizeVenueLayout(createVenueLayout(9999), 9999, 1, 9999);
+  it('refuses impractically large manual rasters without losing any table', () => {
+    const layout = createVenueLayout(9999);
+    const wide = resizeVenueLayout(layout, 9999, 1, 9999);
+    expect(wide).toBe(layout);
+    expect(resizeVenueLayout(layout, 200, 200, 9999)).toBe(layout);
+    expect(layout.columns * layout.rows).toBeLessThanOrEqual(MAX_VENUE_GRID_CELLS);
+    expect(layoutTableNumbers(wide)).toHaveLength(9999);
     const html = renderToStaticMarkup(createElement(VenueLayoutEditor, {
       layout, tableCount: 9999, sport: 'table_tennis', onChange: () => {},
     }));
     expect((html.match(/class="hall-cell /g) ?? [])).toHaveLength(1200);
-    expect(html).toContain('Spalten 1–1200 von 9999');
-    expect(html).toContain('Nächste Spalten');
-    expect(html.indexOf('hall-grid-page-navigation')).toBeLessThan(html.indexOf('hall-plan-scroller'));
+    expect(html).toContain('Zu Spielfläche');
+    expect(html).toContain('max.');
   });
 
   it('preserves tables when growing and swapping', () => {
