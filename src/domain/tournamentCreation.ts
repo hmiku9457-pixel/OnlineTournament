@@ -41,6 +41,8 @@ export interface TournamentDurationPhaseInput {
   entrantCount: number;
   bestOf: number;
   groupCount?: number;
+  /** Actual pre-start group sizes after manual draw adjustments. */
+  groupSizes?: number[];
   swissRounds?: number;
   knockoutBestOf?: number[];
   breakMinutes?: number;
@@ -275,9 +277,11 @@ export function estimatePhaseMetrics(
     }
     case 'GROUPS': {
       const groups = Math.max(1, Math.min(entrants, Math.trunc(phase.groupCount ?? 2)));
-      const groupSizes = Array.from({ length: groups }, (_, i) => Math.floor(entrants / groups) + (i < entrants % groups ? 1 : 0));
-      const waves = roundRobinPlayingWaves(groupSizes, tables);
-      const matches = groupMatchCount(entrants, groups);
+      const balanced = Array.from({ length: groups }, (_, i) => Math.floor(entrants / groups) + (i < entrants % groups ? 1 : 0));
+      const actual = phase.groupSizes?.length === groups && phase.groupSizes.every((count) => Number.isInteger(count) && count >= 0)
+        && phase.groupSizes.reduce((total, count) => total + count, 0) === entrants ? phase.groupSizes : balanced;
+      const waves = roundRobinPlayingWaves(actual, tables);
+      const matches = actual.reduce((sum, count) => sum + count * (count - 1) / 2, 0);
       const minutes = timing?.matchDurationMinutes
         ? gameMinutes : averageSetsForBestOf(phase.bestOf) * (timing?.minutesPerSet ?? MINUTES_PER_SET);
       return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waves * minutes), approximate: true };
