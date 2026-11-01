@@ -29,7 +29,7 @@ import {
 } from '@/domain/tournamentCreation';
 import type { Discipline, StageType } from '@/domain/types';
 import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/recommendations';
-import { createMockTournament, findTournamentNameConflict, prestartPlanningFingerprint, updatePrestartTournamentPhases } from '@/services/mockTournamentStore';
+import { createMockTournament, findTournamentNameConflict, prestartPlanningFingerprint, updatePrestartTournamentPhasesSafely } from '@/services/mockTournamentStore';
 import { hasStartedAnyStage } from '@/domain/prestartPhasePlanning';
 import { getPhaseLifecycle } from '@/services/mockPhaseLifecycle';
 import type { DemoTournament } from '@/data/demoTournaments';
@@ -460,6 +460,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [confirmPrestartDiscard, setConfirmPrestartDiscard] = useState(false);
   const [overwriteTournamentId, setOverwriteTournamentId] = useState<string | null>(null);
   const [prestartSaveError, setPrestartSaveError] = useState('');
+  const [prestartSaveBusy, setPrestartSaveBusy] = useState(false);
   const [step, setStep] = useState<WizardStep>((restoredDraft?.step ?? 1) as WizardStep);
   const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>((restoredDraft?.maxReachedStep ?? 1) as WizardStep);
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(restoredDraft?.hasVisitedPhaseStep ?? false);
@@ -649,8 +650,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     }
   }
 
-  function savePrestartPhases() {
-    if (!prestart || prestartIssues.length || !prestartDirty) return;
+  async function savePrestartPhases() {
+    if (!prestart || prestartIssues.length || !prestartDirty || prestartSaveBusy) return;
     if (!confirmPrestartSave) {
       prestartConfirmationSignature.current = currentPrestartSignature;
       setConfirmPrestartSave(true);
@@ -660,8 +661,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       setConfirmPrestartSave(false);
       return;
     }
-    const result = updatePrestartTournamentPhases(prestart.tournament.id, prestartPhaseDrafts,
+    setPrestartSaveBusy(true);
+    const result = await updatePrestartTournamentPhasesSafely(prestart.tournament.id, prestartPhaseDrafts,
       originalPrestartFingerprint.current);
+    setPrestartSaveBusy(false);
     if (!result.ok) {
       setPrestartSaveError(result.error ?? 'Die Phasen konnten nicht gespeichert werden.');
       setConfirmPrestartSave(false);
@@ -2559,7 +2562,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             ? setConfirmPrestartSave(false) : prestartDirty ? setConfirmPrestartDiscard(true) : discardPrestartEditing()}>
             Abbrechen
           </button>
-          <button className="btn primary" type="button" disabled={prestartIssues.length > 0 || !prestartDirty}
+          <button className="btn primary" type="button" disabled={prestartIssues.length > 0 || !prestartDirty || prestartSaveBusy}
             onClick={savePrestartPhases}>
             {prestartDirty ? 'Änderungen prüfen und speichern' : 'Keine Änderungen vorhanden'}
           </button>
@@ -2683,7 +2686,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             </p>)}
           </div>
           <div className="actions">
-            <button type="button" className="btn primary" onClick={savePrestartPhases}>Ja, Phasen und Auslosung aktualisieren</button>
+            <button type="button" className="btn primary" disabled={prestartSaveBusy} onClick={() => { void savePrestartPhases(); }}>
+              {prestartSaveBusy ? 'Speichern …' : 'Ja, Phasen und Auslosung aktualisieren'}</button>
             <button type="button" className="btn" onClick={() => { setConfirmPrestartSave(false); prestartConfirmationSignature.current = null; }}>Weiter bearbeiten</button>
           </div>
         </section>
