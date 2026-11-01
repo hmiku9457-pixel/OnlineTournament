@@ -15,6 +15,8 @@ describe('creation revision: group fairness and qualified participants', () => {
     expect(needsGroupStreichungsregel(19, 4, 7)).toBe(true);
     expect(needsGroupStreichungsregel(19, 4, 8)).toBe(false);
     expect(needsGroupStreichungsregel(20, 4, 7)).toBe(false);
+    expect(needsGroupStreichungsregel(12, 3, 5, [5, 4, 3])).toBe(true);
+    expect(needsGroupStreichungsregel(12, 3, 5, [4, 4, 4])).toBe(false);
     expect(recommendedEqualGroupQualifiers(19, 4, 7)).toBe(8);
     expect(recommendedEqualGroupQualifiers(19, 4, 8)).toBe(8);
     expect(recommendedEqualGroupQualifiers(19, 4, 10)).toBe(12);
