@@ -6,9 +6,7 @@ export function getVenueTerminology(sport: string) {
   if (kind === 'table') {
     return { singular: 'Tisch', plural: 'Tische', dativePlural: 'Tischen', free: 'Freier Tisch', locked: 'Gesperrter Tisch' };
   }
-  if (kind === 'field') {
-    return { singular: 'Spielfeld', plural: 'Spielfelder', dativePlural: 'Spielfeldern', free: 'Freies Spielfeld', locked: 'Gesperrtes Spielfeld' };
-  }
+  // Alle Sportarten ohne Spieltisch verwenden die Bezeichnung Platz/Plätze.
   // Auch für weitere Sportarten ist ein Platz der verständliche Standard.
   return { singular: 'Platz', plural: 'Plätze', dativePlural: 'Plätzen', free: 'Freier Platz', locked: 'Gesperrter Platz' };
 }
