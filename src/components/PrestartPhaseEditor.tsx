@@ -271,7 +271,10 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                             <option value="overnight">Spieltagsende</option>
                           </select>
                         </label>
-                        <label>{phase.breakKind === 'overnight' ? 'Start am Folgetag' : phase.breakKind === 'until' ? 'Pause bis (Uhrzeit)' : 'Minuten'}
+                        {phase.breakKind === 'overnight' && <label>Fortsetzungsdatum
+                          <input type="date" value={phase.nextDayDate} onChange={(event) => edit(phase.id, { nextDayDate: event.target.value })} />
+                        </label>}
+                        <label>{phase.breakKind === 'overnight' ? 'Fortsetzungsuhrzeit' : phase.breakKind === 'until' ? 'Pause bis (Uhrzeit)' : 'Minuten'}
                           <input type={phase.breakKind === 'minutes' ? 'number' : 'time'}
                             min={phase.breakKind === 'minutes' ? 1 : undefined}
                             max={phase.breakKind === 'minutes' ? 1440 : undefined}
