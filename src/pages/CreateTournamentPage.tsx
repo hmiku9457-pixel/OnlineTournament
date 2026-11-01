@@ -3,7 +3,7 @@ import { createVenueLayout, resizeVenueLayout } from '@/domain/venueLayout';
 import { getVenueTerminology } from '@/domain/venueTerminology';
 import { disciplineLabel, disciplineOptionsForSport, planningMinutesPerSet, sportOptions } from '@/domain/sports';
 import { sportScoring } from '@/domain/sportScoring';
-import { useEffect, useMemo, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   bestOfOptions,
@@ -31,6 +31,7 @@ import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { formatPhaseOverview } from '@/domain/creationOverview';
 import { loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence } from '@/domain/creationDraft';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
+import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedActiveBreakMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
@@ -348,6 +349,8 @@ export function CreateTournamentPage() {
   const [awardsEnabled, setAwardsEnabled] = useState(restoredDraft?.awardsEnabled ?? false);
   const [awardsAtOverride, setAwardsAtOverride] = useState<string | null>(restoredDraft?.awardsAtOverride ?? null);
   const [sport, setSport] = useState(restoredDraft?.sport ?? '');
+  const [pendingSport, setPendingSport] = useState<string | null>(null);
+  const sportSelectRef = useRef<HTMLSelectElement>(null);
   const availableDisciplines = disciplineOptionsForSport(sport);
   const venue = getVenueTerminology(sport);
   const timedSport = sportScoring(sport).mode === 'score';
@@ -836,6 +839,42 @@ export function CreateTournamentPage() {
     navigateToStep((step - 1) as WizardStep);
   }
 
+  function applySportChange(nextSport: string) {
+    const allowed = disciplineOptionsForSport(nextSport);
+    const nextDiscipline = allowed.some((option) => option.value === discipline)
+      ? discipline : allowed[0]?.value ?? 'SINGLES';
+    if (nextDiscipline !== discipline) {
+      setDiscipline(nextDiscipline);
+      resetParticipantEditor();
+      // Team entries use the full display name instead of separate first and last names.
+      if (nextDiscipline === 'TEAMS') {
+        setParticipants((current) => current.map((participant) => ({
+          ...participant,
+          firstName: displayPersonName(participant.firstName, participant.lastName),
+          lastName: '',
+        })));
+      }
+    }
+    setSport(nextSport);
+    setPhaseDrafts((current) => current.map((phase) => ({
+      ...phase,
+      bestOf: phaseBestOfForSport(nextSport, phase.type),
+      knockoutBestOf: phase.knockoutBestOf.map(() => phaseBestOfForSport(nextSport, phase.type)),
+    })));
+  }
+
+  function cancelSportChange() {
+    setPendingSport(null);
+    sportSelectRef.current?.focus();
+  }
+
+  function confirmSportChange() {
+    if (!pendingSport) return;
+    applySportChange(pendingSport);
+    setPendingSport(null);
+    sportSelectRef.current?.focus();
+  }
+
   function discardCreationDraft() {
     if (!window.confirm('Gesamten Entwurf einschließlich Teilnehmern und Phasen verwerfen?')) return;
     clearCreationDraft();
@@ -1016,32 +1055,14 @@ export function CreateTournamentPage() {
               </div>
               <div className="field">
                 <label htmlFor="sport">Sportart <span className="wizard-required-mark" aria-hidden="true">*</span></label>
-                <select id="sport" required value={sport} onChange={(event) => {
+                <select id="sport" ref={sportSelectRef} required value={sport} onChange={(event) => {
                   const selectedSport = event.target.value;
-                  if (selectedSport !== sport && (participants.length > 0 || phaseDrafts.length > 0)
-                    && !window.confirm('Sportart wechseln? Bestehende Teilnehmer müssen gegebenenfalls überprüft werden und die Best-of-Einstellungen werden auf die neue Sportart angepasst.')) return;
-                  const allowed = disciplineOptionsForSport(selectedSport);
-                  const nextDiscipline = allowed.some((option) => option.value === discipline)
-                    ? discipline : allowed[0]?.value ?? 'SINGLES';
-                  if (nextDiscipline !== discipline) {
-                    setDiscipline(nextDiscipline);
-                    resetParticipantEditor();
-                    // Bei Mannschaftssportarten ist der Name des Teams ein eigener Eintrag.
-                    // Vorhandene Spieler werden nicht gelöscht, sondern müssen bei Bedarf
-                    // in der Teilnehmerliste überprüft werden.
-                    if (nextDiscipline === 'TEAMS') {
-                      setParticipants((current) => current.map((participant) => ({
-                        ...participant,
-                        firstName: displayPersonName(participant.firstName, participant.lastName),
-                        lastName: '',
-                      })));
-                    }
+                  if (selectedSport === sport) return;
+                  if (participants.length > 0 || phaseDrafts.length > 0) {
+                    setPendingSport(selectedSport);
+                    return;
                   }
-                  setSport(selectedSport);
-                  setPhaseDrafts((current) => current.map((phase) => ({ ...phase,
-                    bestOf: phaseBestOfForSport(selectedSport, phase.type),
-                    knockoutBestOf: phase.knockoutBestOf.map(() => phaseBestOfForSport(selectedSport, phase.type)),
-                  })));
+                  applySportChange(selectedSport);
                 }}>
                   <option value="" disabled>Sportart auswählen</option>
                   {sportOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
@@ -2116,6 +2137,16 @@ export function CreateTournamentPage() {
       </div>
       </div>}
       </div>
+      {pendingSport && (
+        <SportChangeDialog
+          previousSport={sportOptions.find((option) => option.id === sport)?.label ?? sport}
+          nextSport={sportOptions.find((option) => option.id === pendingSport)?.label ?? pendingSport}
+          hasParticipants={participants.length > 0}
+          hasPhases={phaseDrafts.length > 0}
+          onCancel={cancelSportChange}
+          onConfirm={confirmSportChange}
+        />
+      )}
     </>
   );
 }
