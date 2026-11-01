@@ -474,40 +474,38 @@ try {
   assert.equal(simultaneousConflicts, 1, 'transactional competing saves must not both succeed');
   await racingTab.close();
 
-  const legacySnapshot = await draftPage.evaluate(() => localStorage.getItem('online-tournament:saved-creation-drafts:v1'));
   await secondTab.close();
   await draftsContext.close();
 
-  // A separate browser profile with an existing saved-draft list imports it
-  // once into IndexedDB and retains it after repeated page loads.
-  const legacyContext = await browser.newContext();
-  await legacyContext.addInitScript((raw) => {
-    const key = 'online-tournament:saved-creation-drafts:v1';
-    if (raw && !localStorage.getItem(key)) localStorage.setItem(key, raw);
-  }, legacySnapshot);
-  const legacyPage = await legacyContext.newPage();
-  await legacyPage.goto(base + '/#/tournaments/new');
-  await legacyPage.locator('.sidebar-draft-item').first().waitFor();
-  const migratedCount = await legacyPage.locator('.sidebar-draft-item').count();
-  await legacyPage.locator('.sidebar-draft-item').first().click();
-  await legacyPage.locator('#name').waitFor();
-  await legacyPage.reload();
-  assert.equal(await legacyPage.locator('.sidebar-draft-item').count(), migratedCount);
-  await legacyContext.close();
+  // Old localStorage drafts are intentionally NOT imported by the current
+  // IndexedDB-only development schema. Fresh drafts still persist normally.
+  const freshContext = await browser.newContext();
+  await freshContext.addInitScript(() => {
+    localStorage.setItem('online-tournament:saved-creation-drafts:v1', JSON.stringify([
+      { id: 'obsolete-draft', savedAt: new Date().toISOString(), draft: {} },
+    ]));
+  });
+  const freshPage = await freshContext.newPage();
+  await freshPage.goto(base + '/#/tournaments/new');
+  await freshPage.waitForFunction(() => document.querySelector('.sidebar-drafts-section') === null);
+  assert.equal(await freshPage.locator('.sidebar-draft-item').count(), 0);
+  await freshPage.locator('#name').fill('Neuer Entwurf');
+  await freshPage.getByRole('button', { name: 'Entwurf speichern' }).click();
+  await freshPage.locator('.sidebar-draft-item').first().waitFor();
+  await freshPage.reload();
+  assert.equal(await freshPage.locator('.sidebar-draft-item').count(), 1);
+  await freshContext.close();
 
-  // A browser which blocks IndexedDB must not offer clickable dead draft
-  // links. The user can still see what is saved and why it is unavailable.
+  // Blocked IndexedDB must visibly warn even when there are no old cached
+  // drafts; it must not fake an editable list from previous storage formats.
   const blockedContext = await browser.newContext();
-  await blockedContext.addInitScript((raw) => {
+  await blockedContext.addInitScript(() => {
     Object.defineProperty(window, 'indexedDB', { configurable: true, value: undefined });
-    const key = 'online-tournament:saved-creation-drafts:v1';
-    if (raw && !localStorage.getItem(key)) localStorage.setItem(key, raw);
-  }, legacySnapshot);
+  });
   const blockedPage = await blockedContext.newPage();
   await blockedPage.goto(base + '/#/tournaments/new');
   await blockedPage.locator('.sidebar-storage-warning').waitFor();
-  assert.ok(await blockedPage.locator('.sidebar-draft-item.is-unavailable').count() > 0);
-  assert.equal(await blockedPage.locator('a.sidebar-draft-item').count(), 0);
+  assert.equal(await blockedPage.locator('.sidebar-draft-item').count(), 0);
   await blockedPage.locator('#name').fill('Temporär');
   await blockedPage.getByRole('button', { name: 'Entwurf speichern' }).click();
   await blockedPage.getByText('IndexedDB ist in diesem Browser nicht verfügbar.', { exact: false }).waitFor();
