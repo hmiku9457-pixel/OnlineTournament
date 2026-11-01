@@ -35,6 +35,7 @@ import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { DisciplineChangeDialog } from '@/components/DisciplineChangeDialog';
 import { TestParticipantsDialog } from '@/components/TestParticipantsDialog';
+import { DiscardDraftDialog } from '@/components/DiscardDraftDialog';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
@@ -393,6 +394,8 @@ export function CreateTournamentPage() {
   const [pendingSport, setPendingSport] = useState<string | null>(null);
   const [pendingDiscipline, setPendingDiscipline] = useState<Discipline | null>(null);
   const [testParticipantsDialogOpen, setTestParticipantsDialogOpen] = useState(false);
+  const [discardDraftDialogOpen, setDiscardDraftDialogOpen] = useState(false);
+  const discardDraftButtonRef = useRef<HTMLButtonElement>(null);
   const testParticipantsButtonRef = useRef<HTMLButtonElement>(null);
   const sportSelectRef = useRef<HTMLSelectElement>(null);
   const availableDisciplines = disciplineOptionsForSport(sport);
@@ -935,7 +938,6 @@ export function CreateTournamentPage() {
   }
 
   function discardCreationDraft() {
-    if (!window.confirm('Gesamten Entwurf einschließlich Teilnehmern und Phasen verwerfen?')) return;
     clearCreationDraft();
     window.location.reload();
   }
@@ -1071,7 +1073,7 @@ export function CreateTournamentPage() {
             </p>
           )}
         </div>
-        <button className="btn danger creation-discard-button" type="button" onClick={discardCreationDraft}>
+        <button ref={discardDraftButtonRef} className="btn danger creation-discard-button" type="button" onClick={() => setDiscardDraftDialogOpen(true)}>
           Entwurf verwerfen
         </button>
       </header>
@@ -2255,6 +2257,15 @@ export function CreateTournamentPage() {
       </div>}
       </div>
       </div>
+      {discardDraftDialogOpen && (
+        <DiscardDraftDialog
+          onCancel={() => {
+            setDiscardDraftDialogOpen(false);
+            discardDraftButtonRef.current?.focus();
+          }}
+          onConfirm={discardCreationDraft}
+        />
+      )}
       {testParticipantsDialogOpen && (
         <TestParticipantsDialog
           discipline={discipline}
