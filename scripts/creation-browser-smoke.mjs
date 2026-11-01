@@ -31,6 +31,23 @@ try {
   assert.ok(geometry.maxWidth <= 1550, 'wizard must not exceed its readable maximum width');
   assert.equal(geometry.sidebarLeft, 0, 'navigation stays anchored to the left side');
   await page.setViewportSize({ width: 1440, height: 960 });
+  // The original full description and its adjacent date hint reserve equal
+  // vertical space, matching the alignment already used for sport/discipline.
+  const alignedHints = await page.evaluate(() => {
+    const date = document.querySelector('.wizard-date-hint');
+    const time = document.querySelector('.wizard-start-hint');
+    if (!date || !time) return null;
+    return {
+      dateMinHeight: getComputedStyle(date).minHeight,
+      timeMinHeight: getComputedStyle(time).minHeight,
+      dateHeight: date.getBoundingClientRect().height,
+      timeHeight: time.getBoundingClientRect().height,
+    };
+  });
+  assert.ok(alignedHints);
+  assert.equal(alignedHints.dateMinHeight, alignedHints.timeMinHeight);
+  assert.ok(alignedHints.dateHeight >= 3 * 12, 'date hint should reserve space for longer explanation');
+  assert.ok(alignedHints.timeHeight >= 3 * 12, 'start hint should retain its original readable font size');
   await page.locator('#name').fill('Browser-Smoke-Turnier');
   await page.locator('#tournament-date').click();
   await page.locator('.calendar-picker-dialog input[aria-label="Jahr"]').fill('2030');
