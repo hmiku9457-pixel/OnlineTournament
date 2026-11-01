@@ -4,6 +4,8 @@ import { initialPrestartPhases } from '@/domain/prestartPhasePlanning';
 import { addMockParticipant, createMockTournament, getMockTournament, refreshPrestartSchedule, updatePrestartTournamentPhases } from '@/services/mockTournamentStore';
 import { saveParticipantWithdrawal } from '@/services/mockWithdrawals';
 import { getGroupAssignments, setParticipantGroup } from '@/services/mockDrawStore';
+import { startFirstStage } from '@/services/mockPhaseLifecycle';
+import { getLiveScheduleDeviations } from '@/services/mockLiveSchedule';
 
 const storage = new Map<string, string>();
 beforeEach(() => {
@@ -63,20 +65,32 @@ describe('prestart schedule consistency after roster and phase edits', () => {
     expect(updated.estimatedDuration).toContain('15min');
   });
 
-  it('recalculates the preview and ceremony after moving a player into an uneven group', () => {
+  it('preserves the original schedule until phase start and shows extra time after an uneven draw', () => {
     const tournament = sample();
     const group = tournament.stages[0];
     const assignments = getGroupAssignments(tournament, group);
     const from = tournament.participantNames!.find((name) => assignments[name] === 0)!;
+    expect(setParticipantGroup(tournament, group, from, 1)).toBe(true);
     expect(getMockTournament(tournament.id).plannedSchedule?.find((item) => item.id === 'phase-2')?.at)
       .toBe('2026-11-21T09:15');
+    expect(startFirstStage(tournament)).toBe(true);
+    const deviations = getLiveScheduleDeviations(tournament);
+    expect(deviations['phase-1'].extraMinutes).toBe(10);
+    expect(deviations['phase-2'].offsetMinutes).toBe(10);
+    expect(deviations['award-ceremony'].offsetMinutes).toBe(10);
+  });
+
+  it('keeps the newly balanced baseline after a phase edit clears manual group assignments', () => {
+    const tournament = sample();
+    const group = tournament.stages[0];
+    const assignments = getGroupAssignments(tournament, group);
+    const from = tournament.participantNames!.find((name) => assignments[name] === 0)!;
     expect(setParticipantGroup(tournament, group, from, 1)).toBe(true);
-    const updated = getMockTournament(tournament.id);
-    expect(updated.plannedSchedule?.find((item) => item.id === 'phase-2')?.at)
-      .toBe('2026-11-21T09:25');
-    expect(updated.plannedSchedule?.find((item) => item.id === 'award-ceremony')?.at)
-      .toBe('2026-11-21T09:35');
-    expect(updated.estimatedDuration).toContain('35min');
+    const phases = initialPrestartPhases(tournament);
+    phases[0].label = 'Vorrunde';
+    expect(updatePrestartTournamentPhases(tournament.id, phases).ok).toBe(true);
+    expect(getMockTournament(tournament.id).plannedSchedule?.find((item) => item.id === 'phase-2')?.at)
+      .toBe('2026-11-21T09:15');
   });
 
   it('updates the forecast on registration and withdrawal, without rewriting configured group counts', () => {
