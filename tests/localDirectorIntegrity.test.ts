@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { createMockTournament, updateMockTournamentStatus, getMockTournament, updateMockParticipantName } from '@/services/mockTournamentStore';
 import { startFirstStage, startStage, isStageCompleted, getStageEntrants, getStageStartIssue } from '@/services/mockPhaseLifecycle';
-import { approveMockProgress, getPendingMockApproval, getMockStageMatches, canEditMockMatch, completeMockMatch, assignMockMatchToTable, getMockStoredResult, withdrawMockParticipant, restoreMockParticipant, canRestoreMockParticipant, saveMockMatchSets, abortMockTournament, canWithdrawMockParticipant } from '@/services/mockRuntime';
+import { approveMockProgress, getPendingGroupCutoff, resolveGroupCutoff, getPendingMockApproval, getMockStageMatches, canEditMockMatch, completeMockMatch, assignMockMatchToTable, getMockStoredResult, withdrawMockParticipant, restoreMockParticipant, canRestoreMockParticipant, saveMockMatchSets, abortMockTournament, canWithdrawMockParticipant } from '@/services/mockRuntime';
 import { getGroupAssignments, setParticipantGroup, toggleBracketPin, getPinnedBracketSlots, getBracketSlots, randomizeSwissOrder, getSwissOrder } from '@/services/mockDrawStore';
 import { getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
@@ -33,6 +33,14 @@ function create(types: MockPhaseInput[], prefix = 'P', count = 4) {
   return createMockTournament({ name: prefix, sport: 'table_tennis', discipline: 'SINGLES',
     tables: 3, minimumMatches: 1, estimatedDurationMinutes: 90,
     participantNames: Array.from({ length: count }, (_, i) => `${prefix} Spieler${i}`), phases: types });
+}
+function approveWithGroupTie(t: ReturnType<typeof create>) {
+  const cutoff = getPendingGroupCutoff(t);
+  if (cutoff) {
+    expect(resolveGroupCutoff(t, cutoff.tie.players.slice(0, cutoff.tie.slots),
+      'PLAYOFF', 'Separat ausgetragener Stichentscheid 11:7')).toBeNull();
+  }
+  return approveMockProgress(t);
 }
 function start(t: ReturnType<typeof create>) {
   expect(startFirstStage(t)).toBe(true);
@@ -79,14 +87,14 @@ describe('local director integrity', () => {
     const [group, pause, ko] = t.stages;
     const games = getMockStageMatches(t, group);
     games.forEach(m => completeMockMatch(m.id, win));
-    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     expect(startStage(t, pause)).toBe(true);
     updateMockTournamentStatus(t.id, 'PAUSED');
     completeMockMatch(games[0].id, lose, 'FINISHED', true);
     expect(isStageCompleted(t, group)).toBe(false);
     expect(getMockTournament(t.id).status).toBe('PAUSED');
     expect(getPendingMockApproval(t)?.stageId).toBe(group.id);
-    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     expect(getStageEntrants(t, ko)).toContain(games[0].sideB);
     expect(getStageEntrants(t, ko)).not.toContain(games[0].sideA);
     expect(getStageEntrants(t, pause)).toEqual(getStageEntrants(t, ko));
@@ -96,10 +104,11 @@ describe('local director integrity', () => {
     const t = create([phase('GROUPS', 4), phase('BREAK', 2), phase('KNOCKOUT', 2)]);
     start(t);
     getMockStageMatches(t, t.stages[0]).forEach(m => completeMockMatch(m.id, win));
-    expect(approveMockProgress(t)).not.toBeNull();
+    expect(approveWithGroupTie(t)).not.toBeNull();
     expect(startStage(t, t.stages[1])).toBe(true);
     const selected = getStageEntrants(t, t.stages[2])[0];
     expect(withdrawMockParticipant(t, selected)).toBe(true);
+    if (getPendingGroupCutoff(t)) expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     expect(getStageEntrants(t, t.stages[2])).toHaveLength(2);
     expect(getStageEntrants(t, t.stages[2])).not.toContain(selected);
     expect(canRestoreMockParticipant(t, selected)).toBe(true);
@@ -116,7 +125,7 @@ describe('local director integrity', () => {
     for (const p of t.participantNames!.filter(p => p !== remaining)) {
       expect(withdrawMockParticipant(t, p)).toBe(true);
     }
-    expect(approveMockProgress(t)?.kind).toBe('ROUND');
+    expect(approveWithGroupTie(t)?.kind).toBe('ROUND');
     expect(getMockStageMatches(t, t.stages[0]).filter(m => m.round === 'Runde 2')).toHaveLength(0);
     expect(getPendingMockApproval(t)).toMatchObject({ kind: 'STAGE', round: 2 });
   });
@@ -153,7 +162,7 @@ describe('local director integrity', () => {
     const t = create([phase('ROUND_ROBIN', 2), phase('KNOCKOUT', 2)], 'Small', 2);
     start(t);
     getMockStageMatches(t, t.stages[0]).forEach(m => completeMockMatch(m.id, win));
-    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     const qualified = getStageEntrants(t, t.stages[1])[0];
     expect(withdrawMockParticipant(t, qualified)).toBe(true);
     expect(getStageEntrants(t, t.stages[1])).toHaveLength(1);
@@ -177,7 +186,7 @@ describe('local director integrity', () => {
     const t = create([phase('GROUPS', 4), phase('KNOCKOUT', 2)]);
     start(t);
     getMockStageMatches(t, t.stages[0]).forEach(m => completeMockMatch(m.id, win));
-    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     const ko = t.stages[1];
     const originallyQualified = getStageEntrants(t, ko);
     expect(toggleBracketPin(t, ko, 0)).toBe(true);
@@ -194,12 +203,12 @@ describe('local director integrity', () => {
     start(t);
     const matches = getMockStageMatches(t, t.stages[0]);
     matches.forEach(m => completeMockMatch(m.id, win));
-    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     expect(toggleBracketPin(t, t.stages[1], 0)).toBe(true);
     expect(getPinnedBracketSlots(t, t.stages[1])).toEqual([0]);
     const previous = getStageEntrants(t, t.stages[1]);
     completeMockMatch(matches[0].id, lose, 'FINISHED', true);
-    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     expect(getStageEntrants(t, t.stages[1])).not.toEqual(previous);
     expect(getPinnedBracketSlots(t, t.stages[1])).toEqual([]);
     expect(getMockAudit(t.id).some(e => e.action === 'KNOCKOUT_DRAW_REBUILT')).toBe(true);
@@ -210,7 +219,7 @@ describe('local director integrity', () => {
     start(t);
     const first = getMockStageMatches(t, t.stages[0])[0];
     getMockStageMatches(t, t.stages[0]).forEach(m => completeMockMatch(m.id, win));
-    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     updateMockTournamentStatus(t.id, 'RUNNING');
     updateMockTournamentStatus(t.id, 'PAUSED');
     completeMockMatch(first.id, lose, 'FINISHED', true);
@@ -223,7 +232,7 @@ describe('local director integrity', () => {
     const t = create([phase('GROUPS', 4), phase('KNOCKOUT', 2)]);
     start(t);
     getMockStageMatches(t, t.stages[0]).forEach(m => completeMockMatch(m.id, win));
-    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     const firstQualifiers = getStageEntrants(t, t.stages[1]);
     const reserves = t.participantNames!.filter(n => !firstQualifiers.includes(n));
     expect(reserves).toHaveLength(2);
@@ -237,6 +246,7 @@ describe('local director integrity', () => {
     expect(statistics).toMatchObject({ remaining: 2, eliminated: 0, reserves: 2 });
 
     expect(withdrawMockParticipant(t, firstQualifiers[0])).toBe(true);
+    if (getPendingGroupCutoff(t)) expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     const promoted = getStageEntrants(t, t.stages[1]).find(name => reserves.includes(name));
     expect(promoted).toBeDefined();
     expect(getMockParticipantProgress(t, promoted!).status).toBe('Aktiv');
@@ -248,7 +258,7 @@ describe('local director integrity', () => {
     const t = create([phase('GROUPS', 4), phase('BREAK', 4), phase('KNOCKOUT', 2)]);
     start(t);
     getMockStageMatches(t, t.stages[0]).forEach(m => completeMockMatch(m.id, win));
-    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     expect(startStage(t, t.stages[1])).toBe(true);
     const finalists = getStageEntrants(t, t.stages[2]);
     const reserve = t.participantNames!.find(name => !finalists.includes(name))!;
@@ -261,12 +271,12 @@ describe('local director integrity', () => {
     start(t);
     const games = getMockStageMatches(t, t.stages[0]);
     games.forEach(m => completeMockMatch(m.id, win));
-    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     const previous = getStageEntrants(t, t.stages[1]);
     expect(randomizeSwissOrder(t, t.stages[1])).toBe(true);
     expect(getMockAudit(t.id).some(e => e.action === 'DRAW_CHANGED')).toBe(true);
     completeMockMatch(games[0].id, lose, 'FINISHED', true);
-    expect(approveMockProgress(t)?.kind).toBe('STAGE');
+    expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     const next = getStageEntrants(t, t.stages[1]);
     expect(next).not.toEqual(previous);
     expect(new Set(getSwissOrder(t, t.stages[1]))).toEqual(new Set(next));
