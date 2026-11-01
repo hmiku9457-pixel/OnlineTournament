@@ -45,6 +45,8 @@ describe('replan before tournament start', () => {
   it('warns only when the first-phase recommendation actually differs after a roster change', () => {
     const groups = { ...tournament, stages: tournament.stages.map((stage, index) =>
       index === 0 ? { ...stage, settings: { ...stage.settings, groups: 4 } } : stage) };
+    expect(getFirstPhaseRecommendationWarning(tournament, 19)).toBeNull(); // Kein Teilnehmerwechsel
+    expect(getFirstPhaseRecommendationWarning(groups, 19)).toBeNull(); // Abweichende Wunschplanung allein genügt nicht
     expect(getFirstPhaseRecommendationWarning(groups, 18)).toBeNull();
     expect(getFirstPhaseRecommendationWarning(groups, 7)).toContain('Gruppen empfohlen');
     expect(getFirstPhaseRecommendationWarning(groups, 3)).toContain('mindestens vier');
