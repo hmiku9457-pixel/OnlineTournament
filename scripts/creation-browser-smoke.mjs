@@ -170,6 +170,35 @@ try {
     'a fixed start becomes invalid when the current time advances past it');
   await context3.close();
 
+  // Discard confirmation must never erase the draft on cancel, backdrop or
+  // Escape. Only the destructive modal button clears it and resets the wizard.
+  const context4 = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  const page4 = await context4.newPage();
+  await page4.goto(base + '/#/tournaments/new');
+  await page4.locator('#name').fill('Diesen Entwurf nicht verlieren');
+  await page4.waitForFunction(() =>
+    localStorage.getItem('online-tournament:creation-draft:v1')?.includes('Diesen Entwurf nicht verlieren'));
+  await page4.getByRole('button', { name: 'Entwurf verwerfen', exact: true }).click();
+  const discardDialog = page4.getByRole('dialog', { name: 'Entwurf verwerfen?' });
+  await discardDialog.waitFor();
+  assert.match(await discardDialog.innerText(), /Teilnehmer und Phasen gehen verloren/);
+  await discardDialog.getByRole('button', { name: 'Abbrechen' }).click();
+  assert.equal(await page4.locator('#name').inputValue(), 'Diesen Entwurf nicht verlieren');
+  await page4.reload();
+  assert.equal(await page4.locator('#name').inputValue(), 'Diesen Entwurf nicht verlieren',
+    'cancelling discard must preserve the saved draft after reload');
+  await page4.getByRole('button', { name: 'Entwurf verwerfen', exact: true }).click();
+  await page4.keyboard.press('Escape');
+  assert.equal(await page4.getByRole('dialog', { name: 'Entwurf verwerfen?' }).count(), 0);
+  await page4.getByRole('button', { name: 'Entwurf verwerfen', exact: true }).click();
+  await page4.getByRole('dialog', { name: 'Entwurf verwerfen?' })
+    .getByRole('button', { name: 'Entwurf endgültig verwerfen' }).click();
+  await page4.waitForFunction(() => document.querySelector('#name')?.value === '');
+  assert.equal(await page4.locator('#name').inputValue(), '',
+    'confirming discard resets the creation wizard');
+  assert.equal(await page4.locator('.wizard-step.active').count(), 1);
+  await context4.close();
+
   process.stdout.write('Creation wizard browser smoke tests passed.\n');
 } finally {
   await browser.close();
