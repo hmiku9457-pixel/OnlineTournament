@@ -66,17 +66,19 @@ function HallGrid({ layout, compact, selected, onPlace, onSelect, sport }: {
   );
 }
 
-type VenuePreset = 'rows' | 'line' | 'aisle';
+type VenuePreset = 'rows' | 'line' | 'aisle' | 'square';
 
 /** Simple layouts are easier to start with than an oversized empty raster. */
 function makeVenuePreset(tableCount: number, deskDock: DeskDock, preset: VenuePreset): VenueLayout {
   const count = Math.max(1, Math.trunc(tableCount));
-  const columns = preset === 'line' ? count : Math.max(2, Math.ceil(count / 2));
-  const rows = preset === 'line' ? 1 : preset === 'aisle' ? 3 : 2;
+  const squareSide = Math.ceil(Math.sqrt(count));
+  const columns = preset === 'square' ? squareSide : preset === 'line' ? count : Math.max(2, Math.ceil(count / 2));
+  const rows = preset === 'square' ? squareSide : preset === 'line' ? 1 : preset === 'aisle' ? 3 : 2;
   const cells: VenueCell[] = Array.from({ length: columns * rows }, () => '');
   for (let index = 0; index < count; index += 1) {
-    const row = preset === 'line' || index < columns ? 0 : (preset === 'aisle' ? 2 : 1);
-    const column = preset === 'line' ? index : index % columns;
+    const row = preset === 'square' ? Math.floor(index / columns)
+      : preset === 'line' || index < columns ? 0 : (preset === 'aisle' ? 2 : 1);
+    const column = index % columns;
     cells[row * columns + column] = `table:${index + 1}`;
   }
   return { columns, rows, cells, deskDock };
@@ -91,8 +93,9 @@ export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
   const [selected, setSelected] = useState<VenueCell | null>(null);
   const venue = getVenueTerminology(sport);
   const MIN_SIZE = 1;
-  const MAX_COLUMNS = 100;
-  const MAX_ROWS = 40;
+  // Manual grids must stay editable even when the venue is larger than 100×40.
+  const MAX_COLUMNS = Math.max(100, tableCount, layout.columns);
+  const MAX_ROWS = Math.max(40, tableCount, layout.rows);
   // Beim Verkleinern müssen alle Tische und ggf. die Turnierleitung im Raster Platz behalten.
   const requiredCells = tableCount + (layout.cells.includes('desk') ? 1 : 0);
   const canRemoveColumn = layout.columns > MIN_SIZE && (layout.columns - 1) * layout.rows >= requiredCells;
@@ -118,9 +121,10 @@ export function VenueLayoutEditor({ layout, tableCount, sport, onChange }: {
           <p>Wähle einen Ausgangspunkt oder verschiebe die {venue.plural} anschließend direkt im Plan.</p>
         </div>
         <div className="hall-editor-presets" role="group" aria-label="Vorlage für die Spielflächenanordnung">
-          <button type="button" className="btn small" onClick={() => { onChange(makeVenuePreset(tableCount, layout.deskDock, 'rows')); setSelected(null); }}>Zwei Reihen</button>
+          <button type="button" className="btn small" onClick={() => { onChange(makeVenuePreset(tableCount, layout.deskDock, 'square')); setSelected(null); }}>Quadrat</button>
+          {tableCount <= 80 && <button type="button" className="btn small" onClick={() => { onChange(makeVenuePreset(tableCount, layout.deskDock, 'rows')); setSelected(null); }}>Zwei Reihen</button>}
           <button type="button" className="btn small" onClick={() => { onChange(makeVenuePreset(tableCount, layout.deskDock, 'aisle')); setSelected(null); }}>Mit Mittelgang</button>
-          <button type="button" className="btn small" onClick={() => { onChange(makeVenuePreset(tableCount, layout.deskDock, 'line')); setSelected(null); }}>Eine Reihe</button>
+          {tableCount <= 40 && <button type="button" className="btn small" onClick={() => { onChange(makeVenuePreset(tableCount, layout.deskDock, 'line')); setSelected(null); }}>Eine Reihe</button>}
         </div>
       </div>
       <div className="hall-editor-toolrow">
