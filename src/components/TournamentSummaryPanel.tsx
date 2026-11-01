@@ -1,6 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import { TournamentPlannedSchedule, type TimetableStage } from '@/components/TournamentPlannedSchedule';
 import { getBreakResumeAt } from '@/services/mockPhaseLifecycle';
+import { getLiveScheduleDeviations } from '@/services/mockLiveSchedule';
 import { formatPlannedDateTime } from '@/domain/tournamentSchedule';
 import { disciplineLabel } from '@/domain/sports';
 import type { TournamentStage } from '@/domain/types';
@@ -215,6 +216,7 @@ export function TournamentSummaryPanel({
       <TournamentPlannedSchedule
         scheduledStart={tournament.scheduledStart}
         items={tournament.plannedSchedule}
+        deviations={getLiveScheduleDeviations(tournament)}
         stages={timetableStages}
         onStage={(stageId) => {
           const stage = tournament.stages.find((candidate) => candidate.id === stageId);
