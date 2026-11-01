@@ -109,39 +109,11 @@ function validDraft(value: unknown): value is CreationDraft {
     && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string');
 }
 
-/** Recovered numeric IDs must not collide with new entries after a page reload. */
+/** Restored numeric IDs must not collide with newly created entries. */
 export function highestDraftSequence(items: readonly { id: string }[], prefix: string): number {
-  const pattern = new RegExp('^' + prefix + '-(\\\\d+)
-  try {
-    const store = storage ?? (typeof window !== 'undefined' ? window.localStorage : undefined);
-    const raw = store?.getItem(CREATION_DRAFT_KEY);
-    if (!raw) return null;
-    const decoded: unknown = JSON.parse(raw);
-    if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) return null;
-    const payload = decoded as { version?: unknown; draft?: unknown };
-    return payload.version === 1 && validDraft(payload.draft) ? payload.draft : null;
-  } catch { return null; }
-}
-
-export function saveCreationDraft(draft: CreationDraft, storage?: Pick<Storage, 'setItem'>): boolean {
-  try {
-    const store = storage ?? (typeof window !== 'undefined' ? window.localStorage : undefined);
-    if (!store) return false;
-    store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft }));
-    return true;
-  } catch { return false; }
-}
-
-export function clearCreationDraft(storage?: Pick<Storage, 'removeItem'>): void {
-  try {
-    const store = storage ?? (typeof window !== 'undefined' ? window.localStorage : undefined);
-    store?.removeItem(CREATION_DRAFT_KEY);
-  } catch { /* No storage access; creation can still proceed. */ }
-}
-);
   return items.reduce((highest, item) => {
-    const match = pattern.exec(item.id);
-    return match ? Math.max(highest, Number(match[1])) : highest;
+    const numeric = item.id.startsWith(prefix + '-') ? Number(item.id.slice(prefix.length + 1)) : NaN;
+    return Number.isSafeInteger(numeric) && numeric > highest ? numeric : highest;
   }, 0);
 }
 
