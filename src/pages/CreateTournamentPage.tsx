@@ -905,6 +905,7 @@ export function CreateTournamentPage() {
   // action or stale copy of the phases can remain in the wizard.
   const plannedTimeline = useMemo(() => buildPlannedTimeline(scheduledStart, phaseDrafts.map((phase, index) => ({
     label: phase.label,
+    note: phase.type === 'BREAK' ? phase.note : undefined,
     type: phase.type,
     estimatedMinutes: phaseEstimates[index]?.estimatedDurationMinutes ?? 0,
     breakKind: phase.breakKind,
