@@ -1436,9 +1436,12 @@ export function refreshCompletedStageQualifiers(tournament: DemoTournament, stag
   const nextStage = getNextCompetitionStage(tournament, stage);
   if (!nextStage || isStageStarted(tournament, nextStage)) return false;
   const qualified = computeStageQualifiers(tournament, stage, readResults());
-  if (stage.type === 'SWISS' && swissCutoffStatus(tournament, stage, readResults()) && !qualified.length) {
-    // A result correction has changed/invalidated the earlier cutoff decision.
-    // Reopen the completed Swiss phase so the director must resolve it again.
+  if ((stage.type === 'SWISS' && swissCutoffStatus(tournament, stage, readResults()) && !qualified.length)
+    || (stage.type === 'GROUPS' && groupQualifierResult(tournament, stage, readResults()).cutoff
+      && qualified.length < stageQualifierCount(tournament, stage))) {
+    // A result correction or a later withdrawal can change the qualification
+    // boundary. Reopen for an explicit decision rather than silently selecting
+    // the next person by their name.
     reopenStageForQualification(tournament, stage);
     return false;
   }
