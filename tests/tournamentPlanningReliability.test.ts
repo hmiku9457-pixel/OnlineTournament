@@ -21,7 +21,7 @@ describe('creation wizard: safe durations and minimum actual matches', () => {
     expect(minimumPlayedMatches('GROUPS', 19, 4)).toBe(3);
     expect(minimumPlayedMatches('SWISS', 9, 2, 4)).toBe(3);
     expect(minimumPlayedMatches('SWISS', 9, 2, 5)).toBe(4);
-    expect(minimumPlayedMatches('KNOCKOUT', 6)).toBe(0);
+    expect(minimumPlayedMatches('KNOCKOUT', 6)).toBe(1);
     expect(minimumPlayedMatches('KNOCKOUT', 8)).toBe(1);
     expect(recommendedSwissRounds(9, 4)).toBe(5);
 
