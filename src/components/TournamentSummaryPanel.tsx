@@ -1,4 +1,5 @@
 import type { DemoTournament } from '@/data/demoTournaments';
+import { TournamentPlannedSchedule, type TimetableStage } from '@/components/TournamentPlannedSchedule';
 import { getBreakResumeAt } from '@/services/mockPhaseLifecycle';
 import { formatPlannedDateTime } from '@/domain/tournamentSchedule';
 import { disciplineLabel } from '@/domain/sports';
@@ -91,6 +92,15 @@ export function TournamentSummaryPanel({
   const aborted = tournament.status === 'ABORTED';
   const beforeStart = !tournament.hasStarted && !ended && !aborted;
   const paused = tournament.status === 'PAUSED';
+  const timetableStages: TimetableStage[] = tournament.stages.map((stage, index) => ({
+    id: stage.id,
+    name: stage.name,
+    type: stage.type,
+    status: isStageCompleted(tournament, stage) ? 'completed'
+      : activeStage?.id === stage.id ? 'live' : 'pending',
+    details: stageDetails(stage),
+    advancement: advancementLabel(stage, index === tournament.stages.length - 1),
+  }));
 
   let actionTitle = 'Turnier im Blick';
   let actionText = 'Die wichtigsten Angaben und alle Phasen stehen hier auf einen Blick.';
@@ -148,7 +158,7 @@ export function TournamentSummaryPanel({
       <div className="tournament-summary-heading">
         <div>
           <h2>Übersicht</h2>
-          <p className="muted">Turnierstand, nächste Schritte und Phasenplan – ohne zusätzliche Zwischenstation.</p>
+          <p className="muted">Turnierstand, nächster Schritt und Zeitplan mit dem aktuellen Status aller Phasen.</p>
         </div>
         <div className="tournament-summary-heading-actions">
           {beforeStart && onEditPhases && <button type="button" className="btn small" onClick={onEditPhases}>Phasen vor Start bearbeiten</button>}
@@ -183,49 +193,32 @@ export function TournamentSummaryPanel({
           <div><span>Wartende Spiele</span><strong>{waitingMatches}</strong></div>
           <div><span>{beforeStart ? 'Dauerprognose' : 'Restzeit (Schätzung)'}</span><strong className="tournament-summary-time">{beforeStart ? tournament.estimatedDuration : restTimeLabel}</strong></div>
         </div>
-      </div>
-
-      <div className="tournament-summary-progress-head">
-        <strong>Turnierfortschritt</strong>
-        <span>{progress.percent} % · {progress.completedPhases}/{progress.totalPhases} Phasen</span>
-      </div>
-      <div className="tournament-summary-progress-bar" role="progressbar"
-        aria-label="Geschätzter Turnierfortschritt" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}>
-        <span style={{ width: `${progress.percent}%` }} />
-      </div>
-      {activeStage && progress.matchesInPhase > 0 && (
-        <p className="tournament-summary-progress-note">
-          {activeStage.name}: {progress.completedMatches} von {progress.matchesInPhase} derzeit angesetzten Partien abgeschlossen
-        </p>
-      )}
-
-      <div className="tournament-summary-section-head">
-        <div>
-          <h3>Phasenplan</h3>
-          <p className="muted">Reihenfolge, Spielmodus und Qualifikation. Eine Phase anklicken, um ihren Verlauf zu öffnen.</p>
+        <div className="tournament-summary-progress">
+          <div className="tournament-summary-progress-head">
+            <strong>Turnierfortschritt</strong>
+            <span>{progress.percent} % · {progress.completedPhases}/{progress.totalPhases} Phasen</span>
+          </div>
+          <div className="tournament-summary-progress-bar" role="progressbar"
+            aria-label="Geschätzter Turnierfortschritt" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}>
+            <span style={{ width: `${progress.percent}%` }} />
+          </div>
+          {activeStage && progress.matchesInPhase > 0 && (
+            <p className="tournament-summary-progress-note">
+              {activeStage.name}: {progress.completedMatches} von {progress.matchesInPhase} derzeit angesetzten Partien abgeschlossen
+            </p>
+          )}
         </div>
       </div>
-      <div className="tournament-summary-phases">
-        {tournament.stages.map((stage, index) => {
-          const completed = isStageCompleted(tournament, stage);
-          const started = isStageStarted(tournament, stage);
-          const isCurrent = activeStage?.id === stage.id;
-          const state = completed ? 'Abgeschlossen' : isCurrent ? 'Läuft' : started ? 'Gestartet' : 'Ausstehend';
-          return (
-            <button className={`tournament-summary-phase${isCurrent ? ' is-current' : ''}${completed ? ' is-complete' : ''}`}
-              type="button" key={stage.id} onClick={() => onStage(stage)}
-              aria-label={`Phase ${index + 1}: ${stage.name}, ${state}. Im Turnierverlauf öffnen`}>
-              <span className="tournament-summary-phase-number">{index + 1}</span>
-              <span className="tournament-summary-phase-content">
-                <span className="tournament-summary-phase-title">{stage.name}</span>
-                <span className="tournament-summary-phase-details">{stageDetails(stage)}</span>
-                <span className="tournament-summary-phase-advance">{advancementLabel(stage, index === tournament.stages.length - 1)}</span>
-              </span>
-              <span className={`tournament-summary-phase-state ${completed ? 'complete' : isCurrent ? 'current' : ''}`}>{state}</span>
-            </button>
-          );
-        })}
-      </div>
+
+      <TournamentPlannedSchedule
+        scheduledStart={tournament.scheduledStart}
+        items={tournament.plannedSchedule}
+        stages={timetableStages}
+        onStage={(stageId) => {
+          const stage = tournament.stages.find((candidate) => candidate.id === stageId);
+          if (stage) onStage(stage);
+        }}
+      />
 
       <div className="tournament-summary-details">
         <h3>Turnierdaten</h3>
