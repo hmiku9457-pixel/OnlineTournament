@@ -662,9 +662,15 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       return;
     }
     setPrestartSaveBusy(true);
-    const result = await updatePrestartTournamentPhasesSafely(prestart.tournament.id, prestartPhaseDrafts,
-      originalPrestartFingerprint.current);
-    setPrestartSaveBusy(false);
+    let result: Awaited<ReturnType<typeof updatePrestartTournamentPhasesSafely>>;
+    try {
+      result = await updatePrestartTournamentPhasesSafely(prestart.tournament.id, prestartPhaseDrafts,
+        originalPrestartFingerprint.current);
+    } catch (error) {
+      setPrestartSaveError(error instanceof Error ? error.message : 'Der Speichervorgang ist fehlgeschlagen.');
+      setConfirmPrestartSave(false);
+      return;
+    } finally { setPrestartSaveBusy(false); }
     if (!result.ok) {
       setPrestartSaveError(result.error ?? 'Die Phasen konnten nicht gespeichert werden.');
       setConfirmPrestartSave(false);
