@@ -21,6 +21,8 @@ try {
   await page.locator('.calendar-picker-day').filter({ hasText: /^21$/ }).click();
   await page.locator('#sport').selectOption('table_tennis');
   assert.equal(await page.locator('#discipline').inputValue(), 'SINGLES');
+  await page.getByRole('group', { name: 'Gewünschte Mindestspiele pro Teilnehmer (Pflichtfeld)' })
+    .getByRole('button', { name: '4', exact: true }).click();
   await next(page);
   await page.waitForSelector('.participant-step');
 
@@ -41,8 +43,12 @@ try {
   assert.equal(await page.getByRole('button', { name: '+ Schweizer System' }).count(), 1,
     'disabled recommendation system is still available for manual phases');
   await page.getByRole('button', { name: '+ Jeder gegen jeden' }).click();
+  await page.locator('.wizard-side-minimum-warning').waitFor();
+  assert.match(await page.locator('.wizard-side-minimum-warning').innerText(), /Mindestspielzahl nicht erreicht/);
+  assert.match(await page.locator('.wizard-side-minimum-warning').innerText(), /Garantiert 3 von gewünschten 4/);
   await page.locator('.wizard-continue-button').click();
   await page.waitForSelector('.schedule-wizard-step');
+  assert.match(await page.locator('.wizard-review-check').innerText(), /Die erste Phase garantiert nur 3/);
   assert.equal(await page.locator('.wizard-create-button').isEnabled(), true);
   await page.locator('.wizard-create-button').click();
   await page.waitForURL(/\/tournaments\/[^/]+\/control/, { timeout: 20000 });
@@ -75,6 +81,17 @@ try {
   assert.equal(await page2.locator('#discipline').inputValue(), 'SINGLES');
   await page2.locator('.wizard-step').nth(1).click();
   assert.equal(await page2.locator('.participant-roster-row').count(), 1);
+  await page2.getByRole('button', { name: '19 Testspieler erzeugen' }).click();
+  const testDialog = page2.getByRole('dialog', { name: '19 Testspieler erzeugen?' });
+  await testDialog.waitFor();
+  assert.match(await testDialog.innerText(), /Werden ergänzt:\\s*18/);
+  await testDialog.getByRole('button', { name: 'Abbrechen' }).click();
+  assert.equal(await page2.locator('.participant-roster-row').count(), 1, 'cancel leaves roster unchanged');
+  await page2.getByRole('button', { name: '19 Testspieler erzeugen' }).click();
+  await page2.getByRole('dialog', { name: '19 Testspieler erzeugen?' })
+    .getByRole('button', { name: '18 Testspieler hinzufügen' }).click();
+  assert.equal(await page2.locator('.participant-roster-row').count(), 19,
+    'confirmation adds exactly the missing test players');
   await context2.close();
   process.stdout.write('Creation wizard browser smoke tests passed.\n');
 } finally {
