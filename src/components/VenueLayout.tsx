@@ -69,7 +69,7 @@ function HallGrid({ layout, compact, selected, onPlace, onSelect, sport }: {
 type VenuePreset = 'rows' | 'line' | 'aisle' | 'square';
 
 /** Simple layouts are easier to start with than an oversized empty raster. */
-function makeVenuePreset(tableCount: number, deskDock: DeskDock, preset: VenuePreset): VenueLayout {
+export function makeVenuePreset(tableCount: number, deskDock: DeskDock, preset: VenuePreset): VenueLayout {
   const count = Math.max(1, Math.trunc(tableCount));
   const squareSide = Math.ceil(Math.sqrt(count));
   // Larger halls retain the central aisle, but use compact banks of rows
