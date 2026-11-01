@@ -20,3 +20,24 @@ jobs:
       - run: npm run lint
       - run: npm run test
       - run: npm run build
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium
+      - name: Start wizard and exercise creation in a real browser
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/tournaments/new >/dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/creation-browser-smoke.mjs
