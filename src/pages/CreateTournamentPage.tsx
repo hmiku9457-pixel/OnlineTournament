@@ -1516,8 +1516,12 @@ export function CreateTournamentPage() {
                         mindestens {item.minimumGuaranteedMatches} gespielte Begegnungen
                       </span>
                     </div>
-                    {index === 0 && (
-                      <p className="recommendation-reason">Bis 3,5 Stunden bevorzugt; bei Bedarf mit längeren Alternativen auf fünf Vorschläge ergänzt.</p>
+                    {index === 0 && !item.minimumMatchShortfall && (
+                      <p className="recommendation-reason">
+                        {item.estimatedDurationMinutes <= 210
+                          ? 'Warum empfohlen: Erfüllt dein Mindestspielziel und bleibt innerhalb der bevorzugten 3,5 Stunden.'
+                          : 'Warum empfohlen: Erfüllt dein Mindestspielziel; die geschätzte Dauer liegt über dem bevorzugten Zeitrahmen von 3,5 Stunden.'}
+                      </p>
                     )}
                   </button>
                 ))}
@@ -1527,6 +1531,7 @@ export function CreateTournamentPage() {
                 <div className="format-settings-head">
                   <h3>Vorgaben für Vorschläge</h3>
                   <p className="muted">Die Vorgaben und Turniersystem-Häkchen filtern ausschließlich Empfehlungen. Bei der manuellen Phasenplanung bleiben alle Systeme verfügbar.</p>
+                  <p className="muted">Vorschläge bis 3,5 Stunden werden bevorzugt. Falls nötig, ergänzen längere Turnierformen die Liste auf bis zu fünf Vorschläge.</p>
                 </div>
 
                 <div className="format-setting-fields">
