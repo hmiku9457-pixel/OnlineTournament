@@ -32,6 +32,17 @@ function HallGrid({ layout, compact, selected, onPlace, onSelect, sport }: {
   onPlace?: (index: number, source?: VenueCell) => void;
   onSelect?: (value: VenueCell) => void;
 }) {
+  // Render at most about 1,200 interactive cells. Large venues are divided
+  // into contiguous navigable row windows, preserving all absolute cell IDs.
+  const windowed = layout.cells.length > 1200;
+  const rowsPerPage = windowed ? Math.max(1, Math.floor(1200 / layout.columns)) : layout.rows;
+  const [selectedPage, setSelectedPage] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(layout.rows / rowsPerPage));
+  const page = Math.max(0, Math.min(selectedPage, totalPages - 1));
+  const firstRow = page * rowsPerPage;
+  const lastRow = Math.min(layout.rows, firstRow + rowsPerPage);
+  const firstIndex = firstRow * layout.columns;
+  const visibleCells = layout.cells.slice(firstIndex, lastRow * layout.columns);
   return (
     <div className={compact ? 'hall-plan-scroller compact' : 'hall-plan-scroller'}>
       <div className={`hall-plan-wrap ${compact ? 'compact' : ''}`}>
@@ -39,7 +50,9 @@ function HallGrid({ layout, compact, selected, onPlace, onSelect, sport }: {
         <div className="hall-grid-center">
           {layout.deskDock === 'left' && <div className="hall-desk-outside side">TL</div>}
           <div className="hall-grid" style={{ gridTemplateColumns: `repeat(${layout.columns}, minmax(${compact ? 12 : 62}px, 1fr))` }}>
-            {layout.cells.map((token, index) => (
+            {visibleCells.map((token, offset) => {
+              const index = firstIndex + offset;
+              return (
               <button
                 key={index}
                 type="button"
@@ -56,11 +69,18 @@ function HallGrid({ layout, compact, selected, onPlace, onSelect, sport }: {
                   else if (token && onSelect) onSelect(token);
                 }}
               >{tileLabel(token, compact, sport)}</button>
-            ))}
+            ); })}
           </div>
           {layout.deskDock === 'right' && <div className="hall-desk-outside side">TL</div>}
         </div>
         {layout.deskDock === 'bottom' && <div className="hall-desk-outside bottom">TL</div>}
+        {windowed && <nav className="hall-grid-page-navigation" aria-label="Reihen des Hallenplans">
+          <button type="button" className="btn small" disabled={page === 0}
+            onClick={() => setSelectedPage(Math.max(0, page - 1))}>Vorherige Reihen</button>
+          <span role="status">Reihen {firstRow + 1}–{lastRow} von {layout.rows} · Seite {page + 1}/{totalPages}</span>
+          <button type="button" className="btn small" disabled={page >= totalPages - 1}
+            onClick={() => setSelectedPage(Math.min(totalPages - 1, page + 1))}>Nächste Reihen</button>
+        </nav>}
       </div>
     </div>
   );
