@@ -1825,7 +1825,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
             {groupRecommendationNotice && <div className="callout" role="status">{groupRecommendationNotice} Die bisherige Einstellung bleibt erhalten; über „Empfehlung übernehmen“ kannst du sie ändern.</div>}
             {reviewRequiredPhaseIds.length > 0 && <div className="callout" role="alert">
               Einige Qualifikationswerte oder Rundeneinstellungen wurden nach einer Änderung der Teilnehmerzahl verkleinert. Bitte die markierten Phasen kontrollieren und einzeln als geprüft bestätigen.
-            </div>}}
+            </div>}
 
             <div className="phase-step-layout">
               <div className="phase-step-main">
