@@ -5,7 +5,7 @@ import { DrawActionButton } from '@/components/DrawActionButton';
 import { StageCard } from '@/components/StageCard';
 import { TournamentSummaryPanel } from '@/components/TournamentSummaryPanel';
 
-import { PrestartPhaseEditor } from '@/components/PrestartPhaseEditor';
+import { CreateTournamentPage } from '@/pages/CreateTournamentPage';
 import { getFirstPhaseRecommendationWarning } from '@/domain/prestartPhasePlanning';
 import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
@@ -1290,21 +1290,25 @@ export function TournamentControlPage() {
         </>
       )}
 
-        {tab === 'prestart' && showPrestartPhaseEditor && !tournament.hasStarted && (
-          <PrestartPhaseEditor
-            key={tournament.id}
-            tournament={tournament}
-            activeParticipants={activePrestartParticipants}
-            withdrawnParticipants={participants.length - activePrestartParticipants}
-            onSaved={() => {
-              setShowPrestartPhaseEditor(false);
-              setTab('summary');
-              setSelectedStageId(tournament.stages[0]?.id ?? '');
-              setDrawVersion((value) => value + 1);
-              refreshRuntime();
-            }}
-            onCancel={() => { setShowPrestartPhaseEditor(false); setTab('summary'); }}
-          />
+        {showPrestartPhaseEditor && !tournament.hasStarted && (
+          <div style={{ display: tab === 'prestart' ? undefined : 'none' }}>
+            <CreateTournamentPage
+              key={tournament.id}
+              prestart={{
+                tournament,
+                activeParticipants: activePrestartParticipants,
+                withdrawnParticipants: participants.length - activePrestartParticipants,
+                onSaved: () => {
+                  setShowPrestartPhaseEditor(false);
+                  setTab('summary');
+                  setSelectedStageId(tournament.stages[0]?.id ?? '');
+                  setDrawVersion((value) => value + 1);
+                  refreshRuntime();
+                },
+                onCancel: () => { setShowPrestartPhaseEditor(false); setTab('summary'); },
+              }}
+            />
+          </div>
         )}
 
       {tab === 'overview' && (
