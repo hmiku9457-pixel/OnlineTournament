@@ -1340,10 +1340,13 @@ function groupQualifierResult(tournament: DemoTournament, stage: TournamentStage
   };
   const qualified: string[] = [];
   let tie: GroupCutoffStatus['tie'] | null = null;
-  for (let rankIndex = 0; qualified.length < targetCount; rankIndex += 1) {
+  const maxRank = Math.max(0, ...rankings.map((ranking) => ranking.length));
+  for (let rankIndex = 0; rankIndex < maxRank && qualified.length < targetCount; rankIndex += 1) {
     const tier = rankings.map((ranking) => ranking[rankIndex])
       .filter((row): row is RankingRow => Boolean(row) && !isMockParticipantWithdrawn(tournament, row.name));
-    if (!tier.length) break;
+    // A withdrawn group winner may leave an entire tier empty. Later places
+    // must still be eligible as reserves for the following phase.
+    if (!tier.length) continue;
     tier.sort(compare);
     const slots = targetCount - qualified.length;
     if (tier.length <= slots) {
