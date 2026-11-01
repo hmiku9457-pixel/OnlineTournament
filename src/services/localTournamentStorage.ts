@@ -12,6 +12,20 @@ const ARRAY_KEYS = [
   'online-tournament:mock-draw-config:v1',
   'online-tournament:mock-phase-lifecycle:v1',
   'online-tournament:mock-audit:v1',
+  'online-tournament:mock-inline-breaks:v1',
+  'online-tournament:group-cutoff-decisions:v1',
+  'online-tournament:mock-match-results:v2',
+  'online-tournament:mock-match-runtime:v1',
+  'online-tournament:swiss-round-fixtures:v1',
+] as const;
+const OBJECT_KEYS = [
+  'online-tournament:withdrawn-participants:v1',
+  'online-tournament:withdrawal-timing:v1',
+  'online-tournament:withdrawal-restore:v1',
+  'online-tournament:mock-blocked-tables:v1',
+  'online-tournament:swiss-cutoff-decisions:v1',
+  'online-tournament:swiss-round-robin-history:v1',
+  'online-tournament:swiss-extra-rounds:v1',
 ] as const;
 
 interface StoredValue { key: string; value: string }
@@ -163,6 +177,16 @@ function inspectSnapshot(entries: StoredValue[]): { valid: StoredValue[]; corrup
     try {
       if (!Array.isArray(JSON.parse(raw))) quarantineKey(key, 'Beschädigte gemeinsame Turnierdaten.');
     } catch { quarantineKey(key, 'Beschädigte gemeinsame Turnierdaten.'); }
+  }
+  for (const key of OBJECT_KEYS) {
+    const raw = data.get(key);
+    if (!raw) continue;
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        quarantineKey(key, 'Beschädigter turnierbezogener Einstellungsdatensatz.');
+      }
+    } catch { quarantineKey(key, 'Beschädigter turnierbezogener Einstellungsdatensatz.'); }
   }
   data.set(INDEX, JSON.stringify(good));
   return { valid: [...data].map(([key, value]) => ({ key, value })), corrupt: problems };
