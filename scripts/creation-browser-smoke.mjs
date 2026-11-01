@@ -163,6 +163,12 @@ try {
   await page.waitForURL(/\/tournaments\/[^/]+\/control/, { timeout: 20000 });
   await page.locator('.control-hero-bar h1').waitFor({ state: 'visible', timeout: 20000 });
   assert.equal((await page.locator('.control-hero-bar h1').textContent())?.trim(), 'Browser-Smoke-Turnier');
+  const localTournamentCopies = await page.evaluate(() => Array.from({ length: localStorage.length },
+    (_, index) => localStorage.key(index)).filter((key) =>
+    key?.startsWith('online-tournament:local-prototype-tournaments:v1')));
+  assert.equal(localTournamentCopies.length, 0,
+    'runtime must keep tournament records exclusively in IndexedDB, not in a localStorage mirror');
+
 
   // The director uses the SAME phase card as the wizard. Switching to the
   // participant tab must not discard the still-unsaved prestart edits.
