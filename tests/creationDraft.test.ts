@@ -60,6 +60,18 @@ describe('tournament creation draft recovery', () => {
     expect(loadCreationDraft(store)).toBeNull();
   });
 
+  it('round-trips the prestart recovery key using the same versioned format as the wizard', () => {
+    const store = fakeStorage();
+    const key = 'online-tournament:prestart-recovery:tournament-1';
+    const phaseEditing = { ...makeDraft(), step: 4, phaseDrafts: [
+      { ...makeDraft().phaseDrafts[0], swissRounds: 5 },
+    ] };
+    expect(saveCreationDraft(phaseEditing, store, key)).toBe(true);
+    expect(loadCreationDraft(store, key)?.phaseDrafts[0].swissRounds).toBe(5);
+    clearCreationDraft(store, key);
+    expect(loadCreationDraft(store, key)).toBeNull();
+  });
+
   it('rejects malformed, incompatible or truncated drafts without crashing', () => {
     const store = fakeStorage();
     store.setItem(CREATION_DRAFT_KEY, '{broken');
