@@ -46,7 +46,7 @@ export interface MockGroupMatch {
   sideA: string;
   sideB: string;
   score: string;
-  status: 'played' | 'live' | 'open';
+  status: 'played' | 'live' | 'open' | 'cancelled';
   matchDay?: number;
   sets?: MatchSet[];
 }
@@ -69,6 +69,7 @@ export interface MockBracketMatch {
   decision?: ScoreDecision;
   extraTimeProgress?: ExtraTimeProgress;
   live?: boolean;
+  status?: string;
 }
 
 export interface MockBracketRound {
@@ -130,12 +131,14 @@ export function buildMockGroups(tournament: DemoTournament, stage: TournamentSta
     const groupMatches = stageMatches.filter((match) => match.round === label);
     const standings = computeStandings(members, groupMatches, tournament.sport);
     const matches: MockGroupMatch[] = groupMatches.map((match) => {
-      const status: MockGroupMatch['status'] = match.status === 'FINISHED' ? 'played' : match.status === 'LIVE' ? 'live' : 'open';
+      const status: MockGroupMatch['status'] = match.status === 'FINISHED' ? 'played'
+        : match.status === 'CANCELLED' ? 'cancelled'
+        : ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) ? 'live' : 'open';
       return {
         id: match.id,
         sideA: match.sideA,
         sideB: match.sideB,
-        score: match.status === 'FINISHED' ? match.score.replace(/\s/g, '') : match.status === 'LIVE' ? match.sets?.length ? resultScore(tournament.sport, match.sets) : '0:0' : '–',
+        score: match.status === 'FINISHED' ? match.score.replace(/\s/g, '') : status === 'live' ? match.sets?.length ? resultScore(tournament.sport, match.sets) : '0:0' : '–' : '–',
         status,
         matchDay: match.matchDay,
         sets: match.sets,
@@ -147,6 +150,7 @@ export function buildMockGroups(tournament: DemoTournament, stage: TournamentSta
 
 export function buildMockBracket(tournament: DemoTournament, stage: TournamentStage): MockBracketRound[] {
   const matches = getMockStageBaseMatches(tournament, stage);
+  const runtimeById = new Map(getMockStageMatches(tournament, stage).map((match) => [match.id, match]));
   const byRound = new Map<string, MockBracketMatch[]>();
 
   matches.forEach((match) => {
@@ -168,7 +172,10 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
       score = 'Freilos';
     }
     const list = byRound.get(match.round) ?? [];
-    list.push({ id: match.id, sideA: match.sideA, sideB: match.sideB, score, winner, autoWinner: match.autoWinner, sets: stored?.sets, decision: stored?.decision, extraTimeProgress: stored?.status === 'FINISHED' ? undefined : stored?.extraTimeProgress, live: stored?.status === 'LIVE' || stored?.status === 'CONFIRMATION' });
+    const runtime = runtimeById.get(match.id);
+    const status = stored?.thirdPlaceSkipped || stored?.status === 'FINISHED' || Boolean(match.autoWinner)
+      ? 'FINISHED' : runtime?.status ?? stored?.status ?? 'WAITING';
+    list.push({ id: match.id, sideA: match.sideA, sideB: match.sideB, score, winner, autoWinner: match.autoWinner, sets: stored?.sets, decision: stored?.decision, extraTimeProgress: stored?.status === 'FINISHED' ? undefined : stored?.extraTimeProgress, status, live: ['LIVE', 'READY', 'CONFIRMATION'].includes(status) });
     byRound.set(match.round, list);
   });
 
