@@ -7048,3 +7048,26 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 @media (max-width: 600px) {
   .group-cutoff-dialog .actions .btn { width: 100%; }
 }
+
+/* Keep the original clock visible and mark the projected slip separately. */
+.planned-schedule-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.planned-schedule-deviation {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  width: max-content;
+  padding: 2px 6px;
+  border: 1px solid #f2b766;
+  border-radius: 6px;
+  background: #fff5db;
+  color: #92400e;
+  font-size: .72rem;
+  font-weight: 750;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
