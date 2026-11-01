@@ -88,7 +88,7 @@ function calculateGroupPlan(playerCount: number, minimumMatches: number, maxGrou
 function calculateSwissPlan(playerCount: number, minimumMatches: number, maxSwissRoundsSetting?: number) {
   const recommendedRounds = Math.max(minimumMatches + (playerCount % 2), Math.ceil(Math.log2(playerCount)));
   // Limit to the number of distinct possible opponents in the reduced field.
-  const rounds = clampInteger(maxSwissRoundsSetting, recommendedRounds, 1, Math.min(30, playerCount - 1, recommendedRounds));
+  const rounds = clampInteger(maxSwissRoundsSetting, recommendedRounds, 2, Math.max(2, Math.min(30, playerCount - 1, recommendedRounds)));
   const matches = Math.floor(playerCount / 2) * rounds;
   const roundsBelowMinimum = Math.max(0, minimumMatches - minimumPlayedMatches('SWISS', playerCount, 2, rounds));
   return { rounds, matches, roundsBelowMinimum };
@@ -239,6 +239,9 @@ export function recommendTournamentFormats(
   const tripleSwissRounds = calculateSwissPlan(tripleSwissEntrants, minimumMatches, settings.maxSwissRounds);
 
   function addRecommendation(candidate: Omit<FormatRecommendation, 'estimatedDurationMinutes' | 'estimatedMatches'>) {
+    // All Swiss phases require at least three entrants and two rounds.
+    if (candidate.phases.some((phase) => phase.type === 'SWISS'
+      && ((phase.entrantCount ?? playerCount) < 3 || (phase.swissRounds ?? 0) < 2))) return;
     // A group stage requires at least two real groups with two participants each.
     if (candidate.phases.some((phase) => phase.type === 'GROUPS' && (phase.entrantCount ?? playerCount) < 4)) return;
     // Any change of competition system must eliminate at least one participant.
