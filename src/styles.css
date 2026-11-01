@@ -6899,3 +6899,32 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .wizard-start-past-banner-actions { align-items: stretch; }
   .wizard-start-past-banner-actions .btn { flex: 1 1 240px; }
 }
+/* Yellow, compact cross-group qualification help beside the NEXT phase. */
+.phase-qualification-warning-button {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 23px;
+  width: 23px;
+  height: 23px;
+  padding: 0;
+  margin-left: 3px;
+  border: 1px solid #f59e0b;
+  border-radius: 50%;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: .85rem;
+  font-weight: 850;
+  line-height: 1;
+  cursor: pointer;
+}
+.phase-qualification-warning-button:hover { background: #fde68a; }
+.phase-qualification-warning-button:focus-visible { outline: 2px solid #b45309; outline-offset: 3px; }
+.qualification-rule-dialog { max-width: 580px; }
+.qualification-rule-recommendation {
+  padding: 10px 12px;
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e40af;
+}
+.qualification-rule-recommendation > p { margin: 4px 0 0; font-size: .83rem; line-height: 1.45; }
