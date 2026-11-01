@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DemoTournament } from '@/data/demoTournaments';
 import { createPrestartPhase, estimatePrestartDuration, hasStartedAnyStage, initialPrestartPhases,
-  normalizePrestartPhases, recommendedPrestartGroupCount, validatePrestartPhases } from '@/domain/prestartPhasePlanning';
+  normalizePrestartPhases, recommendedPrestartGroupCount, getFirstPhaseRecommendationWarning, validatePrestartPhases } from '@/domain/prestartPhasePlanning';
 
 const tournament: DemoTournament = {
   id: 'test', name: 'Turnier', subtitle: '', status: 'READY', visibility: 'PRIVATE',
@@ -40,6 +40,33 @@ describe('replan before tournament start', () => {
   it('recommends groups with the following qualification count', () => {
     const phases = normalizePrestartPhases(initialPrestartPhases(tournament), 19);
     expect(recommendedPrestartGroupCount(phases, 0)).toBe(4);
+  });
+
+  it('warns only when the first-phase recommendation actually differs after a roster change', () => {
+    const groups = { ...tournament, stages: tournament.stages.map((stage, index) =>
+      index === 0 ? { ...stage, settings: { ...stage.settings, groups: 4 } } : stage) };
+    expect(getFirstPhaseRecommendationWarning(groups, 18)).toBeNull();
+    expect(getFirstPhaseRecommendationWarning(groups, 7)).toContain('Gruppen empfohlen');
+    expect(getFirstPhaseRecommendationWarning(groups, 3)).toContain('mindestens vier');
+    expect(getFirstPhaseRecommendationWarning(groups, 1)).toContain('weniger als zwei');
+
+    const swiss = { ...tournament, stages: [
+      { ...tournament.stages[1], orderIndex: 0, settings: { entrants: 8, rounds: 3 } },
+    ] };
+    expect(getFirstPhaseRecommendationWarning(swiss, 7)).toBeNull();
+    expect(getFirstPhaseRecommendationWarning(swiss, 4)).toContain('Schweizer Runden empfohlen');
+
+    const knockout = { ...tournament, stages: [
+      { ...tournament.stages[2], orderIndex: 0, settings: { entrants: 9, roundBestOf: '3,3,3,3' } },
+    ] };
+    expect(getFirstPhaseRecommendationWarning(knockout, 8)).toContain('statt 4 Runden');
+    expect(getFirstPhaseRecommendationWarning(knockout, 10)).toBeNull();
+
+    const roundRobin = { ...tournament, stages: [
+      { ...tournament.stages[0], type: 'ROUND_ROBIN' as const, settings: { entrants: 19 } },
+    ] };
+    expect(getFirstPhaseRecommendationWarning(roundRobin, 18)).toBeNull();
+    expect(getFirstPhaseRecommendationWarning({ ...groups, hasStarted: true }, 7)).toBeNull();
   });
 
   it('prevents invalid phase ordering and no-player scenarios', () => {
