@@ -45,6 +45,20 @@ describe('optional hall layout', () => {
     expect(html).toContain('Reihen 1–12 von 100');
     expect(html).toContain('Nächste Reihen');
     expect(html).not.toContain('Spielfläche 9000');
+    expect(html.indexOf('hall-grid-page-navigation')).toBeLessThan(html.indexOf('hall-plan-scroller'));
+    expect(html).toContain('Zu Spielfläche');
+    expect(html).toContain('Springen');
+  });
+
+  it('keeps extremely wide single-row halls within the 1,200-cell rendering budget', () => {
+    const layout = resizeVenueLayout(createVenueLayout(9999), 9999, 1, 9999);
+    const html = renderToStaticMarkup(createElement(VenueLayoutEditor, {
+      layout, tableCount: 9999, sport: 'table_tennis', onChange: () => {},
+    }));
+    expect((html.match(/class="hall-cell /g) ?? [])).toHaveLength(1200);
+    expect(html).toContain('Spalten 1–1200 von 9999');
+    expect(html).toContain('Nächste Spalten');
+    expect(html.indexOf('hall-grid-page-navigation')).toBeLessThan(html.indexOf('hall-plan-scroller'));
   });
 
   it('preserves tables when growing and swapping', () => {
