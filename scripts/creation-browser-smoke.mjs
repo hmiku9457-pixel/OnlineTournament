@@ -493,6 +493,7 @@ try {
   await freshPage.getByRole('button', { name: 'Entwurf speichern' }).click();
   await freshPage.locator('.sidebar-draft-item').first().waitFor();
   await freshPage.reload();
+  await freshPage.locator('.sidebar-draft-item').first().waitFor();
   assert.equal(await freshPage.locator('.sidebar-draft-item').count(), 1);
   await freshContext.close();
 
