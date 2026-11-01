@@ -598,6 +598,7 @@ export function TournamentControlPage() {
   const [pauseClockTick, setPauseClockTick] = useState(0);
   const [confirmEarlyBreak, setConfirmEarlyBreak] = useState(false);
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
+  const [groupCutoffModalOpen, setGroupCutoffModalOpen] = useState(false);
   const [abortModalOpen, setAbortModalOpen] = useState(false);
   const [abortReason, setAbortReason] = useState('');
   const [skipThirdMatchId, setSkipThirdMatchId] = useState<string | null>(null);
@@ -1227,6 +1228,9 @@ export function TournamentControlPage() {
             <strong>Sportlicher Gleichstand an der Qualifikationsgrenze</strong>
             <p>Die Gruppenphase kann erst freigegeben werden, wenn das Entscheidungsergebnis dokumentiert ist. Alphabetische Namen entscheiden nicht.</p>
           </div>
+          <button className="btn primary" type="button" onClick={() => setGroupCutoffModalOpen(true)}>
+            Stichentscheid dokumentieren
+          </button>
         </div>
       )}
       {pendingApproval && <div className="control-review-alert no-print" role="status">
@@ -1960,12 +1964,18 @@ export function TournamentControlPage() {
           </section>
         </div>
       )}
-      {pendingGroupCutoff && <GroupCutoffDecisionModal status={pendingGroupCutoff}
-        onResolve={(winners, method, explanation) => {
-          const error = resolveGroupCutoff(tournament, winners, method, explanation);
-          if (!error) refreshRuntime();
-          return error;
-        }} />}
+      {pendingGroupCutoff && groupCutoffModalOpen && (
+        <GroupCutoffDecisionModal status={pendingGroupCutoff}
+          onClose={() => setGroupCutoffModalOpen(false)}
+          onResolve={(winners, method, explanation) => {
+            const error = resolveGroupCutoff(tournament, winners, method, explanation);
+            if (!error) {
+              setGroupCutoffModalOpen(false);
+              refreshRuntime();
+            }
+            return error;
+          }} />
+      )}
       {pendingSwissCutoff && !activeRoundRobinPlayoff && !activeCutoffSetMatch && <SwissCutoffDecisionModal
         status={pendingSwissCutoff}
         tournament={tournament}
