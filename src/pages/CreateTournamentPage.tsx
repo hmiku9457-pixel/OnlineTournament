@@ -368,6 +368,7 @@ export interface PrestartPhaseMode {
   withdrawnParticipants: number;
   onSaved: () => void;
   onCancel: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 /** The same creation phase editor is used by the pre-start director.
@@ -595,6 +596,26 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   }));
   const prestartDirty = Boolean(prestart && JSON.stringify(prestartPhaseDrafts.map(prestartPhaseSignature))
     !== JSON.stringify(originalPrestartPhases.current.map(prestartPhaseSignature)));
+  useEffect(() => {
+    prestart?.onDirtyChange?.(prestartDirty);
+  }, [prestartDirty, prestart?.onDirtyChange]);
+  // Keep a recoverable snapshot across reloads. A deliberate discard or a
+  // successful save removes it; navigating within the director does not.
+  useEffect(() => {
+    if (!prestart) return;
+    const key = `online-tournament:prestart-recovery:${prestart.tournament.id}`;
+    try {
+      if (prestartDirty) window.sessionStorage.setItem(key, JSON.stringify(draftSnapshot));
+      else window.sessionStorage.removeItem(key);
+    } catch { /* storage disabled */ }
+  }, [prestartDirty, prestart?.tournament.id, draftSnapshot]);
+  function discardPrestartEditing() {
+    if (prestart) {
+      try { window.sessionStorage.removeItem(`online-tournament:prestart-recovery:${prestart.tournament.id}`); } catch { /* storage disabled */ }
+      prestart.onCancel();
+    }
+  }
+
   function savePrestartPhases() {
     if (!prestart || prestartIssues.length) return;
     if (!confirmPrestartSave) { setConfirmPrestartSave(true); return; }
@@ -604,6 +625,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       setConfirmPrestartSave(false);
       return;
     }
+    try { window.sessionStorage.removeItem(`online-tournament:prestart-recovery:${prestart.tournament.id}`); } catch { /* storage disabled */ }
     prestart.onSaved();
   }
 
@@ -1354,7 +1376,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
           <p className="muted">Dieselben Einstellungen wie bei der Turniererstellung. Die neue Planung übernimmt alle {prestart.activeParticipants} aktiven Teilnehmer.</p>
         </div>
         <button className="btn" type="button" onClick={() => prestartDirty
-          ? setConfirmPrestartDiscard(true) : prestart.onCancel()}>Bearbeitung schließen</button>
+          ? setConfirmPrestartDiscard(true) : discardPrestartEditing()}>Bearbeitung schließen</button>
       </header>}
 
       {!prestart && <nav className="wizard-steps" aria-label="Erstellungsschritte">
@@ -2482,7 +2504,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
         {confirmPrestartSave && <p role="status">Phasenplanung übernehmen und bisherige Auslosungen zurücksetzen?</p>}
         <div className="prestart-editor-actions">
           <button className="btn" type="button" onClick={() => confirmPrestartSave
-            ? setConfirmPrestartSave(false) : prestartDirty ? setConfirmPrestartDiscard(true) : prestart.onCancel()}>
+            ? setConfirmPrestartSave(false) : prestartDirty ? setConfirmPrestartDiscard(true) : discardPrestartEditing()}>
             {confirmPrestartSave ? 'Zurück zur Bearbeitung' : 'Abbrechen'}
           </button>
           <button className="btn primary" type="button" disabled={prestartIssues.length > 0}
@@ -2642,7 +2664,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
           <h2>Ungespeicherte Phasenänderungen verwerfen?</h2>
           <p>Die Einstellungen bleiben beim Wechsel zwischen den Turnierleitungs-Tabs erhalten. Beim Schließen ohne Speichern gehen sie jedoch verloren.</p>
           <div className="actions">
-            <button className="btn danger" type="button" onClick={prestart.onCancel}>Änderungen verwerfen</button>
+            <button className="btn danger" type="button" onClick={discardPrestartEditing}>Änderungen verwerfen</button>
             <button className="btn" type="button" onClick={() => setConfirmPrestartDiscard(false)}>Weiter bearbeiten</button>
           </div>
         </section>
