@@ -6840,3 +6840,46 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   min-width: 0;
   margin-inline: auto;
 }
+
+/* Creation wizard: expired fixed start is a full-width, actionable banner. */
+.wizard-start-past-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0 0 16px;
+  padding: 12px 15px;
+  border: 1px solid #fcd34d;
+  border-left: 4px solid #d97706;
+  border-radius: 11px;
+  background: #fffbeb;
+  color: #78350f;
+}
+.wizard-start-past-banner-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: white;
+  font-weight: 850;
+  font-size: 1rem;
+}
+.wizard-start-past-banner-copy { min-width: 0; flex: 1; }
+.wizard-start-past-banner-copy strong { display: block; font-size: .86rem; }
+.wizard-start-past-banner-copy p { margin: 3px 0 0; font-size: .79rem; line-height: 1.5; }
+.wizard-start-past-banner .btn {
+  flex: 0 0 auto;
+  color: #92400e;
+  background: #fff;
+  border-color: #fbbf24;
+  white-space: nowrap;
+}
+.wizard-start-past-banner .btn:hover { background: #fef3c7; }
+.wizard-start-past-banner .btn:focus-visible { outline: 2px solid #b45309; outline-offset: 2px; }
+@media (max-width: 600px) {
+  .wizard-start-past-banner { flex-wrap: wrap; align-items: flex-start; }
+  .wizard-start-past-banner .btn { margin-left: 38px; }
+}
