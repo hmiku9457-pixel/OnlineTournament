@@ -275,14 +275,13 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                           <CalendarDatePicker id={`prestart-date-${phase.id}`} label="Fortsetzungsdatum" value={phase.nextDayDate} minDate={nextCalendarDate((tournament.scheduledStart ?? toLocalDateTime(new Date())).slice(0, 10))} onChange={(value) => edit(phase.id, { nextDayDate: value })} />
                         </label>}
                         <label>{phase.breakKind === 'overnight' ? 'Fortsetzungsuhrzeit' : phase.breakKind === 'until' ? 'Pause bis (Uhrzeit)' : 'Minuten'}
-                          <input type={phase.breakKind === 'minutes' ? 'number' : 'time'}
-                            min={phase.breakKind === 'minutes' ? 1 : undefined}
-                            max={phase.breakKind === 'minutes' ? 1440 : undefined}
-                            value={phase.breakKind === 'overnight' ? phase.nextDayStart : phase.breakKind === 'until' ? phase.breakUntil : phase.breakMinutes}
-                            onChange={(event) => edit(phase.id, phase.breakKind === 'overnight'
-                              ? { nextDayStart: event.target.value }
-                              : phase.breakKind === 'until' ? { breakUntil: event.target.value }
-                                : { breakMinutes: Number(event.target.value) })} />
+                          {phase.breakKind === 'minutes'
+                            ? <input type="number" min={1} max={1440} value={phase.breakMinutes}
+                                onChange={(event) => edit(phase.id, { breakMinutes: Number(event.target.value) })} />
+                            : <ClockTimePicker id={`prestart-clock-${phase.id}`} label="Fortsetzungsuhrzeit"
+                                value={phase.breakKind === 'overnight' ? phase.nextDayStart : phase.breakUntil}
+                                onChange={(value) => edit(phase.id, phase.breakKind === 'overnight'
+                                  ? { nextDayStart: value } : { breakUntil: value })} />}
                         </label>
                         {phase.breakKind === 'until' && <p className="muted prestart-editor-wide">Fortsetzung zur eingestellten Uhrzeit; liegt diese beim Pausenstart bereits zurück, gilt der folgende Tag. Vorzeitig beenden bleibt möglich.</p>}
                         <label className="prestart-editor-wide">Hinweis für Spieler (optional)
