@@ -140,6 +140,65 @@ export function findTournamentNameConflict(name: string): DemoTournament | null 
     ?? matches[0] ?? null;
 }
 
+/** Remove stale local-only data linked to the replaced *unstarted* event.
+ * Only known tournament-scoped keys are touched; every other tournament's
+ * results, fixtures and director settings remain unchanged. */
+export function cleanupReplacedTournamentData(tournamentId: string): void {
+  if (typeof window === 'undefined') return;
+  const arraysWithTournamentId = [
+    'online-tournament:mock-draw-config:v1',
+    'online-tournament:mock-phase-lifecycle:v1',
+    'online-tournament:swiss-round-fixtures:v1',
+    'online-tournament:mock-audit:v1',
+    'online-tournament:mock-inline-breaks:v1',
+  ];
+  const arraysWithMatchId = [
+    'online-tournament:mock-match-results:v2',
+    'online-tournament:mock-match-runtime:v1',
+  ];
+  const mapsByTournament = [
+    'online-tournament:withdrawn-participants:v1',
+    'online-tournament:withdrawal-timing:v1',
+    'online-tournament:withdrawal-restore:v1',
+    'online-tournament:mock-blocked-tables:v1',
+  ];
+  for (const key of arraysWithTournamentId) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const entries: unknown = JSON.parse(raw);
+      if (!Array.isArray(entries)) continue;
+      const remaining = entries.filter((record) => !record || typeof record !== 'object'
+        || (record as { tournamentId?: unknown }).tournamentId !== tournamentId);
+      if (remaining.length !== entries.length) window.localStorage.setItem(key, JSON.stringify(remaining));
+    } catch { /* Preserve unreadable storage rather than deleting unrelated records. */ }
+  }
+  for (const key of arraysWithMatchId) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const entries: unknown = JSON.parse(raw);
+      if (!Array.isArray(entries)) continue;
+      const remaining = entries.filter((record) => !record || typeof record !== 'object'
+        || typeof (record as { matchId?: unknown }).matchId !== 'string'
+        || !(record as { matchId: string }).matchId.startsWith(`${tournamentId}-phase-`));
+      if (remaining.length !== entries.length) window.localStorage.setItem(key, JSON.stringify(remaining));
+    } catch { /* Do not mutate malformed user data. */ }
+  }
+  for (const key of mapsByTournament) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const records: unknown = JSON.parse(raw);
+      if (!records || typeof records !== 'object' || Array.isArray(records)
+        || !Object.prototype.hasOwnProperty.call(records, tournamentId)) continue;
+      const remaining = { ...(records as Record<string, unknown>) };
+      delete remaining[tournamentId];
+      window.localStorage.setItem(key, JSON.stringify(remaining));
+    } catch { /* Do not delete other tournaments' records. */ }
+  }
+}
+
 export function createMockTournament(input: CreateMockTournamentInput): DemoTournament {
   // Existing programmatic test fixtures without a public start time remain valid.
   if (input.scheduledStart !== undefined && !isValidLocalDateTime(input.scheduledStart)) {
@@ -201,6 +260,7 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
   // Replace the unstarted record with a NEW identity; old prestart draws and
   // lifecycle snapshots cannot accidentally attach to the replacement.
   writeLocalTournaments([tournament, ...existing.filter((item) => item.id !== id && item.id !== input.overwriteTournamentId)]);
+  if (input.overwriteTournamentId) cleanupReplacedTournamentData(input.overwriteTournamentId);
   return tournament;
 }
 
