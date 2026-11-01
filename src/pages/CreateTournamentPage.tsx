@@ -330,6 +330,7 @@ export function CreateTournamentPage() {
   const navigate = useNavigate();
   const [restoredDraft] = useState(loadCreationDraft);
   const [creationError, setCreationError] = useState<string | null>(null);
+  const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   const [step, setStep] = useState<WizardStep>((restoredDraft?.step ?? 1) as WizardStep);
   const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>((restoredDraft?.maxReachedStep ?? 1) as WizardStep);
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(restoredDraft?.hasVisitedPhaseStep ?? false);
@@ -379,7 +380,7 @@ export function CreateTournamentPage() {
   // Drafts are restored synchronously on first render, so the first autosave
   // cannot replace a valid draft with the wizard's empty initial values.
   useEffect(() => {
-    saveCreationDraft({
+    const saved = saveCreationDraft({
       step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime,
       sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
       customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
@@ -387,6 +388,7 @@ export function CreateTournamentPage() {
       selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
       knockoutQualifierCount, awardsEnabled, awardsAtOverride,
     });
+    setDraftSaveFailed(!saved);
   }, [
     step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime,
     sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
@@ -944,7 +946,9 @@ export function CreateTournamentPage() {
         <div>
           <h1>Turnier erstellen</h1>
           <p className="muted">Schritt {step} von 5 · Einstellungen bleiben erhalten und können jederzeit über die bereits erreichten Schritte geändert werden.</p>
-          <div className="creation-draft-actions"><span>Entwurf wird in diesem Browser automatisch gespeichert.</span><button className="btn small" type="button" onClick={discardCreationDraft}>Entwurf verwerfen</button></div>
+          <div className="creation-draft-actions"><span role={draftSaveFailed ? 'alert' : undefined}>{draftSaveFailed
+            ? 'Entwurf konnte nicht automatisch gespeichert werden. Bitte Browser-Speicher prüfen.'
+            : 'Entwurf wird in diesem Browser automatisch gespeichert.'}</span><button className="btn small" type="button" onClick={discardCreationDraft}>Entwurf verwerfen</button></div>
         </div>
       </header>
 
