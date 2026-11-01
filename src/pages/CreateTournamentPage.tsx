@@ -1896,10 +1896,17 @@ export function CreateTournamentPage() {
                 <h2>Zusammenfassung</h2>
                 <p className="muted">Prüfe deine Turnierdaten. Über die bisherigen Schritte kannst du Angaben jederzeit korrigieren.</p>
               </div>
-              <div className="creation-review-edit-actions" aria-label="Einstellungen bearbeiten">
-                <button className="btn small" type="button" onClick={() => navigateToStep(1)}>Grunddaten</button>
-                <button className="btn small" type="button" onClick={() => navigateToStep(2)}>Teilnehmer</button>
-                <button className="btn small" type="button" onClick={() => navigateToStep(4)}>Phasen</button>
+              <div className="creation-review-toolbar">
+                <div className="creation-review-edit-actions" aria-label="Einstellungen bearbeiten">
+                  <button className="btn small" type="button" onClick={() => navigateToStep(1)}>Grunddaten</button>
+                  <button className="btn small" type="button" onClick={() => navigateToStep(2)}>Teilnehmer</button>
+                  <button className="btn small" type="button" onClick={() => navigateToStep(4)}>Phasen</button>
+                </div>
+                <div className="creation-review-final-actions">
+                  <button className="btn" type="button" onClick={goBack}>← Zurück</button>
+                  <button className="btn primary wizard-create-button" type="button" onClick={submitTournament}
+                    disabled={!canCreate || scheduleIssues.length > 0}>Turnier erstellen</button>
+                </div>
               </div>
             </div>
             <div className="creation-review-overview" aria-label="Turnierdaten im Überblick">
@@ -1944,7 +1951,6 @@ export function CreateTournamentPage() {
       {step !== 5 && <aside className="wizard-side-summary" aria-label="Aktuelle Einstellungen">
         <div className="wizard-side-summary-heading">
           <div>
-            <span className="wizard-side-kicker">Während der Erstellung</span>
             <h2>Dein Turnier</h2>
           </div>
           <span className="wizard-side-step">{step}/5</span>
@@ -2016,7 +2022,7 @@ export function CreateTournamentPage() {
         )}
         <p className="wizard-side-footnote">Klicke auf eine bereits erreichte Einstellung, um sie direkt zu ändern.</p>
       </aside>}
-      <div className="wizard-side-actions">
+      {step !== 5 && <div className="wizard-side-actions">
         {step === 2 && !participantsValid && (
           <span className="wizard-validation-message">
             {incompleteSavedParticipants > 0
@@ -2027,13 +2033,9 @@ export function CreateTournamentPage() {
         {step === 3 && <span className="muted wizard-optional-note">Eine Empfehlung ist optional.</span>}
         <div className="wizard-side-navigation">
           <button className="btn" type="button" onClick={goBack} disabled={step === 1}>← Zurück</button>
-        {step < 5 ? (
-          <button className="btn primary wizard-continue-button" type="button" onClick={goNext} disabled={!canContinue}>{step === 4 ? 'Weiter zur Zusammenfassung →' : 'Weiter →'}</button>
-        ) : (
-          <button className="btn primary wizard-continue-button wizard-create-button" type="button" onClick={submitTournament} disabled={!canCreate || scheduleIssues.length > 0}>Turnier erstellen</button>
-        )}
+        <button className="btn primary wizard-continue-button" type="button" onClick={goNext} disabled={!canContinue}>{step === 4 ? 'Weiter zur Zusammenfassung →' : 'Weiter →'}</button>
         </div>
-      </div>
+      </div>}
       </div>
       </div>
     </>
