@@ -2,6 +2,7 @@ import {
   createPhaseTemplate,
   defaultBestOfForStage,
   estimatePhaseMetrics,
+  minimumPlayedMatches,
   type CreationPhaseTemplate,
   type TournamentSystemId,
 } from '@/domain/tournamentCreation';
@@ -32,6 +33,7 @@ export interface FormatRecommendation {
   estimatedMatches: number;
   estimatedDurationMinutes: number;
   minimumGuaranteedMatches: number;
+  minimumMatchShortfall?: number;
   score: number;
   requiredSystems: TournamentSystemId[];
   phases: CreationPhaseTemplate[];
@@ -82,11 +84,11 @@ function calculateGroupPlan(playerCount: number, minimumMatches: number, maxGrou
 }
 
 function calculateSwissPlan(playerCount: number, minimumMatches: number, maxSwissRoundsSetting?: number) {
-  const recommendedRounds = Math.max(minimumMatches, Math.ceil(Math.log2(playerCount)));
+  const recommendedRounds = Math.max(minimumMatches + (playerCount % 2), Math.ceil(Math.log2(playerCount)));
   // Limit to the number of distinct possible opponents in the reduced field.
   const rounds = clampInteger(maxSwissRoundsSetting, recommendedRounds, 1, Math.min(30, playerCount - 1, recommendedRounds));
   const matches = Math.floor(playerCount / 2) * rounds;
-  const roundsBelowMinimum = Math.max(0, minimumMatches - rounds);
+  const roundsBelowMinimum = Math.max(0, minimumMatches - minimumPlayedMatches('SWISS', playerCount, 2, rounds));
   return { rounds, matches, roundsBelowMinimum };
 }
 
@@ -264,9 +266,17 @@ export function recommendTournamentFormats(
 
     if (estimatedDurationMinutes > maxDuration) return;
 
-    const minimumMatchShortfall = Math.max(0, minimumMatches - candidate.minimumGuaranteedMatches);
+    // Byes are rankings credits, not played matches. Eliminated players
+    // cannot rely on fixtures in subsequent phases.
+    const opening = candidate.phases[0];
+    const guaranteed = minimumPlayedMatches(
+      opening.type, opening.entrantCount ?? playerCount, opening.groupCount ?? 2, opening.swissRounds ?? 1,
+    );
+    const minimumMatchShortfall = Math.max(0, minimumMatches - guaranteed);
     recommendations.push({
       ...candidate,
+      minimumGuaranteedMatches: guaranteed,
+      minimumMatchShortfall,
       score: candidate.score - minimumMatchShortfall * 20,
       estimatedDurationMinutes,
       estimatedMatches,
@@ -302,7 +312,7 @@ export function recommendTournamentFormats(
       id: 'swiss',
       label: `${swiss.rounds} Runden Schweizer System`,
       description: `Alle Teilnehmer bleiben über ${swiss.rounds} Runden im Turnier; Paarungen richten sich nach dem bisherigen Turnierverlauf.`,
-      minimumGuaranteedMatches: swiss.rounds,
+      minimumGuaranteedMatches: minimumPlayedMatches('SWISS', playerCount, 2, swiss.rounds),
       score: (playerCount >= 12 ? 86 : 62) - swiss.roundsBelowMinimum * 25,
       requiredSystems: ['swiss'],
       phases: [createPhaseTemplate('SWISS', 1, { swissRounds: swiss.rounds, entrantCount: playerCount })],
@@ -314,7 +324,7 @@ export function recommendTournamentFormats(
       id: 'single-ko',
       label: 'Einfaches K.-o.',
       description: 'Sehr kompakt; nach einer Niederlage scheidet ein Teilnehmer aus.',
-      minimumGuaranteedMatches: 1,
+      minimumGuaranteedMatches: minimumPlayedMatches('KNOCKOUT', playerCount),
       score: minimumMatches <= 1 ? 85 : 35,
       requiredSystems: ['knockout'],
       phases: [createPhaseTemplate('KNOCKOUT', 1, { entrantCount: playerCount })],
@@ -343,7 +353,7 @@ export function recommendTournamentFormats(
       id: 'swiss-ko',
       label: `${swiss.rounds} Runden Schweizer System → ${qualifiers} Qualifizierte → K.-o.`,
       description: `${swiss.rounds} Schweizer Runden mit anschließender K.-o.-Phase für ${qualifiers} bestplatzierte Teilnehmer.`,
-      minimumGuaranteedMatches: swiss.rounds,
+      minimumGuaranteedMatches: minimumPlayedMatches('SWISS', playerCount, 2, swiss.rounds),
       score: (playerCount >= 16 ? 95 + Math.min(tableCount, 5) : 70) - swiss.roundsBelowMinimum * 25,
       requiredSystems: ['swiss', 'knockout'],
       phases: [
