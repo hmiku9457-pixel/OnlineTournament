@@ -9,13 +9,15 @@ interface Props {
   timeline: PlannedTimeline;
   awardsEnabled: boolean;
   awardsAt: string;
+  /** Concise competitive phase facts, in phase order; pauses have empty entries. */
+  phaseSummaries?: readonly string[];
   onToggleAwards: (enabled: boolean) => void;
   onAwardsAtChange: (value: string) => void;
 }
 
 /** The single non-binding timetable during creation, including inline ceremony editing. */
 export function PlannedScheduleEditor({
-  scheduledStart, timeline, awardsEnabled, awardsAt, onToggleAwards, onAwardsAtChange,
+  scheduledStart, timeline, awardsEnabled, awardsAt, phaseSummaries = [], onToggleAwards, onAwardsAtChange,
 }: Props) {
   const [ceremonyExpanded, setCeremonyExpanded] = useState(awardsEnabled);
   const expectedEnd = parseLocalDateTime(timeline.estimatedEnd);
@@ -47,6 +49,8 @@ export function PlannedScheduleEditor({
     const phaseIndex = item.id.startsWith('inline-break-') || item.id.startsWith('inline-resume-')
       ? Number(item.id.split('-').at(-1)) - 1
       : item.id.startsWith('phase-') ? Number(item.id.slice(6)) - 1 : -1;
+    const phaseSummary = item.id.startsWith('phase-') && !isBreak && phaseIndex >= 0
+      ? phaseSummaries[phaseIndex] : undefined;
 
     if (isCeremony) {
       return (
@@ -112,9 +116,13 @@ export function PlannedScheduleEditor({
           : isBreak
             ? <span className="planned-schedule-duration">{formatPlannedBreakDuration(item)}</span>
             : <time dateTime={item.at}>{formatPlannedClockTime(item.at)}</time>}
-        <div>
-          <strong>{item.title}</strong>
-          <small>{hint}</small>
+
+        <div className="planned-schedule-row-content">
+          <div className="planned-schedule-row-title">
+            <strong>{item.title}</strong>
+            {phaseSummary && <span className="planned-schedule-phase-summary">{phaseSummary}</span>}
+          </div>
+          {!phaseSummary && <small>{hint}</small>}
           {timeline.warnings.filter((warning) => warning.phaseIndex === phaseIndex && (
             item.id === 'phase-' + (phaseIndex + 1) || item.id === 'inline-break-' + (phaseIndex + 1)
           )).map((warning) => (
