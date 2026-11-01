@@ -52,6 +52,8 @@ type ParticipantFields = {
   lastName: string;
   partnerFirstName: string;
   partnerLastName: string;
+  /** Team label lives separately from the person's first and last names. */
+  teamName?: string;
 };
 
 type ParticipantDraft = ParticipantFields & {
@@ -97,6 +99,7 @@ function emptyParticipantFields(): ParticipantFields {
     lastName: '',
     partnerFirstName: '',
     partnerLastName: '',
+    teamName: '',
   };
 }
 
@@ -106,7 +109,7 @@ function newParticipant(fields: ParticipantFields): ParticipantDraft {
 }
 
 function participantIsComplete(participant: ParticipantFields, discipline: Discipline): boolean {
-  if (discipline === 'TEAMS') return Boolean(displayPersonName(participant.firstName, participant.lastName));
+  if (discipline === 'TEAMS') return Boolean(participant.teamName?.trim() || displayPersonName(participant.firstName, participant.lastName));
   if (!participant.firstName.trim() || !participant.lastName.trim()) return false;
   if (discipline === 'DOUBLES') {
     return Boolean(participant.partnerFirstName.trim() && participant.partnerLastName.trim());
@@ -123,7 +126,7 @@ function displayPersonName(firstName: string, lastName: string): string {
 }
 
 function participantDisplayName(participant: ParticipantFields, discipline: Discipline): string {
-  if (discipline === 'TEAMS') return displayPersonName(participant.firstName, participant.lastName);
+  if (discipline === 'TEAMS') return participant.teamName?.trim() || displayPersonName(participant.firstName, participant.lastName);
   const firstPlayer = displayPersonName(participant.firstName, participant.lastName);
   if (discipline === 'SINGLES') return firstPlayer;
   const secondPlayer = displayPersonName(participant.partnerFirstName, participant.partnerLastName);
@@ -139,7 +142,7 @@ function collectSavedPersonNames(
   for (const participant of participants) {
     if (participant.id === excludedParticipantId) continue;
     if (discipline === 'TEAMS') {
-      const name = displayPersonName(participant.firstName, participant.lastName);
+      const name = participant.teamName?.trim() || displayPersonName(participant.firstName, participant.lastName);
       if (name) names.add(name.toLocaleLowerCase('de-DE'));
       continue;
     }
@@ -165,7 +168,7 @@ function validateParticipant(
 ): ParticipantErrors {
   const errors: ParticipantErrors = {};
   if (discipline === 'TEAMS') {
-    const teamName = displayPersonName(participant.firstName, participant.lastName);
+    const teamName = participant.teamName?.trim() || displayPersonName(participant.firstName, participant.lastName);
     if (!teamName) return { firstName: 'Bitte einen Mannschaftsnamen eingeben.' };
     if (!isAllowedParticipantName(teamName)) return { firstName: 'Nur Buchstaben, Leerzeichen und Bindestriche sind erlaubt.' };
     const occupied = collectSavedPersonNames(participants, discipline, editingParticipantId);
@@ -593,7 +596,6 @@ export function CreateTournamentPage() {
     setParticipantForm((current) => ({
       ...current,
       [field]: sanitizeParticipantName(value),
-      ...(discipline === 'TEAMS' && field === 'firstName' ? { lastName: '' } : {}),
     }));
     setParticipantErrors((current) => {
       const next = { ...current };
@@ -635,6 +637,7 @@ export function CreateTournamentPage() {
       lastName: participant.lastName,
       partnerFirstName: participant.partnerFirstName,
       partnerLastName: participant.partnerLastName,
+      teamName: participant.teamName ?? '',
     });
     setParticipantErrors({});
     setEditingParticipantId(participant.id);
@@ -658,15 +661,28 @@ export function CreateTournamentPage() {
     setParticipants((current) => {
       const next = [...current];
       let sequence = 1;
-      while (next.length < targetCount) {
-        const suffix = String.fromCharCode(64 + sequence);
-        const firstName = discipline === 'TEAMS' ? `Test Mannschaft ${suffix}` : 'Test';
-        const lastName = discipline === 'TEAMS' ? '' : `Spieler ${suffix}`;
-        const partnerFirstName = discipline === 'DOUBLES' ? 'Test' : '';
-        const partnerLastName = discipline === 'DOUBLES' ? `Partner ${suffix}` : '';
-        const candidate: ParticipantFields = { firstName, lastName, partnerFirstName, partnerLastName };
-        const duplicate = validateParticipant(candidate, discipline, next, null);
-        if (Object.keys(duplicate).length === 0) next.push(newParticipant(candidate));
+      let completed = next.filter((entry) => participantIsComplete(entry, discipline)
+        && Object.keys(validateParticipant(entry, discipline, next, entry.id)).length === 0).length;
+      while (completed < targetCount && sequence <= 10000) {
+        // A...Z, AA...AZ, BA...: letters-only and no invalid ASCII after Z.
+        let ordinal = sequence;
+        let suffix = '';
+        while (ordinal > 0) {
+          ordinal -= 1;
+          suffix = String.fromCharCode(65 + (ordinal % 26)) + suffix;
+          ordinal = Math.floor(ordinal / 26);
+        }
+        const candidate: ParticipantFields = {
+          firstName: discipline === 'TEAMS' ? '' : 'Test',
+          lastName: discipline === 'TEAMS' ? '' : `Spieler ${suffix}`,
+          partnerFirstName: discipline === 'DOUBLES' ? 'Test' : '',
+          partnerLastName: discipline === 'DOUBLES' ? `Partner ${suffix}` : '',
+          teamName: discipline === 'TEAMS' ? `Test Mannschaft ${suffix}` : '',
+        };
+        if (Object.keys(validateParticipant(candidate, discipline, next, null)).length === 0) {
+          next.push(newParticipant(candidate));
+          completed += 1;
+        }
         sequence += 1;
       }
       return next;
@@ -1347,9 +1363,9 @@ export function CreateTournamentPage() {
                       <label htmlFor="participant-first">{discipline === 'TEAMS' ? 'Mannschaftsname' : discipline === 'DOUBLES' ? 'Spieler 1 · Vorname' : 'Vorname'}</label>
                       <input
                         id="participant-first"
-                        className={participantErrors.firstName ? 'input-error' : ''}
-                        value={discipline === 'TEAMS' ? displayPersonName(participantForm.firstName, participantForm.lastName) : participantForm.firstName}
-                        onChange={(event) => updateParticipantForm('firstName', event.target.value)}
+                        className={participantErrors.firstName || participantErrors.teamName ? 'input-error' : ''}
+                        value={discipline === 'TEAMS' ? (participantForm.teamName || displayPersonName(participantForm.firstName, participantForm.lastName)) : participantForm.firstName}
+                        onChange={(event) => updateParticipantForm(discipline === 'TEAMS' ? 'teamName' : 'firstName', event.target.value)}
                         aria-invalid={Boolean(participantErrors.firstName)}
                         autoFocus
                       />
