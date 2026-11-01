@@ -432,7 +432,22 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   const [namedDraftMessage, setNamedDraftMessage] = useState('');
   const [savingNamedDraft, setSavingNamedDraft] = useState(false);
-  const savedDraftRevision = useRef<number | null>(initialNamedDraft?.revision ?? (savedDraftId ? 1 : null));
+  // An unsaved recovery snapshot belongs to the revision originally opened,
+  // NOT the newest revision fetched after reloading this browser tab. Otherwise
+  // choosing "recover" could overwrite changes saved by another tab.
+  const savedDraftRevision = useRef<number | null>((() => {
+    if (!savedDraftId) return null;
+    const fallback = initialNamedDraft?.revision ?? 1;
+    const recovery = loadCreationDraft(window.sessionStorage, sessionDraftKey);
+    if (!recovery) return fallback;
+    const stored = Number(window.sessionStorage.getItem(`${sessionDraftKey}:base-revision`));
+    return Number.isSafeInteger(stored) && stored >= 1 ? stored : fallback;
+  })());
+  useEffect(() => {
+    if (!savedDraftId || savedDraftRevision.current === null) return;
+    try { window.sessionStorage.setItem(`${sessionDraftKey}:base-revision`, String(savedDraftRevision.current)); }
+    catch { /* Recoverability is best-effort if browser storage is blocked. */ }
+  }, [savedDraftId, sessionDraftKey]);
   const [draftConflictOpen, setDraftConflictOpen] = useState(false);
   const [recoveryChoiceOpen, setRecoveryChoiceOpen] = useState(() => {
     if (prestart || !savedDraftId || typeof window === 'undefined') return false;
@@ -665,7 +680,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         : draftSnapshot;
       const entry = await saveNamedCreationDraftAtomic(data, copy ? null : savedDraftId,
         copy ? undefined : (savedDraftRevision.current ?? undefined));
-      if (!copy) savedDraftRevision.current = entry.revision ?? 1;
+      if (!copy) {
+        savedDraftRevision.current = entry.revision ?? 1;
+        try { window.sessionStorage.setItem(`${sessionDraftKey}:base-revision`, String(savedDraftRevision.current)); }
+        catch { /* Best-effort recovery metadata. */ }
+      }
       setNamedDraftMessage(copy ? 'Kopie als neuer Entwurf gespeichert.' : 'Entwurf gespeichert.');
       if (copy || entry.id !== savedDraftId) {
         clearCreationDraft(window.sessionStorage, sessionDraftKey);
@@ -2677,6 +2696,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             <button className="btn primary" type="button" onClick={() => { setDraftConflictOpen(false); saveNamedDraft(true); }}>Meine Fassung als Kopie speichern</button>
             <button className="btn" type="button" onClick={() => {
               clearCreationDraft(window.sessionStorage, sessionDraftKey);
+              try { window.sessionStorage.removeItem(`${sessionDraftKey}:base-revision`); } catch { /* ignored */ }
               window.location.reload();
             }}>Aktuellen Speicherstand laden</button>
             <button className="btn" type="button" onClick={() => setDraftConflictOpen(false)}>Weiter bearbeiten</button>
@@ -2691,6 +2711,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             <button className="btn primary" type="button" onClick={() => setRecoveryChoiceOpen(false)}>Ungespeicherte Änderungen wiederherstellen</button>
             <button className="btn" type="button" onClick={() => {
               clearCreationDraft(window.sessionStorage, sessionDraftKey);
+              try { window.sessionStorage.removeItem(`${sessionDraftKey}:base-revision`); } catch { /* ignored */ }
               window.location.reload();
             }}>Gespeicherten Stand laden</button>
           </div>
