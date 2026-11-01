@@ -501,7 +501,7 @@ export function CreateTournamentPage() {
   const participantErrorMessages = uniqueErrorMessages(participantErrors);
 
   const defaultMaxGroups = Math.max(2, Math.ceil(participantCount / (participantCount >= 20 ? 5 : 4)));
-  const defaultMaxSwissRounds = Math.min(30, Math.max(minimumMatches + (participantCount % 2), Math.ceil(Math.log2(Math.max(2, participantCount)))));
+  const defaultMaxSwissRounds = Math.max(minimumMatches + (participantCount % 2), Math.ceil(Math.log2(Math.max(2, participantCount))));
   const defaultKnockoutQualifierCount = Math.max(
     2,
     Math.min(participantCount, participantCount >= 16 ? 8 : 4),
@@ -863,6 +863,7 @@ export function CreateTournamentPage() {
       if (!current[index]) return current;
       if (current[index].type === type) return current;
       if (type === 'SWISS' && current[index].entrantCount < 3) return current;
+      if (type === 'GROUPS' && current[index].entrantCount < 4) return current;
       if (isTerminalStage(type) && index !== current.length - 1) return current;
       if (type === 'BREAK' && (index === 0 || index === current.length - 1 || current[index - 1]?.type === 'BREAK' || current[index + 1]?.type === 'BREAK')) return current;
 
@@ -1823,7 +1824,7 @@ export function CreateTournamentPage() {
                                         className={`btn small ${phase.type === system.stageType ? 'phase-type-active' : ''}`}
                                         key={system.id}
                                         type="button"
-                                        disabled={terminalNotAllowed || (system.stageType === 'SWISS' && phase.entrantCount < 3)}
+                                        disabled={terminalNotAllowed || (system.stageType === 'SWISS' && phase.entrantCount < 3) || (system.stageType === 'GROUPS' && phase.entrantCount < 4)}
                                         title={terminalNotAllowed ? 'Eine K.-o.-Phase kann nur die letzte Phase des Turniers sein.' : undefined}
                                         onClick={() => changePhaseType(index, system.stageType)}
                                       >
@@ -2002,14 +2003,14 @@ export function CreateTournamentPage() {
                                   id={`swiss-rounds-${phase.id}`}
                                   type="number"
                                   min="2"
-                                  max={Math.max(2, Math.min(30, phase.entrantCount - 1))}
+                                  max={Math.max(2, phase.entrantCount - 1)}
                                   value={phase.swissRounds}
                                   onChange={(event) => updatePhase(phase.id, { swissRounds: Math.max(2, Math.min(30, Number(event.target.value))) })}
                                 />
                                 {!isValidSwissRoundCount(phase.swissRounds, phase.entrantCount) &&
                                   <span className="field-error" role="alert">{phase.entrantCount < 3
                                     ? 'Für das Schweizer System sind mindestens 3 Teilnehmer erforderlich.'
-                                    : `Für ${phase.entrantCount} Teilnehmer sind 2 bis ${Math.min(30, phase.entrantCount - 1)} Schweizer Runden möglich.`}</span>}
+                                    : `Für ${phase.entrantCount} Teilnehmer sind 2 bis ${phase.entrantCount - 1} Schweizer Runden möglich.`}</span>}
                               </div>
                             )}
 
