@@ -986,7 +986,7 @@ export function CreateTournamentPage() {
   const awardsAt = awardsAtOverride ?? plannedTimeline.estimatedEnd;
   const plannedSchedule: PlannedScheduleItem[] = [
     ...plannedTimeline.items,
-    ...(awardsEnabled ? [{ id: 'award-ceremony', at: awardsAt, title: 'Siegerehrung', type: 'other' as const }] : []),
+    ...(awardsEnabled ? [{ id: 'award-ceremony', at: awardsAt, title: 'Siegerehrung', type: 'other' as const, autoTime: awardsAtOverride === null }] : []),
   ];
   const ceremonyIssue = awardsEnabled && (!isValidLocalDateTime(awardsAt)
     || (plannedTimeline.estimatedEnd && awardsAt < plannedTimeline.estimatedEnd))
