@@ -1,4 +1,6 @@
 import { MatchResultDetails } from '@/components/MatchResultDetails';
+import { MatchStatusLegend } from '@/components/MatchStatusLegend';
+import { matchVisualClass, matchVisualState, matchVisualLabel } from '@/domain/matchVisualStatus';
 import type { MatchSet } from '@/domain/types';
 import { sportScoring, type ScoreDecision } from '@/domain/sportScoring';
 
@@ -58,7 +60,7 @@ export function SwissRoundCard({ fixtures, matches, standings = [], sport, edita
       : `${standing.wins}:${standing.losses}`,
   ]));
   const finished = currentFixtures.filter((fixture) => fixture.autoWinner || matchById.get(fixture.id)?.status === 'FINISHED').length;
-  const running = currentFixtures.filter((fixture) => matchById.get(fixture.id)?.status === 'LIVE').length;
+  const running = currentFixtures.filter((fixture) => matchVisualState(matchById.get(fixture.id)?.status) === 'live').length;
 
   return (
     <aside className="card swiss-round-card" aria-label="Spiele der aktuellen Schweizer Runde">
@@ -70,24 +72,27 @@ export function SwissRoundCard({ fixtures, matches, standings = [], sport, edita
         {running > 0 && <span className="swiss-round-live-count">{running} live</span>}
       </div>
       {notice && editable && <p className="swiss-draw-notice" role="status">{notice}</p>}
+      <MatchStatusLegend />
       <div className="swiss-round-match-list">
         {currentFixtures.length === 0 && <p className="muted">Für diese Runde sind noch keine Spiele angesetzt.</p>}
         {currentFixtures.map((fixture) => {
           const match = matchById.get(fixture.id);
           const isBye = fixture.sideB === 'Freilos' || Boolean(fixture.autoWinner);
-          const isLive = match?.status === 'LIVE';
-          const isFinished = isBye || match?.status === 'FINISHED';
+          const isLive = !isBye && matchVisualState(match?.status) === 'live';
+          const isFinished = isBye || matchVisualState(match?.status) === 'finished';
+          const visualStatus = isBye ? 'FINISHED' : match?.status;
           const assigned = match?.table && match.table !== 'Noch offen';
           return (
-            <div className={`swiss-round-match${isLive ? ' is-live' : isFinished ? ' is-finished' : ''}`} key={fixture.id}>
+            <div className={`swiss-round-match ${matchVisualClass(visualStatus)}`} key={fixture.id}
+              title={isBye ? 'Freilos – abgeschlossen' : matchVisualLabel(visualStatus)}>
               <div className="swiss-round-match-meta">
                 <span className="swiss-round-match-status">
                   {isLive && <span className="swiss-round-live-indicator" aria-hidden="true" />}
-                  {isBye ? 'Freilos' : isLive ? 'Läuft' : isFinished ? 'Beendet' : match?.status === 'READY' ? 'Zugewiesen' : match?.status === 'CONFIRMATION' ? 'Ergebnis prüfen' : editable ? 'Vorschau' : 'Wartet'}
+                  {isBye ? 'Freilos' : match?.status === 'CONFIRMATION' ? 'Ergebnis prüfen' : isLive ? 'Läuft gerade' : isFinished ? 'Abgeschlossen' : matchVisualLabel(visualStatus)}
                 </span>
                 {assigned && <span>{venueName ? venueName(match.table!) : match.table}</span>}
               </div>
-              <div className={`group-match-row swiss-round-match-row${isLive ? ' live' : ''}`}>
+              <div className={`group-match-row swiss-round-match-row ${matchVisualClass(visualStatus)}`}>
                 <span className="group-match-side swiss-round-player" title={fixture.sideA}>
                   <span className="swiss-round-player-name">{fixture.sideA}</span>
                   {recordByPlayer.has(fixture.sideA) && (
