@@ -526,14 +526,18 @@ function withPrestartRollback(tournamentId: string, action: () => void): { ok: b
     } catch { rollbackFailed = true; }
     // Restore only the affected tournament's draw/lifecycle/audit records.
     // Another tournament's records must survive a rollback.
-    for (const { key, previous } of snapshots) {
+    for (const { key, original, previous } of snapshots) {
       try {
         const latest: unknown = JSON.parse(storage.getItem(key) ?? '[]');
         if (!Array.isArray(latest)) throw new Error('Invalid storage records');
         const unaffected = latest.filter((item) =>
           !item || typeof item !== 'object'
           || (item as { tournamentId?: string }).tournamentId !== tournamentId);
-        storage.setItem(key, JSON.stringify([...previous, ...unaffected]));
+        if (original === null && previous.length === 0 && unaffected.length === 0) {
+          storage.removeItem(key);
+        } else {
+          storage.setItem(key, JSON.stringify([...previous, ...unaffected]));
+        }
       } catch { rollbackFailed = true; }
     }
     window.dispatchEvent(new Event('mock-runtime-change'));
