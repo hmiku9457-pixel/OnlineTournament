@@ -340,6 +340,15 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                             onClick={() => edit(phase.id, { swissRounds: suggestedRounds })}>Empfehlung übernehmen</button>
                         </div>}
                       </>}
+                      {(phase.type === 'SWISS' || phase.type === 'KNOCKOUT') &&
+                        (phase.type === 'SWISS' ? phase.swissRounds : knockoutRoundLabels(phase.entrantCount).length) > 1 && (
+                        <div className="prestart-editor-wide phase-inline-break">
+                          <button type="button" className="btn small" onClick={() => {
+                            edit(phase.id, { inlineBreakAfterRound: phase.inlineBreakAfterRound ? 0 : 1 });
+                            setExpandedInlineBreak(phase.inlineBreakAfterRound ? null : phase.id);
+                          }}>{phase.inlineBreakAfterRound ? 'Zwischenpause deaktivieren' : '+ Zwischenpause hinzufügen'}</button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </article>
