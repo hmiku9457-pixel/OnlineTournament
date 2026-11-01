@@ -421,6 +421,9 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   const [creationError, setCreationError] = useState<string | null>(null);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   const [namedDraftMessage, setNamedDraftMessage] = useState('');
+  const savedDraftRevision = useRef<number | null>(savedDraftId
+    ? (getSavedCreationDraft(savedDraftId)?.revision ?? 1) : null);
+  const [draftConflictOpen, setDraftConflictOpen] = useState(false);
   const [recoveryChoiceOpen, setRecoveryChoiceOpen] = useState(() => {
     if (prestart || !savedDraftId || typeof window === 'undefined') return false;
     const recovery = loadCreationDraft(window.sessionStorage, sessionDraftKey);
@@ -607,14 +610,20 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       const data = copy
         ? { ...draftSnapshot, name: draftSnapshot.name.trim() ? `${draftSnapshot.name.trim()} (Kopie)` : 'Turnierentwurf (Kopie)' }
         : draftSnapshot;
-      const id = saveNamedCreationDraft(data, copy ? null : savedDraftId);
+      const id = saveNamedCreationDraft(data, copy ? null : savedDraftId,
+        copy ? undefined : (savedDraftRevision.current ?? undefined));
+      if (!copy) savedDraftRevision.current = getSavedCreationDraft(id)?.revision ?? 1;
       setNamedDraftMessage(copy ? 'Kopie als neuer Entwurf gespeichert.' : 'Entwurf gespeichert.');
       if (copy || id !== savedDraftId) {
         clearCreationDraft(window.sessionStorage, sessionDraftKey);
         navigate(`/tournaments/new?draft=${encodeURIComponent(id)}`, { replace: !copy });
       }
     } catch (error) {
-      setNamedDraftMessage(error instanceof Error ? error.message : 'Entwurf konnte nicht gespeichert werden.');
+      if (error instanceof Error && error.message === 'DRAFT_CONFLICT') {
+        setDraftConflictOpen(true);
+      } else {
+        setNamedDraftMessage(error instanceof Error ? error.message : 'Entwurf konnte nicht gespeichert werden.');
+      }
     }
   }
 
@@ -2585,6 +2594,20 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       </div>}
       </div>
       </div>
+      {draftConflictOpen && savedDraftId && <div className="prototype-modal-backdrop" role="presentation">
+        <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="draft-conflict-title">
+          <h2 id="draft-conflict-title">Dieser Entwurf wurde zwischenzeitlich geändert</h2>
+          <p>Ein anderer Browser-Tab hat diesen Entwurf bereits gespeichert oder gelöscht. Deine aktuelle Bearbeitung bleibt erhalten und wird nicht automatisch überschrieben.</p>
+          <div className="actions">
+            <button className="btn primary" type="button" onClick={() => { setDraftConflictOpen(false); saveNamedDraft(true); }}>Meine Fassung als Kopie speichern</button>
+            <button className="btn" type="button" onClick={() => {
+              clearCreationDraft(window.sessionStorage, sessionDraftKey);
+              window.location.reload();
+            }}>Aktuellen Speicherstand laden</button>
+            <button className="btn" type="button" onClick={() => setDraftConflictOpen(false)}>Weiter bearbeiten</button>
+          </div>
+        </section>
+      </div>}
       {recoveryChoiceOpen && savedDraftId && <div className="prototype-modal-backdrop" role="presentation">
         <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="draft-recovery-title">
           <h2 id="draft-recovery-title">Ungespeicherte Änderungen gefunden</h2>
