@@ -24,6 +24,9 @@ describe('five-step tournament creation smoke test', () => {
     expect(html).toContain('Entwurf verwerfen');
     expect(html).toContain('class="btn danger creation-discard-button"');
     expect(html).toContain('class="page-head creation-page-head"');
+    expect(html).toContain('class="creation-page-container"');
+    expect(html).toContain('„Jetzt“ aktualisiert die Uhrzeit laufend. Vergangene Startzeiten sind gesperrt.');
+    expect(html).not.toContain('Den tatsächlichen Spielstart löst später die Turnierleitung aus.');
     expect(html).not.toContain('Entwurf wird in diesem Browser automatisch gespeichert.');
   });
 
