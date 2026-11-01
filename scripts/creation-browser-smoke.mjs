@@ -144,6 +144,21 @@ try {
   await page.waitForURL(/\/tournaments\/[^/]+\/control/, { timeout: 20000 });
   await page.locator('.control-hero-bar h1').waitFor({ state: 'visible', timeout: 20000 });
   assert.equal((await page.locator('.control-hero-bar h1').textContent())?.trim(), 'Browser-Smoke-Turnier');
+
+  // The director uses the SAME phase card as the wizard. Switching to the
+  // participant tab must not discard the still-unsaved prestart edits.
+  await page.getByRole('button', { name: 'Phasen vor Start bearbeiten' }).click();
+  await page.locator('.is-prestart-phase-editor .phase-config').first().waitFor();
+  assert.equal(await page.locator('.is-prestart-phase-editor .wizard-side-summary').count(), 0);
+  await page.locator('.is-prestart-phase-editor .phase-config').first().click();
+  const prestartBestOf = page.locator('.is-prestart-phase-editor .phase-bestof select').first();
+  await prestartBestOf.selectOption('3');
+  await page.locator('.control-tabs').getByRole('button', { name: 'Teilnehmer' }).click();
+  await page.locator('.control-tabs').getByRole('button', { name: 'Phasen bearbeiten' }).click();
+  assert.equal(await prestartBestOf.inputValue(), '3', 'prestart phase edits must survive director tab switches');
+  await page.getByRole('button', { name: 'Änderungen prüfen und speichern' }).click();
+  await page.getByRole('button', { name: 'Ja, Phasen und Auslosung aktualisieren' }).click();
+  await page.locator('.control-tabs').getByRole('button', { name: 'Übersicht' }).waitFor();
   assert.deepEqual(errors, [], 'no browser runtime errors');
   await context.close();
 
