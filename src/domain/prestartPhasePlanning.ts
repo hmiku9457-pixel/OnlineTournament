@@ -184,7 +184,7 @@ export function validatePrestartPhases(phases: PrestartPhaseDraft[], activeCount
       if (!isValidSwissRoundCount(phase.swissRounds, phase.entrantCount)) {
         errors.push(phase.entrantCount < 3
           ? `${label}: Für das Schweizer System sind mindestens 3 Teilnehmer erforderlich.`
-          : `${label}: Schweizer Runden müssen zwischen 2 und ${Math.min(30, phase.entrantCount - 1)} liegen.`);
+          : `${label}: Schweizer Runden müssen zwischen 2 und ${phase.entrantCount - 1} liegen.`);
       }
     }
     if (!Number.isInteger(phase.bestOf) || phase.bestOf < 1 || phase.bestOf % 2 === 0) {
