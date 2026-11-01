@@ -1242,7 +1242,7 @@ export function TournamentControlPage() {
             ? () => setShowPrestartPhaseEditor((value) => !value) : undefined}
           activeParticipants={activePrestartParticipants}
           withdrawnParticipants={participants.length - activePrestartParticipants}
-          phasesNeedReview={prestartPlanNeedsReview}
+          phasesNeedReview={Boolean(firstPhaseRecommendationWarning)}
         />
         {showPrestartPhaseEditor && !tournament.hasStarted && (
           <PrestartPhaseEditor
