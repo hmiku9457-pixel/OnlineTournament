@@ -20,7 +20,6 @@ import {
   recommendGroupCount,
   recommendedSwissRounds,
   stageLabel,
-  systemIdForStage,
   tournamentSystemOptions,
   type CreationPhaseTemplate,
   type TournamentSystemId,
@@ -411,7 +410,9 @@ export function CreateTournamentPage() {
 
   const participantCount = participants.filter((participant) => participantIsComplete(participant, discipline)).length;
   const incompleteSavedParticipants = participants.length - participantCount;
-  const participantsValid = participantCount >= 2 && incompleteSavedParticipants === 0;
+  const savedParticipantNamesValid = participants.every((entry) =>
+    Object.keys(validateParticipant(entry, discipline, participants, entry.id)).length === 0);
+  const participantsValid = participantCount >= 2 && incompleteSavedParticipants === 0 && savedParticipantNamesValid;
   const participantErrorMessages = uniqueErrorMessages(participantErrors);
 
   const defaultMaxGroups = Math.max(2, Math.ceil(participantCount / (participantCount >= 20 ? 5 : 4)));
@@ -462,6 +463,7 @@ export function CreateTournamentPage() {
     && hasValidBreakStageOrder(phaseDrafts.map((phase) => phase.type));
   const phaseConfigurationValid = phaseDrafts.some((phase) => phase.type !== 'BREAK') && phaseOrderValid
     && phaseDrafts.every((phase) => {
+      if (!phase.label.trim() || phase.label.length > 80) return false;
       if (phase.type === 'SWISS' && !isValidSwissRoundCount(phase.swissRounds, phase.entrantCount)) return false;
       if ((phase.type === 'SWISS' || phase.type === 'KNOCKOUT') && phase.inlineBreakAfterRound > 0) {
         const rounds = phase.type === 'SWISS' ? phase.swissRounds : knockoutRoundLabels(phase.entrantCount).length;
@@ -627,6 +629,7 @@ export function CreateTournamentPage() {
 
   function insertPhase(insertIndex: number, type: StageType) {
     if (insertIndex < 0 || insertIndex > phaseDrafts.length) return;
+    if (type === 'GROUPS' && (insertIndex === 0 ? participantCount : phaseDrafts[insertIndex - 1].entrantCount) < 4) return;
     if (type === 'BREAK' && (insertIndex === 0 || insertIndex === phaseDrafts.length || phaseDrafts[insertIndex - 1]?.type === 'BREAK' || phaseDrafts[insertIndex]?.type === 'BREAK')) return;
     if (isTerminalStage(type) && insertIndex !== phaseDrafts.length) return;
     if (insertIndex === phaseDrafts.length && phaseDrafts.some((phase) => isTerminalStage(phase.type))) return;
@@ -823,6 +826,12 @@ export function CreateTournamentPage() {
     navigateToStep((step - 1) as WizardStep);
   }
 
+  function discardCreationDraft() {
+    if (!window.confirm('Gesamten Entwurf einschließlich Teilnehmern und Phasen verwerfen?')) return;
+    clearCreationDraft();
+    window.location.reload();
+  }
+
   function submitTournament() {
     if (step !== 5 || !canCreate || scheduleIssues.length > 0) return;
     setCreationError(null);
@@ -935,6 +944,7 @@ export function CreateTournamentPage() {
         <div>
           <h1>Turnier erstellen</h1>
           <p className="muted">Schritt {step} von 5 · Einstellungen bleiben erhalten und können jederzeit über die bereits erreichten Schritte geändert werden.</p>
+          <div className="creation-draft-actions"><span>Entwurf wird in diesem Browser automatisch gespeichert.</span><button className="btn small" type="button" onClick={discardCreationDraft}>Entwurf verwerfen</button></div>
         </div>
       </header>
 
@@ -994,6 +1004,7 @@ export function CreateTournamentPage() {
                   const nextDiscipline = allowed.some((option) => option.value === discipline)
                     ? discipline : allowed[0]?.value ?? 'SINGLES';
                   if (nextDiscipline !== discipline) {
+                    if (participants.length > 0 && !window.confirm('Die Wettbewerbsart ändert sich. Vorhandene Teilnehmereinträge müssen anschließend überprüft werden. Fortfahren?')) return;
                     setDiscipline(nextDiscipline);
                     resetParticipantEditor();
                     // Bei Mannschaftssportarten ist der Name des Teams ein eigener Eintrag.
@@ -1024,6 +1035,7 @@ export function CreateTournamentPage() {
                   onChange={(event) => {
                     const nextDiscipline = event.target.value as Discipline;
                     if (nextDiscipline === discipline) return;
+                    if (participants.length > 0 && !window.confirm('Wettbewerbsart wechseln? Bereits erfasste Teilnehmer müssen anschließend überprüft werden.')) return;
                     setDiscipline(nextDiscipline);
                     resetParticipantEditor();
                   }}>
@@ -1255,6 +1267,7 @@ export function CreateTournamentPage() {
                 </div>
               </aside>
 
+            {!savedParticipantNamesValid && <p className="field-error" role="alert">Mindestens ein Teilnehmer ist doppelt eingetragen. Bitte die Teilnehmerliste überprüfen.</p>}
             {incompleteSavedParticipants > 0 && (
               <div className="wizard-invalid-participants" role="status">
                 <span><strong>{incompleteSavedParticipants} unvollständige {incompleteSavedParticipants === 1 ? 'Eintragung' : 'Eintragungen'}</strong> · Du kannst sie ergänzen oder gesammelt entfernen.</span>
@@ -1432,7 +1445,7 @@ export function CreateTournamentPage() {
                   <div className="phase-insert-options" role="group" aria-label={phaseDrafts.length ? 'Phase am Anfang auswählen' : 'Erste Phase auswählen'}>
                     {tournamentSystemOptions.filter((system) => enabledSystems[system.id]).map((system) => (
                       <button className="btn small" type="button" key={system.id}
-                        disabled={phaseDrafts.length > 0 && isTerminalStage(system.stageType)}
+                        disabled={(phaseDrafts.length > 0 && isTerminalStage(system.stageType)) || (system.stageType === 'GROUPS' && participantCount < 4)}
                         onClick={() => insertPhase(0, system.stageType)}>+ {system.label}</button>
                     ))}
                     {phaseInsertIndex === 0 && phaseDrafts.length > 0 && <button className="btn small" type="button" onClick={() => setPhaseInsertIndex(null)}>Abbrechen</button>}
@@ -1445,6 +1458,8 @@ export function CreateTournamentPage() {
                   <div className="phase-config-list">
                     {phaseDrafts.map((phase, index) => {
                       const maximumPhaseEntrants = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
+                      const previousCompetitionPhaseNumber = phaseDrafts.slice(0, index).reduce((previous, candidate, position) =>
+                        candidate.type === 'BREAK' ? previous : position + 1, 0);
                       const knockoutEntrants = knockoutEntrantPresets(maximumPhaseEntrants);
                       const knockoutRounds = phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount) : [];
                       const inlineBreakRounds = phase.type === 'SWISS' ? phase.swissRounds
@@ -1715,7 +1730,7 @@ export function CreateTournamentPage() {
                           ) : <div className="phase-settings-grid">
                             {index > 0 && isTerminalStage(phase.type) && (
                               <div className="field phase-entrant-choice field-wide">
-                                <label>Weiterkommende Teilnehmer aus Phase {index}</label>
+                                <label>Weiterkommende Teilnehmer aus Phase {previousCompetitionPhaseNumber}</label>
                                 <NumberChoice
                                   ariaLabel={`Weiterkommende Teilnehmer für Phase ${index + 1}`}
                                   value={phase.entrantCount}
@@ -1733,7 +1748,7 @@ export function CreateTournamentPage() {
 
                             {index > 0 && !isTerminalStage(phase.type) && (
                               <div className="field">
-                                <label htmlFor={`entrants-${phase.id}`}>Weiterkommende Teilnehmer aus Phase {index}</label>
+                                <label htmlFor={`entrants-${phase.id}`}>Weiterkommende Teilnehmer aus Phase {previousCompetitionPhaseNumber}</label>
                                 <input
                                   id={`entrants-${phase.id}`}
                                   type="number"
@@ -1904,7 +1919,8 @@ export function CreateTournamentPage() {
                               <div className="phase-insert-options" role="group" aria-label={`Phase nach Phase ${index + 1} hinzufügen`}>
                                 {tournamentSystemOptions.filter((system) => enabledSystems[system.id]).map((system) => (
                                   <button key={system.id} className="btn small" type="button"
-                                    disabled={isTerminalStage(system.stageType) && index + 1 !== phaseDrafts.length}
+                                    disabled={(isTerminalStage(system.stageType) && index + 1 !== phaseDrafts.length)
+                                     || (system.stageType === 'GROUPS' && phase.entrantCount < 4)}
                                     onClick={() => insertPhase(index + 1, system.stageType)}>+ {system.label}</button>
                                 ))}
                                 {index + 1 < phaseDrafts.length && phase.type !== 'BREAK' && phaseDrafts[index + 1]?.type !== 'BREAK' && (
