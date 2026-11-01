@@ -1198,9 +1198,11 @@ export function CreateTournamentPage() {
           )}
         </div>
         <div className="creation-draft-actions">
-          <button className="btn primary" type="button" onClick={() => saveNamedDraft()}>Entwurf speichern</button>
-          {savedDraftId && <button className="btn" type="button" onClick={() => saveNamedDraft(true)}>Entwurf kopieren</button>}
-          <button ref={discardDraftButtonRef} className="btn danger creation-discard-button" type="button" onClick={() => setDiscardDraftDialogOpen(true)}>Entwurf verwerfen</button>
+          <div className="creation-draft-buttons">
+            <button className="btn primary" type="button" onClick={() => saveNamedDraft()}>Entwurf speichern</button>
+            {savedDraftId && <button className="btn" type="button" onClick={() => saveNamedDraft(true)}>Entwurf kopieren</button>}
+            <button ref={discardDraftButtonRef} className="btn danger creation-discard-button" type="button" onClick={() => setDiscardDraftDialogOpen(true)}>Entwurf verwerfen</button>
+          </div>
           {namedDraftMessage && <span className="field-hint" role="status">{namedDraftMessage}</span>}
         </div>
       </header>
