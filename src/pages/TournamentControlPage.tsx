@@ -1,3 +1,4 @@
+import { localTournamentStorage } from '@/services/localTournamentStorage';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
@@ -798,7 +799,7 @@ export function TournamentControlPage() {
 
   useEffect(() => {
     function handleStorage(event: StorageEvent) {
-      if (event.storageArea !== window.localStorage || (event.key && !event.key.startsWith('online-tournament:'))) return;
+      if (event.storageArea !== localTournamentStorage || (event.key && !event.key.startsWith('online-tournament:'))) return;
       // Änderungen aus einem anderen Tab dürfen keine veralteten Wartelisten anzeigen.
       refreshRuntime();
     }

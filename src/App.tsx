@@ -10,6 +10,7 @@ import { ScoringPage } from '@/pages/ScoringPage';
 import { SpectatorPage } from '@/pages/SpectatorPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { StorageIntegrityBanner } from '@/components/StorageIntegrityBanner';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
 import { getSavedCreationDraftAtomic } from '@/domain/savedCreationDraftStore';
 import type { SavedCreationDraft } from '@/domain/creationDraft';
@@ -57,6 +58,8 @@ function CreateTournamentRoute() {
 
 export default function App() {
   return (
+    <>
+    <StorageIntegrityBanner />
     <Routes>
       <Route element={<AppShell />}>
         <Route path="/" element={<DashboardPage />} />
@@ -71,5 +74,6 @@ export default function App() {
       <Route path="/live/:tournamentId" element={<SpectatorPage />} />
       <Route path="*" element={<Navigate to="/404" replace />} />
     </Routes>
+    </>
   );
 }
