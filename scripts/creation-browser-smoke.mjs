@@ -140,7 +140,23 @@ try {
   await page.waitForSelector('.schedule-wizard-step');
   assert.match(await page.locator('.wizard-review-check').innerText(), /Die erste Phase garantiert nur 3/);
   assert.equal(await page.locator('.wizard-create-button').isEnabled(), true);
+
+  // Creating from a named draft whose revision was advanced in another tab
+  // must still create the tournament, while retaining the newer draft and
+  // explaining the retained record instead of silently deleting it.
+  await page.getByRole('button', { name: 'Entwurf speichern' }).click();
+  await page.waitForURL(/draft=/);
+  await page.locator('.wizard-create-button').waitFor();
+  const changedDraftTab = await context.newPage();
+  await changedDraftTab.goto(page.url());
+  await changedDraftTab.locator('#name').fill('Browser-Smoke-Turnier – geänderter Entwurf');
+  await changedDraftTab.getByRole('button', { name: 'Entwurf speichern' }).click();
+  await changedDraftTab.getByText('Entwurf gespeichert.', { exact: true }).waitFor();
+  await changedDraftTab.close();
   await page.locator('.wizard-create-button').click();
+  await page.getByRole('alertdialog', { name: 'Turnier erstellt – Entwurf bleibt erhalten' }).waitFor();
+  assert.equal(await page.locator('.sidebar-draft-item').count(), 1);
+  await page.getByRole('button', { name: 'Zur Turnierleitung' }).click();
   await page.waitForURL(/\/tournaments\/[^/]+\/control/, { timeout: 20000 });
   await page.locator('.control-hero-bar h1').waitFor({ state: 'visible', timeout: 20000 });
   assert.equal((await page.locator('.control-hero-bar h1').textContent())?.trim(), 'Browser-Smoke-Turnier');
