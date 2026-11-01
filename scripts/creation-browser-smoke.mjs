@@ -140,6 +140,18 @@ try {
   assert.equal(await page3.getByRole('button', { name: 'Vorheriger Monat' }).isDisabled(), true);
   assert.equal(await page3.locator('.calendar-picker-day').filter({ hasText: /^20$/ }).isDisabled(), true);
   await page3.getByRole('button', { name: 'Heute', exact: true }).click();
+  assert.match(await page3.locator('.clock-picker-trigger-value').innerText(), /Jetzt · 12:34/,
+    'choosing Heute automatically enables live current time');
+  // Selecting a future date switches back to a fixed clock; selecting the
+  // actual current calendar day must reactivate live mode.
+  await page3.locator('#tournament-date').click();
+  await page3.locator('.calendar-picker-day').filter({ hasText: /^22$/ }).click();
+  assert.equal(await page3.locator('.clock-picker-trigger-value').innerText(), '12:34',
+    'future dates do not remain linked to the live clock');
+  await page3.locator('#tournament-date').click();
+  await page3.locator('.calendar-picker-day').filter({ hasText: /^21$/ }).click();
+  assert.match(await page3.locator('.clock-picker-trigger-value').innerText(), /Jetzt · 12:34/,
+    'choosing the current date directly in the calendar enables live mode');
 
   await page3.locator('#tournament-start-time').click();
   const timeDialog = page3.locator('.clock-picker-dialog');
@@ -165,9 +177,19 @@ try {
   await page3.getByRole('button', { name: 'Übernehmen', exact: true }).click();
   assert.equal(await page3.locator('.clock-picker-trigger-value').innerText(), '12:35');
   await page3.clock.fastForward(65000);
-  await page3.waitForFunction(() => document.querySelector('.wizard-review-warning')?.textContent?.includes('Vergangenheit'));
+  await page3.locator('.wizard-start-past-banner').waitFor({ state: 'visible' });
+  assert.match(await page3.locator('.wizard-start-past-banner').innerText(),
+    /Der geplante Turnierstart liegt in der Vergangenheit/);
   assert.equal(await page3.locator('.wizard-continue-button').isDisabled(), true,
     'a fixed start becomes invalid when the current time advances past it');
+  await page3.reload();
+  await page3.locator('.wizard-start-past-banner').waitFor({ state: 'visible' });
+  assert.equal(await page3.locator('.wizard-continue-button').isDisabled(), true,
+    'reloading a stale draft cannot bypass the expired-start warning');
+  await page3.locator('.wizard-start-past-banner').getByRole('button', { name: 'Jetzt verwenden' }).click();
+  await page3.locator('.wizard-start-past-banner').waitFor({ state: 'detached' });
+  assert.match(await page3.locator('.clock-picker-trigger-value').innerText(), /Jetzt · 12:36/,
+    'banner action re-enables live current time and resolves the issue');
   await context3.close();
 
   // Discard confirmation must never erase the draft on cancel, backdrop or
