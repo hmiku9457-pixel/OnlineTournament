@@ -149,6 +149,8 @@ try {
   // participant tab must not discard the still-unsaved prestart edits.
   await page.getByRole('button', { name: 'Phasen vor Start bearbeiten' }).click();
   await page.locator('.is-prestart-phase-editor .phase-config').first().waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Keine Änderungen vorhanden' }).isDisabled(), true,
+    'Opening and saving an unchanged phase plan must never destroy existing draws');
   assert.equal(await page.locator('.is-prestart-phase-editor .wizard-side-summary').count(), 0);
   await page.locator('.is-prestart-phase-editor .phase-config').first().click();
   const prestartBestOf = page.locator('.is-prestart-phase-editor .phase-bestof select').first();
@@ -162,6 +164,16 @@ try {
   await navigationDialog.waitFor();
   await navigationDialog.getByRole('button', { name: 'Weiter bearbeiten' }).click();
   assert.equal(await prestartBestOf.inputValue(), '3');
+  // Reload must reconstruct the UNSAVED phase plan from its versioned
+  // session snapshot. Accept the native unload confirmation for this test.
+  page.on('dialog', async (dialog) => { if (dialog.type() === 'beforeunload') await dialog.accept(); });
+  await page.waitForFunction(() => Object.keys(sessionStorage).some((key) =>
+    key.startsWith('online-tournament:prestart-recovery:') && sessionStorage.getItem(key)?.includes('"version":1')));
+  await page.reload();
+  await page.getByRole('button', { name: 'Phasen vor Start bearbeiten' }).click();
+  await page.getByText('Deine zuvor ungespeicherte Phasenplanung wurde aus dieser Browsersitzung wiederhergestellt.', { exact: false }).waitFor();
+  await page.locator('.is-prestart-phase-editor .phase-config').first().click();
+  assert.equal(await page.locator('.is-prestart-phase-editor .phase-bestof select').first().inputValue(), '3');
   await page.getByRole('button', { name: 'Änderungen prüfen und speichern' }).click();
   await page.getByRole('alertdialog', { name: 'Vorstart-Planung wirklich übernehmen?' }).waitFor();
   await page.getByRole('button', { name: 'Ja, Phasen und Auslosung aktualisieren' }).click();
