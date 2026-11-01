@@ -381,6 +381,9 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   const [restoredDraft] = useState(() => {
     if (prestart) {
       const t = prestart.tournament;
+      const recovered = typeof window !== 'undefined'
+        ? loadCreationDraft(window.sessionStorage, `online-tournament:prestart-recovery:${t.id}`) : null;
+      if (recovered?.name === t.name && recovered.step === 4) return recovered;
       const phases = initialPrestartPhases(t);
       const sportId = findSportOption(t.sport)?.id ?? 'table_tennis';
       const players = Array.from({ length: prestart.activeParticipants }, (_, index) => ({
@@ -432,6 +435,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     return Boolean(recovery && saved && JSON.stringify(recovery) !== JSON.stringify(saved));
   });
   const [confirmPrestartSave, setConfirmPrestartSave] = useState(false);
+  const prestartConfirmationSignature = useRef<string | null>(null);
   const [confirmPrestartDiscard, setConfirmPrestartDiscard] = useState(false);
   const [overwriteTournamentId, setOverwriteTournamentId] = useState<string | null>(null);
   const [prestartSaveError, setPrestartSaveError] = useState('');
@@ -594,8 +598,17 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     inlineBreakKind: phase.inlineBreakKind, inlineBreakMinutes: phase.inlineBreakMinutes,
     inlineBreakUntil: phase.inlineBreakUntil,
   }));
-  const prestartDirty = Boolean(prestart && JSON.stringify(prestartPhaseDrafts.map(prestartPhaseSignature))
+  const currentPrestartSignature = JSON.stringify(prestartPhaseDrafts.map(prestartPhaseSignature));
+  const prestartDirty = Boolean(prestart && currentPrestartSignature
     !== JSON.stringify(originalPrestartPhases.current.map(prestartPhaseSignature)));
+  useEffect(() => {
+    if (!confirmPrestartSave) return;
+    if (prestartConfirmationSignature.current !== currentPrestartSignature) {
+      prestartConfirmationSignature.current = null;
+      setConfirmPrestartSave(false);
+      setPrestartSaveError('Die Planung wurde nach dem Prüfen geändert. Bitte die Änderungen erneut bestätigen.');
+    }
+  }, [confirmPrestartSave, currentPrestartSignature]);
   useEffect(() => {
     prestart?.onDirtyChange?.(prestartDirty);
   }, [prestartDirty, prestart?.onDirtyChange]);
@@ -618,7 +631,15 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
 
   function savePrestartPhases() {
     if (!prestart || prestartIssues.length) return;
-    if (!confirmPrestartSave) { setConfirmPrestartSave(true); return; }
+    if (!confirmPrestartSave) {
+      prestartConfirmationSignature.current = currentPrestartSignature;
+      setConfirmPrestartSave(true);
+      return;
+    }
+    if (prestartConfirmationSignature.current !== currentPrestartSignature) {
+      setConfirmPrestartSave(false);
+      return;
+    }
     const result = updatePrestartTournamentPhases(prestart.tournament.id, prestartPhaseDrafts);
     if (!result.ok) {
       setPrestartSaveError(result.error ?? 'Die Phasen konnten nicht gespeichert werden.');
@@ -917,7 +938,11 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       // by itself a change of the organizer's qualification settings.
       const altered = (index > 0 && oldPhase.type !== 'BREAK' && oldPhase.entrantCount !== nextPhase.entrantCount)
         || oldPhase.groupCount !== nextPhase.groupCount
-        || JSON.stringify(oldPhase.knockoutBestOf) !== JSON.stringify(nextPhase.knockoutBestOf);
+        || JSON.stringify(oldPhase.knockoutBestOf) !== JSON.stringify(nextPhase.knockoutBestOf)
+        // The participant count may invalidate unchanged Swiss rounds or
+        // group settings. These phases must be acknowledged as well.
+        || (nextPhase.type === 'SWISS' && !isValidSwissRoundCount(nextPhase.swissRounds, nextPhase.entrantCount))
+        || (nextPhase.type === 'GROUPS' && nextPhase.entrantCount < 4);
       return altered ? [oldPhase.id] : [];
     });
     if (needsReview.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...needsReview])]);
@@ -2501,15 +2526,15 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
         })()}
         <p className="muted">Beim Speichern werden die bisherigen Vorstart-Auslosungen neu erstellt. Teilnehmer, Codes und Rückzüge bleiben erhalten.</p>
         {prestartSaveError && <p role="alert" className="field-error">{prestartSaveError}</p>}
-        {confirmPrestartSave && <p role="status">Phasenplanung übernehmen und bisherige Auslosungen zurücksetzen?</p>}
+
         <div className="prestart-editor-actions">
           <button className="btn" type="button" onClick={() => confirmPrestartSave
             ? setConfirmPrestartSave(false) : prestartDirty ? setConfirmPrestartDiscard(true) : discardPrestartEditing()}>
-            {confirmPrestartSave ? 'Zurück zur Bearbeitung' : 'Abbrechen'}
+            Abbrechen
           </button>
           <button className="btn primary" type="button" disabled={prestartIssues.length > 0}
             onClick={savePrestartPhases}>
-            {confirmPrestartSave ? 'Ja, Phasen und Auslosung aktualisieren' : 'Änderungen prüfen und speichern'}
+            Änderungen prüfen und speichern
           </button>
         </div>
       </section>}
@@ -2618,6 +2643,24 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       </div>}
       </div>
       </div>
+      {confirmPrestartSave && prestart && <div className="prototype-modal-backdrop" role="presentation">
+        <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="prestart-save-confirm-title">
+          <h2 id="prestart-save-confirm-title">Vorstart-Planung wirklich übernehmen?</h2>
+          <p>Die bisherige Auslosung wird zurückgesetzt. Die Teilnehmer, Codes und dokumentierten Rückzüge bleiben erhalten.</p>
+          <div className="prestart-confirm-summary">
+            {prestartPhaseDrafts.map((phase, index) => <p key={phase.id}>
+              <strong>{index + 1}. {phase.label}</strong> · {phase.entrantCount} Teilnehmer
+              {phase.type === 'SWISS' ? ` · ${phase.swissRounds} Schweizer Runden` : ''}
+              {phase.type === 'GROUPS' ? ` · ${phase.groupCount} Gruppen` : ''}
+              {phase.type !== 'BREAK' ? ` · Best-of-${phase.bestOf}` : ''}
+            </p>)}
+          </div>
+          <div className="actions">
+            <button type="button" className="btn primary" onClick={savePrestartPhases}>Ja, Phasen und Auslosung aktualisieren</button>
+            <button type="button" className="btn" onClick={() => { setConfirmPrestartSave(false); prestartConfirmationSignature.current = null; }}>Weiter bearbeiten</button>
+          </div>
+        </section>
+      </div>}
       {draftConflictOpen && savedDraftId && <div className="prototype-modal-backdrop" role="presentation">
         <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="draft-conflict-title">
           <h2 id="draft-conflict-title">Dieser Entwurf wurde zwischenzeitlich geändert</h2>
