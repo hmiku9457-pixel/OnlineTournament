@@ -7074,8 +7074,26 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 
 /* Explicitly saved tournament drafts: compact actions without disturbing the
    existing red discard action or the sidebar's tournament navigation. */
-.creation-draft-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
-.creation-draft-actions > .field-hint { flex-basis: 100%; text-align: right; }
+/* Keep the button row fixed even when save feedback is shown underneath. */
+.creation-draft-actions {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  margin-left: auto;
+  max-width: 100%;
+}
+.creation-draft-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+.creation-page-head .creation-draft-buttons .creation-discard-button { margin-left: 0; }
+.creation-draft-actions > .field-hint { text-align: right; margin: 0; }
 .sidebar-drafts-section { margin-top: 13px; }
 .sidebar-draft-item { border-style: dashed; }
 .sidebar-draft-item > strong { font-size: .82rem; overflow-wrap: anywhere; }
@@ -7089,7 +7107,8 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .prestart-editor .phase-inline-break-settings > label { display: grid; gap: 6px; font-size: .79rem; font-weight: 650; }
 .prestart-editor .phase-inline-break-settings input, .prestart-editor .phase-inline-break-settings select { width: 100%; }
 @media (max-width: 740px) {
-  .creation-draft-actions { width: 100%; justify-content: flex-start; }
+  .creation-draft-actions { width: 100%; align-items: flex-start; margin-left: 0; }
+  .creation-draft-buttons { justify-content: flex-start; }
   .creation-draft-actions > .field-hint { text-align: left; }
   .creation-undo-remove .btn { min-height: 32px; }
 }
