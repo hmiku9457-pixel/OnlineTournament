@@ -60,9 +60,10 @@ export function CalendarDatePicker({
   const today = toCalendarDate(new Date());
   const displayDate = (date: Date) => date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const days = calendarMonthDays(viewYear, viewMonth);
+  const previousMonthUnavailable = Boolean(minimum && `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}` <= minimum.slice(0, 7));
 
   function show() {
-    const initial = selected ?? parseCalendarDate(minimum) ?? new Date();
+    const initial = selected && (!minimum || value >= minimum) ? selected : parseCalendarDate(minimum) ?? new Date();
     setViewMonth(initial.getMonth());
     setViewYear(initial.getFullYear());
     setOpen(true);
@@ -73,6 +74,7 @@ export function CalendarDatePicker({
   }
   function navigateMonths(delta: number) {
     const date = new Date(viewYear, viewMonth + delta, 1);
+    if (minimum && `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` < minimum.slice(0, 7)) return;
     setViewYear(date.getFullYear());
     setViewMonth(date.getMonth());
   }
@@ -134,14 +136,19 @@ export function CalendarDatePicker({
               <button type="button" className="calendar-picker-close" aria-label="Schließen" onClick={close}>×</button>
             </div>
             <div className="calendar-picker-month-nav">
-              <button type="button" ref={firstFocusRef} aria-label="Vorheriger Monat" onClick={() => navigateMonths(-1)}>‹</button>
+              <button type="button" ref={firstFocusRef} aria-label="Vorheriger Monat" disabled={previousMonthUnavailable} onClick={() => navigateMonths(-1)}>‹</button>
               <select aria-label="Monat" value={viewMonth} onChange={(event) => setViewMonth(Number(event.target.value))}>
-                {months.map((month, index) => <option key={month} value={index}>{month}</option>)}
+                {months.map((month, index) => <option key={month} value={index} disabled={Boolean(minimum && `${viewYear}-${String(index + 1).padStart(2, "0")}` < minimum.slice(0, 7))}>{month}</option>)}
               </select>
-              <input type="number" aria-label="Jahr" min={1} max={9999} value={viewYear}
+              <input type="number" aria-label="Jahr" min={minimum ? Number(minimum.slice(0, 4)) : 1} max={9999} value={viewYear}
                 onChange={(event) => {
                   const year = Number(event.target.value);
-                  if (Number.isInteger(year) && year >= 1 && year <= 9999) setViewYear(year);
+                  if (Number.isInteger(year) && year >= (minimum ? Number(minimum.slice(0, 4)) : 1) && year <= 9999) {
+                    setViewYear(year);
+                    if (minimum && year === Number(minimum.slice(0, 4)) && viewMonth < Number(minimum.slice(5, 7)) - 1) {
+                      setViewMonth(Number(minimum.slice(5, 7)) - 1);
+                    }
+                  }
                 }}/>
               <button type="button" aria-label="Nächster Monat" onClick={() => navigateMonths(1)}>›</button>
             </div>
