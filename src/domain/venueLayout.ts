@@ -11,8 +11,10 @@ export interface VenueLayout {
 
 export function createVenueLayout(tableCount: number): VenueLayout {
   const tables = Math.max(1, Math.floor(tableCount));
-  const columns = 10;
-  const rows = Math.max(3, Math.ceil(tables / columns));
+  // A square is the default starting point for every table count.
+  const side = Math.ceil(Math.sqrt(tables));
+  const columns = side;
+  const rows = side;
   return {
     columns,
     rows,
