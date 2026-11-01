@@ -70,6 +70,18 @@ try {
   assert.equal(await page.locator('.participant-roster-row').count(), 4, 'draft survives browser reload');
   await next(page);
   await page.waitForSelector('.format-step');
+  assert.match(await page.locator('.format-settings-head').innerText(),
+    /Vorschläge bis 3,5 Stunden werden bevorzugt/,
+    'the general recommendation policy belongs in the settings panel');
+  const firstSuggestion = page.locator('.recommendation-list .recommendation').first();
+  assert.doesNotMatch(await firstSuggestion.innerText(),
+    /Bis 3,5 Stunden bevorzugt; bei Bedarf/,
+    'the first recommendation must not contain a generic list-selection policy');
+  if (await firstSuggestion.locator('.recommendation-reason').count()) {
+    assert.match(await firstSuggestion.locator('.recommendation-reason').innerText(),
+      /Warum empfohlen: Erfüllt dein Mindestspielziel/,
+      'an individual recommendation has a factual reason based on its metrics');
+  }
   // Hiding a system from recommendations must not remove it from the editor.
   await page.locator('.format-toggle-group input').nth(2).uncheck();
   await next(page);
