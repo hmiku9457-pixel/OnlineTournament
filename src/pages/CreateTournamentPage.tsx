@@ -1064,11 +1064,12 @@ export function CreateTournamentPage() {
             <div className="form-grid">
               <div className="field full">
                 <label htmlFor="name">Turniername <span className="wizard-required-mark" aria-hidden="true">*</span></label>
-                <input id="name" required value={name} onChange={(event) => setName(event.target.value)} placeholder="Turniername eingeben" autoFocus />
+                <input id="name" required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} placeholder="Turniername eingeben" autoFocus />
               </div>
               <div className="field">
                 <label htmlFor="tournament-date">Turnierdatum <span className="wizard-required-mark" aria-hidden="true">*</span></label>
                 <CalendarDatePicker id="tournament-date" label="Turnierdatum" required value={scheduledDate} onChange={setScheduledDate} />
+                {dateIsPast && <span className="field-hint wizard-review-warning" role="status">Das geplante Turnierdatum liegt in der Vergangenheit. Für Testturniere ist das möglich; für ein neues Turnier bitte den Termin prüfen.</span>}
                 <span className="field-hint">Geplantes Datum für die Ankündigung und den Zeitplan. Den tatsächlichen Turnierstart legt die Turnierleitung fest.</span>
               </div>
               <div className="field">
@@ -1098,7 +1099,10 @@ export function CreateTournamentPage() {
                   onChange={(event) => {
                     const nextDiscipline = event.target.value as Discipline;
                     if (nextDiscipline === discipline) return;
-                    if (participants.length > 0 && !window.confirm('Wettbewerbsart wechseln? Bereits erfasste Teilnehmer müssen anschließend überprüft werden.')) return;
+                    if (participants.length > 0) {
+                      setPendingDiscipline(nextDiscipline);
+                      return;
+                    }
                     setDiscipline(nextDiscipline);
                     resetParticipantEditor();
                   }}>
@@ -1123,6 +1127,7 @@ export function CreateTournamentPage() {
                   presets={Array.from({ length: 12 }, (_, index) => index + 1)}
                   custom={customTables}
                   customMinimum={13}
+                  customMaximum={9999}
                   onPreset={(value) => { setTables(value); setCustomTables(false); }}
                   onCustom={() => { setCustomTables(true); setTables((current) => current > 12 ? current : 13); }}
                   onCustomValue={setTables}
@@ -1168,11 +1173,12 @@ export function CreateTournamentPage() {
                   presets={[1, 2, 3, 4, 5]}
                   custom={customMinimumMatches}
                   customMinimum={6}
+                  customMaximum={100}
                   onPreset={(value) => { setMinimumMatches(value); setCustomMinimumMatches(false); }}
                   onCustom={() => { setCustomMinimumMatches(true); setMinimumMatches((current) => current > 5 ? current : 6); }}
                   onCustomValue={setMinimumMatches}
                 />
-                <span className="field-hint">Zielwert für die Empfehlungen. Die tatsächliche Spielanzahl hängt von Turnierform und Verlauf ab.</span>
+                <span className="field-hint">Zielwert für tatsächlich gespielte Begegnungen. Freilose zählen nicht als gespieltes Match. Abweichungen werden in den Empfehlungen angezeigt.</span>
               </div>
               <div className="field match-timing-fields">
                 <label htmlFor="match-duration">{timedSport ? <>Spieldauer (Minuten) <span className="wizard-required-mark" aria-hidden="true">*</span></> : 'Satzdauer (Minuten)'}</label>
@@ -1217,7 +1223,7 @@ export function CreateTournamentPage() {
                     )}
                     <button className="btn small wizard-test-player-button" type="button" onClick={generateTestParticipants}
                       disabled={participantCount >= 19}
-                      title={participantCount >= 19 ? 'Bereits mindestens 19 Teilnehmer gespeichert.' : 'Teilnehmerliste mit Testeinträgen auf 19 ergänzen'}>
+                      title={participantCount >= 19 ? 'Bereits mindestens 19 Teilnehmer gespeichert.' : 'Nur für Testturniere: Teilnehmerliste mit Testeinträgen auf 19 ergänzen'}>
                       {discipline === 'TEAMS' ? '19 Testmannschaften erzeugen' : discipline === 'SINGLES' ? '19 Testspieler erzeugen' : '19 Testdoppel erzeugen'}
                     </button>
                   </div>
@@ -1335,7 +1341,7 @@ export function CreateTournamentPage() {
               <div className="wizard-invalid-participants" role="status">
                 <span><strong>{incompleteSavedParticipants} unvollständige {incompleteSavedParticipants === 1 ? 'Eintragung' : 'Eintragungen'}</strong> · Du kannst sie ergänzen oder gesammelt entfernen.</span>
                 <button type="button" className="btn small danger-outline" onClick={removeIncompleteParticipants}>
-                  Alle fehlerhaften Einträge entfernen
+                  Unvollständige Einträge entfernen
                 </button>
               </div>
             )}
@@ -1364,7 +1370,7 @@ export function CreateTournamentPage() {
                 )}
                 {recommendations.map((item, index) => (
                   <button
-                    className={`card recommendation recommendation-select ${selectedRecommendationId === item.id ? 'selected' : ''} ${index === 0 ? 'best' : ''}`}
+                    className={`card recommendation recommendation-select ${selectedRecommendationId === item.id && recommendationPlanMatches ? 'selected' : ''} ${index === 0 ? 'best' : ''}`}
                     key={item.id}
                     type="button"
                     onClick={() => selectRecommendation(item)}
@@ -1397,14 +1403,22 @@ export function CreateTournamentPage() {
                       </h3>
                       <div className="recommendation-labels">
                         <span className="badge">{index === 0 ? 'Empfohlen' : 'Alternative'}</span>
-                        {selectedRecommendationId === item.id && <span className="badge selected-badge">Ausgewählt</span>}
+                        {selectedRecommendationId === item.id && <span className="badge selected-badge">{recommendationPlanMatches ? 'Ausgewählt' : 'Plan weicht ab · erneut übernehmen'}</span>}
                       </div>
                     </div>
                     <p>{item.description}</p>
                     <div className="recommendation-metrics">
                       <span className="recommendation-metric-tag">{item.estimatedMatches} Spiele</span>
                       <span className="recommendation-metric-tag">ca. {formatDuration(item.estimatedDurationMinutes)}</span>
+                      <span className={`recommendation-metric-tag ${item.minimumMatchShortfall ? 'wizard-metric-warning' : ''}`}>
+                        mindestens {item.minimumGuaranteedMatches} gespielte Begegnungen
+                      </span>
                     </div>
+                    {item.minimumMatchShortfall ? (
+                      <p className="wizard-review-warning">Abweichung: Mindestens {item.minimumGuaranteedMatches} statt der gewünschten {minimumMatches} Begegnungen. Freilose sind nicht eingerechnet.</p>
+                    ) : index === 0 && (
+                      <p className="recommendation-reason">Warum empfohlen: Der Vorschlag berücksichtigt Teilnehmerzahl, Spielflächen, Spieldauer und das Mindestspielziel.</p>
+                    )
                   </button>
                 ))}
               </div>
@@ -1412,7 +1426,7 @@ export function CreateTournamentPage() {
               <aside className="format-settings-panel">
                 <div className="format-settings-head">
                   <h3>Vorgaben für Vorschläge</h3>
-                  <p className="muted">Diese Vorgaben steuern nur die Empfehlungen. Alle Phasen lassen sich anschließend individuell bearbeiten.</p>
+                  <p className="muted">Die Vorgaben und Turniersystem-Häkchen filtern ausschließlich Empfehlungen. Bei der manuellen Phasenplanung bleiben alle Systeme verfügbar.</p>
                 </div>
 
                 <div className="format-setting-fields">
@@ -1424,7 +1438,7 @@ export function CreateTournamentPage() {
                       min="2"
                       max={Math.max(2, Math.floor(participantCount / 2))}
                       value={effectiveMaxGroups}
-                      onChange={(event) => setMaxGroups(Math.max(2, Number(event.target.value)))}
+                      onChange={(event) => setMaxGroups(Math.max(2, Math.min(Math.max(2, Math.floor(participantCount / 2)), Math.trunc(Number(event.target.value)) || 2)))}
                       disabled={!enabledSystems.groups}
                     />
                     <span className="field-hint">Gruppen-Vorschläge verwenden höchstens diese Anzahl.</span>
@@ -1438,7 +1452,7 @@ export function CreateTournamentPage() {
                       min="1"
                       max="30"
                       value={effectiveMaxSwissRounds}
-                      onChange={(event) => setMaxSwissRounds(Math.max(1, Number(event.target.value)))}
+                      onChange={(event) => setMaxSwissRounds(Math.max(1, Math.min(30, Math.trunc(Number(event.target.value)) || 1)))}
                       disabled={!enabledSystems.swiss}
                     />
                     <span className="field-hint">Schweizer Vorschläge überschreiten diese Rundenzahl nicht.</span>
@@ -1452,7 +1466,7 @@ export function CreateTournamentPage() {
                       min="2"
                       max={Math.max(2, participantCount)}
                       value={effectiveKnockoutQualifierCount}
-                      onChange={(event) => setKnockoutQualifierCount(Math.max(2, Number(event.target.value)))}
+                      onChange={(event) => setKnockoutQualifierCount(Math.max(2, Math.min(Math.max(2, participantCount), Math.trunc(Number(event.target.value)) || 2)))}
                       disabled={!enabledSystems.knockout}
                     />
                     <span className="field-hint">Beispiel: 8 bedeutet, dass eine vorgeschlagene K.-o.-Phase mit 8 Teilnehmern startet.</span>
@@ -1487,8 +1501,9 @@ export function CreateTournamentPage() {
               <div className="phase-step-main">
                 {selectedRecommendation && (
                   <div className="selected-format-summary">
-                    <span className="badge">Vorlage</span>
+                    <span className="badge">{recommendationPlanMatches ? 'Vorlage' : 'Individuell angepasst'}</span>
                     <strong>{selectedRecommendation.label}</strong>
+                    {!recommendationPlanMatches && <span className="wizard-review-warning">Der Phasenplan weicht von der Empfehlung ab. Deine Phasen bleiben erhalten.</span>}
                     <span className="muted">Alle Einstellungen unten bleiben frei änderbar.</span>
                   </div>
                 )}
@@ -2030,6 +2045,14 @@ export function CreateTournamentPage() {
                 </div>
               </div>
             </div>
+            {(minimumMatchesShortfall > 0 || dateIsPast || scheduleIssues.length > 0) && (
+              <div className="wizard-review-check" role="status">
+                <strong>Vor Erstellung prüfen</strong>
+                {minimumMatchesShortfall > 0 && <p>Die erste Phase garantiert nur {actualMinimumMatches} tatsächlich gespielte Begegnungen pro Teilnehmer, gewünscht sind {minimumMatches}. Freilose zählen nicht als Spiele.</p>}
+                {dateIsPast && <p>Der geplante Turnierbeginn liegt in der Vergangenheit.</p>}
+                {scheduleIssues.map((issue, index) => <p key={index}>{issue}</p>)}
+              </div>
+            )}
             <div className="creation-review-overview" aria-label="Turnierdaten im Überblick">
               <div className="creation-review-identity">
                 <span>Dein Turnier</span>
@@ -2047,7 +2070,7 @@ export function CreateTournamentPage() {
               <div className="creation-review-timing">
                 <div><span>Voraussichtliche Spielzeit</span><strong>ca. {formatDuration(estimatedPlayingMinutes)}</strong></div>
                 <div><span>Geplante Unterbrechungen</span><strong>{formatDuration(estimatedBreakMinutes)}</strong></div>
-                <div><span>Gesamtdauer inkl. Pausen</span><strong>{formatDuration(estimatedTournamentDurationMinutes)}</strong></div>
+                <div><span>Aktive Turnierdauer inkl. Pausen</span><strong>{formatDuration(estimatedTournamentDurationMinutes)}</strong></div>
                 <div><span>Voraussichtliches Ende</span><strong>{plannedTimeline.estimatedEnd ? formatPlannedDateTime(plannedTimeline.estimatedEnd) : 'Noch offen'}</strong></div>
               </div>
             </div>
@@ -2126,12 +2149,13 @@ export function CreateTournamentPage() {
           {phaseDrafts.length > 0 && (
             <div className="wizard-side-duration-breakdown">
               <span>Geplante Pausen <strong>{formatDuration(estimatedBreakMinutes)}</strong></span>
-              <span>Gesamtdauer inkl. Pausen <strong>{formatDuration(estimatedTournamentDurationMinutes)}</strong></span>
+              <span>Aktive Turnierdauer inkl. Pausen <strong>{formatDuration(estimatedTournamentDurationMinutes)}</strong></span>
               {plannedTimeline.estimatedEnd && <span>Voraussichtliches Ende <strong>{formatPlannedDateTime(plannedTimeline.estimatedEnd)}</strong></span>}
             </div>
           )}
           {phaseDrafts.length > 0 && <small>Unverbindliche Planung mit {timedSport ? `${matchDurationMinutes} Min. je Spiel` : `${planningMinutesPerSet(sport)} Min. je Satz`}. Zusätzliche Verzögerungen bei der Rundenfreigabe sind nicht enthalten.</small>}
-          {plannedTimeline.warnings.length > 0 && <small>⚠ Die Pausenplanung enthält einen Zeitkonflikt. Bitte Datum und Uhrzeit in Schritt 4 prüfen.</small>}
+          {plannedTimeline.warnings.length > 0 && <small>⚠ Die Pausenplanung enthält einen Zeitkonflikt, der vor Erstellung korrigiert werden muss.</small>}
+          {minimumMatchesShortfall > 0 && <small className="wizard-review-warning">⚠ Mindestens {actualMinimumMatches} statt {minimumMatches} tatsächlich gespielter Matches garantiert.</small>}
         </div>
         {maxReachedStep >= 4 && !canCreate && (
           <div className="wizard-side-validation" role="status">
@@ -2160,6 +2184,16 @@ export function CreateTournamentPage() {
       </div>
       </div>}
       </div>
+      {pendingDiscipline && (
+        <DisciplineChangeDialog
+          previousDiscipline={disciplineLabel(discipline)}
+          nextDiscipline={disciplineLabel(pendingDiscipline)}
+          currentDiscipline={discipline}
+          nextDisciplineId={pendingDiscipline}
+          onCancel={() => { setPendingDiscipline(null); document.getElementById('discipline')?.focus(); }}
+          onConfirm={confirmDisciplineChange}
+        />
+      )}
       {pendingSport && (
         <SportChangeDialog
           previousSport={sportOptions.find((option) => option.id === sport)?.label ?? sport}
