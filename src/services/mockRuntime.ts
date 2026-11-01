@@ -12,6 +12,7 @@ import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/
 import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
 import { rankStandings, type RankedParticipant } from '@/domain/standingRankings';
+import { discardedGroupOpponents, needsGroupStreichungsregel } from '@/domain/groupQualification';
 import { compareRankingRows, resultScore, resultWinnerSide, scoreWithDecision, sportScoring, validateCompleteResult, validateScoreDecision, type ExtraTimeProgress, type ScoreDecision, type WinnerSide } from '@/domain/sportScoring';
 import { getWithdrawalAwardSets } from '@/domain/withdrawalScoring';
 import { newPlayoffRound, playoffBoundaryTie, playoffQualified, playoffRoundFinished, type PlayoffMode } from '@/domain/swissCutoffPlayoff';
@@ -1308,11 +1309,32 @@ function computeStageQualifiers(tournament: DemoTournament, stage: TournamentSta
       const groupLabel = `Gruppe ${groupLetter(groupIndex)}`;
       return rankParticipants(members, matches.filter((match) => match.round === groupLabel), results, tournament.sport);
     });
+    const groupSizes = rankings.map((ranking) => ranking.length);
+    const smallestSize = Math.min(...groupSizes);
+    const applyStreichung = needsGroupStreichungsregel(
+      rankings.reduce((sum, ranking) => sum + ranking.length, 0), rankings.length, targetCount,
+    );
+    // The published group tables and group places keep every match. For a
+    // partially qualifying placement (e.g. three of four runners-up), only
+    // the cross-group comparison discards results versus bottom-ranked
+    // opponents absent in the smallest group.
+    const comparableRows = new Map<string, RankingRow>();
+    if (applyStreichung) {
+      rankings.forEach((ranking, groupIndex) => {
+        const ignored = discardedGroupOpponents(ranking, smallestSize);
+        const eligible = ranking.filter((row) => !ignored.has(row.name)).map((row) => row.name);
+        const groupMatches = matches.filter((match) => match.round === `Gruppe ${groupLetter(groupIndex)}`
+          && !ignored.has(match.sideA) && !ignored.has(match.sideB));
+        rankParticipants(eligible, groupMatches, results, tournament.sport)
+          .forEach((row) => comparableRows.set(row.name, row));
+      });
+    }
     const qualified: string[] = [];
     for (let rankIndex = 0; qualified.length < targetCount; rankIndex += 1) {
       const tier = rankings.map((ranking) => ranking[rankIndex]).filter((row): row is RankingRow => Boolean(row));
       if (!tier.length) break;
-      tier.sort((a, b) => compareRankingRows(tournament.sport, a, b));
+      tier.sort((a, b) => compareRankingRows(tournament.sport,
+        comparableRows.get(a.name) ?? a, comparableRows.get(b.name) ?? b));
       qualified.push(...tier.filter((row) => !isMockParticipantWithdrawn(tournament, row.name)).slice(0, targetCount - qualified.length).map((row) => row.name));
     }
     return qualified;
