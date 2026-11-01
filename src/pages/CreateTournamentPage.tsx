@@ -38,7 +38,8 @@ import { findSportOption } from '@/domain/sports';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { formatPhaseOverview } from '@/domain/creationOverview';
 import { needsRosterPhaseReview } from '@/domain/phaseReview';
-import { CREATION_DRAFT_KEY, loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence, getSavedCreationDraft, saveNamedCreationDraft, removeSavedCreationDraft, type CreationDraft } from '@/domain/creationDraft';
+import { CREATION_DRAFT_KEY, loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence, type CreationDraft, type SavedCreationDraft } from '@/domain/creationDraft';
+import { saveNamedCreationDraftAtomic, removeSavedCreationDraftAtomic } from '@/domain/savedCreationDraftStore';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { RecommendationDurationPicker, DEFAULT_RECOMMENDATION_DURATION, MIN_RECOMMENDATION_DURATION, MAX_RECOMMENDATION_DURATION, formatRecommendationDuration } from '@/components/RecommendationDurationPicker';
 import { RecommendationNumberStepper } from '@/components/RecommendationNumberStepper';
@@ -374,7 +375,7 @@ export interface PrestartPhaseMode {
 
 /** The same creation phase editor is used by the pre-start director.
  * Its surrounding wizard and summary card are hidden in pre-start mode. */
-export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMode } = {}) {
+export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart?: PrestartPhaseMode; initialNamedDraft?: SavedCreationDraft } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const savedDraftId = new URLSearchParams(location.search).get('draft');
@@ -416,7 +417,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       return initial;
     }
     const draft = loadCreationDraft(typeof window !== 'undefined' ? window.sessionStorage : undefined, sessionDraftKey)
-      ?? (savedDraftId ? getSavedCreationDraft(savedDraftId)?.draft ?? null : loadCreationDraft());
+      ?? (savedDraftId ? initialNamedDraft?.draft ?? null : loadCreationDraft());
     if (draft) {
       participantSequence = Math.max(participantSequence, highestDraftSequence(draft.participants, 'participant'));
       phaseSequence = Math.max(phaseSequence, highestDraftSequence(draft.phaseDrafts, 'phase'));
@@ -430,13 +431,13 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   const [creationError, setCreationError] = useState<string | null>(null);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   const [namedDraftMessage, setNamedDraftMessage] = useState('');
-  const savedDraftRevision = useRef<number | null>(savedDraftId
-    ? (getSavedCreationDraft(savedDraftId)?.revision ?? 1) : null);
+  const [savingNamedDraft, setSavingNamedDraft] = useState(false);
+  const savedDraftRevision = useRef<number | null>(initialNamedDraft?.revision ?? (savedDraftId ? 1 : null));
   const [draftConflictOpen, setDraftConflictOpen] = useState(false);
   const [recoveryChoiceOpen, setRecoveryChoiceOpen] = useState(() => {
     if (prestart || !savedDraftId || typeof window === 'undefined') return false;
     const recovery = loadCreationDraft(window.sessionStorage, sessionDraftKey);
-    const saved = getSavedCreationDraft(savedDraftId)?.draft;
+    const saved = initialNamedDraft?.draft;
     return Boolean(recovery && saved && JSON.stringify(recovery) !== JSON.stringify(saved));
   });
   const [confirmPrestartSave, setConfirmPrestartSave] = useState(false);
@@ -655,18 +656,20 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     prestart.onSaved();
   }
 
-  function saveNamedDraft(copy = false) {
+  async function saveNamedDraft(copy = false) {
+    if (savingNamedDraft) return;
+    setSavingNamedDraft(true);
     try {
       const data = copy
         ? { ...draftSnapshot, name: draftSnapshot.name.trim() ? `${draftSnapshot.name.trim()} (Kopie)` : 'Turnierentwurf (Kopie)' }
         : draftSnapshot;
-      const id = saveNamedCreationDraft(data, copy ? null : savedDraftId,
+      const entry = await saveNamedCreationDraftAtomic(data, copy ? null : savedDraftId,
         copy ? undefined : (savedDraftRevision.current ?? undefined));
-      if (!copy) savedDraftRevision.current = getSavedCreationDraft(id)?.revision ?? 1;
+      if (!copy) savedDraftRevision.current = entry.revision ?? 1;
       setNamedDraftMessage(copy ? 'Kopie als neuer Entwurf gespeichert.' : 'Entwurf gespeichert.');
-      if (copy || id !== savedDraftId) {
+      if (copy || entry.id !== savedDraftId) {
         clearCreationDraft(window.sessionStorage, sessionDraftKey);
-        navigate(`/tournaments/new?draft=${encodeURIComponent(id)}`, { replace: !copy });
+        navigate(`/tournaments/new?draft=${encodeURIComponent(entry.id)}`, { replace: !copy });
       }
     } catch (error) {
       if (error instanceof Error && error.message === 'DRAFT_CONFLICT') {
@@ -674,7 +677,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       } else {
         setNamedDraftMessage(error instanceof Error ? error.message : 'Entwurf konnte nicht gespeichert werden.');
       }
-    }
+    } finally { setSavingNamedDraft(false); }
   }
 
   const editingSavedParticipant = participants.find((participant) => participant.id === editingParticipantId);
@@ -1225,13 +1228,18 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     sportSelectRef.current?.focus();
   }
 
-  function discardCreationDraft() {
-    clearCreationDraft(window.sessionStorage, sessionDraftKey);
-    clearCreationDraft(); // Clear any legacy single-draft recovery copy.
-    if (savedDraftId) {
-      removeSavedCreationDraft(savedDraftId);
-      navigate('/tournaments/new', { replace: true });
-    } else window.location.reload();
+  async function discardCreationDraft() {
+    try {
+      if (savedDraftId) await removeSavedCreationDraftAtomic(savedDraftId, savedDraftRevision.current ?? undefined);
+      clearCreationDraft(window.sessionStorage, sessionDraftKey);
+      clearCreationDraft(); // Clear any legacy single-draft recovery copy.
+      if (savedDraftId) navigate('/tournaments/new', { replace: true });
+      else window.location.reload();
+    } catch (error) {
+      setDiscardDraftDialogOpen(false);
+      if (error instanceof Error && error.message === 'DRAFT_CONFLICT') setDraftConflictOpen(true);
+      else setNamedDraftMessage(error instanceof Error ? error.message : 'Entwurf konnte nicht verworfen werden.');
+    }
   }
 
   function submitTournament(overwriteExistingId?: string) {
@@ -1289,7 +1297,8 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     });
     clearCreationDraft(window.sessionStorage, sessionDraftKey);
     clearCreationDraft();
-    if (savedDraftId) removeSavedCreationDraft(savedDraftId);
+    if (savedDraftId) void removeSavedCreationDraftAtomic(savedDraftId, savedDraftRevision.current ?? undefined)
+      .catch(() => { /* The tournament is already created; do not delete edits from another tab. */ });
     navigate(`/tournaments/${tournament.id}/control`, { replace: true });
     } catch (error) {
       setCreationError(error instanceof Error ? error.message : 'Das Turnier konnte nicht gespeichert werden. Bitte Speicherplatz prüfen und erneut versuchen.');
@@ -1387,8 +1396,8 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
         </div>
         <div className="creation-draft-actions">
           <div className="creation-draft-buttons">
-            <button className="btn primary" type="button" onClick={() => saveNamedDraft()}>Entwurf speichern</button>
-            {savedDraftId && <button className="btn" type="button" onClick={() => saveNamedDraft(true)}>Entwurf kopieren</button>}
+            <button className="btn primary" type="button" disabled={savingNamedDraft} onClick={() => { void saveNamedDraft(); }}>{savingNamedDraft ? "Speichere …" : "Entwurf speichern"}</button>
+            {savedDraftId && <button className="btn" type="button" disabled={savingNamedDraft} onClick={() => { void saveNamedDraft(true); }}>Entwurf kopieren</button>}
             <button ref={discardDraftButtonRef} className="btn danger creation-discard-button" type="button" onClick={() => setDiscardDraftDialogOpen(true)}>Entwurf verwerfen</button>
           </div>
           {namedDraftMessage && <span className="field-hint" role="status">{namedDraftMessage}</span>}
