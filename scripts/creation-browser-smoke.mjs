@@ -13,7 +13,7 @@ try {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto(base + '/tournaments/new');
+  await page.goto(base + '/#/tournaments/new');
   await page.locator('#name').fill('Browser-Smoke-Turnier');
   await page.locator('#tournament-date').click();
   await page.locator('.calendar-picker-dialog input[aria-label="Jahr"]').fill('2030');
@@ -54,7 +54,7 @@ try {
   // competition change explicit and preserve the participant list on cancel.
   const context2 = await browser.newContext();
   const page2 = await context2.newPage();
-  await page2.goto(base + '/tournaments/new');
+  await page2.goto(base + '/#/tournaments/new');
   await page2.locator('#name').fill('Wechsel-Test');
   await page2.locator('#tournament-date').click();
   await page2.locator('.calendar-picker-dialog input[aria-label="Jahr"]').fill('2030');
