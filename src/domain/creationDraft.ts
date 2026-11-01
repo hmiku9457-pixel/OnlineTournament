@@ -165,6 +165,8 @@ export function clearCreationDraft(storage?: Pick<Storage, 'removeItem'>, key = 
 export interface SavedCreationDraft {
   id: string;
   savedAt: string;
+  /** Monotonically increasing version used for edit conflict detection. */
+  revision?: number;
   draft: CreationDraft;
 }
 
@@ -188,13 +190,24 @@ function emitDraftChange() {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('creation-drafts-change'));
 }
 
-export function saveNamedCreationDraft(draft: CreationDraft, existingId?: string | null): string {
+/** Explicitly saved drafts use optimistic concurrency control. Legacy entries
+ * without a revision start at version 1. Passing the loaded version is mandatory
+ * for an editor update; null explicitly means "save as a new draft". */
+export function saveNamedCreationDraft(
+  draft: CreationDraft, existingId?: string | null, expectedRevision?: number,
+): string {
   if (!validDraft(draft)) throw new Error('Der Entwurf enthält ungültige Angaben.');
   const all = listSavedCreationDrafts();
-  const id = existingId && all.some((item) => item.id === existingId)
-    ? existingId : (typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID() : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  const entry: SavedCreationDraft = { id, savedAt: new Date().toISOString(), draft };
+  const previous = existingId ? all.find((item) => item.id === existingId) : undefined;
+  if (existingId && !previous) throw new Error('DRAFT_CONFLICT');
+  if (previous && expectedRevision !== undefined && (previous.revision ?? 1) !== expectedRevision) {
+    throw new Error('DRAFT_CONFLICT');
+  }
+  const id = previous?.id ?? (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID() : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const entry: SavedCreationDraft = {
+    id, savedAt: new Date().toISOString(), revision: previous ? (previous.revision ?? 1) + 1 : 1, draft,
+  };
   window.localStorage.setItem(SAVED_CREATION_DRAFTS_KEY, JSON.stringify([entry, ...all.filter((item) => item.id !== id)]));
   emitDraftChange();
   return id;
