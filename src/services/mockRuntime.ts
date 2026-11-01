@@ -985,9 +985,12 @@ export function canRestoreMockParticipant(tournament: DemoTournament, name: stri
   }
   const stage = tournament.stages.find((item) => item.id === record.phaseId);
   const active = getActiveStage(tournament);
-  if (!stage || isStageStarted(tournament, stage) || (active && active.type !== 'BREAK')) return false;
-  const previous = getPreviousCompetitionStage(tournament, stage);
-  return Boolean(previous && isStageCompleted(tournament, previous));
+  const previous = stage ? getPreviousCompetitionStage(tournament, stage) : undefined;
+  const reopenedForReplacement = Boolean(previous && isStageStarted(tournament, previous)
+    && getPendingGroupCutoff(tournament)?.stageId === previous.id);
+  if (!stage || isStageStarted(tournament, stage)
+    || (active && active.type !== 'BREAK' && !reopenedForReplacement)) return false;
+  return Boolean(previous && (isStageCompleted(tournament, previous) || reopenedForReplacement));
 }
 
 export function restoreMockParticipant(tournament: DemoTournament, name: string) {
@@ -1001,7 +1004,15 @@ export function restoreMockParticipant(tournament: DemoTournament, name: string)
     const upcoming = tournament.stages.find((stage) => stage.id === record.phaseId);
     if (upcoming) {
       const previous = getPreviousCompetitionStage(tournament, upcoming);
-      if (previous) refreshCompletedStageQualifiers(tournament, previous);
+      if (previous) {
+        if (isStageCompleted(tournament, previous)) refreshCompletedStageQualifiers(tournament, previous);
+        else if (isStageStarted(tournament, previous) && !getPendingGroupCutoff(tournament)) {
+          // Reversing the withdrawal restores the director's previously
+          // approved results. The reopened qualification no longer needs
+          // a new tie-break; reapply that existing approval automatically.
+          approveMockProgress(tournament);
+        }
+      }
     }
   }
   recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'PARTICIPANT_RESTORED', description: `${name}: Rückzug vor Phasenstart rückgängig gemacht` });
