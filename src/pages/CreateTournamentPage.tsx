@@ -450,6 +450,7 @@ export function CreateTournamentPage() {
       minimumMatches,
       matchDurationMinutes,
       breakMinutes,
+      sport,
       enabledSystems,
       effectiveMaxGroups,
       effectiveMaxSwissRounds,
