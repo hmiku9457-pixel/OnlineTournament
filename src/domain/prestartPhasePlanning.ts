@@ -1,7 +1,7 @@
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { StageType } from '@/domain/types';
 import {
-  estimateTournamentDurationMinutes, hasValidBreakStageOrder,
+  estimateTournamentDurationMinutes, hasValidBreakStageOrder, isValidSwissRoundCount,
   hasValidTerminalStageOrder, knockoutRoundLabels, recommendGroupCount,
   recommendedSwissRounds, stageLabel, type TournamentDurationPhaseInput,
 } from '@/domain/tournamentCreation';
@@ -142,8 +142,7 @@ export function validatePrestartPhases(phases: PrestartPhaseDraft[], activeCount
       }
     }
     if (phase.type === 'SWISS') {
-      if (!Number.isInteger(phase.swissRounds) || phase.swissRounds < 1
-        || phase.swissRounds > Math.min(30, phase.entrantCount - 1)) {
+      if (!isValidSwissRoundCount(phase.swissRounds, phase.entrantCount)) {
         errors.push(`${label}: Schweizer Runden müssen zwischen 1 und ${Math.max(1, Math.min(30, phase.entrantCount - 1))} liegen.`);
       }
     }
