@@ -1260,7 +1260,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
 
   return (
     <>
-      <div className={`creation-page-container ${prestart ? 'is-prestart-phase-editor' : ''}`}>
+      <div className={prestart ? 'creation-page-container is-prestart-phase-editor' : 'creation-page-container'}>
       {!prestart ? <header className="page-head creation-page-head">
         <div className="creation-page-heading">
           <h1>{savedDraftId ? 'Turnierentwurf bearbeiten' : 'Turnier erstellen'}</h1>
