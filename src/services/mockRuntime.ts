@@ -4,7 +4,7 @@ import { reconcilePrestartDraws, reconcileQualifiedDraw } from '@/services/mockD
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
-import { getAllMockTournaments, updateMockTournamentStatus } from '@/services/mockTournamentStore';
+import { getAllMockTournaments, updateMockTournamentStatus, refreshPrestartSchedule } from '@/services/mockTournamentStore';
 import { blocksInlineBreakRound, isInlineBreakReleased } from '@/services/mockInlineBreak';
 import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, getNextCompetitionStage, getPreviousCompetitionStage, isStageCompleted, isStageStarted, setStageEntrants, reopenStageForQualification, isSwissRoundApproved, approveSwissRound, revokeSwissRoundApprovals, reopenStageAfterCorrection } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
@@ -944,6 +944,7 @@ export function withdrawMockParticipant(tournament: DemoTournament, name: string
     // Eine zurückgezogene Person wird vor dem Turnierbeginn ersatzlos aus
     // der Auslosung entfernt; keine kampflosen Partien erzeugen.
     reconcilePrestartDraws(tournament);
+    refreshPrestartSchedule(tournament.id);
   } else {
     settleWithdrawnMatches(tournament);
   }
@@ -991,8 +992,10 @@ export function restoreMockParticipant(tournament: DemoTournament, name: string)
   if (!canRestoreMockParticipant(tournament, name)) return false;
   const record = getWithdrawalRestoreEligibility(tournament.id, name)!;
   removeParticipantWithdrawal(tournament, name);
-  if (record.kind === 'PRESTART') reconcilePrestartDraws(tournament);
-  else {
+  if (record.kind === 'PRESTART') {
+    reconcilePrestartDraws(tournament);
+    refreshPrestartSchedule(tournament.id);
+  } else {
     const upcoming = tournament.stages.find((stage) => stage.id === record.phaseId);
     if (upcoming) {
       const previous = getPreviousCompetitionStage(tournament, upcoming);
