@@ -6,6 +6,7 @@ import { CreateTournamentPage } from '@/pages/CreateTournamentPage';
 import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { TestParticipantsDialog } from '@/components/TestParticipantsDialog';
 import { DiscardDraftDialog } from '@/components/DiscardDraftDialog';
+import { UnsavedParticipantDialog } from '@/components/UnsavedParticipantDialog';
 import { CREATION_DRAFT_KEY, type CreationDraft } from '@/domain/creationDraft';
 import { createVenueLayout } from '@/domain/venueLayout';
 
@@ -48,6 +49,16 @@ describe('five-step tournament creation smoke test', () => {
     expect(modal).toContain('class="btn danger"');
     expect(modal).toContain('>Entwurf endgültig verwerfen</button>');
     expect(modal).not.toContain('window.confirm');
+  });
+
+  it('provides a consistent modal before losing unsaved participant edits', () => {
+    const modal = renderToStaticMarkup(createElement(UnsavedParticipantDialog, {
+      onStay: () => {}, onDiscard: () => {},
+    }));
+    expect(modal).toContain('role="dialog"');
+    expect(modal).toContain('Ungespeicherte Teilnehmerdaten');
+    expect(modal).toContain('Weiter bearbeiten');
+    expect(modal).toContain('Eingaben verwerfen');
   });
 
   it('renders sport-change confirmation as an accessible dialog with explicit choices', () => {
