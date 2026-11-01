@@ -1,13 +1,18 @@
 import {
   createPhaseTemplate,
+  defaultBestOfForStage,
+  estimatePhaseMetrics,
   type CreationPhaseTemplate,
   type TournamentSystemId,
 } from '@/domain/tournamentCreation';
+import { sportScoring } from '@/domain/sportScoring';
 
 export interface RecommendationInput {
   playerCount: number;
   tableCount: number;
   minimumMatches: number;
+  /** Set to use the same Best-of and sport timing rules as the phase editor. */
+  sport?: string;
   matchDurationMinutes?: number;
   venueTurnoverMinutes?: number;
 }
@@ -236,7 +241,23 @@ export function recommendTournamentFormats(
     if (candidate.phases.length > 1 && candidate.phases.some((phase, index) =>
       index > 0 && (phase.entrantCount ?? playerCount) >= (candidate.phases[index - 1].entrantCount ?? playerCount))) return;
     const baselineDuration = estimateDurationMinutes(candidate.phases, playerCount, tableCount);
-    const estimatedDurationMinutes = Math.round(baselineDuration * (Math.max(1, input.matchDurationMinutes ?? 15) + Math.max(0, input.venueTurnoverMinutes ?? 0)) / MINUTES_PER_SET);
+    const scoring = input.sport ? sportScoring(input.sport) : null;
+    const timing = scoring?.mode === 'score'
+      ? { matchDurationMinutes: input.matchDurationMinutes ?? 15, venueTurnoverMinutes: input.venueTurnoverMinutes ?? 0 }
+      : { minutesPerSet: input.matchDurationMinutes ?? MINUTES_PER_SET };
+    const estimatedDurationMinutes = scoring
+      ? candidate.phases.reduce((sum, phase) => {
+          const bestOf = scoring.mode === 'score' ? 1
+            : scoring.shortSetEntry ? defaultBestOfForStage(phase.type) : scoring.recommendedBestOf;
+          return sum + estimatePhaseMetrics({
+            type: phase.type, entrantCount: phase.entrantCount ?? playerCount,
+            bestOf, groupCount: phase.groupCount, swissRounds: phase.swissRounds,
+            knockoutBestOf: phase.type === 'KNOCKOUT'
+              ? Array.from({ length: Math.ceil(Math.log2(phase.entrantCount ?? playerCount)) }, () => bestOf)
+              : undefined,
+          }, tableCount, timing).estimatedDurationMinutes;
+        }, 0)
+      : Math.round(baselineDuration * (Math.max(1, input.matchDurationMinutes ?? 15) + Math.max(0, input.venueTurnoverMinutes ?? 0)) / MINUTES_PER_SET);
     const estimatedMatches = totalEstimatedMatches(candidate.phases, playerCount);
 
     if (estimatedDurationMinutes > maxDuration) return;
