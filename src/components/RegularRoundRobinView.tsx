@@ -4,6 +4,8 @@ import type { TournamentStage } from '@/domain/types';
 import { SwissStandingsTable } from '@/components/SwissStandingsTable';
 import { SwissRoundRobinMatrix } from '@/components/SwissRoundRobinMatrix';
 import { GroupMatchDayList, type GroupMatchDayItem } from '@/components/GroupMatchDayList';
+import { MatchStatusLegend } from '@/components/MatchStatusLegend';
+import { matchVisualClass, matchVisualLabel, matchVisualState } from '@/domain/matchVisualStatus';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { buildRoundRobinStandings } from '@/services/mockCompetitionViews';
@@ -41,7 +43,8 @@ export function RegularRoundRobinView({ tournament, stage, onEditResult }: Props
     score: match.score,
     sets: match.sets,
     status: match.status === 'FINISHED' ? 'played'
-      : ['LIVE', 'READY', 'CONFIRMATION'].includes(match.status) ? 'live' : 'open',
+      : match.status === 'CANCELLED' ? 'cancelled'
+      : matchVisualState(match.status) === 'live' ? 'live' : 'open',
   }));
 
   // For BO1 show concrete set points (11:7); for longer set matches display
@@ -103,6 +106,7 @@ export function RegularRoundRobinView({ tournament, stage, onEditResult }: Props
     </div>
     <article className="card group-overview-card swiss-intermediate-schedule">
       <h4>Spielplan und Ergebnisse</h4>
+      <MatchStatusLegend />
       <GroupMatchDayList matches={schedule} sport={tournament.sport} onEditResult={onEditResult} />
     </article>
     {selectedPlayer && (
@@ -118,7 +122,7 @@ export function RegularRoundRobinView({ tournament, stage, onEditResult }: Props
               const opponent = match.sideA === selectedPlayer ? match.sideB : match.sideA;
               const displayed = resultForMatchParticipant({ ...match, sport: tournament.sport }, selectedPlayer);
               const stored = getMockStoredResult(match.id);
-              return <div className="player-game-row" key={match.id}>
+              return <div className={`player-game-row ${matchVisualClass(match.status)}`} title={matchVisualLabel(match.status)} key={match.id}>
                 <span className="muted">Spieltag {match.matchDay}</span>
                 <strong>vs. {opponent}</strong>
                 <span className="player-game-result-cell">
