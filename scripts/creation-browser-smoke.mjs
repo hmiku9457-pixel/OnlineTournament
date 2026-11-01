@@ -85,10 +85,18 @@ try {
   await durationDialog.getByRole('button', { name: 'Übernehmen' }).click();
   assert.equal(await page.locator('#preferred-duration').innerText(), '02:10');
   const swissBefore = Number(await page.locator('#max-swiss-rounds').inputValue());
-  await page.getByRole('button', { name: 'Maximale Schweizer Runden erhöhen' }).click();
-  assert.equal(Number(await page.locator('#max-swiss-rounds').inputValue()), swissBefore + 1);
-  await page.getByRole('button', { name: 'Maximale Schweizer Runden verringern' }).click();
+  const swissLimit = Number(await page.locator('#max-swiss-rounds').getAttribute('max'));
+  if (swissBefore < swissLimit) {
+    await page.getByRole('button', { name: 'Maximale Schweizer Runden erhöhen' }).click();
+    assert.equal(Number(await page.locator('#max-swiss-rounds').inputValue()), swissBefore + 1);
+    await page.getByRole('button', { name: 'Maximale Schweizer Runden verringern' }).click();
+  } else {
+    await page.getByRole('button', { name: 'Maximale Schweizer Runden verringern' }).click();
+    assert.equal(Number(await page.locator('#max-swiss-rounds').inputValue()), swissBefore - 1);
+    await page.getByRole('button', { name: 'Maximale Schweizer Runden erhöhen' }).click();
+  }
   assert.equal(Number(await page.locator('#max-swiss-rounds').inputValue()), swissBefore);
+  assert.equal(swissLimit, 3, 'four participants allow at most three distinct Swiss opponents');
   await page.reload();
   await page.waitForSelector('.format-step');
   assert.equal(await page.locator('#preferred-duration').innerText(), '02:10',
