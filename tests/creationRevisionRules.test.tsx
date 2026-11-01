@@ -25,7 +25,7 @@ describe('creation revision: group fairness and qualified participants', () => {
     const allMatches: RankingMatch[] = [];
     for (let i = 0; i < a.length; i++) {
       for (let j = i + 1; j < a.length; j++) {
-        allMatches.push({ sideA: a[i], sideB: a[j], status: 'FINISHED', sets: [{ sideAScore: 11, sideBScore: 5 }] });
+        allMatches.push({ sideA: a[i], sideB: a[j], status: 'FINISHED', sets: [{ number: 1, sideAScore: 11, sideBScore: 5 }] });
       }
     }
     const full = rankStandings(a, allMatches, 'table_tennis');
