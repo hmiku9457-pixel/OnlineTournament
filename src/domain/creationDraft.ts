@@ -3,7 +3,6 @@ import type { TournamentSystemId } from './tournamentCreation';
 import type { VenueLayout } from './venueLayout';
 
 export const CREATION_DRAFT_KEY = 'online-tournament:creation-draft:v1';
-export const SAVED_CREATION_DRAFTS_KEY = 'online-tournament:saved-creation-drafts:v1';
 
 export interface CreationDraftParticipant {
   id: string;
@@ -43,8 +42,7 @@ export interface CreationDraft {
   name: string;
   scheduledDate: string;
   scheduledTime: string;
-  /** Live current-time mode (optional for older drafts). */
-  useCurrentTime?: boolean;
+  useCurrentTime: boolean;
   sport: string;
   discipline: Discipline;
   timedMatchMinutes: string;
@@ -67,8 +65,7 @@ export interface CreationDraft {
   maxGroups: number | null;
   maxSwissRounds: number | null;
   knockoutQualifierCount: number | null;
-  /** Chosen soft time target, in minutes (older drafts default to 210). */
-  preferredDurationMinutes?: number;
+  preferredDurationMinutes: number;
   awardsEnabled: boolean;
   awardsAtOverride: string | null;
 }
@@ -82,7 +79,7 @@ export function validDraft(value: unknown): value is CreationDraft {
     && Number(data.maxReachedStep) <= 5
     && typeof data.name === 'string' && typeof data.scheduledDate === 'string'
     && typeof data.scheduledTime === 'string'
-    && (data.useCurrentTime === undefined || typeof data.useCurrentTime === 'boolean')
+    && typeof data.useCurrentTime === 'boolean'
     && typeof data.sport === 'string'
     && ['SINGLES', 'DOUBLES', 'TEAMS'].includes(String(data.discipline))
     && typeof data.timedMatchMinutes === 'string' && typeof data.venueTurnoverMinutes === 'string'
@@ -117,9 +114,8 @@ export function validDraft(value: unknown): value is CreationDraft {
       typeof (data.enabledSystems as unknown as Record<string, unknown>)[key] === 'boolean')
     && [data.maxGroups, data.maxSwissRounds, data.knockoutQualifierCount]
       .every((v) => v === null || (typeof v === 'number' && Number.isInteger(v)))
-    && (data.preferredDurationMinutes === undefined
-      || (Number.isInteger(data.preferredDurationMinutes) && data.preferredDurationMinutes >= 15
-        && data.preferredDurationMinutes <= 1439))
+    && Number.isInteger(data.preferredDurationMinutes) && data.preferredDurationMinutes >= 15
+        && data.preferredDurationMinutes <= 1439
     && (data.selectedRecommendationId === null || typeof data.selectedRecommendationId === 'string')
     && typeof data.awardsEnabled === 'boolean'
     && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string');
@@ -168,56 +164,7 @@ export interface SavedCreationDraft {
   id: string;
   savedAt: string;
   /** Monotonically increasing version used for edit conflict detection. */
-  revision?: number;
+  revision: number;
   draft: CreationDraft;
 }
 
-export function listSavedCreationDrafts(): SavedCreationDraft[] {
-  try {
-    const raw = window.localStorage.getItem(SAVED_CREATION_DRAFTS_KEY);
-    if (!raw) return [];
-    const items: unknown = JSON.parse(raw);
-    if (!Array.isArray(items)) return [];
-    return items.filter((item): item is SavedCreationDraft => Boolean(item && typeof item === 'object'
-      && typeof item.id === 'string' && typeof item.savedAt === 'string'
-      && validDraft(item.draft))).sort((a, b) => b.savedAt.localeCompare(a.savedAt));
-  } catch { return []; }
-}
-
-export function getSavedCreationDraft(id: string): SavedCreationDraft | null {
-  return listSavedCreationDrafts().find((item) => item.id === id) ?? null;
-}
-
-function emitDraftChange() {
-  if (typeof window !== 'undefined') window.dispatchEvent(new Event('creation-drafts-change'));
-}
-
-/** Explicitly saved drafts use optimistic concurrency control. Legacy entries
- * without a revision start at version 1. Passing the loaded version is mandatory
- * for an editor update; null explicitly means "save as a new draft". */
-export function saveNamedCreationDraft(
-  draft: CreationDraft, existingId?: string | null, expectedRevision?: number,
-): string {
-  if (!validDraft(draft)) throw new Error('Der Entwurf enthält ungültige Angaben.');
-  const all = listSavedCreationDrafts();
-  const previous = existingId ? all.find((item) => item.id === existingId) : undefined;
-  if (existingId && !previous) throw new Error('DRAFT_CONFLICT');
-  if (previous && expectedRevision !== undefined && (previous.revision ?? 1) !== expectedRevision) {
-    throw new Error('DRAFT_CONFLICT');
-  }
-  const id = previous?.id ?? (typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID() : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  const entry: SavedCreationDraft = {
-    id, savedAt: new Date().toISOString(), revision: previous ? (previous.revision ?? 1) + 1 : 1, draft,
-  };
-  window.localStorage.setItem(SAVED_CREATION_DRAFTS_KEY, JSON.stringify([entry, ...all.filter((item) => item.id !== id)]));
-  emitDraftChange();
-  return id;
-}
-
-export function removeSavedCreationDraft(id: string): void {
-  const all = listSavedCreationDrafts();
-  if (!all.some((item) => item.id === id)) return;
-  window.localStorage.setItem(SAVED_CREATION_DRAFTS_KEY, JSON.stringify(all.filter((item) => item.id !== id)));
-  emitDraftChange();
-}
