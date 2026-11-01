@@ -29,7 +29,7 @@ import {
 } from '@/domain/tournamentCreation';
 import type { Discipline, StageType } from '@/domain/types';
 import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/recommendations';
-import { createMockTournament, findTournamentNameConflict, updatePrestartTournamentPhases } from '@/services/mockTournamentStore';
+import { createMockTournament, findTournamentNameConflict, prestartPlanningFingerprint, updatePrestartTournamentPhases } from '@/services/mockTournamentStore';
 import { hasStartedAnyStage } from '@/domain/prestartPhasePlanning';
 import { getPhaseLifecycle } from '@/services/mockPhaseLifecycle';
 import type { DemoTournament } from '@/data/demoTournaments';
@@ -594,6 +594,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   }, [draftSnapshot, sessionDraftKey, prestart]);
 
   const originalPrestartPhases = useRef(prestart ? initialPrestartPhases(prestart.tournament) : []);
+  const originalPrestartFingerprint = useRef(prestart ? prestartPlanningFingerprint(prestart.tournament) : '');
   const prestartPhaseDrafts: PrestartPhaseDraft[] = phaseDrafts.map((phase) => ({
     id: phase.id, type: phase.type, label: phase.label, entrantCount: phase.entrantCount,
     bestOf: phase.bestOf, groupCount: phase.groupCount, swissRounds: phase.swissRounds,
@@ -622,10 +623,8 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   useEffect(() => {
     if (!prestart) return;
     const key = `online-tournament:prestart-recovery:${prestart.tournament.id}`;
-    try {
-      if (prestartDirty) window.sessionStorage.setItem(key, JSON.stringify(draftSnapshot));
-      else window.sessionStorage.removeItem(key);
-    } catch { /* storage disabled */ }
+    if (prestartDirty) saveCreationDraft(draftSnapshot, window.sessionStorage, key);
+    else clearCreationDraft(window.sessionStorage, key);
   }, [prestartDirty, prestart?.tournament.id, draftSnapshot]);
   function discardPrestartEditing() {
     if (prestart) {
@@ -635,7 +634,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   }
 
   function savePrestartPhases() {
-    if (!prestart || prestartIssues.length) return;
+    if (!prestart || prestartIssues.length || !prestartDirty) return;
     if (!confirmPrestartSave) {
       prestartConfirmationSignature.current = currentPrestartSignature;
       setConfirmPrestartSave(true);
@@ -645,7 +644,8 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       setConfirmPrestartSave(false);
       return;
     }
-    const result = updatePrestartTournamentPhases(prestart.tournament.id, prestartPhaseDrafts);
+    const result = updatePrestartTournamentPhases(prestart.tournament.id, prestartPhaseDrafts,
+      originalPrestartFingerprint.current);
     if (!result.ok) {
       setPrestartSaveError(result.error ?? 'Die Phasen konnten nicht gespeichert werden.');
       setConfirmPrestartSave(false);
@@ -2531,9 +2531,9 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
             ? setConfirmPrestartSave(false) : prestartDirty ? setConfirmPrestartDiscard(true) : discardPrestartEditing()}>
             Abbrechen
           </button>
-          <button className="btn primary" type="button" disabled={prestartIssues.length > 0}
+          <button className="btn primary" type="button" disabled={prestartIssues.length > 0 || !prestartDirty}
             onClick={savePrestartPhases}>
-            Änderungen prüfen und speichern
+            {prestartDirty ? 'Änderungen prüfen und speichern' : 'Keine Änderungen vorhanden'}
           </button>
         </div>
       </section>}
