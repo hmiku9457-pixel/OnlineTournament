@@ -161,6 +161,16 @@ export function recommendGroupCount(entrants: number, followingEntrants?: number
   return best;
 }
 
+/** Shared guidance for changes to the participant field. Neither the creation
+ * wizard nor the pre-start editor silently overwrites a chosen group count. */
+export function changedGroupRecommendationMessage(
+  entrants: number, currentGroups: number, followingEntrants?: number,
+): string | null {
+  const suggested = recommendGroupCount(entrants, followingEntrants);
+  return suggested === currentGroups ? null
+    : `Für ${entrants} Teilnehmer werden ${suggested} Gruppen empfohlen (aktuell geplant: ${currentGroups}).`;
+}
+
 /** Describe the actual distribution of entrants across groups, without 4–4 ranges. */
 export function formatGroupDistribution(entrantCount: number, groupCount: number): string {
   const groups = Math.max(1, Math.trunc(groupCount));
