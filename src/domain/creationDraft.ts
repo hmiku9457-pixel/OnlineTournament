@@ -1,0 +1,131 @@
+import type { Discipline, StageType } from './types';
+import type { TournamentSystemId } from './tournamentCreation';
+
+export const CREATION_DRAFT_KEY = 'online-tournament:creation-draft:v1';
+
+export interface CreationDraftParticipant {
+  id: string;
+  firstName: string;
+  lastName: string;
+  partnerFirstName: string;
+  partnerLastName: string;
+}
+
+export interface CreationDraftPhase {
+  id: string;
+  type: StageType;
+  label: string;
+  bestOf: number;
+  groupCount: number;
+  swissRounds: number;
+  entrantCount: number;
+  knockoutBestOf: number[];
+  customEntrants: boolean;
+  breakKind: 'minutes' | 'until' | 'overnight';
+  breakMinutes: number;
+  nextDayStart: string;
+  nextDayDate: string;
+  breakUntil: string;
+  note: string;
+  inlineBreakAfterRound: number;
+  inlineBreakKind: 'minutes' | 'until';
+  inlineBreakMinutes: number;
+  inlineBreakUntil: string;
+}
+
+export interface CreationDraft {
+  step: number;
+  maxReachedStep: number;
+  hasVisitedPhaseStep: boolean;
+  name: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  sport: string;
+  discipline: Discipline;
+  timedMatchMinutes: string;
+  venueTurnoverMinutes: string;
+  tables: number;
+  customTables: boolean;
+  venueLayoutEnabled: boolean;
+  venueLayout: unknown;
+  participants: CreationDraftParticipant[];
+  participantForm: Omit<CreationDraftParticipant, 'id'>;
+  editingParticipantId: string | null;
+  minimumMatches: number;
+  customMinimumMatches: boolean;
+  phaseDrafts: CreationDraftPhase[];
+  selectedRecommendationId: string | null;
+  enabledSystems: Record<TournamentSystemId, boolean>;
+  maxGroups: number | null;
+  maxSwissRounds: number | null;
+  knockoutQualifierCount: number | null;
+  awardsEnabled: boolean;
+  awardsAtOverride: string | null;
+}
+
+function validDraft(value: unknown): value is CreationDraft {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const data = value as Partial<CreationDraft>;
+  const allowedTypes = ['ROUND_ROBIN', 'GROUPS', 'SWISS', 'KNOCKOUT', 'BREAK'];
+  return Number.isInteger(data.step) && Number(data.step) >= 1 && Number(data.step) <= 5
+    && Number.isInteger(data.maxReachedStep) && Number(data.maxReachedStep) >= Number(data.step)
+    && Number(data.maxReachedStep) <= 5
+    && typeof data.name === 'string' && typeof data.scheduledDate === 'string'
+    && typeof data.scheduledTime === 'string' && typeof data.sport === 'string'
+    && ['SINGLES', 'DOUBLES', 'TEAMS'].includes(String(data.discipline))
+    && typeof data.timedMatchMinutes === 'string' && typeof data.venueTurnoverMinutes === 'string'
+    && Number.isInteger(data.tables) && Number(data.tables) >= 1 && Number(data.tables) <= 9999
+    && typeof data.customTables === 'boolean' && typeof data.venueLayoutEnabled === 'boolean'
+    && Array.isArray(data.participants) && data.participants.length <= 10000
+    && data.participants.every((entry) => entry && typeof entry.id === 'string'
+      && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
+        .every((key) => typeof (entry as unknown as Record<string, unknown>)[key] === 'string'))
+    && Array.isArray(data.phaseDrafts) && data.phaseDrafts.length <= 80
+    && data.phaseDrafts.every((entry) => entry && typeof entry.id === 'string'
+      && allowedTypes.includes(entry.type) && Number.isInteger(entry.entrantCount)
+      && Number.isInteger(entry.groupCount) && Number.isInteger(entry.swissRounds)
+      && Array.isArray(entry.knockoutBestOf) && typeof entry.label === 'string'
+      && typeof entry.breakKind === 'string' && typeof entry.nextDayDate === 'string')
+    && data.participantForm !== null && typeof data.participantForm === 'object'
+    && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
+      .every((key) => typeof (data.participantForm as unknown as Record<string, unknown>)[key] === 'string')
+    && (data.editingParticipantId === null || typeof data.editingParticipantId === 'string')
+    && typeof data.hasVisitedPhaseStep === 'boolean' && typeof data.customMinimumMatches === 'boolean'
+    && Number.isInteger(data.minimumMatches) && Number(data.minimumMatches) >= 1
+    && data.enabledSystems !== null && typeof data.enabledSystems === 'object'
+    && ['round-robin', 'groups', 'swiss', 'knockout'].every((key) =>
+      typeof (data.enabledSystems as unknown as Record<string, unknown>)[key] === 'boolean')
+    && [data.maxGroups, data.maxSwissRounds, data.knockoutQualifierCount]
+      .every((v) => v === null || Number.isInteger(v))
+    && (data.selectedRecommendationId === null || typeof data.selectedRecommendationId === 'string')
+    && typeof data.awardsEnabled === 'boolean'
+    && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string');
+}
+
+export function loadCreationDraft(storage?: Pick<Storage, 'getItem'>): CreationDraft | null {
+  try {
+    const store = storage ?? (typeof window !== 'undefined' ? window.localStorage : undefined);
+    const raw = store?.getItem(CREATION_DRAFT_KEY);
+    if (!raw) return null;
+    const decoded: unknown = JSON.parse(raw);
+    if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) return null;
+    const payload = decoded as { version?: unknown; draft?: unknown };
+    return payload.version === 1 && validDraft(payload.draft) ? payload.draft : null;
+  } catch { return null; }
+}
+
+export function saveCreationDraft(draft: CreationDraft, storage?: Pick<Storage, 'setItem'>): boolean {
+  try {
+    const store = storage ?? (typeof window !== 'undefined' ? window.localStorage : undefined);
+    if (!store) return false;
+    store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft }));
+    return true;
+  } catch { return false; }
+}
+
+export function clearCreationDraft(storage?: Pick<Storage, 'removeItem'>): void {
+  try {
+    const store = storage ?? (typeof window !== 'undefined' ? window.localStorage : undefined);
+    store?.removeItem(CREATION_DRAFT_KEY);
+  } catch { /* No storage access; creation can still proceed. */ }
+}
