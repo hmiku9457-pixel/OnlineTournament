@@ -124,6 +124,7 @@ export function validatePlannedSchedule(items: PlannedScheduleItem[]): string[] 
 
 export interface SchedulePhaseProposal {
   label: string;
+  note?: string;
   type: 'BREAK' | string;
   estimatedMinutes: number;
   breakKind?: 'minutes' | 'until' | 'overnight';
@@ -174,6 +175,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
       id: `phase-${index + 1}`,
       at: toLocalDateTime(cursor),
       title: phase.label,
+      note: isBreak ? phase.note?.trim() : undefined,
       type: isBreak ? 'break' : 'competition',
       ...(isBreak ? { breakKind: phase.breakKind ?? 'minutes' } : {}),
     });
