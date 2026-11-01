@@ -6819,3 +6819,12 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   outline-offset: 3px;
   border-radius: 2px;
 }
+
+/* Keep the five-step creation flow centered on ultra-wide displays.
+ * The application sidebar remains anchored to the left edge of the shell. */
+.creation-page-container {
+  width: 100%;
+  max-width: 1550px;
+  min-width: 0;
+  margin-inline: auto;
+}
