@@ -272,7 +272,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                           </select>
                         </label>
                         {phase.breakKind === 'overnight' && <label>Fortsetzungsdatum
-                          <input type="date" value={phase.nextDayDate} onChange={(event) => edit(phase.id, { nextDayDate: event.target.value })} />
+                          <CalendarDatePicker id={`prestart-date-${phase.id}`} label="Fortsetzungsdatum" value={phase.nextDayDate} minDate={nextCalendarDate((tournament.scheduledStart ?? toLocalDateTime(new Date())).slice(0, 10))} onChange={(value) => edit(phase.id, { nextDayDate: value })} />
                         </label>}
                         <label>{phase.breakKind === 'overnight' ? 'Fortsetzungsuhrzeit' : phase.breakKind === 'until' ? 'Pause bis (Uhrzeit)' : 'Minuten'}
                           <input type={phase.breakKind === 'minutes' ? 'number' : 'time'}
