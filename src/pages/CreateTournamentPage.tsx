@@ -20,6 +20,7 @@ import {
   knockoutEntrantPresets,
   knockoutRoundLabels,
   recommendGroupCount,
+  changedGroupRecommendationMessage,
   recommendedSwissRounds,
   stageLabel,
   tournamentSystemOptions,
@@ -448,6 +449,9 @@ export function CreateTournamentPage() {
   const [venueLayout, setVenueLayout] = useState(() => restoredDraft?.venueLayout ?? resizeVenueLayout(createVenueLayout(8), 4, 2, 8));
   useEffect(() => { setVenueLayout((current) => resizeVenueLayout(current, current.columns, Math.max(current.rows, Math.ceil(tables / current.columns)), tables)); }, [tables]);
   const [participants, setParticipants] = useState<ParticipantDraft[]>(restoredDraft?.participants ?? []);
+  const [recentlyRemovedParticipant, setRecentlyRemovedParticipant] = useState<{ participant: ParticipantDraft; index: number } | null>(null);
+  const [groupRecommendationNotice, setGroupRecommendationNotice] = useState<string | null>(null);
+  const previousRosterCount = useRef<number>(restoredDraft?.participants.length ?? 0);
   const [participantForm, setParticipantForm] = useState<ParticipantFields>(restoredDraft?.participantForm ?? emptyParticipantFields());
   const [participantErrors, setParticipantErrors] = useState<ParticipantErrors>({});
   const [editingParticipantId, setEditingParticipantId] = useState<string | null>(restoredDraft?.editingParticipantId ?? null);
@@ -661,8 +665,19 @@ export function CreateTournamentPage() {
   }
 
   function removeParticipant(id: string) {
+    const index = participants.findIndex((participant) => participant.id === id);
+    if (index < 0) return;
+    setRecentlyRemovedParticipant({ participant: participants[index], index });
     setParticipants((current) => current.filter((participant) => participant.id !== id));
     if (editingParticipantId === id) resetParticipantEditor();
+  }
+
+  function undoRemoveParticipant() {
+    if (!recentlyRemovedParticipant) return;
+    const { participant, index } = recentlyRemovedParticipant;
+    setParticipants((current) => current.some((item) => item.id === participant.id)
+      ? current : [...current.slice(0, index), participant, ...current.slice(index)]);
+    setRecentlyRemovedParticipant(null);
   }
 
   function removeIncompleteParticipants() {
@@ -758,6 +773,25 @@ export function CreateTournamentPage() {
       return JSON.stringify(normalized) === JSON.stringify(current) ? current : normalized;
     });
   // Die Teilnehmerzahl ist die Quelle für das Startfeld aller Phasen.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [participantCount]);
+
+  // Reuse the same recommendation logic as the director's pre-start editor.
+  // Existing manual group plans remain untouched after roster changes.
+  useEffect(() => {
+    const previous = previousRosterCount.current;
+    previousRosterCount.current = participantCount;
+    if (previous === participantCount) return;
+    const groupIndex = phaseDrafts.findIndex((phase) => phase.type === 'GROUPS');
+    if (groupIndex < 0 || participantCount < 4) {
+      setGroupRecommendationNotice(null);
+      return;
+    }
+    const phase = phaseDrafts[groupIndex];
+    const entrants = groupIndex === 0 ? participantCount : phase.entrantCount;
+    const following = phaseDrafts.slice(groupIndex + 1).find((item) => item.type !== 'BREAK');
+    setGroupRecommendationNotice(changedGroupRecommendationMessage(entrants, phase.groupCount, following?.entrantCount));
+  // Group-change hints should appear when roster size changes, not every edit.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participantCount]);
 
@@ -1497,6 +1531,10 @@ export function CreateTournamentPage() {
                 </div>
               </aside>
 
+            {recentlyRemovedParticipant && <div className="creation-undo-remove" role="status">
+              <span>„{participantDisplayName(recentlyRemovedParticipant.participant, discipline)}“ wurde entfernt.</span>
+              <button className="btn small" type="button" onClick={undoRemoveParticipant}>Rückgängig</button>
+            </div>}
             {!savedParticipantNamesValid && <p className="field-error" role="alert">Mindestens ein gespeicherter Teilnehmereintrag ist unvollständig oder doppelt. Bitte die Teilnehmerliste überprüfen.</p>}
             {incompleteSavedParticipants > 0 && (
               <div className="wizard-invalid-participants" role="status">
@@ -1656,6 +1694,7 @@ export function CreateTournamentPage() {
           <section className="phase-wizard-step">
             <h2>Phasen konfigurieren</h2>
             <p className="muted">Ordne deine Phasen an und öffne bei Bedarf die Einstellungen.</p>
+            {groupRecommendationNotice && <div className="callout" role="status">{groupRecommendationNotice} Die bisherige Einstellung bleibt erhalten; über „Empfehlung übernehmen“ kannst du sie ändern.</div>}
 
             <div className="phase-step-layout">
               <div className="phase-step-main">
