@@ -1,3 +1,4 @@
+import { getPendingGroupCutoff, resolveGroupCutoff } from '@/services/mockRuntime';
 import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
@@ -7,6 +8,18 @@ import { getStageEntrants, isStageCompleted, startFirstStage, startStage } from 
 import { completeMockMatch, getMockStageMatches } from '@/services/mockRuntime';
 import { getMockConfirmedFinalStandings } from '@/services/mockParticipantProgress';
 import { RegularRoundRobinView } from '@/components/RegularRoundRobinView';
+
+function approveWithCutoff(t: ReturnType<typeof create>) {
+  let open = getPendingGroupCutoff(t);
+  let attempts = 0;
+  while (open && attempts++ < 20) {
+    expect(resolveGroupCutoff(t, open.tie.players.slice(-open.tie.slots), 'PLAYOFF',
+      'Ausgetragenes Entscheidungsspiel 11:7')).toBeNull();
+    open = getPendingGroupCutoff(t);
+  }
+  expect(open).toBeNull();
+  return approveMockProgress(t);
+}
 
 const storage = new Map<string, string>();
 beforeEach(() => {
@@ -39,7 +52,7 @@ function completeFirst(t: ReturnType<typeof create>) {
   updateMockTournamentStatus(t.id, 'RUNNING');
   getMockStageMatches(t, t.stages[0]).forEach((match) =>
     completeMockMatch(match.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]));
-  expect(approveMockProgress(t)?.kind).toBe('STAGE');
+  expect(approveWithCutoff(t)?.kind).toBe('STAGE');
   expect(isStageCompleted(t, t.stages[0])).toBe(true);
 }
 
