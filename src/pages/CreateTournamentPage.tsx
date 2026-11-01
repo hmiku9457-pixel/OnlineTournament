@@ -399,6 +399,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
         venueLayout: t.venueLayout ?? createVenueLayout(t.tables),
         participants: players, participantForm: emptyParticipantFields(), editingParticipantId: null,
         minimumMatches: t.minimumMatches ?? 1, customMinimumMatches: true,
+        reviewRequiredPhaseIds: [],
         phaseDrafts: phases.map((phase, index) => ({
           ...phase, nextDayDate: phase.nextDayDate ?? '',
           customEntrants: index > 0 && !knockoutEntrantPresets(phases[index - 1].entrantCount).includes(phase.entrantCount),
@@ -523,6 +524,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   const [customMinimumMatches, setCustomMinimumMatches] = useState(restoredDraft?.customMinimumMatches ?? false);
   const [selectedRecommendationId, setSelectedRecommendationId] = useState<string | null>(restoredDraft?.selectedRecommendationId ?? null);
   const [phaseDrafts, setPhaseDrafts] = useState<PhaseDraft[]>(restoredDraft?.phaseDrafts ?? []);
+  const [reviewRequiredPhaseIds, setReviewRequiredPhaseIds] = useState<string[]>(restoredDraft?.reviewRequiredPhaseIds ?? []);
   const [editingPhaseTypeId, setEditingPhaseTypeId] = useState<string | null>(null);
   const [expandedPhaseId, setExpandedPhaseId] = useState<string | null>(null);
   const [expandedInlineBreakIds, setExpandedInlineBreakIds] = useState<string[]>([]);
@@ -544,7 +546,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
     sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
     customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
-    editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts,
+    editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
     knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
   }), [
@@ -856,11 +858,20 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   }
 
   useEffect(() => {
-    setPhaseDrafts((current) => {
-      if (!current.length) return current;
-      const normalized = normalizePhaseEntrants(current);
-      return JSON.stringify(normalized) === JSON.stringify(current) ? current : normalized;
+    if (!phaseDrafts.length) return;
+    const normalized = normalizePhaseEntrants(phaseDrafts);
+    const needsReview = phaseDrafts.flatMap((oldPhase, index) => {
+      const nextPhase = normalized[index];
+      if (!nextPhase) return [];
+      // The first playing field automatically follows registration; it is not
+      // by itself a change of the organizer's qualification settings.
+      const altered = (index > 0 && oldPhase.type !== 'BREAK' && oldPhase.entrantCount !== nextPhase.entrantCount)
+        || oldPhase.groupCount !== nextPhase.groupCount
+        || JSON.stringify(oldPhase.knockoutBestOf) !== JSON.stringify(nextPhase.knockoutBestOf);
+      return altered ? [oldPhase.id] : [];
     });
+    if (needsReview.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...needsReview])]);
+    if (JSON.stringify(normalized) !== JSON.stringify(phaseDrafts)) setPhaseDrafts(normalized);
   // Die Teilnehmerzahl ist die Quelle für das Startfeld aller Phasen.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participantCount]);
@@ -1265,7 +1276,8 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     ? 'Die Siegerehrung muss am oder nach dem voraussichtlichen Turnierende liegen.' : null;
   const scheduleIssues = [...validatePlannedSchedule(plannedSchedule), ...plannedTimelineConflicts(plannedTimeline), ...(ceremonyIssue ? [ceremonyIssue] : [])];
   const prestartIssues = prestart
-    ? [...validatePrestartPhases(prestartPhaseDrafts, prestart.activeParticipants), ...plannedTimelineConflicts(plannedTimeline)]
+    ? [...validatePrestartPhases(prestartPhaseDrafts, prestart.activeParticipants), ...plannedTimelineConflicts(plannedTimeline),
+      ...(reviewRequiredPhaseIds.length ? ['Bitte alle automatisch veränderten Phasen als geprüft markieren.'] : [])]
     : [];
   const overnightDatesValid = phaseDrafts.every((phase, index) => {
     if (phase.type !== 'BREAK' || phase.breakKind !== 'overnight') return true;
@@ -1273,7 +1285,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     return !phase.nextDayDate || (Boolean(parseCalendarDate(phase.nextDayDate)) && Boolean(plannedStart)
       && phase.nextDayDate > plannedStart!.slice(0, 10));
   });
-  const canCreate = basicsValid && participantsValid && gameSettingsValid
+  const canCreate = reviewRequiredPhaseIds.length === 0 && basicsValid && participantsValid && gameSettingsValid
     && phaseConfigurationValid && phaseEntrantsValid && overnightDatesValid && hasVisitedPhaseStep
     && scheduleIssues.length === 0;
   const firstCompetition = phaseDrafts.find((phase) => phase.type !== 'BREAK');
@@ -1806,6 +1818,9 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
             <h2>Phasen konfigurieren</h2>
             <p className="muted">Ordne deine Phasen an und öffne bei Bedarf die Einstellungen.</p>
             {groupRecommendationNotice && <div className="callout" role="status">{groupRecommendationNotice} Die bisherige Einstellung bleibt erhalten; über „Empfehlung übernehmen“ kannst du sie ändern.</div>}
+            {reviewRequiredPhaseIds.length > 0 && <div className="callout" role="alert">
+              Einige Qualifikationswerte oder Rundeneinstellungen wurden nach einer Änderung der Teilnehmerzahl verkleinert. Bitte die markierten Phasen kontrollieren und einzeln als geprüft bestätigen.
+            </div>}}
 
             <div className="phase-step-layout">
               <div className="phase-step-main">
@@ -1919,6 +1934,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
                               <div className="phase-card-title">
                                 <span className="badge">Phase {index + 1}</span>
                                 <h3>{phase.label}</h3>
+                                {reviewRequiredPhaseIds.includes(phase.id) && <span className="phase-warning-chip" role="status">Prüfung erforderlich</span>}
                                 {unequalGroupComparison && (
                                   <button className="phase-qualification-warning-button" type="button"
                                     aria-label={`Streichungsregel für Phase ${index + 1} erläutern`}
@@ -1992,6 +2008,10 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
                             </div>
                           </div>
 
+                          {reviewRequiredPhaseIds.includes(phase.id) && <div className="phase-review-acknowledgement">
+                            <span>Die Teilnehmerkonstellation hat diese Phase verändert. Prüfe Qualifikationsplätze und gegebenenfalls die Rundenanzahl.</span>
+                            <button className="btn small" type="button" onClick={() => setReviewRequiredPhaseIds((ids) => ids.filter((id) => id !== phase.id))}>Als geprüft markieren</button>
+                          </div>}
                           {isExpanded && <div className="phase-config-body">
                           {editingPhaseType && (
                             <div className="phase-type-editor">
