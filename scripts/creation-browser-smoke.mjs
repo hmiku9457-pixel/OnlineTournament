@@ -14,6 +14,7 @@ try {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(base + '/#/tournaments/new');
+  await page.locator('.creation-page-container').waitFor();
   // Check the creation wizard is centered within the content area at
   // ultra-wide widths, while the main navigation stays at the far left.
   await page.setViewportSize({ width: 2560, height: 960 });
