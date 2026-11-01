@@ -1,3 +1,4 @@
+import { getPendingGroupCutoff, resolveGroupCutoff } from '@/services/mockRuntime';
 import { approveMockProgress } from '@/services/mockRuntime';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { getMatchFinalization } from '@/domain/matchFinalization';
@@ -6,6 +7,18 @@ import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { getStageEntrants, isStageCompleted, startFirstStage } from '@/services/mockPhaseLifecycle';
 import { assignMockMatchToTable, canRestoreMockParticipant, completeMockMatch, getMockAssignmentBlockReason, getMockRuntimeMatches, isMockParticipantWithdrawn, restoreMockParticipant, saveMockMatchSets, withdrawMockParticipant } from '@/services/mockRuntime';
+
+function approveWithCutoff(t: ReturnType<typeof makeTournament>) {
+  let open = getPendingGroupCutoff(t);
+  let attempts = 0;
+  while (open && attempts++ < 12) {
+    expect(resolveGroupCutoff(t, open.tie.players.slice(-open.tie.slots), 'PLAYOFF',
+      'Stichentscheid nach ausgespieltem Ergebnis 11:7')).toBeNull();
+    open = getPendingGroupCutoff(t);
+  }
+  expect(open).toBeNull();
+  return approveMockProgress(t);
+}
 
 const storage = new Map<string, string>();
 const localStorage = {
@@ -82,7 +95,7 @@ describe('Pre-phase withdrawal restoration', () => {
     startFirstStage(tournament);
     const running = updateMockTournamentStatus(tournament.id, 'RUNNING');
     getMockRuntimeMatches(running).forEach((match) => completeMockMatch(match.id, scores));
-    expect(approveMockProgress(running)?.kind).toBe('STAGE');
+    expect(approveWithCutoff(running)?.kind).toBe('STAGE');
     expect(isStageCompleted(running, running.stages[0])).toBe(true);
     const finalist = getStageEntrants(running, running.stages[1])[0];
     expect(withdrawMockParticipant(running, finalist)).toBe(true);
