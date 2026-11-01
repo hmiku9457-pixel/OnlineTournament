@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, plannedActiveBreakMinutes, formatPlannedBreakDuration, groupPlannedScheduleDays, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
+import { TournamentSummaryPanel } from '@/components/TournamentSummaryPanel';
 import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { createMockTournament, getMockTournament } from '@/services/mockTournamentStore';
@@ -276,6 +277,38 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect((markup.match(/class="planned-schedule-phase-summary"/g) ?? [])).toHaveLength(3);
     expect(markup).toContain('Siegerehrung');
     expect(markup).toContain('aria-expanded="false"');
+  });
+
+  it('ordnet die Leitungsübersicht: Übersicht, nächster Schritt, kombinierter Zeitplan, Turnierdaten', () => {
+    const tournament = createMockTournament({
+      name: 'Reihenfolge-Test', sport: 'table_tennis', discipline: 'SINGLES',
+      tables: 2, minimumMatches: 1, estimatedDurationMinutes: 30,
+      participantNames: ['Anna', 'Ben'],
+      scheduledStart: '2026-11-01T10:00',
+      plannedSchedule: [{ id: 'phase-1', at: '2026-11-01T10:00', title: 'Jeder gegen jeden', type: 'competition' }],
+      phases: [{
+        type: 'ROUND_ROBIN', label: 'Jeder gegen jeden', entrantCount: 2,
+        groupCount: 1, swissRounds: 1, bestOf: 1, knockoutBestOf: [],
+      }],
+    });
+    const markup = renderToStaticMarkup(createElement(TournamentSummaryPanel, {
+      tournament, participants: 2, activeMatches: 0, waitingMatches: 0,
+      blockedTables: 0, restTimeLabel: '30 Min.',
+      progress: { percent: 0, completedPhases: 0, totalPhases: 1, matchesInPhase: 0, completedMatches: 0 },
+      pendingApproval: false, onControl: () => {}, onParticipants: () => {},
+      onStage: () => {}, onFinalStandings: () => {},
+    }));
+    const headings = [
+      markup.indexOf('>Übersicht</h2>'),
+      markup.indexOf('>Nächster Schritt</span>'),
+      markup.indexOf('>Geplanter Zeitplan</h2>'),
+      markup.indexOf('>Turnierdaten</h3>'),
+    ];
+    expect(headings.every((value) => value >= 0)).toBe(true);
+    expect(headings).toEqual([...headings].sort((a, b) => a - b));
+    expect(markup).not.toContain('>Phasenplan</h3>');
+    expect((markup.match(/class="planned-schedule-stage-button"/g) ?? [])).toHaveLength(1);
+    expect(markup).toContain('>Ausstehend</span>');
   });
 
   it('vereint Phasenplan und Zeitplan mit Live-, Abgeschlossen- und Ausstehend-Status', () => {
