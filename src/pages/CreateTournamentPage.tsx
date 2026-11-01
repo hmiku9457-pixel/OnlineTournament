@@ -611,7 +611,20 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   }, [draftSnapshot, sessionDraftKey, prestart]);
 
   const originalPrestartPhases = useRef(prestart ? initialPrestartPhases(prestart.tournament) : []);
-  const originalPrestartFingerprint = useRef(prestart ? prestartPlanningFingerprint(prestart.tournament) : '');
+  // Recovery is based on the version that was originally edited, never on
+  // the latest tournament loaded after a browser refresh.
+  const prestartRecoveryKey = prestart ? `online-tournament:prestart-recovery:${prestart.tournament.id}` : '';
+  const originalPrestartFingerprint = useRef((() => {
+    if (!prestart) return '';
+    if (prestartRecovered) {
+      try { return window.sessionStorage.getItem(`${prestartRecoveryKey}:fingerprint`) ?? ''; }
+      catch { return ''; }
+    }
+    return prestartPlanningFingerprint(prestart.tournament);
+  })());
+  const prestartRecoveryConflict = Boolean(prestart && prestartRecovered
+    && (!originalPrestartFingerprint.current
+      || originalPrestartFingerprint.current !== prestartPlanningFingerprint(prestart.tournament)));
   const prestartPhaseDrafts: PrestartPhaseDraft[] = phaseDrafts.map((phase) => ({
     id: phase.id, type: phase.type, label: phase.label, entrantCount: phase.entrantCount,
     bestOf: phase.bestOf, groupCount: phase.groupCount, swissRounds: phase.swissRounds,
@@ -640,18 +653,29 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   useEffect(() => {
     if (!prestart) return;
     const key = `online-tournament:prestart-recovery:${prestart.tournament.id}`;
-    if (prestartDirty) saveCreationDraft(draftSnapshot, window.sessionStorage, key);
-    else clearCreationDraft(window.sessionStorage, key);
+    if (prestartDirty) {
+      saveCreationDraft(draftSnapshot, window.sessionStorage, key);
+      if (!prestartRecovered && originalPrestartFingerprint.current) {
+        try { window.sessionStorage.setItem(`${key}:fingerprint`, originalPrestartFingerprint.current); }
+        catch { /* storage unavailable: a later recovery fails safely */ }
+      }
+    } else {
+      clearCreationDraft(window.sessionStorage, key);
+      try { window.sessionStorage.removeItem(`${key}:fingerprint`); } catch { /* ignore */ }
+    }
   }, [prestartDirty, prestart?.tournament.id, draftSnapshot]);
   function discardPrestartEditing() {
     if (prestart) {
-      try { window.sessionStorage.removeItem(`online-tournament:prestart-recovery:${prestart.tournament.id}`); } catch { /* storage disabled */ }
+      try {
+        window.sessionStorage.removeItem(prestartRecoveryKey);
+        window.sessionStorage.removeItem(`${prestartRecoveryKey}:fingerprint`);
+      } catch { /* storage disabled */ }
       prestart.onCancel();
     }
   }
 
   async function savePrestartPhases() {
-    if (!prestart || prestartIssues.length || !prestartDirty || prestartSaveBusy) return;
+    if (!prestart || prestartRecoveryConflict || prestartIssues.length || !prestartDirty || prestartSaveBusy) return;
     if (!confirmPrestartSave) {
       prestartConfirmationSignature.current = currentPrestartSignature;
       setConfirmPrestartSave(true);
@@ -676,7 +700,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       setConfirmPrestartSave(false);
       return;
     }
-    try { window.sessionStorage.removeItem(`online-tournament:prestart-recovery:${prestart.tournament.id}`); } catch { /* storage disabled */ }
+    try {
+      window.sessionStorage.removeItem(prestartRecoveryKey);
+      window.sessionStorage.removeItem(`${prestartRecoveryKey}:fingerprint`);
+    } catch { /* storage disabled */ }
     prestart.onSaved();
   }
 
@@ -1435,6 +1462,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           <h1>Phasen vor Turnierstart bearbeiten</h1>
           <p className="muted">Dieselben Einstellungen wie bei der Turniererstellung. Die neue Planung übernimmt alle {prestart.activeParticipants} aktiven Teilnehmer.</p>
           {prestartRecovered && <p className="callout" role="status">Deine zuvor ungespeicherte Phasenplanung wurde aus dieser Browsersitzung wiederhergestellt. Sie ist noch nicht endgültig gespeichert.</p>}
+          {prestartRecoveryConflict && <div className="callout" role="alert">
+            <strong>Konflikt beim Wiederherstellen:</strong> Die Turnierplanung oder Auslosung wurde seit dem letzten Bearbeiten verändert, oder ihre ursprüngliche Version ist unbekannt.
+            Deine ungespeicherten Änderungen bleiben zur Kontrolle sichtbar, dürfen aber die neuere Planung nicht überschreiben.
+            <button className="btn small" type="button" onClick={discardPrestartEditing}>Arbeitsfassung verwerfen und aktuelle Planung öffnen</button>
+          </div>}
         </div>
         <button className="btn" type="button" onClick={() => prestartDirty
           ? setConfirmPrestartDiscard(true) : discardPrestartEditing()}>Bearbeitung schließen</button>
@@ -2568,7 +2600,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             ? setConfirmPrestartSave(false) : prestartDirty ? setConfirmPrestartDiscard(true) : discardPrestartEditing()}>
             Abbrechen
           </button>
-          <button className="btn primary" type="button" disabled={prestartIssues.length > 0 || !prestartDirty || prestartSaveBusy}
+          <button className="btn primary" type="button" disabled={prestartRecoveryConflict || prestartIssues.length > 0 || !prestartDirty || prestartSaveBusy}
             onClick={savePrestartPhases}>
             {prestartDirty ? 'Änderungen prüfen und speichern' : 'Keine Änderungen vorhanden'}
           </button>
