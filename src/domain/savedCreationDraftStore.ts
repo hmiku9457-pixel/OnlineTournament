@@ -1,0 +1,165 @@
+import {
+  getSavedCreationDraft, listSavedCreationDrafts, SAVED_CREATION_DRAFTS_KEY,
+  type CreationDraft, type SavedCreationDraft,
+} from '@/domain/creationDraft';
+
+/**
+ * Durable, transactional, per-draft storage. The old localStorage array is a
+ * backwards-compatible read cache ONLY; IndexedDB is authoritative once opened.
+ * Upgrade migrates existing named drafts exactly once in a single transaction.
+ */
+const DATABASE = 'online-tournament:named-creation-drafts:v1';
+const STORE = 'drafts';
+const META = 'meta';
+
+function openDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') { reject(new Error('IndexedDB ist in diesem Browser nicht verfügbar.')); return; }
+    const request = indexedDB.open(DATABASE, 1);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(STORE)) database.createObjectStore(STORE, { keyPath: 'id' });
+      if (!database.objectStoreNames.contains(META)) database.createObjectStore(META);
+    };
+    request.onerror = () => reject(request.error ?? new Error('Die Entwurfsdatenbank konnte nicht geöffnet werden.'));
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+function runTransaction<T>(
+  database: IDBDatabase, mode: IDBTransactionMode,
+  stores: string[], perform: (transaction: IDBTransaction, done: (value: T) => void) => void,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(stores, mode);
+    let value: T;
+    tx.oncomplete = () => resolve(value);
+    tx.onerror = () => reject(tx.error ?? new Error('Der Entwurf konnte nicht gespeichert werden.'));
+    tx.onabort = () => reject(tx.error ?? new Error('Die Entwurfsänderung wurde abgebrochen.'));
+    try {
+      perform(tx, (result) => { value = result; });
+    } catch (error) {
+      try { tx.abort(); } catch { /* already completed */ }
+      reject(error);
+    }
+  });
+}
+
+async function withDatabase<T>(action: (db: IDBDatabase) => Promise<T>): Promise<T> {
+  const db = await openDatabase();
+  try {
+    // Only import the legacy localStorage list on the first transaction.
+    // A deleted/renamed IndexedDB entry must never reappear after migration.
+    await runTransaction<void>(db, 'readwrite', [STORE, META], (tx, done) => {
+      const meta = tx.objectStore(META);
+      const check = meta.get('legacy-migrated');
+      check.onsuccess = () => {
+        if (check.result !== true) {
+          for (const draft of listSavedCreationDrafts()) {
+            tx.objectStore(STORE).put({ ...draft, revision: draft.revision ?? 1 });
+          }
+          meta.put(true, 'legacy-migrated');
+        }
+        done(undefined);
+      };
+    });
+    return await action(db);
+  } finally { db.close(); }
+}
+
+function eventAndCache(list: SavedCreationDraft[]): void {
+  try {
+    // Legacy UI readers and older client versions can still display a snapshot.
+    // This cache is never consulted for conflict resolution after migration.
+    window.localStorage.setItem(SAVED_CREATION_DRAFTS_KEY, JSON.stringify(list));
+  } catch { /* IndexedDB remains the source of truth if localStorage is full. */ }
+  window.dispatchEvent(new Event('creation-drafts-change'));
+}
+
+export async function listSavedCreationDraftsAtomic(): Promise<SavedCreationDraft[]> {
+  return withDatabase(async (db) => {
+    const drafts = await runTransaction<SavedCreationDraft[]>(db, 'readonly', [STORE], (tx, done) => {
+      const request = tx.objectStore(STORE).getAll();
+      request.onsuccess = () => done(request.result as SavedCreationDraft[]);
+    });
+    return drafts.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  });
+}
+
+export async function getSavedCreationDraftAtomic(id: string): Promise<SavedCreationDraft | null> {
+  return withDatabase((db) => runTransaction<SavedCreationDraft | null>(db, 'readonly', [STORE], (tx, done) => {
+    const request = tx.objectStore(STORE).get(id);
+    request.onsuccess = () => done((request.result as SavedCreationDraft | undefined) ?? null);
+  }));
+}
+
+function freshId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID() : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+async function refreshLegacyCache(): Promise<void> {
+  try { eventAndCache(await listSavedCreationDraftsAtomic()); }
+  catch { window.dispatchEvent(new Event('creation-drafts-change')); }
+}
+
+/** Atomic compare-and-swap: the revision check and put execute inside ONE
+ * IndexedDB readwrite transaction, serialized across all browser tabs. */
+export async function saveNamedCreationDraftAtomic(
+  draft: CreationDraft, existingId?: string | null, expectedRevision?: number,
+): Promise<SavedCreationDraft> {
+  // Reuse the existing, strictly validated draft serializer without writing a
+  // localStorage entry. Invalid drafts are rejected before a transaction opens.
+  const normalized = JSON.parse(JSON.stringify(draft)) as CreationDraft;
+  const candidate = await withDatabase((db) => runTransaction<SavedCreationDraft>(db, 'readwrite', [STORE], (tx, done) => {
+    const store = tx.objectStore(STORE);
+    const request = existingId ? store.get(existingId) : null;
+    const apply = (previous: SavedCreationDraft | null) => {
+      if (existingId && (!previous || expectedRevision === undefined
+        || (previous.revision ?? 1) !== expectedRevision)) {
+        tx.abort();
+        return;
+      }
+      const entry: SavedCreationDraft = {
+        id: previous?.id ?? freshId(), savedAt: new Date().toISOString(),
+        revision: previous ? (previous.revision ?? 1) + 1 : 1, draft: normalized,
+      };
+      store.put(entry);
+      done(entry);
+    };
+    if (request) request.onsuccess = () => apply((request.result as SavedCreationDraft | undefined) ?? null);
+    else apply(null);
+  })).catch((error) => {
+    if (existingId && error instanceof DOMException && error.name === 'AbortError') throw new Error('DRAFT_CONFLICT');
+    throw error;
+  });
+  await refreshLegacyCache();
+  return candidate;
+}
+
+/** Deletion checks the revision too, so a stale tab cannot discard newer work. */
+export async function removeSavedCreationDraftAtomic(id: string, expectedRevision?: number): Promise<void> {
+  await withDatabase((db) => runTransaction<void>(db, 'readwrite', [STORE], (tx, done) => {
+    const store = tx.objectStore(STORE);
+    const request = store.get(id);
+    request.onsuccess = () => {
+      const existing = request.result as SavedCreationDraft | undefined;
+      if (existing && expectedRevision !== undefined && (existing.revision ?? 1) !== expectedRevision) {
+        tx.abort();
+        return;
+      }
+      store.delete(id);
+      done(undefined);
+    };
+  })).catch((error) => {
+    if (error instanceof DOMException && error.name === 'AbortError') throw new Error('DRAFT_CONFLICT');
+    throw error;
+  });
+  await refreshLegacyCache();
+}
+
+/** Existing synchronous legacy readers are retained for old drafts and tests,
+ * but browser flows now use only the atomic database functions above. */
+export function readLegacyDraftOnUnavailableDatabase(id: string): SavedCreationDraft | null {
+  return getSavedCreationDraft(id);
+}
