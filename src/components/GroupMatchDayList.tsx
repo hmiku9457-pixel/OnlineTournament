@@ -27,7 +27,7 @@ export function GroupMatchDayList({
       <div className="group-match-day" key={day}>
         <strong className="group-match-day-label">Spieltag {day}</strong>
         {matches.filter((match) => (match.matchDay ?? 0) === day).map((match) => (
-          <div className={`group-match-row ${matchVisualClass(match.status)}`} key={match.id}
+          <div className={`group-match-row${match.status === 'live' ? ' live' : ''} ${matchVisualClass(match.status)}`} key={match.id}
             role="group" aria-label={`${match.sideA} gegen ${match.sideB}: ${matchVisualLabel(match.status)}`}
             title={matchVisualLabel(match.status)}>
             <span className="group-match-state-dot" aria-hidden="true" />
