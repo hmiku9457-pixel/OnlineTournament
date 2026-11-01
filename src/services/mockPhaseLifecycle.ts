@@ -4,6 +4,9 @@ import type { TournamentStage } from '@/domain/types';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getGroupAssignments, compactStartedGroupAssignments } from '@/services/mockDrawStore';
 import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
+import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
+import { planningMinutesPerSet } from '@/domain/sports';
+import { sportScoring } from '@/domain/sportScoring';
 
 const PHASE_KEY = 'online-tournament:mock-phase-lifecycle:v1';
 
@@ -14,6 +17,8 @@ interface PhaseLifecycleState {
   approvedSwissRounds?: Record<string, number[]>;
   stageEntrants?: Record<string, string[]>;
   stageStartedAt?: Record<string, string>;
+  /** Additional projected time caused by actual conditions at phase start. */
+  stageExtraMinutes?: Record<string, number>;
   /** Exact clock target chosen when beginning a break; stable on reload. */
   breakResumeAt?: Record<string, string>;
 }
@@ -187,7 +192,27 @@ export function startStage(tournament: DemoTournament, stage: TournamentStage, p
       pauseResume.setHours(hour, minute, 0, 0);
     }
   }
-  if (stage.type === 'GROUPS') compactStartedGroupAssignments(tournament, stage, entrants);
+  let additionalMinutes = 0;
+  if (stage.type === 'GROUPS') {
+    const groups = Math.max(1, Number(stage.settings.groups) || 1);
+    const assignments = getGroupAssignments(tournament, stage);
+    const sizes = Array<number>(groups).fill(0);
+    entrants.forEach((name) => { sizes[assignments[name] ?? 0] += 1; });
+    const scoring = sportScoring(tournament.sport);
+    const timing = scoring.mode === 'score'
+      ? { matchDurationMinutes: tournament.matchDurationMinutes ?? 15,
+          venueTurnoverMinutes: tournament.venueTurnoverMinutes ?? 0 }
+      : { minutesPerSet: planningMinutesPerSet(tournament.sport) };
+    const baseline = estimatePhaseMetrics({
+      type: 'GROUPS', entrantCount: entrants.length, groupCount: groups, bestOf: stage.bestOf,
+    }, tournament.tables, timing).estimatedDurationMinutes;
+    const actual = estimatePhaseMetrics({
+      type: 'GROUPS', entrantCount: entrants.length, groupCount: groups, groupSizes: sizes,
+      bestOf: stage.bestOf,
+    }, tournament.tables, timing).estimatedDurationMinutes;
+    additionalMinutes = Math.max(0, actual - baseline);
+    compactStartedGroupAssignments(tournament, stage, entrants);
+  }
   // Die vor dem Start gültige Auslosung einfrieren. Ansonsten würden bei
   // einem späteren Lesen die ursprüngliche Teilnehmerzahl aus dem Wizard
   // erneut greifen und Nachmeldungen verschwinden / Rückzüge zurückkehren.
@@ -196,6 +221,7 @@ export function startStage(tournament: DemoTournament, stage: TournamentStage, p
     startedStageIds: [...new Set([...state.startedStageIds, stage.id])],
     stageEntrants: { ...(state.stageEntrants ?? {}), [stage.id]: entrants },
     stageStartedAt: { ...(state.stageStartedAt ?? {}), [stage.id]: startDate.toISOString() },
+    stageExtraMinutes: { ...(state.stageExtraMinutes ?? {}), [stage.id]: additionalMinutes },
     breakResumeAt: pauseResume ? { ...(state.breakResumeAt ?? {}), [stage.id]: pauseResume.toISOString() } : state.breakResumeAt,
   });
   return true;
