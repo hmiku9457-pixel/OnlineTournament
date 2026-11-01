@@ -1412,6 +1412,7 @@ function groupQualifierResult(tournament: DemoTournament, stage: TournamentStage
   };
   let latest = calculate();
   let firstResolved: GroupCutoffStatus | null = null;
+  const resolvedStatuses: GroupCutoffStatus[] = [];
   // Resolve group-local ties *before* comparing the group's ranked
   // representatives with other groups. Only a tie that straddles an
   // actual qualification boundary needs a separate decision.
@@ -1425,8 +1426,9 @@ function groupQualifierResult(tournament: DemoTournament, stage: TournamentStage
       if (block.length > 1 && selected > 0 && selected < block.length) {
         const tie = { players: block.map((row) => row.name), slots: selected, firstRank: start + 1 };
         const state = statusFor(tie, 'intra', `Gruppe ${groupLetter(originalIndex)}`);
-        if (!state.decision) return { qualified: [], cutoff: state, resolved: firstResolved };
+        if (!state.decision) return { qualified: [], cutoff: state, resolved: firstResolved, resolvedAll: resolvedStatuses };
         firstResolved ??= state;
+        resolvedStatuses.push(state);
         const winnerNames = new Set(state.decision.winners);
         const reordered = rows.slice(start, end).sort((a, b) => Number(winnerNames.has(b.name)) - Number(winnerNames.has(a.name)));
         rows.splice(start, end - start, ...reordered);
@@ -1435,7 +1437,8 @@ function groupQualifierResult(tournament: DemoTournament, stage: TournamentStage
       start = end;
     }
   }
-  return { ...latest, resolved: firstResolved ?? (latest.cutoff?.decision ? latest.cutoff : null) };
+  return { ...latest, resolved: firstResolved ?? (latest.cutoff?.decision ? latest.cutoff : null),
+    resolvedAll: [...resolvedStatuses, ...(latest.cutoff?.decision ? [latest.cutoff] : [])] };
 }
 
 function roundRobinQualifierResult(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]) {
@@ -1444,10 +1447,12 @@ function roundRobinQualifierResult(tournament: DemoTournament, stage: Tournament
   const rows = rankParticipants(getStageEntrants(tournament, stage), matches, results, tournament.sport)
     .filter((row) => !isMockParticipantWithdrawn(tournament, row.name));
   let qualified = rows.slice(0, targetCount).map((row) => row.name);
-  if (targetCount <= 0 || targetCount >= rows.length) return { qualified, cutoff: null as GroupCutoffStatus | null, resolved: null as GroupCutoffStatus | null };
+  if (targetCount <= 0 || targetCount >= rows.length) return { qualified, cutoff: null as GroupCutoffStatus | null, resolved: null as GroupCutoffStatus | null,
+    resolvedAll: [] as GroupCutoffStatus[] };
   const same = (a: RankingRow, b: RankingRow) =>
     compareRankingRows(tournament.sport, { ...a, name: '' }, { ...b, name: '' }) === 0;
-  if (!same(rows[targetCount - 1], rows[targetCount])) return { qualified, cutoff: null as GroupCutoffStatus | null, resolved: null as GroupCutoffStatus | null };
+  if (!same(rows[targetCount - 1], rows[targetCount])) return { qualified, cutoff: null as GroupCutoffStatus | null, resolved: null as GroupCutoffStatus | null,
+    resolvedAll: [] as GroupCutoffStatus[] };
   let first = targetCount - 1;
   let last = targetCount;
   while (first > 0 && same(rows[first - 1], rows[targetCount - 1])) first--;
@@ -1465,7 +1470,8 @@ function roundRobinQualifierResult(tournament: DemoTournament, stage: Tournament
     && stored.winners.every((name) => tie.players.includes(name)) ? stored : null;
   const cutoff: GroupCutoffStatus = { stageId: stage.id, stageName: stage.name, tie, signature, decision, scope: 'round-robin' };
   qualified = [...rows.slice(0, first).map((row) => row.name), ...(decision?.winners ?? [])];
-  return { qualified, cutoff, resolved: decision ? cutoff : null };
+  return { qualified, cutoff, resolved: decision ? cutoff : null,
+    resolvedAll: decision ? [cutoff] : [] };
 }
 
 function qualificationCutoffResult(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]) {
@@ -1484,26 +1490,29 @@ export function getPendingGroupCutoff(tournament: DemoTournament): GroupCutoffSt
   return cutoff && cutoff.decision?.winners.length !== cutoff.tie.slots ? cutoff : null;
 }
 
-export function getEditableGroupCutoff(tournament: DemoTournament): GroupCutoffStatus | null {
-  if (['ABORTED', 'FINISHED'].includes(tournament.status)) return null;
+export function getEditableGroupCutoffs(tournament: DemoTournament): GroupCutoffStatus[] {
+  if (['ABORTED', 'FINISHED'].includes(tournament.status)) return [];
   const stages = [...tournament.stages].reverse().filter((stage) =>
     ['GROUPS', 'ROUND_ROBIN'].includes(stage.type) && isStageStarted(tournament, stage)
     && Boolean(getNextCompetitionStage(tournament, stage))
     && !isStageStarted(tournament, getNextCompetitionStage(tournament, stage)!));
-  for (const stage of stages) {
-    const result = qualificationCutoffResult(tournament, stage, readResults());
-    if (result.cutoff?.decision) return result.cutoff;
-    if (result.resolved?.decision) return result.resolved;
-  }
-  return null;
+  return stages.flatMap((stage) =>
+    qualificationCutoffResult(tournament, stage, readResults()).resolvedAll).filter((status) => Boolean(status.decision));
+}
+
+export function getEditableGroupCutoff(tournament: DemoTournament): GroupCutoffStatus | null {
+  return getEditableGroupCutoffs(tournament)[0] ?? null;
 }
 
 /** Director records the outcome of a separately conducted tie-break or a lot.
  * The decision is attached to the exact group results and automatically expires
  * after any result correction that changes the qualification signature. */
 export function resolveGroupCutoff(tournament: DemoTournament,
-  winners: string[], method: 'PLAYOFF' | 'LOT', explanation: string): string | null {
-  const current = getPendingGroupCutoff(tournament) ?? getEditableGroupCutoff(tournament);
+  winners: string[], method: 'PLAYOFF' | 'LOT', explanation: string,
+  correctionSignature?: string): string | null {
+  const current = getPendingGroupCutoff(tournament)
+    ?? (correctionSignature ? getEditableGroupCutoffs(tournament).find((item) => item.signature === correctionSignature) ?? null
+      : getEditableGroupCutoff(tournament));
   if (!current) return 'Kein offener oder korrigierbarer Stichentscheid vorhanden.';
   if (new Set(winners).size !== current.tie.slots || winners.length !== current.tie.slots
     || winners.some((name) => !current.tie.players.includes(name))) {
