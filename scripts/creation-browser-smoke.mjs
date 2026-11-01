@@ -405,12 +405,35 @@ try {
   await secondTab.getByRole('button', { name: 'Entwurf speichern' }).click();
   await secondTab.getByText('Entwurf gespeichert.', { exact: true }).waitFor();
   await draftPage.locator('#name').fill('Meine nicht gespeicherte Fassung');
+  await draftPage.waitForFunction(() => Object.keys(sessionStorage).some((key) =>
+    key.includes('online-tournament:creation-draft:v1:') && sessionStorage.getItem(key)?.includes('Meine nicht gespeicherte Fassung')));
+  await draftPage.reload();
+  await draftPage.getByRole('alertdialog', { name: 'Ungespeicherte Änderungen gefunden' })
+    .getByRole('button', { name: 'Ungespeicherte Änderungen wiederherstellen' }).click();
   await draftPage.getByRole('button', { name: 'Entwurf speichern' }).click();
   await draftPage.getByRole('alertdialog', { name: 'Dieser Entwurf wurde zwischenzeitlich geändert' }).waitFor();
   await draftPage.getByRole('button', { name: 'Meine Fassung als Kopie speichern' }).click();
   await draftPage.waitForFunction(() => document.querySelectorAll('.sidebar-draft-item').length === 3);
+  const legacySnapshot = await draftPage.evaluate(() => localStorage.getItem('online-tournament:saved-creation-drafts:v1'));
   await secondTab.close();
   await draftsContext.close();
+
+  // A separate browser profile with an existing saved-draft list imports it
+  // once into IndexedDB and retains it after repeated page loads.
+  const legacyContext = await browser.newContext();
+  const legacyPage = await legacyContext.newPage();
+  await legacyPage.goto(base + '/#/tournaments/new');
+  await legacyPage.evaluate((raw) => {
+    if (raw) localStorage.setItem('online-tournament:saved-creation-drafts:v1', raw);
+  }, legacySnapshot);
+  await legacyPage.reload();
+  await legacyPage.locator('.sidebar-draft-item').first().waitFor();
+  const migratedCount = await legacyPage.locator('.sidebar-draft-item').count();
+  await legacyPage.locator('.sidebar-draft-item').first().click();
+  await legacyPage.locator('#name').waitFor();
+  await legacyPage.reload();
+  assert.equal(await legacyPage.locator('.sidebar-draft-item').count(), migratedCount);
+  await legacyContext.close();
 
   process.stdout.write('Creation wizard browser smoke tests passed.\n');
 } finally {
