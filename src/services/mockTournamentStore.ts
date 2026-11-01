@@ -1,4 +1,4 @@
-import { buildPlannedTimeline, plannedActiveBreakMinutes, validatePlannedSchedule, isValidLocalDateTime, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, plannedActiveBreakMinutes, validatePlannedSchedule, isValidLocalDateTime, isStartAtOrAfterNow, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { getPhaseLifecycle, resetPrestartPhaseLifecycle } from '@/services/mockPhaseLifecycle';
 import { generatePlayerCodes, generateUniquePlayerCode } from '@/services/mockPlayerCodes';
 import { recordMockAudit } from '@/services/mockAudit';
@@ -45,6 +45,8 @@ export interface CreateMockTournamentInput {
   phases: MockPhaseInput[];
   estimatedDurationMinutes: number;
   scheduledStart?: string;
+  /** Check the current-time boundary for interactive creations, not legacy test fixtures. */
+  requireFutureStart?: boolean;
   plannedSchedule?: PlannedScheduleItem[];
   venueLayout?: VenueLayout;
   matchDurationMinutes?: number;
@@ -129,6 +131,9 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
   // Existing programmatic test fixtures without a public start time remain valid.
   if (input.scheduledStart !== undefined && !isValidLocalDateTime(input.scheduledStart)) {
     throw new Error('Ungültiges Turnierdatum oder Startzeit.');
+  }
+  if (input.requireFutureStart && !isStartAtOrAfterNow(input.scheduledStart ?? '')) {
+    throw new Error('Der geplante Turnierstart darf nicht in der Vergangenheit liegen.');
   }
   const scheduleIssues = validatePlannedSchedule(input.plannedSchedule ?? []);
   if (scheduleIssues.length) throw new Error(scheduleIssues[0]);
