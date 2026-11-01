@@ -1,6 +1,6 @@
 /** Unicode letters, numerals, dots and a parenthesized club qualifier are
  * permitted for individual players and teams. Slashes separate doubles. */
-const validName = /^[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N} .()\-]*$/u;
+const validName = /^[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N} .()-]*$/u;
 
 export function isAllowedParticipantName(value: string): boolean {
   const name = value.trim();
@@ -16,5 +16,5 @@ export function isAllowedParticipantName(value: string): boolean {
 
 /** Keep club numbers, dots and distinguishing annotations while typing. */
 export function sanitizeParticipantName(value: string): string {
-  return value.replace(/[^\p{L}\p{M}\p{N} .()\-]/gu, '');
+  return value.replace(/[^\p{L}\p{M}\p{N} .()-]/gu, '');
 }
