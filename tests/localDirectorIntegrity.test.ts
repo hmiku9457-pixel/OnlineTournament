@@ -192,6 +192,8 @@ describe('local director integrity', () => {
     expect(toggleBracketPin(t, ko, 0)).toBe(true);
     expect(getPinnedBracketSlots(t, ko)).toEqual([0]);
     expect(withdrawMockParticipant(t, originallyQualified[0])).toBe(true);
+    // A new exact tie on the reserve boundary requires a director decision.
+    if (getPendingGroupCutoff(t)) expect(approveWithGroupTie(t)?.kind).toBe('STAGE');
     expect(getStageEntrants(t, ko)).not.toContain(originallyQualified[0]);
     expect(getPinnedBracketSlots(t, ko)).toEqual([]);
     expect(getBracketSlots(t, ko)).toEqual(expect.arrayContaining(getStageEntrants(t, ko)));
