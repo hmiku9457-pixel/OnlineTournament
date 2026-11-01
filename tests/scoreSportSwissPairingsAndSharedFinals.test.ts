@@ -1,4 +1,4 @@
-import { approveMockProgress } from '@/services/mockRuntime';
+import { approveMockProgress, getPendingGroupCutoff, resolveGroupCutoff } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { startFirstStage, startStage, getStageEntrants, isStageCompleted } from '@/services/mockPhaseLifecycle';
@@ -59,22 +59,28 @@ describe('3/1/0-Paarungsgruppen für Ergebnissportarten', () => {
   });
 });
 
-describe('Geteilte Endplatzierung, aber alphabetische Qualifikation', () => {
-  it('wählt an einer nicht-schweizerischen Grenze alphabetisch und teilt die Endplätze der Ausgeschiedenen', () => {
+describe('Geteilte Endplatzierung und ausdrücklich entschiedene Qualifikation', () => {
+  it('fordert einen Stichentscheid statt alphabetischer Qualifikation und teilt die Endplätze der Ausgeschiedenen', () => {
     const t = tournament('ROUND_ROBIN', 4, true);
     const stage = t.stages[0];
     getMockStageMatches(t, stage).forEach((m) => completeMockMatch(m.id, score(1, 1)));
+    expect(approveMockProgress(t)).toBeNull();
+    const decision = getPendingGroupCutoff(t)!;
+    expect(decision.scope).toBe('round-robin');
+    expect(decision.tie.players).toHaveLength(4);
+    const picked = decision.tie.players.slice(-2);
+    expect(resolveGroupCutoff(t, picked, 'PLAYOFF', 'Entscheidungsspiele 2:1 und 3:0')).toBeNull();
     expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(isStageCompleted(t, stage)).toBe(true);
     const names = getStageEntrants(t, stage).sort((a, b) => a.localeCompare(b, 'de'));
-    expect(getStageEntrants(t, t.stages[1])).toEqual(names.slice(0, 2));
+    expect(getStageEntrants(t, t.stages[1])).toEqual(picked);
     expect(buildRoundRobinStandings(t, stage).map((row) => row.rank)).toEqual([1, 1, 1, 1]);
     expect(getMockConfirmedFinalStandings(t)).toEqual([]);
     expect(startStage(t, t.stages[1])).toBe(true);
     const eliminated = getMockConfirmedFinalStandings(t);
     expect(eliminated).toHaveLength(2);
     expect(eliminated.every((row) => row.placement === 'Platz 3–4')).toBe(true);
-    expect(eliminated.map((row) => row.name).sort()).toEqual(names.slice(2));
+    expect(eliminated.map((row) => row.name).sort()).toEqual(names.filter((name) => !picked.includes(name)).sort());
   });
 
   it('vergibt auch bei abschließendem Jeder gegen Jeden denselben Endplatz bei absoluten Gleichstand', () => {
