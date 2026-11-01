@@ -114,7 +114,7 @@ export function getFirstPhaseRecommendationWarning(tournament: DemoTournament, a
     return changedGroupRecommendationMessage(activeCount, phase.groupCount, drafts.slice(index + 1).find(competitive)?.entrantCount);
   }
   if (phase.type === 'SWISS') {
-    const recommended = recommendedSwissRounds(activeCount);
+    const recommended = recommendedSwissRounds(activeCount, tournament.minimumMatches ?? 1);
     if (phase.swissRounds !== recommended) {
       return `Für ${activeCount} Teilnehmer werden ${recommended} Schweizer Runden empfohlen (aktuell geplant: ${phase.swissRounds}).`;
     }
