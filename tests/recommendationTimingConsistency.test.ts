@@ -40,7 +40,10 @@ describe('wizard recommendations and phase editor use compatible timing', () => 
 
   it('rejects impossible Swiss rounds before creation and at pre-start edits', () => {
     expect(isValidSwissRoundCount(4, 9)).toBe(true);
-    expect(isValidSwissRoundCount(1, 2)).toBe(true);
+    expect(isValidSwissRoundCount(1, 2)).toBe(false);
+    expect(isValidSwissRoundCount(1, 3)).toBe(false);
+    expect(isValidSwissRoundCount(2, 2)).toBe(false);
+    expect(isValidSwissRoundCount(2, 3)).toBe(true);
     expect(isValidSwissRoundCount(2, 2)).toBe(false);
     expect(isValidSwissRoundCount(30, 3)).toBe(false);
     expect(isValidSwissRoundCount(1.5, 9)).toBe(false);
