@@ -354,6 +354,14 @@ function NumberChoice({
   );
 }
 
+function prestartPhaseSignature(phase: PrestartPhaseDraft): unknown[] {
+  return [phase.id, phase.type, phase.label, phase.entrantCount, phase.bestOf,
+    phase.groupCount, phase.swissRounds, phase.knockoutBestOf, phase.breakKind,
+    phase.breakMinutes, phase.nextDayStart, phase.nextDayDate ?? '', phase.breakUntil,
+    phase.note, phase.inlineBreakAfterRound, phase.inlineBreakKind,
+    phase.inlineBreakMinutes, phase.inlineBreakUntil];
+}
+
 export interface PrestartPhaseMode {
   tournament: DemoTournament;
   activeParticipants: number;
@@ -412,6 +420,12 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   const [creationError, setCreationError] = useState<string | null>(null);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   const [namedDraftMessage, setNamedDraftMessage] = useState('');
+  const [recoveryChoiceOpen, setRecoveryChoiceOpen] = useState(() => {
+    if (prestart || !savedDraftId || typeof window === 'undefined') return false;
+    const recovery = loadCreationDraft(window.sessionStorage, sessionDraftKey);
+    const saved = getSavedCreationDraft(savedDraftId)?.draft;
+    return Boolean(recovery && saved && JSON.stringify(recovery) !== JSON.stringify(saved));
+  });
   const [confirmPrestartSave, setConfirmPrestartSave] = useState(false);
   const [confirmPrestartDiscard, setConfirmPrestartDiscard] = useState(false);
   const [overwriteTournamentId, setOverwriteTournamentId] = useState<string | null>(null);
@@ -546,7 +560,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     setDraftSaveFailed(!saveCreationDraft(draftSnapshot, window.sessionStorage, sessionDraftKey));
   }, [draftSnapshot, sessionDraftKey, prestart]);
 
-  const originalPrestartPhases = useRef(prestart ? JSON.stringify(initialPrestartPhases(prestart.tournament)) : '');
+  const originalPrestartPhases = useRef(prestart ? initialPrestartPhases(prestart.tournament) : []);
   const prestartPhaseDrafts: PrestartPhaseDraft[] = phaseDrafts.map((phase) => ({
     id: phase.id, type: phase.type, label: phase.label, entrantCount: phase.entrantCount,
     bestOf: phase.bestOf, groupCount: phase.groupCount, swissRounds: phase.swissRounds,
@@ -556,7 +570,8 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     inlineBreakKind: phase.inlineBreakKind, inlineBreakMinutes: phase.inlineBreakMinutes,
     inlineBreakUntil: phase.inlineBreakUntil,
   }));
-  const prestartDirty = Boolean(prestart && JSON.stringify(prestartPhaseDrafts) !== originalPrestartPhases.current);
+  const prestartDirty = Boolean(prestart && JSON.stringify(prestartPhaseDrafts.map(prestartPhaseSignature))
+    !== JSON.stringify(originalPrestartPhases.current.map(prestartPhaseSignature)));
   function savePrestartPhases() {
     if (!prestart || prestartIssues.length) return;
     if (!confirmPrestartSave) { setConfirmPrestartSave(true); return; }
@@ -2406,6 +2421,13 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
           <strong>Bitte vor dem Speichern korrigieren:</strong>
           <ul>{prestartIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
         </div>}
+        {(() => {
+          const ceremony = prestart.tournament.plannedSchedule?.find((item) => item.id === 'award-ceremony');
+          return ceremony && !ceremony.autoTime && ceremony.at < plannedTimeline.estimatedEnd
+            ? <p className="callout" role="status">Die bisher festgelegte Siegerehrung um {formatPlannedDateTime(ceremony.at)}
+              wird aufgrund der neuen Phasendauer automatisch auf {formatPlannedDateTime(plannedTimeline.estimatedEnd)} verschoben.</p>
+            : null;
+        })()}
         <p className="muted">Beim Speichern werden die bisherigen Vorstart-Auslosungen neu erstellt. Teilnehmer, Codes und Rückzüge bleiben erhalten.</p>
         {prestartSaveError && <p role="alert" className="field-error">{prestartSaveError}</p>}
         {confirmPrestartSave && <p role="status">Phasenplanung übernehmen und bisherige Auslosungen zurücksetzen?</p>}
@@ -2525,6 +2547,19 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       </div>}
       </div>
       </div>
+      {recoveryChoiceOpen && savedDraftId && <div className="prototype-modal-backdrop" role="presentation">
+        <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="draft-recovery-title">
+          <h2 id="draft-recovery-title">Ungespeicherte Änderungen gefunden</h2>
+          <p>Für diesen Entwurf existiert eine neuere Bearbeitungsfassung in diesem Browser-Tab. Du kannst sie wiederherstellen oder stattdessen den zuletzt ausdrücklich gespeicherten Stand laden.</p>
+          <div className="actions">
+            <button className="btn primary" type="button" onClick={() => setRecoveryChoiceOpen(false)}>Ungespeicherte Änderungen wiederherstellen</button>
+            <button className="btn" type="button" onClick={() => {
+              clearCreationDraft(window.sessionStorage, sessionDraftKey);
+              window.location.reload();
+            }}>Gespeicherten Stand laden</button>
+          </div>
+        </section>
+      </div>}
       {overwriteTournamentId && <div className="prototype-modal-backdrop" role="presentation">
         <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="overwrite-tournament-title">
           <h2 id="overwrite-tournament-title">Vorhandenes Turnier überschreiben?</h2>
