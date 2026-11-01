@@ -4,7 +4,7 @@ import { getStageEntrants, startFirstStage } from '@/services/mockPhaseLifecycle
 import { getGroupAssignments, setParticipantGroup } from '@/services/mockDrawStore';
 import { buildMockGroups } from '@/services/mockCompetitionViews';
 import { completeMockMatch, getMockStageMatches, getPendingGroupCutoff,
-  getPendingMockApproval, resolveGroupCutoff, approveMockProgress } from '@/services/mockRuntime';
+  getPendingMockApproval, getEditableGroupCutoffs, resolveGroupCutoff, approveMockProgress } from '@/services/mockRuntime';
 import { getLiveScheduleDeviations } from '@/services/mockLiveSchedule';
 import { buildPlannedTimeline } from '@/domain/tournamentSchedule';
 
@@ -56,6 +56,14 @@ describe('same sporting criteria across all qualification formats', () => {
     expect(getPendingGroupCutoff(t)).toBeNull();
     expect(approveMockProgress(t)?.kind).toBe('STAGE');
     expect(new Set(getStageEntrants(t, t.stages[1]))).toEqual(new Set(chosen));
+    const recorded = getEditableGroupCutoffs(t);
+    expect(recorded).toHaveLength(2);
+    const second = recorded[1];
+    const alternate = second.tie.players.find((name) => !second.decision?.winners.includes(name))!;
+    expect(resolveGroupCutoff(t, [alternate], 'LOT',
+      'Korrigierter Losentscheid mit Zeugen', second.signature)).toBeNull();
+    expect(getStageEntrants(t, t.stages[1])).toContain(alternate);
+    expect(getStageEntrants(t, t.stages[1])).not.toContain(chosen[1]);
   });
 
   it('never selects the alphabetical round-robin cutoff without director approval', () => {
