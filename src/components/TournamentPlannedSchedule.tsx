@@ -30,7 +30,9 @@ export function TournamentPlannedSchedule({
   const plannedIndices = new Set<number>();
   const combined: PlannedScheduleItem[] = items.flatMap((item) => {
     const match = /^phase-(\d+)$/.exec(item.id);
+    const inline = /^inline-(?:break|resume)-(\d+)$/.exec(item.id);
     const index = match ? Number(match[1]) - 1 : -1;
+    if (inline && stages && !stages[Number(inline[1]) - 1]) return [];
     const stage = index >= 0 ? stages?.[index] : undefined;
     // An edited phase plan can have fewer stages than its old preview.
     if (match && stages && !stage) return [];
