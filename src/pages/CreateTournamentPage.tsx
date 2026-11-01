@@ -569,7 +569,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
     sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
     customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
-    editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts,
+    editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
     knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
   ]);
