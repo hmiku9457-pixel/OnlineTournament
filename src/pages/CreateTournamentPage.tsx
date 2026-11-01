@@ -10,6 +10,7 @@ import {
   createPhaseTemplate,
   defaultBestOfForStage,
   estimatePhaseMetrics,
+  estimateKnockoutRoundMinutes,
   minimumPlayedMatches,
   formatGroupDistribution,
   hasValidTerminalStageOrder,
@@ -36,6 +37,9 @@ import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { DisciplineChangeDialog } from '@/components/DisciplineChangeDialog';
 import { TestParticipantsDialog } from '@/components/TestParticipantsDialog';
 import { DiscardDraftDialog } from '@/components/DiscardDraftDialog';
+import { QualificationRuleDialog } from '@/components/QualificationRuleDialog';
+import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/domain/groupQualification';
+import { isAllowedParticipantName, sanitizeParticipantName } from '@/domain/participantNames';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
@@ -100,7 +104,7 @@ function newParticipant(fields: ParticipantFields): ParticipantDraft {
 }
 
 function participantIsComplete(participant: ParticipantFields, discipline: Discipline): boolean {
-  if (discipline === 'TEAMS') return Boolean(participant.firstName.trim());
+  if (discipline === 'TEAMS') return Boolean(displayPersonName(participant.firstName, participant.lastName));
   if (!participant.firstName.trim() || !participant.lastName.trim()) return false;
   if (discipline === 'DOUBLES') {
     return Boolean(participant.partnerFirstName.trim() && participant.partnerLastName.trim());
@@ -117,7 +121,7 @@ function displayPersonName(firstName: string, lastName: string): string {
 }
 
 function participantDisplayName(participant: ParticipantFields, discipline: Discipline): string {
-  if (discipline === 'TEAMS') return participant.firstName.trim();
+  if (discipline === 'TEAMS') return displayPersonName(participant.firstName, participant.lastName);
   const firstPlayer = displayPersonName(participant.firstName, participant.lastName);
   if (discipline === 'SINGLES') return firstPlayer;
   const secondPlayer = displayPersonName(participant.partnerFirstName, participant.partnerLastName);
@@ -133,7 +137,8 @@ function collectSavedPersonNames(
   for (const participant of participants) {
     if (participant.id === excludedParticipantId) continue;
     if (discipline === 'TEAMS') {
-      if (participant.firstName.trim()) names.add(participant.firstName.trim().toLocaleLowerCase('de-DE'));
+      const name = displayPersonName(participant.firstName, participant.lastName);
+      if (name) names.add(name.toLocaleLowerCase('de-DE'));
       continue;
     }
     if (participant.firstName.trim() && participant.lastName.trim()) {
@@ -158,8 +163,9 @@ function validateParticipant(
 ): ParticipantErrors {
   const errors: ParticipantErrors = {};
   if (discipline === 'TEAMS') {
-    const teamName = participant.firstName.trim();
+    const teamName = displayPersonName(participant.firstName, participant.lastName);
     if (!teamName) return { firstName: 'Bitte einen Mannschaftsnamen eingeben.' };
+    if (!isAllowedParticipantName(teamName)) return { firstName: 'Nur Buchstaben, Leerzeichen und Bindestriche sind erlaubt.' };
     const occupied = collectSavedPersonNames(participants, discipline, editingParticipantId);
     return occupied.has(teamName.toLocaleLowerCase('de-DE'))
       ? { firstName: 'Diese Mannschaft ist bereits eingetragen.' } : errors;
@@ -171,6 +177,11 @@ function validateParticipant(
     if (!participant.partnerLastName.trim()) errors.partnerLastName = 'Nachname von Spieler 2 fehlt.';
   }
 
+  for (const field of ['firstName', 'lastName', ...(discipline === 'DOUBLES' ? ['partnerFirstName', 'partnerLastName'] : [])] as ParticipantField[]) {
+    if (participant[field].trim() && !isAllowedParticipantName(participant[field])) {
+      errors[field] = 'Nur Buchstaben, Leerzeichen und Bindestriche sind erlaubt.';
+    }
+  }
   if (Object.keys(errors).length > 0) return errors;
 
   const existingNames = collectSavedPersonNames(participants, discipline, editingParticipantId);
@@ -402,6 +413,7 @@ export function CreateTournamentPage() {
   const [pendingDiscipline, setPendingDiscipline] = useState<Discipline | null>(null);
   const [testParticipantsDialogOpen, setTestParticipantsDialogOpen] = useState(false);
   const [discardDraftDialogOpen, setDiscardDraftDialogOpen] = useState(false);
+  const [qualificationRulePhaseId, setQualificationRulePhaseId] = useState<string | null>(null);
   const [focusStartSettings, setFocusStartSettings] = useState(false);
   const discardDraftButtonRef = useRef<HTMLButtonElement>(null);
   const testParticipantsButtonRef = useRef<HTMLButtonElement>(null);
@@ -569,7 +581,11 @@ export function CreateTournamentPage() {
   });
 
   function updateParticipantForm(field: ParticipantField, value: string) {
-    setParticipantForm((current) => ({ ...current, [field]: value }));
+    setParticipantForm((current) => ({
+      ...current,
+      [field]: sanitizeParticipantName(value),
+      ...(discipline === 'TEAMS' && field === 'firstName' ? { lastName: '' } : {}),
+    }));
     setParticipantErrors((current) => {
       const next = { ...current };
       if (field === 'firstName' || field === 'lastName') {
@@ -634,7 +650,7 @@ export function CreateTournamentPage() {
       const next = [...current];
       let sequence = 1;
       while (next.length < targetCount) {
-        const suffix = String(sequence).padStart(2, '0');
+        const suffix = String.fromCharCode(64 + sequence);
         const firstName = discipline === 'TEAMS' ? `Test Mannschaft ${suffix}` : 'Test';
         const lastName = discipline === 'TEAMS' ? '' : `Spieler ${suffix}`;
         const partnerFirstName = discipline === 'DOUBLES' ? 'Test' : '';
@@ -930,14 +946,7 @@ export function CreateTournamentPage() {
     if (nextDiscipline !== discipline) {
       setDiscipline(nextDiscipline);
       resetParticipantEditor();
-      // Team entries use the full display name instead of separate first and last names.
-      if (nextDiscipline === 'TEAMS') {
-        setParticipants((current) => current.map((participant) => ({
-          ...participant,
-          firstName: displayPersonName(participant.firstName, participant.lastName),
-          lastName: '',
-        })));
-      }
+      // Keep first name, surname, and both partner fields intact.
     }
     setSport(nextSport);
     setPhaseDrafts((current) => current.map((phase) => ({
@@ -1043,6 +1052,10 @@ export function CreateTournamentPage() {
     nextDayStart: phase.nextDayStart,
     nextDayDate: phase.nextDayDate,
     roundCount: phase.type === 'SWISS' ? phase.swissRounds : phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount).length : undefined,
+    roundDurationsMinutes: phase.type === 'KNOCKOUT'
+      ? estimateKnockoutRoundMinutes(phase.entrantCount, tables, phase.bestOf, phase.knockoutBestOf,
+        timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : { minutesPerSet: planningMinutesPerSet(sport) })
+      : undefined,
     inlineBreakAfterRound: phase.inlineBreakAfterRound,
     inlineBreakKind: phase.inlineBreakKind,
     inlineBreakMinutes: phase.inlineBreakMinutes,
@@ -1324,7 +1337,7 @@ export function CreateTournamentPage() {
                       <input
                         id="participant-first"
                         className={participantErrors.firstName ? 'input-error' : ''}
-                        value={participantForm.firstName}
+                        value={discipline === 'TEAMS' ? displayPersonName(participantForm.firstName, participantForm.lastName) : participantForm.firstName}
                         onChange={(event) => updateParticipantForm('firstName', event.target.value)}
                         aria-invalid={Boolean(participantErrors.firstName)}
                         autoFocus
@@ -1372,6 +1385,7 @@ export function CreateTournamentPage() {
                     </button>
                   </div>
                 </div>
+                <p className="field-hint">Namen: nur Buchstaben (auch Ø, ø, Ä usw.), Leerzeichen und Bindestriche.</p>
                 <div className="participant-validation" aria-live="polite">
                   {participantErrorMessages.map((message) => (
                     <span className="field-error" key={message}>{message}</span>
@@ -1502,10 +1516,8 @@ export function CreateTournamentPage() {
                         mindestens {item.minimumGuaranteedMatches} gespielte Begegnungen
                       </span>
                     </div>
-                    {item.minimumMatchShortfall ? (
-                      <p className="wizard-review-warning">Abweichung: Mindestens {item.minimumGuaranteedMatches} statt der gewünschten {minimumMatches} Begegnungen. Freilose sind nicht eingerechnet.</p>
-                    ) : index === 0 && (
-                      <p className="recommendation-reason">Warum empfohlen: Der Vorschlag berücksichtigt Teilnehmerzahl, Spielflächen, Spieldauer und das Mindestspielziel.</p>
+                    {index === 0 && (
+                      <p className="recommendation-reason">Bis 3,5 Stunden bevorzugt; bei Bedarf mit längeren Alternativen auf fünf Vorschläge ergänzt.</p>
                     )}
                   </button>
                 ))}
@@ -1562,7 +1574,7 @@ export function CreateTournamentPage() {
                 </div>
 
                 <fieldset className="format-toggle-group">
-                  <legend>Erlaubte Turniersysteme</legend>
+                  <legend>Turniersysteme für Empfehlungen</legend>
                   {tournamentSystemOptions.map((system) => (
                     <label className="format-toggle" key={system.id}>
                       <input
@@ -1635,6 +1647,9 @@ export function CreateTournamentPage() {
                       const editingPhaseType = editingPhaseTypeId === phase.id;
                       const isExpanded = expandedPhaseId === phase.id;
                       const nextPhase = phaseDrafts.slice(index + 1).find((candidate) => candidate.type !== 'BREAK');
+                      const previousPlaying = phaseDrafts.slice(0, index).reverse().find((candidate) => candidate.type !== 'BREAK');
+                      const unequalGroupComparison = previousPlaying?.type === 'GROUPS'
+                        && needsGroupStreichungsregel(previousPlaying.entrantCount, previousPlaying.groupCount, phase.entrantCount);
                       const recommendedGroups = phase.type === 'GROUPS'
                         ? recommendGroupCount(phase.entrantCount, nextPhase?.entrantCount) : null;
                       const recommendedRounds = phase.type === 'SWISS'
@@ -1694,6 +1709,12 @@ export function CreateTournamentPage() {
                               <div className="phase-card-title">
                                 <span className="badge">Phase {index + 1}</span>
                                 <h3>{phase.label}</h3>
+                                {unequalGroupComparison && (
+                                  <button className="phase-qualification-warning-button" type="button"
+                                    aria-label={`Streichungsregel für Phase ${index + 1} erläutern`}
+                                    title="Ungleiche Gruppen: Streichungsregel und empfohlene Qualifikationsplätze anzeigen"
+                                    onClick={() => setQualificationRulePhaseId(phase.id)}>!</button>
+                                )}
                               </div>
                               <div className="phase-quick-tags">
                                 {phase.type === 'BREAK' ? (
@@ -1809,13 +1830,6 @@ export function CreateTournamentPage() {
                                     {phase.groupCount === recommendedGroups ? 'Bereits übernommen' : 'Empfehlung übernehmen'}
                                   </button>
                                 </>
-                              )}
-                              {phase.type === 'GROUPS' && groupQualifiers !== null && (
-                                <p className="phase-qualification-explanation">
-                                  {groupQualifiers % phase.groupCount === 0
-                                    ? `${groupQualifiers / phase.groupCount} Qualifikationsplätze je Gruppe bei ${phase.groupCount} Gruppen.`
-                                    : `${groupQualifiers} Qualifikationsplätze lassen sich nicht gleichmäßig auf ${phase.groupCount} Gruppen verteilen. Den Qualifikationsmodus und mögliche gruppenübergreifende Vergleiche vor Turnierstart prüfen.`}
-                                </p>
                               )}
                               {recommendedRounds !== null && (
                                 <>
@@ -2291,6 +2305,21 @@ export function CreateTournamentPage() {
       </div>}
       </div>
       </div>
+      {qualificationRulePhaseId && (() => {
+        const phaseIndex = phaseDrafts.findIndex((phase) => phase.id === qualificationRulePhaseId);
+        const previous = phaseDrafts.slice(0, phaseIndex).reverse().find((phase) => phase.type !== 'BREAK');
+        const current = phaseDrafts[phaseIndex];
+        if (!previous || previous.type !== 'GROUPS' || !current) return null;
+        return (
+          <QualificationRuleDialog
+            groupCount={previous.groupCount} groupEntrants={previous.entrantCount}
+            qualifiers={current.entrantCount}
+            recommended={recommendedEqualGroupQualifiers(previous.entrantCount, previous.groupCount, current.entrantCount)}
+            onCancel={() => setQualificationRulePhaseId(null)}
+            onApply={(count) => { updatePhaseEntrants(phaseIndex, count); setQualificationRulePhaseId(null); }}
+          />
+        );
+      })()}
       {discardDraftDialogOpen && (
         <DiscardDraftDialog
           onCancel={() => {
