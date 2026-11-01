@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { CreateTournamentPage } from '@/pages/CreateTournamentPage';
@@ -51,11 +50,13 @@ describe('creation review regressions', () => {
     expect(phases[1].bestOf).toBe(5);
     expect(phases[1].knockoutBestOf).toEqual([7]);
 
-    const markup = renderToStaticMarkup(createElement(MemoryRouter, {},
-      createElement(CreateTournamentPage, { prestart: {
-        tournament: t, activeParticipants: 4, withdrawnParticipants: 0,
-        onSaved: () => {}, onCancel: () => {},
-      } })));
+    const markup = renderToStaticMarkup(
+      <MemoryRouter>
+        <CreateTournamentPage prestart={{
+          tournament: t, activeParticipants: 4, withdrawnParticipants: 0,
+          onSaved: () => {}, onCancel: () => {},
+        }} />
+      </MemoryRouter>);
     expect(markup).toContain('Phasen vor Turnierstart bearbeiten');
     expect(markup).toContain('phase-wizard-step');
     expect(markup).not.toContain('wizard-side-summary');
