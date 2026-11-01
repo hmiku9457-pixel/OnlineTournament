@@ -1947,8 +1947,8 @@ export function CreateTournamentPage() {
         )}
       </div>
 
-      <div className="wizard-sidebar-column">
-      {step !== 5 && <aside className="wizard-side-summary" aria-label="Aktuelle Einstellungen">
+      {step !== 5 && <div className="wizard-sidebar-column">
+      <aside className="wizard-side-summary" aria-label="Aktuelle Einstellungen">
         <div className="wizard-side-summary-heading">
           <div>
             <h2>Dein Turnier</h2>
@@ -2021,8 +2021,8 @@ export function CreateTournamentPage() {
           </div>
         )}
         <p className="wizard-side-footnote">Klicke auf eine bereits erreichte Einstellung, um sie direkt zu ändern.</p>
-      </aside>}
-      {step !== 5 && <div className="wizard-side-actions">
+      </aside>
+      <div className="wizard-side-actions">
         {step === 2 && !participantsValid && (
           <span className="wizard-validation-message">
             {incompleteSavedParticipants > 0
@@ -2035,8 +2035,8 @@ export function CreateTournamentPage() {
           <button className="btn" type="button" onClick={goBack} disabled={step === 1}>← Zurück</button>
         <button className="btn primary wizard-continue-button" type="button" onClick={goNext} disabled={!canContinue}>{step === 4 ? 'Weiter zur Zusammenfassung →' : 'Weiter →'}</button>
         </div>
-      </div>}
       </div>
+      </div>}
       </div>
     </>
   );
