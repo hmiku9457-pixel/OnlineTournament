@@ -26,7 +26,9 @@ export function getGroupCutoffDecision(tournamentId: string, stageId: string, si
 }
 
 export function saveGroupCutoffDecision(decision: GroupCutoffDecision): void {
-  const prior = readAll().filter((x) => !(x.tournamentId === decision.tournamentId && x.stageId === decision.stageId));
+  // Multiple independent group ties can exist in one stage. Keep other
+  // decisions for the same results, but replace a corrected choice for this signature.
+  const prior = readAll().filter((x) => !(x.tournamentId === decision.tournamentId && x.stageId === decision.stageId && x.signature === decision.signature));
   if (typeof window === 'undefined') throw new Error('Eine Speicherung ist nur im Turnierbrowser möglich.');
   window.localStorage.setItem(KEY, JSON.stringify([...prior, decision]));
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
