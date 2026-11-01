@@ -1,3 +1,4 @@
+import { getPendingGroupCutoff, resolveGroupCutoff } from '@/services/mockRuntime';
 import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MockPhaseInput } from '@/services/mockTournamentStore';
@@ -6,6 +7,18 @@ import { buildMockGroups } from '@/services/mockCompetitionViews';
 import { getMockParticipantProgress } from '@/services/mockParticipantProgress';
 import { completeMockMatch, getMockStageBaseMatches, getMockStageMatches, getMockStoredResult, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getStageEntrants, isStageCompleted, startFirstStage, startStage } from '@/services/mockPhaseLifecycle';
+
+function approveWithCutoff(tournament: ReturnType<typeof create>) {
+  let open = getPendingGroupCutoff(tournament);
+  let attempts = 0;
+  while (open && attempts++ < 15) {
+    expect(resolveGroupCutoff(tournament, open.tie.players.slice(-open.tie.slots), 'PLAYOFF',
+      'Zusätzlicher Stichentscheid, Ergebnis: 11:7')).toBeNull();
+    open = getPendingGroupCutoff(tournament);
+  }
+  expect(open).toBeNull();
+  return approveMockProgress(tournament);
+}
 
 const storage = new Map<string, string>();
 const fakeLocalStorage = {
@@ -39,7 +52,7 @@ describe('Teilnehmerstatus und K.-o.-Spiel um Platz 3', () => {
     updateMockTournamentStatus(tournament.id, 'RUNNING');
     const first = tournament.stages[0];
     getMockStageMatches(tournament, first).forEach((match) => completeMockMatch(match.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]));
-    expect(approveMockProgress(tournament)?.kind).toBe('STAGE');
+    expect(approveWithCutoff(tournament)?.kind).toBe('STAGE');
     const standings = buildMockGroups(tournament, first)[0].standings;
     expect(isStageCompleted(tournament, first)).toBe(true);
     const second = tournament.stages[1];
@@ -71,7 +84,7 @@ describe('Teilnehmerstatus und K.-o.-Spiel um Platz 3', () => {
     expect(isStageCompleted(tournament, stage)).toBe(false);
     expect(skipMockThirdPlaceMatch(tournament, third!.id)).toBe(true);
     expect(getMockStoredResult(third!.id)?.thirdPlaceSkipped).toBe(true);
-    expect(approveMockProgress(tournament)?.kind).toBe('STAGE');
+    expect(approveWithCutoff(tournament)?.kind).toBe('STAGE');
     expect(isStageCompleted(tournament, stage)).toBe(true);
     expect(getMockParticipantProgress(tournament, third!.sideA)).toEqual({ status: 'Ausgeschieden', placement: 'Platz 3' });
     expect(getMockParticipantProgress(tournament, third!.sideB)).toEqual({ status: 'Ausgeschieden', placement: 'Platz 3' });
