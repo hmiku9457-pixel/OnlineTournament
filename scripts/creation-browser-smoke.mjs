@@ -46,7 +46,8 @@ try {
   assert.equal(await page.locator('.wizard-create-button').isEnabled(), true);
   await page.locator('.wizard-create-button').click();
   await page.waitForURL(/\/tournaments\/[^/]+\/control/, { timeout: 20000 });
-  assert.equal(await page.locator('h1').first().textContent(), 'Browser-Smoke-Turnier');
+  await page.locator('.control-hero-bar h1').waitFor({ state: 'visible', timeout: 20000 });
+  assert.equal((await page.locator('.control-hero-bar h1').textContent())?.trim(), 'Browser-Smoke-Turnier');
   assert.deepEqual(errors, [], 'no browser runtime errors');
   await context.close();
 
