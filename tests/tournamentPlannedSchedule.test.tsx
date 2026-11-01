@@ -342,6 +342,23 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(html).not.toContain('Alte Gruppenphase');
   });
 
+  it('zeigt nach Anpassungen nur noch vorhandene Phasen und keine verwaisten Zwischenpausen', () => {
+    const html = renderToStaticMarkup(createElement(TournamentPlannedSchedule, {
+      scheduledStart: '2026-11-01T10:00',
+      items: [
+        { id: 'phase-1', at: '2026-11-01T10:00', title: 'Vorrunde', type: 'competition' },
+        { id: 'phase-2', at: '2026-11-01T11:00', title: 'Entfernt', type: 'competition' },
+        { id: 'inline-break-2', at: '2026-11-01T11:10', title: 'Verwaiste Zwischenpause', type: 'break' },
+      ],
+      stages: [{ id: 'one', name: 'Vorrunde', type: 'GROUPS', status: 'live' }],
+      onStage: () => {},
+    }));
+    expect(html).toContain('Vorrunde');
+    expect(html).not.toContain('Entfernt');
+    expect(html).not.toContain('Verwaiste Zwischenpause');
+    expect((html.match(/class="planned-schedule-stage-button"/g) ?? [])).toHaveLength(1);
+  });
+
   it('zeigt und verlinkt sämtliche Phasen auch ohne veröffentlichten Zeitplan', () => {
     const html = renderToStaticMarkup(createElement(TournamentPlannedSchedule, {
       stages: [
