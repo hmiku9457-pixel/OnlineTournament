@@ -33,6 +33,8 @@ import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { formatPhaseOverview } from '@/domain/creationOverview';
 import { loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence } from '@/domain/creationDraft';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
+import { RecommendationDurationPicker, DEFAULT_RECOMMENDATION_DURATION, MIN_RECOMMENDATION_DURATION, MAX_RECOMMENDATION_DURATION, formatRecommendationDuration } from '@/components/RecommendationDurationPicker';
+import { RecommendationNumberStepper } from '@/components/RecommendationNumberStepper';
 import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { DisciplineChangeDialog } from '@/components/DisciplineChangeDialog';
 import { TestParticipantsDialog } from '@/components/TestParticipantsDialog';
@@ -453,6 +455,11 @@ export function CreateTournamentPage() {
   const [maxGroups, setMaxGroups] = useState<number | null>(restoredDraft?.maxGroups ?? null);
   const [maxSwissRounds, setMaxSwissRounds] = useState<number | null>(restoredDraft?.maxSwissRounds ?? null);
   const [knockoutQualifierCount, setKnockoutQualifierCount] = useState<number | null>(restoredDraft?.knockoutQualifierCount ?? null);
+  const [preferredDurationMinutes, setPreferredDurationMinutes] = useState(restoredDraft?.preferredDurationMinutes ?? DEFAULT_RECOMMENDATION_DURATION);
+  function adjustPreferredDuration(delta: number) {
+    setPreferredDurationMinutes((value) => Math.min(MAX_RECOMMENDATION_DURATION,
+      Math.max(MIN_RECOMMENDATION_DURATION, value + delta)));
+  }
 
   // Drafts are restored synchronously on first render, so the first autosave
   // cannot replace a valid draft with the wizard's empty initial values.
@@ -463,7 +470,7 @@ export function CreateTournamentPage() {
       customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
       editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts,
       selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
-      knockoutQualifierCount, awardsEnabled, awardsAtOverride,
+      knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
     });
     setDraftSaveFailed(!saved);
   }, [
@@ -472,7 +479,7 @@ export function CreateTournamentPage() {
     customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
     editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
-    knockoutQualifierCount, awardsEnabled, awardsAtOverride,
+    knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
   ]);
 
   const editingSavedParticipant = participants.find((participant) => participant.id === editingParticipantId);
@@ -512,6 +519,7 @@ export function CreateTournamentPage() {
         maxGroups: effectiveMaxGroups,
         maxSwissRounds: effectiveMaxSwissRounds,
         knockoutQualifierCount: effectiveKnockoutQualifierCount,
+        preferredDurationMinutes,
       },
     ),
     [
@@ -525,6 +533,7 @@ export function CreateTournamentPage() {
       effectiveMaxGroups,
       effectiveMaxSwissRounds,
       effectiveKnockoutQualifierCount,
+      preferredDurationMinutes,
     ],
   );
 
@@ -1518,9 +1527,9 @@ export function CreateTournamentPage() {
                     </div>
                     {index === 0 && !item.minimumMatchShortfall && (
                       <p className="recommendation-reason">
-                        {item.estimatedDurationMinutes <= 210
-                          ? 'Warum empfohlen: Erfüllt dein Mindestspielziel und bleibt innerhalb der bevorzugten 3,5 Stunden.'
-                          : 'Warum empfohlen: Erfüllt dein Mindestspielziel; die geschätzte Dauer liegt über dem bevorzugten Zeitrahmen von 3,5 Stunden.'}
+                        {item.estimatedDurationMinutes <= preferredDurationMinutes
+                          ? `Warum empfohlen: Erfüllt dein Mindestspielziel und liegt innerhalb deiner geplanten Turnierdauer von ${formatRecommendationDuration(preferredDurationMinutes)}.`
+                          : `Warum empfohlen: Erfüllt dein Mindestspielziel; die geschätzte Dauer übersteigt deine Zielzeit von ${formatRecommendationDuration(preferredDurationMinutes)}.`}
                       </p>
                     )}
                   </button>
@@ -1530,51 +1539,47 @@ export function CreateTournamentPage() {
               <aside className="format-settings-panel">
                 <div className="format-settings-head">
                   <h3>Vorgaben für Vorschläge</h3>
-                  <p className="muted">Die Vorgaben und Turniersystem-Häkchen filtern ausschließlich Empfehlungen. Bei der manuellen Phasenplanung bleiben alle Systeme verfügbar.</p>
-                  <p className="muted">Vorschläge bis 3,5 Stunden werden bevorzugt. Falls nötig, ergänzen längere Turnierformen die Liste auf bis zu fünf Vorschläge.</p>
+                  <p className="muted">Passe die Vorschläge an deine Veranstaltung an. Deine manuelle Phasenplanung bleibt unabhängig von diesen Vorgaben.</p>
                 </div>
 
                 <div className="format-setting-fields">
                   <div className="field">
                     <label htmlFor="max-groups">Maximale Gruppenanzahl</label>
-                    <input
-                      id="max-groups"
-                      type="number"
-                      min="2"
-                      max={Math.max(2, Math.floor(participantCount / 2))}
-                      value={effectiveMaxGroups}
-                      onChange={(event) => setMaxGroups(Math.max(2, Math.min(Math.max(2, Math.floor(participantCount / 2)), Math.trunc(Number(event.target.value)) || 2)))}
-                      disabled={!enabledSystems.groups}
-                    />
-                    <span className="field-hint">Gruppen-Vorschläge verwenden höchstens diese Anzahl.</span>
+                    <RecommendationNumberStepper id="max-groups" label="Maximale Gruppenanzahl"
+                      value={effectiveMaxGroups} min={2} max={Math.max(2, Math.floor(participantCount / 2))}
+                      onChange={setMaxGroups} disabled={!enabledSystems.groups}/>
+                    <span className="field-hint">Höchstens so viele Gruppen in den Vorschlägen.</span>
                   </div>
 
                   <div className="field">
                     <label htmlFor="max-swiss-rounds">Max. Schweizer Runden</label>
-                    <input
-                      id="max-swiss-rounds"
-                      type="number"
-                      min="1"
-                      max="30"
-                      value={effectiveMaxSwissRounds}
-                      onChange={(event) => setMaxSwissRounds(Math.max(1, Math.min(30, Math.trunc(Number(event.target.value)) || 1)))}
-                      disabled={!enabledSystems.swiss}
-                    />
-                    <span className="field-hint">Schweizer Vorschläge überschreiten diese Rundenzahl nicht.</span>
+                    <RecommendationNumberStepper id="max-swiss-rounds" label="Maximale Schweizer Runden"
+                      value={effectiveMaxSwissRounds} min={1} max={30}
+                      onChange={setMaxSwissRounds} disabled={!enabledSystems.swiss}/>
+                    <span className="field-hint">Obergrenze für Runden im Schweizer System.</span>
                   </div>
 
                   <div className="field">
                     <label htmlFor="knockout-qualifiers">Teilnehmer einer empfohlenen K.-o.-Phase</label>
-                    <input
-                      id="knockout-qualifiers"
-                      type="number"
-                      min="2"
-                      max={Math.max(2, participantCount)}
-                      value={effectiveKnockoutQualifierCount}
-                      onChange={(event) => setKnockoutQualifierCount(Math.max(2, Math.min(Math.max(2, participantCount), Math.trunc(Number(event.target.value)) || 2)))}
-                      disabled={!enabledSystems.knockout}
-                    />
-                    <span className="field-hint">Beispiel: 8 bedeutet, dass eine vorgeschlagene K.-o.-Phase mit 8 Teilnehmern startet.</span>
+                    <RecommendationNumberStepper id="knockout-qualifiers" label="Teilnehmer einer empfohlenen K.-o.-Phase"
+                      value={effectiveKnockoutQualifierCount} min={2} max={Math.max(2, participantCount)}
+                      onChange={setKnockoutQualifierCount} disabled={!enabledSystems.knockout}/>
+                    <span className="field-hint">So viele Spieler erreichen die K.-o.-Phase.</span>
+                  </div>
+                  <div className="field recommendation-duration-field">
+                    <label htmlFor="preferred-duration">Geplante Turnierdauer</label>
+                    <div className="recommendation-duration-stepper" role="group" aria-label="Geplante Turnierdauer anpassen">
+                      <button type="button" className="recommendation-number-stepper-button"
+                        aria-label="Geplante Turnierdauer um 15 Minuten verringern"
+                        disabled={preferredDurationMinutes <= MIN_RECOMMENDATION_DURATION}
+                        onClick={() => adjustPreferredDuration(-15)}>−</button>
+                      <RecommendationDurationPicker value={preferredDurationMinutes} onChange={setPreferredDurationMinutes}/>
+                      <button type="button" className="recommendation-number-stepper-button"
+                        aria-label="Geplante Turnierdauer um 15 Minuten erhöhen"
+                        disabled={preferredDurationMinutes >= MAX_RECOMMENDATION_DURATION}
+                        onClick={() => adjustPreferredDuration(15)}>+</button>
+                    </div>
+                    <span className="field-hint">Mit −/+ in 15-Minuten-Schritten ändern oder die Stunden und Minuten über das Uhrsymbol einstellen. Längere Formen ergänzen bei Bedarf auf fünf Vorschläge.</span>
                   </div>
                 </div>
 
