@@ -1260,8 +1260,8 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
 
   return (
     <>
-      <div className="creation-page-container">
-      <header className="page-head creation-page-head">
+      <div className={`creation-page-container ${prestart ? 'is-prestart-phase-editor' : ''}`}>
+      {!prestart ? <header className="page-head creation-page-head">
         <div className="creation-page-heading">
           <h1>{savedDraftId ? 'Turnierentwurf bearbeiten' : 'Turnier erstellen'}</h1>
           <p className="muted">Schritt {step} von 5 · Einstellungen bleiben erhalten und können jederzeit über die bereits erreichten Schritte geändert werden.</p>
@@ -1279,9 +1279,16 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
           </div>
           {namedDraftMessage && <span className="field-hint" role="status">{namedDraftMessage}</span>}
         </div>
-      </header>
+      </header> : <header className="page-head creation-page-head">
+        <div className="creation-page-heading">
+          <h1>Phasen vor Turnierstart bearbeiten</h1>
+          <p className="muted">Dieselben Einstellungen wie bei der Turniererstellung. Die neue Planung übernimmt alle {prestart.activeParticipants} aktiven Teilnehmer.</p>
+        </div>
+        <button className="btn" type="button" onClick={() => prestartDirty
+          ? setConfirmPrestartDiscard(true) : prestart.onCancel()}>Bearbeitung schließen</button>
+      </header>}
 
-      <nav className="wizard-steps" aria-label="Erstellungsschritte">
+      {!prestart && <nav className="wizard-steps" aria-label="Erstellungsschritte">
         {stepLabels.map((label, index) => {
           const stepNumber = (index + 1) as WizardStep;
           const reached = stepNumber <= maxReachedStep;
@@ -1306,9 +1313,9 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
             </button>
           );
         })}
-      </nav>
+      </nav>}
 
-      {dateIsPast && (
+      {!prestart && dateIsPast && (
         <div className="wizard-start-past-banner" role="alert">
           <span className="wizard-start-past-banner-icon" aria-hidden="true">!</span>
           <div className="wizard-start-past-banner-copy">
@@ -2376,8 +2383,31 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
           </section>
         )}
       </div>
-
-      {step !== 5 && <div className="wizard-sidebar-column">
+      {prestart && <section className="prestart-phase-save-panel" aria-label="Vorstart-Planung übernehmen">
+        <PlannedScheduleEditor
+          scheduledStart={scheduledStart} timeline={plannedTimeline}
+          phaseSummaries={phaseDrafts.map((_, index) => formatPhaseOverview(phaseDrafts, index, discipline))}
+          awardsEnabled={false} awardsAt={plannedTimeline.estimatedEnd}
+          showCeremony={false} onToggleAwards={() => {}} onAwardsAtChange={() => {}} />
+        {prestartIssues.length > 0 && <div className="prestart-editor-errors" role="alert">
+          <strong>Bitte vor dem Speichern korrigieren:</strong>
+          <ul>{prestartIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
+        </div>}
+        <p className="muted">Beim Speichern werden die bisherigen Vorstart-Auslosungen neu erstellt. Teilnehmer, Codes und Rückzüge bleiben erhalten.</p>
+        {prestartSaveError && <p role="alert" className="field-error">{prestartSaveError}</p>}
+        {confirmPrestartSave && <p role="status">Phasenplanung übernehmen und bisherige Auslosungen zurücksetzen?</p>}
+        <div className="prestart-editor-actions">
+          <button className="btn" type="button" onClick={() => confirmPrestartSave
+            ? setConfirmPrestartSave(false) : prestartDirty ? setConfirmPrestartDiscard(true) : prestart.onCancel()}>
+            {confirmPrestartSave ? 'Zurück zur Bearbeitung' : 'Abbrechen'}
+          </button>
+          <button className="btn primary" type="button" disabled={prestartIssues.length > 0}
+            onClick={savePrestartPhases}>
+            {confirmPrestartSave ? 'Ja, Phasen und Auslosung aktualisieren' : 'Änderungen prüfen und speichern'}
+          </button>
+        </div>
+      </section>}
+      {!prestart && step !== 5 && <div className="wizard-sidebar-column">
       <aside className="wizard-side-summary" aria-label="Aktuelle Einstellungen">
         <div className="wizard-side-summary-heading">
           <div>
@@ -2482,6 +2512,16 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       </div>}
       </div>
       </div>
+      {confirmPrestartDiscard && prestart && <div className="prototype-modal-backdrop" role="presentation">
+        <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-label="Ungespeicherte Phasenänderungen">
+          <h2>Ungespeicherte Phasenänderungen verwerfen?</h2>
+          <p>Die Einstellungen bleiben beim Wechsel zwischen den Turnierleitungs-Tabs erhalten. Beim Schließen ohne Speichern gehen sie jedoch verloren.</p>
+          <div className="actions">
+            <button className="btn danger" type="button" onClick={prestart.onCancel}>Änderungen verwerfen</button>
+            <button className="btn" type="button" onClick={() => setConfirmPrestartDiscard(false)}>Weiter bearbeiten</button>
+          </div>
+        </section>
+      </div>}
       {qualificationRulePhaseId && (() => {
         const phaseIndex = phaseDrafts.findIndex((phase) => phase.id === qualificationRulePhaseId);
         const previous = phaseDrafts.slice(0, phaseIndex).reverse().find((phase) => phase.type !== 'BREAK');
