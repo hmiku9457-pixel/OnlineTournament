@@ -72,13 +72,21 @@ type VenuePreset = 'rows' | 'line' | 'aisle' | 'square';
 function makeVenuePreset(tableCount: number, deskDock: DeskDock, preset: VenuePreset): VenueLayout {
   const count = Math.max(1, Math.trunc(tableCount));
   const squareSide = Math.ceil(Math.sqrt(count));
-  const columns = preset === 'square' ? squareSide : preset === 'line' ? count : Math.max(2, Math.ceil(count / 2));
-  const rows = preset === 'square' ? squareSide : preset === 'line' ? 1 : preset === 'aisle' ? 3 : 2;
+  // Larger halls retain the central aisle, but use compact banks of rows
+  // instead of two extremely wide rows separated by empty space.
+  const compactAisle = preset === 'aisle' && count > 80;
+  const wingColumns = Math.ceil(Math.sqrt(count / 2));
+  const columns = compactAisle ? wingColumns * 2 + 1
+    : preset === 'square' ? squareSide : preset === 'line' ? count : Math.max(2, Math.ceil(count / 2));
+  const rows = compactAisle ? Math.ceil(count / (wingColumns * 2))
+    : preset === 'square' ? squareSide : preset === 'line' ? 1 : preset === 'aisle' ? 3 : 2;
   const cells: VenueCell[] = Array.from({ length: columns * rows }, () => '');
   for (let index = 0; index < count; index += 1) {
-    const row = preset === 'square' ? Math.floor(index / columns)
-      : preset === 'line' || index < columns ? 0 : (preset === 'aisle' ? 2 : 1);
-    const column = index % columns;
+    const row = compactAisle ? Math.floor(index / (wingColumns * 2))
+      : preset === 'square' ? Math.floor(index / columns)
+        : preset === 'line' || index < columns ? 0 : (preset === 'aisle' ? 2 : 1);
+    const withinBank = index % (wingColumns * 2);
+    const column = compactAisle ? withinBank + (withinBank >= wingColumns ? 1 : 0) : index % columns;
     cells[row * columns + column] = `table:${index + 1}`;
   }
   return { columns, rows, cells, deskDock };
