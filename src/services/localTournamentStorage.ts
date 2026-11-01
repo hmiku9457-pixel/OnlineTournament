@@ -26,7 +26,8 @@ let ready = false;
 let revision = 0;
 let currentError = '';
 let quarantine: CorruptLocalRecord[] = [];
-const changedKeys = new Set<string>();
+const pendingChanges = new Map<string, string | null>();
+let outstandingCommits = 0;
 let flushScheduled = false;
 let writeTail: Promise<void> = Promise.resolve();
 let channel: BroadcastChannel | null = null;
@@ -199,7 +200,7 @@ export async function initializeLocalTournamentStorage(): Promise<void> {
     channel = new BroadcastChannel('online-tournament:canonical-state');
     channel.onmessage = (event: MessageEvent<{ revision?: number }>) => {
       if ((event.data?.revision ?? 0) <= revision) return;
-      if (changedKeys.size > 0) {
+      if (pendingChanges.size > 0 || outstandingCommits > 0) {
         signalError('Ein anderer Tab hat den Turnierstand geändert. Bitte die Seite neu laden, bevor du weitere Änderungen vornimmst.');
         return;
       }
@@ -236,18 +237,21 @@ async function commitChanges(snapshot: Array<{ key: string; value: string | null
 }
 
 export function flushPendingLocalTournamentWrites(): Promise<void> {
-  if (!ready || changedKeys.size === 0) return writeTail;
-  const snapshot = [...changedKeys].map((key) => ({ key, value: nativeStorage().getItem(key) }));
-  changedKeys.clear();
-  writeTail = writeTail.then(() => commitChanges(snapshot));
+  if (!ready || pendingChanges.size === 0) return writeTail;
+  // Capture each tab's own mutations. Sampling shared localStorage later could
+  // accidentally commit a competing tab's uncommitted value instead.
+  const snapshot = [...pendingChanges].map(([key, value]) => ({ key, value }));
+  pendingChanges.clear();
+  outstandingCommits += 1;
+  writeTail = writeTail.then(() => commitChanges(snapshot)).finally(() => { outstandingCommits -= 1; });
   void writeTail.catch(() => { /* An error banner is displayed; no silent success. */ });
   return writeTail;
 }
 
-function scheduleWrite(key: string): void {
+function scheduleWrite(key: string, value: string | null): void {
   if (!ready || !key.startsWith(PREFIX)) return;
   if (currentError) throw new Error(currentError);
-  changedKeys.add(key);
+  pendingChanges.set(key, value);
   if (flushScheduled) return;
   flushScheduled = true;
   queueMicrotask(() => {
@@ -265,17 +269,17 @@ export const localTournamentStorage: Storage = {
   setItem(key: string, value: string) {
     if (ready && currentError && key.startsWith(PREFIX)) throw new Error(currentError);
     nativeStorage().setItem(key, value);
-    scheduleWrite(key);
+    scheduleWrite(key, value);
   },
   removeItem(key: string) {
     if (ready && currentError && key.startsWith(PREFIX)) throw new Error(currentError);
     nativeStorage().removeItem(key);
-    scheduleWrite(key);
+    scheduleWrite(key, null);
   },
   clear() {
     const keys = allLocalKeys();
     nativeStorage().clear();
-    for (const key of keys) scheduleWrite(key);
+    for (const key of keys) scheduleWrite(key, null);
   },
 };
 
