@@ -4,6 +4,8 @@ export interface PlannedScheduleItem {
   at: string; // Tournament-local wall-clock date/time: YYYY-MM-DDTHH:mm
   title: string;
   type: 'competition' | 'break' | 'other';
+  /** Ceremony follows the projected finish unless explicitly rescheduled. */
+  autoTime?: boolean;
   note?: string;
   /** Estimated pause length; set only for breaks. Kept separate from 'at',
    * which is still required internally to calculate later phase starts. */
