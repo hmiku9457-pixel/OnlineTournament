@@ -1473,24 +1473,47 @@ export function getPendingGroupCutoff(tournament: DemoTournament): GroupCutoffSt
   return cutoff && cutoff.decision?.winners.length !== cutoff.tie.slots ? cutoff : null;
 }
 
+export function getEditableGroupCutoff(tournament: DemoTournament): GroupCutoffStatus | null {
+  if (['ABORTED', 'FINISHED'].includes(tournament.status)) return null;
+  const stages = [...tournament.stages].reverse().filter((stage) =>
+    ['GROUPS', 'ROUND_ROBIN'].includes(stage.type) && isStageStarted(tournament, stage)
+    && Boolean(getNextCompetitionStage(tournament, stage))
+    && !isStageStarted(tournament, getNextCompetitionStage(tournament, stage)!));
+  for (const stage of stages) {
+    const result = qualificationCutoffResult(tournament, stage, readResults());
+    if (result.cutoff?.decision) return result.cutoff;
+    if (result.resolved?.decision) return result.resolved;
+  }
+  return null;
+}
+
 /** Director records the outcome of a separately conducted tie-break or a lot.
  * The decision is attached to the exact group results and automatically expires
  * after any result correction that changes the qualification signature. */
 export function resolveGroupCutoff(tournament: DemoTournament,
   winners: string[], method: 'PLAYOFF' | 'LOT', explanation: string): string | null {
-  const current = getPendingGroupCutoff(tournament);
-  if (!current) return 'Kein offener Gruppen-Stichentscheid vorhanden.';
+  const current = getPendingGroupCutoff(tournament) ?? getEditableGroupCutoff(tournament);
+  if (!current) return 'Kein offener oder korrigierbarer Stichentscheid vorhanden.';
   if (new Set(winners).size !== current.tie.slots || winners.length !== current.tie.slots
     || winners.some((name) => !current.tie.players.includes(name))) {
     return `Bitte genau ${current.tie.slots} der betroffenen Teilnehmer auswählen.`;
   }
   if (explanation.trim().length < 3) return 'Bitte das Entscheidungsergebnis bzw. Losverfahren dokumentieren.';
+  const priorDecision = current.decision;
   saveGroupCutoffDecision({
     tournamentId: tournament.id, stageId: current.stageId, signature: current.signature,
     winners, method, explanation: explanation.trim(),
   });
   recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'GROUP_TIE_RESOLVED',
     description: `Gruppen-Qualifikationsgleichstand durch ${method === 'PLAYOFF' ? 'Stichentscheid' : 'Losentscheid'} gelöst: ${winners.join(', ')}. ${explanation.trim()}` });
+  if (priorDecision) {
+    recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'GROUP_TIE_RESOLVED',
+      description: 'Qualifikations-Stichentscheid korrigiert',
+      before: priorDecision.winners.join(', ') + ' (' + priorDecision.method + '): ' + priorDecision.explanation,
+      after: winners.join(', ') + ' (' + method + '): ' + explanation.trim() });
+    const stage = tournament.stages.find((candidate) => candidate.id === current.stageId);
+    if (stage && isStageCompleted(tournament, stage)) refreshCompletedStageQualifiers(tournament, stage);
+  }
   return null;
 }
 
