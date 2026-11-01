@@ -32,6 +32,14 @@ describe('calendar date picker', () => {
     expect(calendarMonthDays(2028, 1).filter((day) => day !== null)).toHaveLength(29);
   });
 
+  it('accepts the current day as the lower bound', () => {
+    const markup = renderToStaticMarkup(createElement(CalendarDatePicker, {
+      id: 'event', value: '2030-11-21', minDate: '2030-11-21', onChange: () => {},
+    }));
+    expect(markup).toContain('21.11.2030');
+    expect(markup).not.toContain('calendar-picker-dialog');
+  });
+
   it('renders a reusable dialog trigger with German date text and required metadata', () => {
     const markup = renderToStaticMarkup(createElement(CalendarDatePicker, {
       id: 'tournament-date', value: '2026-11-01', required: true, label: 'Turnierdatum', onChange: () => {},
