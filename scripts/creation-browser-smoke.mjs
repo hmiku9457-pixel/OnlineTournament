@@ -93,6 +93,49 @@ try {
   assert.equal(await page2.locator('.participant-roster-row').count(), 19,
     'confirmation adds exactly the missing test players');
   await context2.close();
+
+  // Date/time restrictions and live "Jetzt" mode with a deterministic
+  // browser clock in Europe/Berlin, including a minute rollover and reload.
+  const context3 = await browser.newContext({ timezoneId: 'Europe/Berlin' });
+  const page3 = await context3.newPage();
+  await page3.clock.install({ time: new Date('2030-11-21T12:34:20+01:00') });
+  await page3.goto(base + '/#/tournaments/new');
+  await page3.locator('#name').fill('Zeitgrenzen-Test');
+  await page3.locator('#sport').selectOption('table_tennis');
+  await page3.locator('#tournament-date').click();
+  assert.equal(await page3.getByRole('button', { name: 'Vorheriger Monat' }).isDisabled(), true);
+  assert.equal(await page3.locator('.calendar-picker-day').filter({ hasText: /^20$/ }).isDisabled(), true);
+  await page3.getByRole('button', { name: 'Heute', exact: true }).click();
+
+  await page3.locator('#tournament-start-time').click();
+  const timeDialog = page3.locator('.clock-picker-dialog');
+  assert.equal(await timeDialog.getByRole('button', { name: '11 Uhr', exact: true }).isDisabled(), true);
+  assert.equal(await timeDialog.getByRole('button', { name: '12 Uhr', exact: true }).isDisabled(), false);
+  await timeDialog.getByRole('button', { name: '12 Uhr', exact: true }).click();
+  assert.equal(await timeDialog.getByRole('button', { name: '30 Minuten' }).isDisabled(), true);
+  await timeDialog.getByRole('button', { name: '35 Minuten' }).isDisabled().then((value) => assert.equal(value, false));
+  await timeDialog.locator('input').first().fill('11');
+  assert.equal(await timeDialog.getByRole('button', { name: 'Übernehmen' }).isDisabled(), true,
+    'manual entry cannot bypass the disabled past hours');
+  await timeDialog.getByRole('button', { name: /^Jetzt/ }).click();
+  assert.match(await page3.locator('.clock-picker-trigger-value').innerText(), /Jetzt · 12:34/);
+  await page3.clock.fastForward(65000);
+  await page3.waitForFunction(() => document.querySelector('.clock-picker-trigger-value')?.textContent?.includes('12:35'));
+  await page3.reload();
+  assert.match(await page3.locator('.clock-picker-trigger-value').innerText(), /Jetzt · 12:35/,
+    'current-time mode survives saving and reloading the draft');
+
+  await page3.locator('#tournament-start-time').click();
+  await page3.locator('.clock-picker-manual input').first().fill('12');
+  await page3.locator('.clock-picker-manual input').nth(1).fill('35');
+  await page3.getByRole('button', { name: 'Übernehmen', exact: true }).click();
+  assert.equal(await page3.locator('.clock-picker-trigger-value').innerText(), '12:35');
+  await page3.clock.fastForward(65000);
+  await page3.waitForFunction(() => document.querySelector('.wizard-review-warning')?.textContent?.includes('Vergangenheit'));
+  assert.equal(await page3.locator('.wizard-continue-button').isDisabled(), true,
+    'a fixed start becomes invalid when the current time advances past it');
+  await context3.close();
+
   process.stdout.write('Creation wizard browser smoke tests passed.\n');
 } finally {
   await browser.close();
