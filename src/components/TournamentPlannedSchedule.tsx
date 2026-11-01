@@ -1,4 +1,5 @@
 import type { PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import type { LiveScheduleDeviation } from '@/services/mockLiveSchedule';
 import { formatPlannedBreakDuration, formatPlannedClockTime, groupPlannedScheduleDays, isValidLocalDateTime } from '@/domain/tournamentSchedule';
 
 export interface TimetableStage {
@@ -16,11 +17,12 @@ interface Props {
   title?: string;
   stages?: TimetableStage[];
   onStage?: (stageId: string) => void;
+  deviations?: Record<string, LiveScheduleDeviation>;
 }
 
 /** A non-binding timetable. Optional real stage links and status never affect phase lifecycle. */
 export function TournamentPlannedSchedule({
-  scheduledStart, items = [], title = 'Geplanter Zeitplan', stages, onStage,
+  scheduledStart, items = [], title = 'Geplanter Zeitplan', stages, onStage, deviations = {},
 }: Props) {
   if (!scheduledStart && items.length === 0 && !stages?.length) return null;
 
@@ -61,14 +63,17 @@ export function TournamentPlannedSchedule({
     return match ? stages?.[Number(match[1]) - 1] : undefined;
   };
   const timeLabel = (item: PlannedScheduleItem) => {
+    const deviation = deviations[item.id];
+    const additional = (deviation?.offsetMinutes ?? 0) + (deviation?.extraMinutes ?? 0);
+    const extra = additional > 0 ? <span className="planned-schedule-deviation" title="Prognostizierte zusätzliche Minuten gegenüber dem ursprünglichen Zeitplan">+ {additional} min</span> : null;
     if (!isValidLocalDateTime(item.at)) return <span className="planned-schedule-duration">Zeit noch offen</span>;
     if (item.type === 'break' && item.breakKind === 'overnight') {
-      return <span className="planned-schedule-duration">Ende ca. {formatPlannedClockTime(item.at)}</span>;
+      return <span className="planned-schedule-duration">Ende ca. {formatPlannedClockTime(item.at)} {extra}</span>;
     }
     if (item.type === 'break') {
-      return <span className="planned-schedule-duration">{formatPlannedBreakDuration(item)}</span>;
+      return <span className="planned-schedule-duration">{formatPlannedBreakDuration(item)} {extra}</span>;
     }
-    return <time dateTime={item.at}>{formatPlannedClockTime(item.at)}</time>;
+    return <span className="planned-schedule-clock"><time dateTime={item.at}>{formatPlannedClockTime(item.at)}</time>{extra}</span>;
   };
 
   return (
