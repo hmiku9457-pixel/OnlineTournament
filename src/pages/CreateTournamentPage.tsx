@@ -1060,6 +1060,7 @@ export function CreateTournamentPage() {
 
   return (
     <>
+      <div className="creation-page-container">
       <header className="page-head creation-page-head">
         <div className="creation-page-heading">
           <h1>Turnier erstellen</h1>
@@ -1124,7 +1125,7 @@ export function CreateTournamentPage() {
                 <ClockTimePicker id="tournament-start-time" value={scheduledTime} onChange={setScheduledTime}
                   label="Geplanter Turnierbeginn" minTime={scheduledDate === currentLocalMinute.slice(0, 10) ? currentLocalMinute.slice(11, 16) : undefined}
                   nowTime={currentLocalMinute.slice(11, 16)} nowActive={useCurrentTime} onNow={selectCurrentTime} />
-                <span className="field-hint">Frühere Uhrzeiten sind am heutigen Tag gesperrt. „Jetzt“ übernimmt die aktuelle Uhrzeit und aktualisiert sie fortlaufend. Den tatsächlichen Spielstart löst später die Turnierleitung aus.</span>
+                <span className="field-hint">„Jetzt“ aktualisiert die Uhrzeit laufend. Vergangene Startzeiten sind gesperrt.</span>
               </div>
               <div className="field">
                 <label htmlFor="sport">Sportart <span className="wizard-required-mark" aria-hidden="true">*</span></label>
@@ -2252,6 +2253,7 @@ export function CreateTournamentPage() {
         </div>
       </div>
       </div>}
+      </div>
       </div>
       {testParticipantsDialogOpen && (
         <TestParticipantsDialog
