@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clearCreationDraft, CREATION_DRAFT_KEY, loadCreationDraft, saveCreationDraft, type CreationDraft } from '@/domain/creationDraft';
+import { clearCreationDraft, CREATION_DRAFT_KEY, highestDraftSequence, loadCreationDraft, saveCreationDraft, type CreationDraft } from '@/domain/creationDraft';
 import { resizeVenueLayout, createVenueLayout } from '@/domain/venueLayout';
 
 function makeDraft(): CreationDraft {
@@ -72,6 +72,12 @@ describe('tournament creation draft recovery', () => {
     invalidLayout.venueLayout.cells.length = 2;
     store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft: invalidLayout }));
     expect(loadCreationDraft(store)).toBeNull();
+  });
+
+  it('starts new internal identifiers after the highest restored identifier', () => {
+    expect(highestDraftSequence([{ id: 'participant-3' }, { id: 'participant-19' }, { id: 'other' }], 'participant')).toBe(19);
+    expect(highestDraftSequence([{ id: 'phase-2' }, { id: 'phase-6' }], 'phase')).toBe(6);
+    expect(highestDraftSequence([], 'phase')).toBe(0);
   });
 
   it('allows creation to proceed if the browser refuses a draft write', () => {
