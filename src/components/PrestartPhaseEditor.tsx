@@ -16,6 +16,7 @@ import { planningMinutesPerSet } from '@/domain/sports';
 import { buildPlannedTimeline, plannedActiveBreakMinutes, plannedTimelineConflicts, toLocalDateTime } from '@/domain/tournamentSchedule';
 import { CalendarDatePicker, nextCalendarDate } from '@/components/CalendarDatePicker';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
+import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { updatePrestartTournamentPhases } from '@/services/mockTournamentStore';
 
 interface Props {
@@ -409,6 +410,15 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                 onClick={() => insert(drafts.length, option.type)}>{option.name}</button>)}
           </div>}
         </div>}
+      {timeline.items.length > 0 && <PlannedScheduleEditor
+        scheduledStart={tournament.scheduledStart ?? ''}
+        timeline={timeline}
+        awardsEnabled={false}
+        awardsAt={timeline.estimatedEnd}
+        onToggleAwards={() => {}}
+        onAwardsAtChange={() => {}}
+        showCeremony={false}
+      />}
       {errors.length > 0 && <div className="prestart-editor-errors" role="alert">
         <strong>Diese Angaben müssen vor dem Speichern korrigiert werden:</strong>
         <ul>{errors.map((error, index) => <li key={index}>{error}</li>)}</ul>
