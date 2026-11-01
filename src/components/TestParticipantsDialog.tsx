@@ -4,12 +4,13 @@ import type { Discipline } from '@/domain/types';
 interface Props {
   discipline: Discipline;
   existingCount: number;
+  incompleteCount?: number;
   onCancel: () => void;
   onConfirm: () => void;
 }
 
 /** Confirm adding demo entrants without using the browser's native confirm dialog. */
-export function TestParticipantsDialog({ discipline, existingCount, onCancel, onConfirm }: Props) {
+export function TestParticipantsDialog({ discipline, existingCount, incompleteCount = 0, onCancel, onConfirm }: Props) {
   const titleId = useId();
   const descriptionId = useId();
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -56,14 +57,15 @@ export function TestParticipantsDialog({ discipline, existingCount, onCancel, on
           <span className="test-participants-dialog-icon" aria-hidden="true">+</span>
           <div>
             <h2 id={titleId}>19 {noun} erzeugen?</h2>
-            <p id={descriptionId}>Die Teilnehmerliste wird für einen Test auf 19 Einträge aufgefüllt.</p>
+            <p id={descriptionId}>Die Liste wird auf 19 vollständige Testteilnehmer aufgefüllt.</p>
           </div>
         </div>
         <div className="sport-change-dialog-notes">
           <div className="test-participants-dialog-preview">
-            <span>Bereits vorhanden: <strong>{existingCount}</strong></span>
+            <span>Bereits vollständig: <strong>{existingCount}</strong></span>
             <span>Werden ergänzt: <strong>{remaining}</strong></span>
-            <span>Danach insgesamt: <strong>19</strong></span>
+            <span>Danach vollständig: <strong>19</strong></span>
+            {incompleteCount > 0 && <span>Zusätzlich unvollständig: <strong>{incompleteCount}</strong></span>
           </div>
           <p>Vorhandene Teilnehmer bleiben unverändert. Die neuen Testeinträge erhalten eindeutige Namen und können später wieder entfernt werden.</p>
         </div>
