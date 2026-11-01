@@ -36,7 +36,7 @@ import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { DisciplineChangeDialog } from '@/components/DisciplineChangeDialog';
 import { TestParticipantsDialog } from '@/components/TestParticipantsDialog';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
-import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedActiveBreakMinutes, plannedTimelineConflicts, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
@@ -346,9 +346,47 @@ export function CreateTournamentPage() {
   const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>((restoredDraft?.maxReachedStep ?? 1) as WizardStep);
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(restoredDraft?.hasVisitedPhaseStep ?? false);
   const [name, setName] = useState(restoredDraft?.name ?? '');
-  const [scheduledDate, setScheduledDate] = useState(restoredDraft?.scheduledDate ?? '');
-  const [scheduledTime, setScheduledTime] = useState(restoredDraft?.scheduledTime ?? '09:00');
+  // Keep the local time in sync while the wizard is open. Date and time are
+  // minute-precise; a live "Jetzt" selection follows minute and day rollovers.
+  const [currentLocalMinute, setCurrentLocalMinute] = useState(() => toLocalDateTime(new Date()));
+  const [useCurrentTime, setUseCurrentTime] = useState(restoredDraft?.useCurrentTime ?? false);
+  const [fixedDate, setFixedDate] = useState(restoredDraft?.scheduledDate ?? '');
+  const [fixedTime, setFixedTime] = useState(restoredDraft?.scheduledTime ?? '09:00');
+  const scheduledDate = useCurrentTime ? currentLocalMinute.slice(0, 10) : fixedDate;
+  const scheduledTime = useCurrentTime ? currentLocalMinute.slice(11, 16) : fixedTime;
   const scheduledStart = `${scheduledDate}T${scheduledTime}`;
+  useEffect(() => {
+    const refreshClock = () => {
+      const minute = toLocalDateTime(new Date());
+      setCurrentLocalMinute((old) => old === minute ? old : minute);
+    };
+    refreshClock();
+    const timer = window.setInterval(refreshClock, 1000);
+    window.addEventListener('focus', refreshClock);
+    document.addEventListener('visibilitychange', refreshClock);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshClock);
+      document.removeEventListener('visibilitychange', refreshClock);
+    };
+  }, []);
+  function setScheduledDate(value: string) {
+    const clock = toLocalDateTime(new Date());
+    const previousTime = scheduledTime;
+    setUseCurrentTime(false);
+    setFixedDate(value);
+    setFixedTime(value === clock.slice(0, 10) && previousTime < clock.slice(11, 16)
+      ? clock.slice(11, 16) : previousTime);
+  }
+  function setScheduledTime(value: string) {
+    setFixedDate(scheduledDate);
+    setFixedTime(value);
+    setUseCurrentTime(false);
+  }
+  function selectCurrentTime() {
+    setCurrentLocalMinute(toLocalDateTime(new Date()));
+    setUseCurrentTime(true);
+  }
   const [awardsEnabled, setAwardsEnabled] = useState(restoredDraft?.awardsEnabled ?? false);
   const [awardsAtOverride, setAwardsAtOverride] = useState<string | null>(restoredDraft?.awardsAtOverride ?? null);
   const [sport, setSport] = useState(restoredDraft?.sport ?? '');
@@ -397,7 +435,7 @@ export function CreateTournamentPage() {
   // cannot replace a valid draft with the wizard's empty initial values.
   useEffect(() => {
     const saved = saveCreationDraft({
-      step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime,
+      step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
       sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
       customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
       editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts,
@@ -406,7 +444,7 @@ export function CreateTournamentPage() {
     });
     setDraftSaveFailed(!saved);
   }, [
-    step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime,
+    step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
     sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
     customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
     editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts,
@@ -510,7 +548,8 @@ export function CreateTournamentPage() {
             : phase.breakKind === 'overnight' && /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.nextDayStart)));
     });
   const gameSettingsValid = Number.isInteger(minimumMatches) && minimumMatches >= 1 && minimumMatches <= 100 && validMatchDuration && validTurnover;
-  const basicsValid = Boolean(name.trim()) && name.trim().length <= 120 && Boolean(sport) && selectedDisciplineValid && isValidLocalDateTime(scheduledStart) && Number.isSafeInteger(tables) && tables >= 1 && tables <= 9999 && gameSettingsValid;
+  const startTimeIsAllowed = isStartAtOrAfterNow(scheduledStart, new Date(currentLocalMinute));
+  const basicsValid = Boolean(name.trim()) && name.trim().length <= 120 && Boolean(sport) && selectedDisciplineValid && startTimeIsAllowed && Number.isSafeInteger(tables) && tables >= 1 && tables <= 9999 && gameSettingsValid;
   const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
     const maximum = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
     return phase.entrantCount >= 2 && phase.entrantCount <= maximum
@@ -903,13 +942,19 @@ export function CreateTournamentPage() {
 
   function submitTournament() {
     if (step !== 5 || !canCreate || scheduleIssues.length > 0) return;
+    const submitStart = useCurrentTime ? toLocalDateTime(new Date()) : scheduledStart;
+    if (!isStartAtOrAfterNow(submitStart)) {
+      setCreationError('Der geplante Turnierstart muss jetzt oder in der Zukunft liegen. Bitte Datum und Uhrzeit korrigieren.');
+      return;
+    }
     setCreationError(null);
     try {
     const tournament = createMockTournament({
       name,
       sport,
       discipline,
-      scheduledStart,
+      scheduledStart: submitStart,
+      requireFutureStart: true,
       plannedSchedule: plannedSchedule.map((entry) => ({ ...entry, title: entry.title.trim(), note: entry.note?.trim() })),
       tables,
       minimumMatches,
@@ -1006,7 +1051,7 @@ export function CreateTournamentPage() {
   const firstCompetition = phaseDrafts.find((phase) => phase.type !== 'BREAK');
   const actualMinimumMatches = firstCompetition ? minimumPlayedMatches(firstCompetition.type, firstCompetition.entrantCount, firstCompetition.groupCount, firstCompetition.swissRounds) : 0;
   const minimumMatchesShortfall = firstCompetition ? Math.max(0, minimumMatches - actualMinimumMatches) : 0;
-  const dateIsPast = isValidLocalDateTime(scheduledStart) && scheduledStart < toLocalDateTime(new Date());
+  const dateIsPast = isValidLocalDateTime(scheduledStart) && !startTimeIsAllowed;
   const canContinue =
     (step === 1 && basicsValid) ||
     (step === 2 && participantsValid) ||
@@ -1070,14 +1115,16 @@ export function CreateTournamentPage() {
               </div>
               <div className="field">
                 <label htmlFor="tournament-date">Turnierdatum <span className="wizard-required-mark" aria-hidden="true">*</span></label>
-                <CalendarDatePicker id="tournament-date" label="Turnierdatum" required value={scheduledDate} onChange={setScheduledDate} />
-                {dateIsPast && <span className="field-hint wizard-review-warning" role="status">Das geplante Turnierdatum liegt in der Vergangenheit. Für Testturniere ist das möglich; für ein neues Turnier bitte den Termin prüfen.</span>}
+                <CalendarDatePicker id="tournament-date" label="Turnierdatum" required value={scheduledDate} minDate={currentLocalMinute.slice(0, 10)} onChange={setScheduledDate} />
+                {dateIsPast && <span className="field-hint wizard-review-warning" role="status">Der Turnierstart darf nicht in der Vergangenheit liegen. Wähle eine spätere Uhrzeit oder verwende „Jetzt“.</span>}
                 <span className="field-hint">Geplantes Datum für die Ankündigung und den Zeitplan. Den tatsächlichen Turnierstart legt die Turnierleitung fest.</span>
               </div>
               <div className="field">
                 <label htmlFor="tournament-start-time">Geplanter Turnierbeginn <span className="wizard-required-mark" aria-hidden="true">*</span></label>
-                <ClockTimePicker id="tournament-start-time" value={scheduledTime} onChange={setScheduledTime} label="Geplanter Turnierbeginn" />
-                <span className="field-hint">Startzeit für die Ankündigung und die Zeitplanung. Der tatsächliche Start wird später durch die Turnierleitung ausgelöst.</span>
+                <ClockTimePicker id="tournament-start-time" value={scheduledTime} onChange={setScheduledTime}
+                  label="Geplanter Turnierbeginn" minTime={scheduledDate === currentLocalMinute.slice(0, 10) ? currentLocalMinute.slice(11, 16) : undefined}
+                  nowTime={currentLocalMinute.slice(11, 16)} nowActive={useCurrentTime} onNow={selectCurrentTime} />
+                <span className="field-hint">Frühere Uhrzeiten sind am heutigen Tag gesperrt. „Jetzt“ übernimmt die aktuelle Uhrzeit und aktualisiert sie fortlaufend. Den tatsächlichen Spielstart löst später die Turnierleitung aus.</span>
               </div>
               <div className="field">
                 <label htmlFor="sport">Sportart <span className="wizard-required-mark" aria-hidden="true">*</span></label>
@@ -2059,7 +2106,7 @@ export function CreateTournamentPage() {
               <div className="wizard-review-check" role="status">
                 <strong>Vor Erstellung prüfen</strong>
                 {minimumMatchesShortfall > 0 && <p>Die erste Phase garantiert nur {actualMinimumMatches} tatsächlich gespielte Begegnungen pro Teilnehmer, gewünscht sind {minimumMatches}. Freilose zählen nicht als Spiele.</p>}
-                {dateIsPast && <p>Der geplante Turnierbeginn liegt in der Vergangenheit.</p>}
+                {dateIsPast && <p>Der geplante Turnierbeginn liegt in der Vergangenheit und muss vor der Erstellung geändert werden.</p>}
                 {scheduleIssues.map((issue, index) => <p key={index}>{issue}</p>)}
               </div>
             )}
