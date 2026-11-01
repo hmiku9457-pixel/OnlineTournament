@@ -367,6 +367,13 @@ try {
     assert.ok(Math.abs(beforeSave[index].x - afterSave[index].x) < 1,
       `Draft button ${index} shifted after saving an existing draft`);
   }
+  await draftPage.locator('#name').fill('Ungespeicherte Fassung');
+  await draftPage.waitForFunction(() => sessionStorage.getItem('online-tournament:creation-draft:v1:' +
+    new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('draft'))?.includes('Ungespeicherte Fassung'));
+  await draftPage.reload();
+  await draftPage.getByRole('alertdialog', { name: 'Ungespeicherte Änderungen gefunden' }).waitFor();
+  await draftPage.getByRole('button', { name: 'Gespeicherten Stand laden' }).click();
+  await draftPage.waitForFunction(() => document.querySelector('#name')?.value === 'Entwurf A');
   await draftPage.getByRole('button', { name: 'Entwurf kopieren' }).click();
   await draftPage.waitForFunction(() => document.querySelectorAll('.sidebar-draft-item').length === 2);
   assert.match(await draftPage.locator('#name').inputValue(), /Kopie/);
