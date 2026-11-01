@@ -523,6 +523,17 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   const [groupRecommendationNotice, setGroupRecommendationNotice] = useState<string | null>(null);
   const previousRosterCount = useRef<number>(restoredDraft?.participants.length ?? 0);
   const [participantForm, setParticipantForm] = useState<ParticipantFields>(restoredDraft?.participantForm ?? emptyParticipantFields());
+  // Registration may change in another director tab while this editor stays
+  // mounted. Reconcile the field size without discarding its unsaved plan.
+  useEffect(() => {
+    if (!prestart) return;
+    setParticipants((current) => current.length === prestart.activeParticipants
+      ? current : Array.from({ length: prestart.activeParticipants }, (_, index) => ({
+        id: `participant-${index + 1}`, firstName: 'Teilnehmer', lastName: String(index + 1),
+        partnerFirstName: 'Partner', partnerLastName: String(index + 1),
+        teamName: `Mannschaft ${index + 1}`,
+      })));
+  }, [prestart?.activeParticipants]);
   const [participantErrors, setParticipantErrors] = useState<ParticipantErrors>({});
   const [editingParticipantId, setEditingParticipantId] = useState<string | null>(restoredDraft?.editingParticipantId ?? null);
   const [minimumMatches, setMinimumMatches] = useState(restoredDraft?.minimumMatches ?? 4);
@@ -829,6 +840,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     if (selectedRecommendationId === recommendation.id && recommendationPlanMatches) return;
     setSelectedRecommendationId(recommendation.id);
     setPhaseDrafts(recommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
+    setReviewRequiredPhaseIds([]);
     setExpandedPhaseId(null);
     setPhaseInsertIndex(null);
   }
@@ -933,6 +945,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
 
   function removePhase(id: string) {
     setSelectedRecommendationId(null);
+    setReviewRequiredPhaseIds((ids) => ids.filter((candidate) => candidate !== id));
     if (editingPhaseTypeId === id) setEditingPhaseTypeId(null);
     if (expandedPhaseId === id) setExpandedPhaseId(null);
     setPhaseDrafts((current) => normalizePhaseEntrants(current.filter((phase) => phase.id !== id)));
