@@ -7,6 +7,8 @@ import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
 import { SwissRoundRobinMatrix } from '@/components/SwissRoundRobinMatrix';
 import { GroupMatchDayList, type GroupMatchDayItem } from '@/components/GroupMatchDayList';
+import { MatchStatusLegend } from '@/components/MatchStatusLegend';
+import { matchVisualClass, matchVisualLabel, matchVisualState } from '@/domain/matchVisualStatus';
 import { playoffBoundaryTie, playoffRankingsWithHeadToHead, type PlayoffRound } from '@/domain/swissCutoffPlayoff';
 import { resultScore, sportScoring } from '@/domain/sportScoring';
 import type { MockStanding } from '@/services/mockCompetitionViews';
@@ -68,8 +70,8 @@ export function SwissRoundRobinHistory({
         matchDay: match.matchDay ?? index + 1,
         score: recordedSets.length ? resultScore(sport, recordedSets) : '–',
         sets: recordedSets,
-        status: finished ? 'played'
-          : game?.status === 'LIVE' || game?.status === 'CONFIRMATION' ? 'live' : 'open',
+        status: finished ? 'played' : game?.status === 'CANCELLED' ? 'cancelled'
+          : matchVisualState(game?.status) === 'live' ? 'live' : 'open',
       };
     }));
   return (
@@ -117,6 +119,7 @@ export function SwissRoundRobinHistory({
       </div>
       <article className="card group-overview-card swiss-intermediate-schedule">
         <h4>Spielplan und Ergebnisse</h4>
+        <MatchStatusLegend />
         <GroupMatchDayList matches={scheduledMatches} sport={sport} onEditResult={onEditResult} />
       </article>
       {selectedPlayer && (
@@ -133,7 +136,7 @@ export function SwissRoundRobinHistory({
                   const opponent = match.sideA === selectedPlayer ? match.sideB : match.sideA;
                   const displayed = resultForMatchParticipant({ ...match, sport }, selectedPlayer);
                   return (
-                    <div className="player-game-row" key={match.id}>
+                    <div className={`player-game-row ${matchVisualClass(match.status)}`} title={matchVisualLabel(match.status)} key={match.id}>
                       <span className="muted">Spieltag {match.matchDay}</span>
                       <strong>vs. {opponent}</strong>
                       <span className="player-game-result-cell">
