@@ -256,8 +256,16 @@ export const localTournamentStorage: Storage = {
   get length() { return nativeStorage().length; },
   key(index: number) { return nativeStorage().key(index); },
   getItem(key: string) { return nativeStorage().getItem(key); },
-  setItem(key: string, value: string) { nativeStorage().setItem(key, value); scheduleWrite(key); },
-  removeItem(key: string) { nativeStorage().removeItem(key); scheduleWrite(key); },
+  setItem(key: string, value: string) {
+    if (ready && currentError && key.startsWith(PREFIX)) throw new Error(currentError);
+    nativeStorage().setItem(key, value);
+    scheduleWrite(key);
+  },
+  removeItem(key: string) {
+    if (ready && currentError && key.startsWith(PREFIX)) throw new Error(currentError);
+    nativeStorage().removeItem(key);
+    scheduleWrite(key);
+  },
   clear() {
     const keys = allLocalKeys();
     nativeStorage().clear();

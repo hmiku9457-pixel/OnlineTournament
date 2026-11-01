@@ -622,7 +622,8 @@ export async function updatePrestartTournamentPhasesSafely(
 ): Promise<ReturnType<typeof updatePrestartTournamentPhases>> {
   const perform = () => updatePrestartTournamentPhases(tournamentId, drafts, expectedFingerprint);
   if (typeof navigator !== 'undefined' && navigator.locks?.request) {
-    return navigator.locks.request('online-tournament:prestart:shared-storage', { mode: 'exclusive' }, perform).then(async (result) => {
+    return navigator.locks.request('online-tournament:prestart:shared-storage', { mode: 'exclusive' }, async () => {
+      const result = perform();
       if (result.ok) await flushPendingLocalTournamentWrites();
       return result;
     });
@@ -630,7 +631,7 @@ export async function updatePrestartTournamentPhasesSafely(
   if (typeof indexedDB === 'undefined') {
     return { ok: false, error: 'Die sichere Speichersperre ist in diesem Browser nicht verfügbar.' };
   }
-  return new Promise((resolve) => {
+  return new Promise<ReturnType<typeof updatePrestartTournamentPhases>>((resolve) => {
     const request = indexedDB.open('online-tournament:prestart-locks:v1', 1);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains('locks')) request.result.createObjectStore('locks');

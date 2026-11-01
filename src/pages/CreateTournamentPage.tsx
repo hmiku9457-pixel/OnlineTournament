@@ -29,7 +29,7 @@ import {
 } from '@/domain/tournamentCreation';
 import type { Discipline, StageType } from '@/domain/types';
 import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/recommendations';
-import { createMockTournament, findTournamentNameConflict, prestartPlanningFingerprint, updatePrestartTournamentPhasesSafely } from '@/services/mockTournamentStore';
+import { createMockTournamentAtomic, findTournamentNameConflict, prestartPlanningFingerprint, updatePrestartTournamentPhasesSafely } from '@/services/mockTournamentStore';
 import { hasStartedAnyStage } from '@/domain/prestartPhasePlanning';
 import { getPhaseLifecycle } from '@/services/mockPhaseLifecycle';
 import type { DemoTournament } from '@/data/demoTournaments';
@@ -1317,7 +1317,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setCreationError(null);
     setSubmittingTournament(true);
     try {
-    const tournament = createMockTournament({
+    const tournament = await createMockTournamentAtomic({
       name,
       sport,
       discipline,
