@@ -1577,7 +1577,7 @@ export function TournamentControlPage() {
               <p>{isStageStarted(tournament, selectedStage)
                 ? 'Die Pause läuft. Die beim Start festgelegte Uhrzeit ist verbindlich, kann aber durch die Turnierleitung vorzeitig freigegeben werden.'
                 : selectedStage.settings.breakKind === 'overnight'
-                  ? `Geplante Fortsetzung am Folgetag um ${selectedStage.settings.nextDayStart} Uhr`
+                  ? `Geplante Fortsetzung ${selectedStage.settings.nextDayDate ? `am ${selectedStage.settings.nextDayDate}` : 'am Folgetag'} um ${selectedStage.settings.nextDayStart} Uhr`
                   : selectedStage.settings.breakKind === 'until'
                     ? `Geplante Pause bis ${selectedStage.settings.breakUntil ?? '12:00'} Uhr (beim Pausenstart anpassbar)`
                     : `Voreinstellung: ${selectedStage.settings.breakMinutes} Minuten (beim Pausenstart anpassbar)`}</p>
@@ -1962,7 +1962,7 @@ export function TournamentControlPage() {
                 <p className="muted">{pauseMode === 'clock' ? 'Die nächste zukünftige Uhrzeit zählt; liegt sie heute bereits zurück, ist morgen gemeint.' : 'Die Zeit läuft ab dem tatsächlichen Start der Pause.'}</p>
               </div>
             )}
-            {pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind === 'overnight' && <p className="muted">Der nächste Spieltag beginnt planmäßig morgen um {pendingStartStage.settings.nextDayStart} Uhr.</p>}
+            {pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind === 'overnight' && <p className="muted">Der nächste Spieltag beginnt planmäßig {pendingStartStage.settings.nextDayDate ? `am ${pendingStartStage.settings.nextDayDate}` : 'am Folgetag'} um {pendingStartStage.settings.nextDayStart} Uhr.</p>}
             {firstPhaseRecommendationWarning && startModal.kind === 'tournament' && <p className="break-prestart-warning" role="status">Hinweis zur ersten Phase: {firstPhaseRecommendationWarning} Bitte prüfe vor dem Start die Phaseneinstellungen. Ein erneutes Bestätigen der Phasenplanung ist für gültige Konstellationen nicht erforderlich.</p>}
             {pendingPauseIssue && <p className="field-error" role="alert">{pendingPauseIssue}</p>}
             {pendingStartIssue && <p className="field-error" role="alert">{pendingStartIssue}</p>}
