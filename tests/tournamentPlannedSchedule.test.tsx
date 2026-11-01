@@ -425,7 +425,7 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(time.items[1].at).toBe('2026-11-01T10:50');
     expect(time.items[2].at).toBe('2026-11-01T14:00');
     expect(time.estimatedEnd).toBe('2026-11-01T14:15');
-    expect(plannedTimelineDurationMinutes('2026-11-01T10:00', time.estimatedEnd)).toBe(250);
+    expect(plannedTimelineDurationMinutes('2026-11-01T10:00', time.estimatedEnd)).toBe(255);
     expect(time.warnings).toEqual([]);
   });
 
