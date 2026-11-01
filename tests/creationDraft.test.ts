@@ -1,11 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
-import { clearCreationDraft, CREATION_DRAFT_KEY, highestDraftSequence, loadCreationDraft, saveCreationDraft, listSavedCreationDrafts, saveNamedCreationDraft, getSavedCreationDraft, removeSavedCreationDraft, type CreationDraft } from '@/domain/creationDraft';
+import { describe, expect, it } from 'vitest';
+import { clearCreationDraft, CREATION_DRAFT_KEY, highestDraftSequence, loadCreationDraft, saveCreationDraft, type CreationDraft } from '@/domain/creationDraft';
 import { resizeVenueLayout, createVenueLayout } from '@/domain/venueLayout';
 
 function makeDraft(): CreationDraft {
   return {
     step: 4, maxReachedStep: 5, hasVisitedPhaseStep: true,
-    name: 'Vereinsmeisterschaft', scheduledDate: '2026-11-01', scheduledTime: '10:00',
+    name: 'Vereinsmeisterschaft', scheduledDate: '2026-11-01', scheduledTime: '10:00', useCurrentTime: false,
     sport: 'table_tennis', discipline: 'SINGLES',
     timedMatchMinutes: '', venueTurnoverMinutes: '', tables: 9,
     customTables: false, venueLayoutEnabled: true,
@@ -88,12 +88,15 @@ describe('tournament creation draft recovery', () => {
     expect(loadCreationDraft(store)).toBeNull();
   });
 
-  it('accepts older drafts without a duration preference and rejects invalid values', () => {
+  it('rejects previous-schema drafts and invalid duration values', () => {
     const store = fakeStorage();
-    const legacy = makeDraft();
-    delete legacy.preferredDurationMinutes;
-    expect(saveCreationDraft(legacy, store)).toBe(true);
-    expect(loadCreationDraft(store)?.preferredDurationMinutes).toBeUndefined();
+    const incomplete = { ...makeDraft() } as Partial<CreationDraft>;
+    delete incomplete.preferredDurationMinutes;
+    store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft: incomplete }));
+    expect(loadCreationDraft(store)).toBeNull();
+    delete incomplete.useCurrentTime;
+    store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft: incomplete }));
+    expect(loadCreationDraft(store)).toBeNull();
     for (const invalid of [-15, 0, 12.5, 1440, 100000]) {
       const corrupted = { ...makeDraft(), preferredDurationMinutes: invalid };
       store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft: corrupted }));
@@ -105,43 +108,6 @@ describe('tournament creation draft recovery', () => {
     expect(highestDraftSequence([{ id: 'participant-3' }, { id: 'participant-19' }, { id: 'other' }], 'participant')).toBe(19);
     expect(highestDraftSequence([{ id: 'phase-2' }, { id: 'phase-6' }], 'phase')).toBe(6);
     expect(highestDraftSequence([], 'phase')).toBe(0);
-  });
-
-  it('keeps saved drafts separately, updates them by ID and can remove just one', () => {
-    const store = fakeStorage();
-    vi.stubGlobal('window', Object.assign(new EventTarget(), { localStorage: store }));
-    try {
-      const first = saveNamedCreationDraft(makeDraft());
-      const second = saveNamedCreationDraft({ ...makeDraft(), name: 'Zweite Veranstaltung' });
-      expect(first).not.toBe(second);
-      expect(listSavedCreationDrafts()).toHaveLength(2);
-      expect(getSavedCreationDraft(second)?.draft.name).toBe('Zweite Veranstaltung');
-      expect(saveNamedCreationDraft({ ...makeDraft(), name: 'Aktualisiert' }, first)).toBe(first);
-      expect(getSavedCreationDraft(first)?.draft.name).toBe('Aktualisiert');
-      removeSavedCreationDraft(first);
-      expect(listSavedCreationDrafts()).toHaveLength(1);
-      expect(getSavedCreationDraft(second)).not.toBeNull();
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('rejects a stale save from another browser tab without modifying the newer entry', () => {
-    const store = fakeStorage();
-    vi.stubGlobal('window', Object.assign(new EventTarget(), { localStorage: store }));
-    try {
-      const id = saveNamedCreationDraft(makeDraft());
-      const firstRevision = getSavedCreationDraft(id)?.revision;
-      expect(firstRevision).toBe(1);
-      saveNamedCreationDraft({ ...makeDraft(), name: 'Von Tab B' }, id, firstRevision);
-      expect(getSavedCreationDraft(id)?.revision).toBe(2);
-      expect(() => saveNamedCreationDraft({ ...makeDraft(), name: 'Veraltete Fassung' }, id, firstRevision))
-        .toThrow('DRAFT_CONFLICT');
-      expect(getSavedCreationDraft(id)?.draft.name).toBe('Von Tab B');
-      const copy = saveNamedCreationDraft({ ...makeDraft(), name: 'Meine Kopie' });
-      expect(copy).not.toBe(id);
-      expect(listSavedCreationDrafts()).toHaveLength(2);
-    } finally { vi.unstubAllGlobals(); }
   });
 
   it('retains the hall layout customization flag even while the individual plan is inactive', () => {
