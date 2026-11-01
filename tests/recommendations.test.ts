@@ -2,6 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { recommendTournamentFormats } from '@/engine/recommendations';
 
 describe('format recommendations', () => {
+  it('does not offer a group stage when fewer than four people participate', () => {
+    for (const playerCount of [2, 3]) {
+      const formats = recommendTournamentFormats(
+        { playerCount, tableCount: 2, minimumMatches: 1 },
+        { maxRecommendedDurationMinutes: 10000 },
+      );
+      expect(formats.some((format) => format.phases.some((phase) => phase.type === 'GROUPS'))).toBe(false);
+    }
+  });
+
   it('prefers Swiss to knockout for a larger field', () => {
     const result = recommendTournamentFormats({ playerCount: 24, tableCount: 8, minimumMatches: 4 });
     expect(result[0].id).toBe('swiss-ko');
