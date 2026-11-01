@@ -29,7 +29,7 @@ import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/
 import { createMockTournament } from '@/services/mockTournamentStore';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { formatPhaseOverview } from '@/domain/creationOverview';
-import { loadCreationDraft, saveCreationDraft, clearCreationDraft } from '@/domain/creationDraft';
+import { loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence } from '@/domain/creationDraft';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedActiveBreakMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
@@ -328,7 +328,14 @@ function NumberChoice({
 
 export function CreateTournamentPage() {
   const navigate = useNavigate();
-  const [restoredDraft] = useState(loadCreationDraft);
+  const [restoredDraft] = useState(() => {
+    const draft = loadCreationDraft();
+    if (draft) {
+      participantSequence = Math.max(participantSequence, highestDraftSequence(draft.participants, 'participant'));
+      phaseSequence = Math.max(phaseSequence, highestDraftSequence(draft.phaseDrafts, 'phase'));
+    }
+    return draft;
+  });
   const [creationError, setCreationError] = useState<string | null>(null);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   const [step, setStep] = useState<WizardStep>((restoredDraft?.step ?? 1) as WizardStep);
