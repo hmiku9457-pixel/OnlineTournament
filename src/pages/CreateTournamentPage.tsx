@@ -184,7 +184,7 @@ function validateParticipant(
   }
 
   for (const field of ['firstName', 'lastName', ...(discipline === 'DOUBLES' ? ['partnerFirstName', 'partnerLastName'] : [])] as ParticipantField[]) {
-    if (participant[field].trim() && !isAllowedParticipantName(participant[field])) {
+    if ((participant[field] ?? '').trim() && !isAllowedParticipantName(participant[field] ?? '')) {
       errors[field] = 'Nur Buchstaben, Leerzeichen und Bindestriche sind erlaubt.';
     }
   }
