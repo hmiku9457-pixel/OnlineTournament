@@ -36,6 +36,17 @@ describe('optional hall layout', () => {
     expect(html81).toContain('>Mit Mittelgang<');
   });
 
+  it('renders a bounded interactive window even for nearly ten thousand surfaces', () => {
+    const layout = createVenueLayout(9999);
+    const html = renderToStaticMarkup(createElement(VenueLayoutEditor, {
+      layout, tableCount: 9999, sport: 'table_tennis', onChange: () => {},
+    }));
+    expect((html.match(/class="hall-cell /g) ?? [])).toHaveLength(1200);
+    expect(html).toContain('Reihen 1–12 von 100');
+    expect(html).toContain('Nächste Reihen');
+    expect(html).not.toContain('Spielfläche 9000');
+  });
+
   it('preserves tables when growing and swapping', () => {
     const initial = createVenueLayout(4);
     const withExtraRow = resizeVenueLayout(initial, 4, 2, 4);
