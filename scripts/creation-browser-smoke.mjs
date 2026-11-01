@@ -176,6 +176,8 @@ try {
   await page3.locator('.clock-picker-manual input').nth(1).fill('35');
   await page3.getByRole('button', { name: 'Übernehmen', exact: true }).click();
   assert.equal(await page3.locator('.clock-picker-trigger-value').innerText(), '12:35');
+  await next(page3);
+  await page3.waitForSelector('.participant-step');
   await page3.clock.fastForward(65000);
   await page3.locator('.wizard-start-past-banner').waitFor({ state: 'visible' });
   assert.match(await page3.locator('.wizard-start-past-banner').innerText(),
@@ -186,7 +188,24 @@ try {
   await page3.locator('.wizard-start-past-banner').waitFor({ state: 'visible' });
   assert.equal(await page3.locator('.wizard-continue-button').isDisabled(), true,
     'reloading a stale draft cannot bypass the expired-start warning');
-  await page3.locator('.wizard-start-past-banner').getByRole('button', { name: 'Jetzt verwenden' }).click();
+  const warningBanner = page3.locator('.wizard-start-past-banner');
+  const currentTimeButton = warningBanner.getByRole('button', {
+    name: 'Stattdessen das aktuelle Datum und Uhrzeit verwenden', exact: true,
+  });
+  const settingsButton = warningBanner.getByRole('button', {
+    name: 'Zur Datums und Uhrzeiteinstellung', exact: true,
+  });
+  assert.equal(await currentTimeButton.count(), 1);
+  assert.equal(await settingsButton.count(), 1);
+  await settingsButton.click();
+  await page3.locator('#tournament-date').waitFor({ state: 'visible' });
+  assert.equal(await page3.locator('.wizard-step.active .wizard-step-content strong').innerText(),
+    'Grunddaten', 'settings button navigates back to the first creation step');
+  assert.equal(await page3.evaluate(() => document.activeElement?.id), 'tournament-date',
+    'settings button focuses the date picker after step navigation');
+  assert.equal(await page3.locator('.clock-picker-trigger-value').innerText(), '12:35',
+    'navigation does not silently alter the selected fixed time');
+  await currentTimeButton.click();
   await page3.locator('.wizard-start-past-banner').waitFor({ state: 'detached' });
   assert.match(await page3.locator('.clock-picker-trigger-value').innerText(), /Jetzt · 12:36/,
     'banner action re-enables live current time and resolves the issue');
