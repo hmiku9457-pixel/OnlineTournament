@@ -178,6 +178,31 @@ try {
   await page.getByRole('alertdialog', { name: 'Vorstart-Planung wirklich übernehmen?' }).waitFor();
   await page.getByRole('button', { name: 'Ja, Phasen und Auslosung aktualisieren' }).click();
   await page.locator('.control-tabs').getByRole('button', { name: 'Übersicht' }).waitFor();
+
+  // Recovery must not silently treat another tab's newer plan as its own
+  // opening version: old unsaved edits remain visible but cannot be committed.
+  await page.getByRole('button', { name: 'Phasen vor Start bearbeiten' }).click();
+  await page.locator('.is-prestart-phase-editor .phase-config').first().click();
+  await page.locator('.is-prestart-phase-editor .phase-bestof select').first().selectOption('7');
+  await page.waitForFunction(() => Object.keys(sessionStorage).some((key) =>
+    key.endsWith(':fingerprint') && key.includes('prestart-recovery')));
+  const otherDirectorTab = await context.newPage();
+  await otherDirectorTab.goto(page.url());
+  await otherDirectorTab.getByRole('button', { name: 'Phasen vor Start bearbeiten' }).click();
+  await otherDirectorTab.locator('.is-prestart-phase-editor .phase-config').first().click();
+  await otherDirectorTab.locator('.is-prestart-phase-editor .phase-bestof select').first().selectOption('5');
+  await otherDirectorTab.getByRole('button', { name: 'Änderungen prüfen und speichern' }).click();
+  await otherDirectorTab.getByRole('button', { name: 'Ja, Phasen und Auslosung aktualisieren' }).click();
+  await otherDirectorTab.locator('.control-tabs').getByRole('button', { name: 'Übersicht' }).waitFor();
+  await page.reload();
+  await page.getByRole('button', { name: 'Phasen vor Start bearbeiten' }).click();
+  await page.getByText('Konflikt beim Wiederherstellen:', { exact: false }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Änderungen prüfen und speichern' }).isDisabled(), true);
+  await page.getByRole('button', { name: 'Arbeitsfassung verwerfen und aktuelle Planung öffnen' }).click();
+  await page.getByRole('button', { name: 'Phasen vor Start bearbeiten' }).click();
+  await page.locator('.is-prestart-phase-editor .phase-config').first().click();
+  assert.equal(await page.locator('.is-prestart-phase-editor .phase-bestof select').first().inputValue(), '5');
+  await otherDirectorTab.close();
   assert.deepEqual(errors, [], 'no browser runtime errors');
   await context.close();
 
