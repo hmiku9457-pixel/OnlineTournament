@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createVenueLayout, dockVenueDesk, layoutTableNumbers, placeVenueCell, resizeVenueLayout } from '@/domain/venueLayout';
 
 describe('optional hall layout', () => {
-  it('starts with a 10 by 3 grid, accommodating larger tournaments', () => {
+  it('starts with a square grid, accommodating larger tournaments', () => {
     const layout = createVenueLayout(19);
-    expect(layout.columns).toBe(10);
-    expect(layout.rows).toBe(3);
-    expect(layout.cells).toHaveLength(30);
+    expect(layout.columns).toBe(5);
+    expect(layout.rows).toBe(5);
+    expect(layout.cells).toHaveLength(25);
     expect(layoutTableNumbers(layout)).toEqual(Array.from({ length: 19 }, (_, i) => i + 1));
   });
 
