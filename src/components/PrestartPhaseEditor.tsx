@@ -271,7 +271,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                             value={phase.groupCount} onChange={(event) => edit(phase.id, { groupCount: Number(event.target.value) })}/>
                         </label>}
                         {phase.type === 'SWISS' && <label>Schweizer Runden
-                          <input type="number" min={2} max={Math.max(2, Math.min(30, phase.entrantCount - 1))}
+                          <input type="number" min={2} max={Math.max(2, phase.entrantCount - 1)}
                             value={phase.swissRounds} onChange={(event) => edit(phase.id, { swissRounds: Number(event.target.value) })}/>
                         </label>}
                         {!scoreSport && <label>Best-of
