@@ -1281,7 +1281,7 @@ export function CreateTournamentPage() {
                 </div>
               </aside>
 
-            {!savedParticipantNamesValid && <p className="field-error" role="alert">Mindestens ein Teilnehmer ist doppelt eingetragen. Bitte die Teilnehmerliste überprüfen.</p>}
+            {!savedParticipantNamesValid && <p className="field-error" role="alert">Mindestens ein gespeicherter Teilnehmereintrag ist unvollständig oder doppelt. Bitte die Teilnehmerliste überprüfen.</p>}
             {incompleteSavedParticipants > 0 && (
               <div className="wizard-invalid-participants" role="status">
                 <span><strong>{incompleteSavedParticipants} unvollständige {incompleteSavedParticipants === 1 ? 'Eintragung' : 'Eintragungen'}</strong> · Du kannst sie ergänzen oder gesammelt entfernen.</span>
