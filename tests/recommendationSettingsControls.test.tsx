@@ -19,7 +19,7 @@ describe('recommendation settings numeric controls', () => {
       id: 'max-groups', label: 'Maximale Gruppenanzahl',
       value: 2, min: 2, max: 12, onChange: () => {},
     }));
-    expect(atMin).toMatch(/aria-label="Maximale Gruppenanzahl verringern"[^>]*disabled=""/);
+    expect(atMin).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Maximale Gruppenanzahl verringern"/);
   });
 
   it('formats the selected time as a duration, validates hours/minutes and opens a dialog', () => {
