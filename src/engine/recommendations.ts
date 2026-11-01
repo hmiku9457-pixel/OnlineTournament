@@ -88,7 +88,7 @@ function calculateGroupPlan(playerCount: number, minimumMatches: number, maxGrou
 function calculateSwissPlan(playerCount: number, minimumMatches: number, maxSwissRoundsSetting?: number) {
   const recommendedRounds = Math.max(minimumMatches + (playerCount % 2), Math.ceil(Math.log2(playerCount)));
   // Limit to the number of distinct possible opponents in the reduced field.
-  const rounds = clampInteger(maxSwissRoundsSetting, recommendedRounds, 2, Math.max(2, Math.min(30, playerCount - 1, recommendedRounds)));
+  const rounds = clampInteger(maxSwissRoundsSetting, recommendedRounds, 2, Math.max(2, Math.min(playerCount - 1, recommendedRounds)));
   const matches = Math.floor(playerCount / 2) * rounds;
   const roundsBelowMinimum = Math.max(0, minimumMatches - minimumPlayedMatches('SWISS', playerCount, 2, rounds));
   return { rounds, matches, roundsBelowMinimum };
