@@ -6568,3 +6568,124 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
     align-items: flex-start;
   }
 }
+
+/* Einheitlicher Spielstatus in Turnierleitung und Turnierverlauf:
+   grau = abgeschlossen, grün = zugewiesen/laufend, blau = ausstehend.
+   Die Zustandsfarbe ist unabhängig von Sieg/Niederlage und Qualifikation. */
+.match-status-legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px 14px;
+  color: #475467; font-size: .72rem; font-weight: 650;
+}
+.match-status-legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.match-status-legend-item::before {
+  content: ''; display: inline-block; width: 9px; height: 9px;
+  border-radius: 3px; border: 1px solid var(--match-status-border);
+  background: var(--match-status-accent);
+}
+.match-state-finished { --match-status-bg: #f1f2f4; --match-status-border: #b6bdc8; --match-status-accent: #7d8796; --match-status-text: #475467; }
+.match-state-live { --match-status-bg: #ecfdf3; --match-status-border: #abefc6; --match-status-accent: #12b76a; --match-status-text: #067647; }
+.match-state-waiting { --match-status-bg: #eff6ff; --match-status-border: #b2ddff; --match-status-accent: #2e90fa; --match-status-text: #175cd3; }
+.match-state-cancelled { --match-status-bg: #f2f4f7; --match-status-border: #d0d5dd; --match-status-accent: #98a2b3; --match-status-text: #667085; }
+
+/* Compact group, group-playoff and round-robin lists keep their existing grid. */
+.group-overview-card .group-match-row.match-state-finished,
+.group-overview-card .group-match-row.match-state-live,
+.group-overview-card .group-match-row.match-state-waiting,
+.group-overview-card .group-match-row.match-state-cancelled {
+  background: var(--match-status-bg);
+  border: 1px solid var(--match-status-border);
+  border-left: 3px solid var(--match-status-accent);
+  color: #344054;
+}
+.group-match-row .group-match-state-dot {
+  position: absolute; top: 50%; left: 3px; transform: translateY(-50%);
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--match-status-accent);
+}
+.group-match-row.match-state-live .group-match-side { font-weight: 700; color: #054f31; }
+.group-match-row.match-state-live .match-result-trigger {
+  border-radius: 5px; padding: 2px 4px; background: #d1fadf;
+  color: #05603a; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.group-overview-card > .match-status-legend,
+.swiss-round-card > .match-status-legend { margin: 3px 0 5px; }
+
+/* Swiss round cards already have a separate status/meta line. */
+.swiss-round-match.match-state-finished,
+.swiss-round-match.match-state-live,
+.swiss-round-match.match-state-waiting,
+.swiss-round-match.match-state-cancelled {
+  border: 1px solid var(--match-status-border);
+  border-left: 3px solid var(--match-status-accent);
+  background: var(--match-status-bg);
+}
+.swiss-round-match.match-state-finished .swiss-round-match-meta,
+.swiss-round-match.match-state-live .swiss-round-match-meta,
+.swiss-round-match.match-state-waiting .swiss-round-match-meta,
+.swiss-round-match.match-state-cancelled .swiss-round-match-meta {
+  color: var(--match-status-text); font-weight: 750;
+}
+.swiss-round-match .swiss-round-match-row.group-match-row {
+  background: transparent; border: 0; color: #344054;
+}
+
+/* Brackets: the status applies to the whole match, not only its winner. */
+.bracket-match.match-state-finished,
+.bracket-match.match-state-live,
+.bracket-match.match-state-waiting,
+.bracket-match.match-state-cancelled {
+  border: 1px solid var(--match-status-border);
+  border-left: 3px solid var(--match-status-accent);
+  background: var(--match-status-bg);
+}
+.bracket-match .bracket-match-status-line {
+  display: flex; gap: 6px; align-items: center;
+  padding: 4px 8px; border-bottom: 1px solid var(--match-status-border);
+  background: var(--match-status-bg); color: var(--match-status-text);
+  font-size: .68rem; font-weight: 800; line-height: 1.3;
+}
+.bracket-match .bracket-match-status-line::before {
+  content: ''; width: 6px; height: 6px; flex: 0 0 6px;
+  background: var(--match-status-accent); border-radius: 50%;
+}
+.bracket-match.match-state-finished > div.winner { background: #e7e9ed; }
+.bracket-match.match-state-live > .bracket-live-status {
+  background: var(--match-status-bg); border-bottom-color: var(--match-status-border);
+}
+
+/* The queue is always blue until a match is assigned. Conflicts remain amber. */
+.match-queue-row.match-state-waiting {
+  background: var(--match-status-bg); border-left: 3px solid var(--match-status-accent);
+}
+.match-queue-row.participant-busy.match-state-waiting {
+  background: #fffbeb; border-left-color: #f79009;
+}
+
+/* Consistent row fills for completed/live/waiting results and player histories. */
+.player-game-row.match-state-finished,
+.player-game-row.match-state-live,
+.player-game-row.match-state-waiting,
+.player-game-row.match-state-cancelled {
+  background: var(--match-status-bg);
+  border-left: 3px solid var(--match-status-accent);
+  border-bottom-color: var(--match-status-border);
+  padding-left: 8px; padding-right: 8px; border-radius: 5px;
+}
+.control-tab-panel .table-wrap tbody tr.match-state-finished > td,
+.control-tab-panel .table-wrap tbody tr.match-state-live > td,
+.control-tab-panel .table-wrap tbody tr.match-state-waiting > td,
+.control-tab-panel .table-wrap tbody tr.match-state-cancelled > td {
+  background: var(--match-status-bg);
+  border-bottom-color: var(--match-status-border);
+}
+.control-tab-panel .table-wrap tbody tr[class*="match-state-"] > td:first-child {
+  box-shadow: inset 3px 0 var(--match-status-accent);
+}
+.badge.match-status-table-badge.match-state-finished,
+.badge.match-status-table-badge.match-state-live,
+.badge.match-status-table-badge.match-state-waiting,
+.badge.match-status-table-badge.match-state-cancelled {
+  color: var(--match-status-text);
+  background: var(--match-status-bg);
+  border: 1px solid var(--match-status-border);
+}
