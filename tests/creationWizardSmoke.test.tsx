@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { CreateTournamentPage } from '@/pages/CreateTournamentPage';
+import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { CREATION_DRAFT_KEY, type CreationDraft } from '@/domain/creationDraft';
 import { createVenueLayout } from '@/domain/venueLayout';
 
@@ -23,6 +24,40 @@ describe('five-step tournament creation smoke test', () => {
     expect(html).toContain('class="btn danger creation-discard-button"');
     expect(html).toContain('class="page-head creation-page-head"');
     expect(html).not.toContain('Entwurf wird in diesem Browser automatisch gespeichert.');
+  });
+
+  it('renders sport-change confirmation as an accessible dialog with explicit choices', () => {
+    const modal = renderToStaticMarkup(createElement(SportChangeDialog, {
+      previousSport: 'Tischtennis',
+      nextSport: 'Fußball',
+      hasParticipants: true,
+      hasPhases: true,
+      onCancel: () => {},
+      onConfirm: () => {},
+    }));
+    expect(modal).toContain('role="dialog"');
+    expect(modal).toContain('aria-modal="true"');
+    expect(modal).toContain('Sportart wechseln?');
+    expect(modal).toContain('Tischtennis');
+    expect(modal).toContain('Fußball');
+    expect(modal).toContain('Bereits erfasste Teilnehmer bleiben erhalten');
+    expect(modal).toContain('Best-of-Einstellungen bestehender Phasen');
+    expect(modal).toContain('>Abbrechen</button>');
+    expect(modal).toContain('class="btn danger"');
+    expect(modal).toContain('>Sportart wechseln</button>');
+  });
+
+  it('only mentions affected data in the sport-change dialog', () => {
+    const modal = renderToStaticMarkup(createElement(SportChangeDialog, {
+      previousSport: 'Badminton',
+      nextSport: 'Fußball',
+      hasParticipants: false,
+      hasPhases: true,
+      onCancel: () => {},
+      onConfirm: () => {},
+    }));
+    expect(modal).not.toContain('Bereits erfasste Teilnehmer bleiben erhalten');
+    expect(modal).toContain('Best-of-Einstellungen bestehender Phasen');
   });
 
   it('restores a complete five-step configuration into the final review', () => {
