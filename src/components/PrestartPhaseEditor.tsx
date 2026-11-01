@@ -3,7 +3,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { StageType } from '@/domain/types';
 import {
   bestOfOptions, formatGroupDistribution, hasValidBreakStageOrder,
-  hasValidTerminalStageOrder, knockoutRoundLabels, recommendedSwissRounds,
+  hasValidTerminalStageOrder, knockoutRoundLabels, recommendedSwissRounds, estimatePhaseMetrics, estimateKnockoutRoundMinutes,
   stageLabel, tournamentSystemOptions,
 } from '@/domain/tournamentCreation';
 import {
@@ -12,6 +12,10 @@ import {
   validatePrestartPhases, type PrestartPhaseDraft,
 } from '@/domain/prestartPhasePlanning';
 import { sportScoring } from '@/domain/sportScoring';
+import { planningMinutesPerSet } from '@/domain/sports';
+import { buildPlannedTimeline, plannedActiveBreakMinutes, plannedTimelineConflicts, toLocalDateTime } from '@/domain/tournamentSchedule';
+import { CalendarDatePicker, nextCalendarDate } from '@/components/CalendarDatePicker';
+import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { updatePrestartTournamentPhases } from '@/services/mockTournamentStore';
 
 interface Props {
@@ -40,13 +44,34 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
   const [drafts, setDrafts] = useState(() =>
     normalizePrestartPhases(initialPrestartPhases(tournament), activeParticipants));
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [expandedInlineBreak, setExpandedInlineBreak] = useState<string | null>(null);
   const [insertAfter, setInsertAfter] = useState<number | null>(null);
   const [dragged, setDragged] = useState<string | null>(null);
   const [confirmSave, setConfirmSave] = useState(false);
   const [saveError, setSaveError] = useState('');
   const scoreSport = sportScoring(tournament.sport).mode === 'score';
-  const errors = validatePrestartPhases(drafts, activeParticipants);
-  const estimated = estimatePrestartDuration(tournament, drafts);
+  const timing = scoreSport
+    ? { matchDurationMinutes: tournament.matchDurationMinutes ?? 15, venueTurnoverMinutes: tournament.venueTurnoverMinutes ?? 0 }
+    : { minutesPerSet: planningMinutesPerSet(tournament.sport) };
+  const estimates = drafts.map((phase) => estimatePhaseMetrics(phase, tournament.tables, timing));
+  const timeline = buildPlannedTimeline(tournament.scheduledStart ?? '', drafts.map((phase, index) => ({
+    label: phase.label, note: phase.type === 'BREAK' ? phase.note : undefined,
+    type: phase.type, estimatedMinutes: estimates[index].estimatedDurationMinutes,
+    breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
+    breakUntil: phase.breakUntil, nextDayStart: phase.nextDayStart, nextDayDate: phase.nextDayDate,
+    roundCount: phase.type === 'SWISS' ? phase.swissRounds
+      : phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount).length : undefined,
+    roundDurationsMinutes: phase.type === 'KNOCKOUT'
+      ? estimateKnockoutRoundMinutes(phase.entrantCount, tournament.tables, phase.bestOf, phase.knockoutBestOf, timing)
+      : undefined,
+    inlineBreakAfterRound: phase.inlineBreakAfterRound, inlineBreakKind: phase.inlineBreakKind,
+    inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
+  })));
+  const errors = [...validatePrestartPhases(drafts, activeParticipants), ...plannedTimelineConflicts(timeline)];
+  const estimated = tournament.scheduledStart
+    ? estimates.reduce((total, item, index) => total + (drafts[index].type === 'BREAK' ? 0 : item.estimatedDurationMinutes), 0)
+      + plannedActiveBreakMinutes(timeline)
+    : estimatePrestartDuration(tournament, drafts);
 
   function change(next: PrestartPhaseDraft[]) {
     setDrafts(normalizePrestartPhases(next, activeParticipants));
@@ -114,7 +139,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
       <div className="prestart-editor-header">
         <div>
           <h2>Phasen vor Turnierstart bearbeiten</h2>
-          <p className="muted">Große Absagen oder Nachmeldungen? Passe die Turnierform an die tatsächlich anwesenden Teilnehmer an.</p>
+          <p className="muted">Alle Funktionen der Phasenerstellung stehen hier auch nach Nachmeldungen oder Absagen zur Verfügung. Die Auslosung wird beim Speichern neu aufgebaut.</p>
         </div>
         <button className="btn small" type="button" onClick={onCancel}>Schließen</button>
       </div>
@@ -122,7 +147,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
         <div><span>Aktive Teilnehmer</span><strong>{activeParticipants}</strong></div>
         <div><span>Vor Start zurückgezogen</span><strong>{withdrawnParticipants}</strong></div>
         <div><span>Phasen</span><strong>{drafts.length}</strong></div>
-        <div><span>Neue Zeitprognose</span><strong>{durationLabel(estimated)}</strong></div>
+        <div><span>Aktive Turnierdauer inkl. Pausen</span><strong>{durationLabel(estimated)}</strong></div>
       </div>
       <p className="prestart-editor-explanation">
         Die erste Spielphase übernimmt automatisch alle {activeParticipants} aktiven Teilnehmer. Bei folgenden Phasen kannst du Qualifikationsplätze festlegen.
