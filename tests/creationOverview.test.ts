@@ -28,7 +28,7 @@ describe('Kurzbeschreibung der Wettkampfphasen in der Turnierzusammenfassung', (
       { type: 'SWISS', entrantCount: 8, swissRounds: 3 },
     ];
     expect(phaseQualificationPlaces(unchanged, 0)).toBeNull();
-    expect(formatPhaseOverview(unchanged, 0, 'SINGLES')).toBe('2 Gruppen');
+    expect(formatPhaseOverview(unchanged, 0, 'SINGLES')).toBe('2 Gruppen · 8 Spieler');
     expect(formatPhaseOverview(unchanged, 1, 'SINGLES')).toBe('8 Spieler · 3 Runden');
   });
 
