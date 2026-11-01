@@ -1521,7 +1521,7 @@ export function CreateTournamentPage() {
                 </div>
                 {(phaseDrafts.length === 0 || phaseInsertIndex === 0) && (
                   <div className="phase-insert-options" role="group" aria-label={phaseDrafts.length ? 'Phase am Anfang auswählen' : 'Erste Phase auswählen'}>
-                    {tournamentSystemOptions.filter((system) => enabledSystems[system.id]).map((system) => (
+                    {tournamentSystemOptions.map((system) => (
                       <button className="btn small" type="button" key={system.id}
                         disabled={(phaseDrafts.length > 0 && isTerminalStage(system.stageType)) || (system.stageType === 'GROUPS' && participantCount < 4)}
                         onClick={() => insertPhase(0, system.stageType)}>+ {system.label}</button>
@@ -1997,7 +1997,7 @@ export function CreateTournamentPage() {
                             </button>
                             {phaseInsertIndex === index + 1 && (
                               <div className="phase-insert-options" role="group" aria-label={`Phase nach Phase ${index + 1} hinzufügen`}>
-                                {tournamentSystemOptions.filter((system) => enabledSystems[system.id]).map((system) => (
+                                {tournamentSystemOptions.map((system) => (
                                   <button key={system.id} className="btn small" type="button"
                                     disabled={(isTerminalStage(system.stageType) && index + 1 !== phaseDrafts.length)
                                      || (system.stageType === 'GROUPS' && phase.entrantCount < 4)}
