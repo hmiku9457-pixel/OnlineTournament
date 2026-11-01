@@ -347,6 +347,19 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                             edit(phase.id, { inlineBreakAfterRound: phase.inlineBreakAfterRound ? 0 : 1 });
                             setExpandedInlineBreak(phase.inlineBreakAfterRound ? null : phase.id);
                           }}>{phase.inlineBreakAfterRound ? 'Zwischenpause deaktivieren' : '+ Zwischenpause hinzufügen'}</button>
+                          {phase.inlineBreakAfterRound > 0 && <button className="phase-inline-break-header" type="button"
+                            aria-expanded={expandedInlineBreak === phase.id}
+                            onClick={() => setExpandedInlineBreak(expandedInlineBreak === phase.id ? null : phase.id)}>
+                            Pause nach Runde {phase.inlineBreakAfterRound} · Einstellungen {expandedInlineBreak === phase.id ? 'schließen' : 'öffnen'}
+                          </button>}
+                          {phase.inlineBreakAfterRound > 0 && expandedInlineBreak === phase.id && <div className="phase-inline-break-settings">
+                            <label>Pause nach Runde
+                              <select value={phase.inlineBreakAfterRound} onChange={(event) => edit(phase.id, { inlineBreakAfterRound: Number(event.target.value) })}>
+                                {Array.from({ length: (phase.type === 'SWISS' ? phase.swissRounds : knockoutRoundLabels(phase.entrantCount).length) - 1 },
+                                  (_, index) => <option key={index + 1} value={index + 1}>Runde {index + 1}</option>)}
+                              </select>
+                            </label>
+                          </div>}
                         </div>
                       )}
                     </div>
