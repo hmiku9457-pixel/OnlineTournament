@@ -203,7 +203,7 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
   const old = scheduleFor(initialPrestartPhases(tournament));
   const recalculated = scheduleFor(phases);
   const awards = tournament.plannedSchedule.find((entry) => entry.id === 'award-ceremony');
-  const oldWasAutomatic = awards?.at === old.timeline.estimatedEnd;
+  const oldWasAutomatic = awards?.autoTime === true || awards?.at === old.timeline.estimatedEnd;
   const ceremonyAt = awards && (oldWasAutomatic || awards.at < recalculated.timeline.estimatedEnd)
     ? recalculated.timeline.estimatedEnd : awards?.at;
   const otherEntries = tournament.plannedSchedule.filter((entry) =>
