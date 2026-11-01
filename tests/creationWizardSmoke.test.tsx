@@ -25,8 +25,11 @@ describe('five-step tournament creation smoke test', () => {
     expect(html).toContain('class="btn danger creation-discard-button"');
     expect(html).toContain('class="page-head creation-page-head"');
     expect(html).toContain('class="creation-page-container"');
-    expect(html).toContain('„Jetzt“ aktualisiert die Uhrzeit laufend. Vergangene Startzeiten sind gesperrt.');
-    expect(html).not.toContain('Den tatsächlichen Spielstart löst später die Turnierleitung aus.');
+    expect(html).toContain('class="field-hint wizard-date-hint"');
+    expect(html).toContain('class="field-hint wizard-start-hint"');
+    expect(html).toContain('Frühere Uhrzeiten sind am heutigen Tag gesperrt.');
+    expect(html).toContain('„Jetzt“ übernimmt die aktuelle Uhrzeit und aktualisiert sie fortlaufend.');
+    expect(html).toContain('Den tatsächlichen Spielstart löst später die Turnierleitung aus.');
     expect(html).not.toContain('Entwurf wird in diesem Browser automatisch gespeichert.');
   });
 
