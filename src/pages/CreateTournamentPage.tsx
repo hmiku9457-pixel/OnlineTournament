@@ -34,6 +34,7 @@ import { loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftS
 import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { DisciplineChangeDialog } from '@/components/DisciplineChangeDialog';
+import { TestParticipantsDialog } from '@/components/TestParticipantsDialog';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedActiveBreakMinutes, plannedTimelineConflicts, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
@@ -353,6 +354,8 @@ export function CreateTournamentPage() {
   const [sport, setSport] = useState(restoredDraft?.sport ?? '');
   const [pendingSport, setPendingSport] = useState<string | null>(null);
   const [pendingDiscipline, setPendingDiscipline] = useState<Discipline | null>(null);
+  const [testParticipantsDialogOpen, setTestParticipantsDialogOpen] = useState(false);
+  const testParticipantsButtonRef = useRef<HTMLButtonElement>(null);
   const sportSelectRef = useRef<HTMLSelectElement>(null);
   const availableDisciplines = disciplineOptionsForSport(sport);
   const venue = getVenueTerminology(sport);
@@ -576,7 +579,6 @@ export function CreateTournamentPage() {
   }
 
   function generateTestParticipants() {
-    if (!window.confirm('Testteilnehmer ergänzen? Die Einträge sind nur für Testturniere gedacht und können anschließend entfernt werden.')) return;
     const targetCount = 19;
     setParticipants((current) => {
       const next = [...current];
@@ -1221,7 +1223,8 @@ export function CreateTournamentPage() {
                     {editingParticipantId && (
                       <button className="btn small danger-outline" type="button" onClick={resetParticipantEditor}>Abbrechen</button>
                     )}
-                    <button className="btn small wizard-test-player-button" type="button" onClick={generateTestParticipants}
+                    <button className="btn small wizard-test-player-button" type="button" ref={testParticipantsButtonRef}
+                      onClick={() => setTestParticipantsDialogOpen(true)}
                       disabled={participantCount >= 19}
                       title={participantCount >= 19 ? 'Bereits mindestens 19 Teilnehmer gespeichert.' : 'Nur für Testturniere: Teilnehmerliste mit Testeinträgen auf 19 ergänzen'}>
                       {discipline === 'TEAMS' ? '19 Testmannschaften erzeugen' : discipline === 'SINGLES' ? '19 Testspieler erzeugen' : '19 Testdoppel erzeugen'}
@@ -2162,8 +2165,20 @@ export function CreateTournamentPage() {
           )}
           {phaseDrafts.length > 0 && <small>Unverbindliche Planung mit {timedSport ? `${matchDurationMinutes} Min. je Spiel` : `${planningMinutesPerSet(sport)} Min. je Satz`}. Zusätzliche Verzögerungen bei der Rundenfreigabe sind nicht enthalten.</small>}
           {plannedTimeline.warnings.length > 0 && <small>⚠ Die Pausenplanung enthält einen Zeitkonflikt, der vor Erstellung korrigiert werden muss.</small>}
-          {minimumMatchesShortfall > 0 && <small className="wizard-review-warning">⚠ Mindestens {actualMinimumMatches} statt {minimumMatches} tatsächlich gespielter Matches garantiert.</small>}
         </div>
+        {minimumMatchesShortfall > 0 && (
+          <div className="wizard-side-minimum-warning" role="status" aria-label="Warnung zur Mindestspielzahl">
+            <span className="wizard-side-minimum-warning-icon" aria-hidden="true">!</span>
+            <div className="wizard-side-minimum-warning-content">
+              <strong>Mindestspielzahl nicht erreicht</strong>
+              <p>Garantiert <b>{actualMinimumMatches}</b> von gewünschten <b>{minimumMatches}</b> tatsächlich gespielten Begegnungen pro Teilnehmer.</p>
+              <small>Freilose zählen nicht als gespielte Begegnungen.</small>
+              {maxReachedStep >= 4 && (
+                <button type="button" onClick={() => navigateToStep(4)}>Phasenplanung prüfen</button>
+              )}
+            </div>
+          </div>
+        )}
         {maxReachedStep >= 4 && !canCreate && (
           <div className="wizard-side-validation" role="status">
             <strong>Noch nicht bereit zur Erstellung</strong>
@@ -2191,6 +2206,20 @@ export function CreateTournamentPage() {
       </div>
       </div>}
       </div>
+      {testParticipantsDialogOpen && (
+        <TestParticipantsDialog
+          discipline={discipline}
+          existingCount={participantCount}
+          onCancel={() => {
+            setTestParticipantsDialogOpen(false);
+            testParticipantsButtonRef.current?.focus();
+          }}
+          onConfirm={() => {
+            generateTestParticipants();
+            setTestParticipantsDialogOpen(false);
+          }}
+        />
+      )}
       {pendingDiscipline && (
         <DisciplineChangeDialog
           previousDiscipline={disciplineLabel(discipline)}
