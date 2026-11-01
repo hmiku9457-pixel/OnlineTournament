@@ -152,6 +152,8 @@ export interface SchedulePhaseProposal {
   /** Optional explicit return date; absent means the calendar day after the previous phase. */
   nextDayDate?: string;
   roundCount?: number;
+  /** Durations in the actual round order, including any first-round byes. */
+  roundDurationsMinutes?: number[];
   inlineBreakAfterRound?: number;
   inlineBreakKind?: 'minutes' | 'until';
   inlineBreakMinutes?: number;
@@ -202,7 +204,12 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
       const roundCount = Math.max(0, Math.trunc(phase.roundCount ?? 0));
       const afterRound = Number(phase.inlineBreakAfterRound) || 0;
       if (roundCount > 1 && afterRound >= 1 && afterRound < roundCount) {
-        const before = Math.round(totalDuration * afterRound / roundCount);
+        const roundMinutes = phase.roundDurationsMinutes;
+        const validBreakdown = roundMinutes?.length === roundCount
+          && roundMinutes.every((value) => Number.isFinite(value) && value >= 0);
+        const before = validBreakdown
+          ? roundMinutes.slice(0, afterRound).reduce((sum, value) => sum + value, 0)
+          : Math.round(totalDuration * afterRound / roundCount);
         const after = Math.round(totalDuration) - before;
         const inlineStart = new Date(cursor.getTime() + before * 60000);
         const inlinePause: PlannedScheduleItem = { id: `inline-break-${index + 1}`, at: toLocalDateTime(inlineStart),
