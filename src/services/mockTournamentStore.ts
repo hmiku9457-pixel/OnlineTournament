@@ -374,16 +374,92 @@ export function refreshPrestartSchedule(tournamentId: string): void {
  * Draws and lifecycle snapshots are discarded, but registration/codes/withdrawals
  * and other tournaments are untouched.
  */
+/** The opened director plan's concurrency stamp covers stages, roster and
+ * prepared draws, not just the tournament status. This prevents stale editor
+ * tabs from deleting group assignments entered elsewhere. */
+export function prestartPlanningFingerprint(tournament: DemoTournament): string {
+  let draws: unknown = [];
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem('online-tournament:mock-draw-config:v1') ?? '[]');
+    draws = Array.isArray(value) ? value.filter((entry) => entry && typeof entry === 'object'
+      && (entry as { tournamentId?: string }).tournamentId === tournament.id) : [];
+  } catch { /* Leave malformed draws out of the stamp; writes still validate. */ }
+  const roster = getRuntimeParticipantNames(tournament);
+  const active = roster.filter((name) => !isParticipantWithdrawn(tournament, name));
+  return JSON.stringify([tournament.stages, roster, active, draws]);
+}
+
+/** Compare only sporting settings. Cosmetic/generated stage IDs do not
+ * represent a change to the director's plan. */
+function samePrestartPlan(tournament: DemoTournament, drafts: PrestartPhaseDraft[]): boolean {
+  const before = initialPrestartPhases(tournament);
+  if (before.length !== drafts.length) return false;
+  const canonical = (phase: PrestartPhaseDraft) => JSON.stringify({
+    type: phase.type, label: phase.label.trim(), entrantCount: phase.entrantCount,
+    bestOf: phase.type === 'BREAK' ? null : phase.bestOf,
+    groups: phase.type === 'GROUPS' ? phase.groupCount : null,
+    swissRounds: phase.type === 'SWISS' ? phase.swissRounds : null,
+    knockoutBestOf: phase.type === 'KNOCKOUT' ? phase.knockoutBestOf : null,
+    breakKind: phase.type === 'BREAK' ? phase.breakKind : null,
+    breakMinutes: phase.type === 'BREAK' && phase.breakKind === 'minutes' ? phase.breakMinutes : null,
+    nextDayStart: phase.type === 'BREAK' && phase.breakKind === 'overnight' ? phase.nextDayStart : null,
+    nextDayDate: phase.type === 'BREAK' && phase.breakKind === 'overnight' ? phase.nextDayDate ?? '' : null,
+    breakUntil: phase.type === 'BREAK' && phase.breakKind === 'until' ? phase.breakUntil : null,
+    note: phase.type === 'BREAK' ? phase.note : null,
+    inlineBreakAfterRound: phase.type === 'SWISS' || phase.type === 'KNOCKOUT' ? phase.inlineBreakAfterRound : null,
+    inlineBreakKind: phase.inlineBreakAfterRound ? phase.inlineBreakKind : null,
+    inlineBreakMinutes: phase.inlineBreakAfterRound && phase.inlineBreakKind === 'minutes' ? phase.inlineBreakMinutes : null,
+    inlineBreakUntil: phase.inlineBreakAfterRound && phase.inlineBreakKind === 'until' ? phase.inlineBreakUntil : null,
+  });
+  return before.every((phase, index) => canonical(phase) === canonical(drafts[index]));
+}
+
+/** LocalStorage has no multi-key transaction. Keep byte-for-byte snapshots of
+ * every key changed by a director phase save, including its audit record.
+ * On failure restore the complete previous state or flag restoration failure. */
+const PRESTART_TRANSACTION_KEYS = [
+  STORAGE_KEY,
+  'online-tournament:mock-draw-config:v1',
+  'online-tournament:mock-phase-lifecycle:v1',
+  'online-tournament:mock-audit:v1',
+] as const;
+
+function withPrestartRollback(action: () => void): { ok: boolean; rollbackFailed: boolean } {
+  const storage = window.localStorage;
+  const snapshot = PRESTART_TRANSACTION_KEYS.map((key) => ({ key, original: storage.getItem(key) }));
+  try {
+    action();
+    return { ok: true, rollbackFailed: false };
+  } catch {
+    let rollbackFailed = false;
+    for (const { key, original } of snapshot) {
+      try {
+        if (original === null) storage.removeItem(key);
+        else storage.setItem(key, original);
+      } catch { rollbackFailed = true; }
+    }
+    window.dispatchEvent(new Event('mock-runtime-change'));
+    window.dispatchEvent(new Event('mock-draw-change'));
+    window.dispatchEvent(new Event('mock-phase-change'));
+    return { ok: false, rollbackFailed };
+  }
+}
+
 export function updatePrestartTournamentPhases(
   tournamentId: string,
   drafts: PrestartPhaseDraft[],
-): { ok: boolean; error?: string; tournament?: DemoTournament } {
+  expectedFingerprint?: string,
+): { ok: boolean; error?: string; tournament?: DemoTournament; unchanged?: boolean } {
   const all = readLocalTournaments();
   const previous = all.find((item) => item.id === tournamentId);
   if (!previous) return { ok: false, error: 'Turnier nicht gefunden.' };
   if (hasStartedAnyStage(previous, getPhaseLifecycle(previous).startedStageIds)) {
     return { ok: false, error: 'Die Phasen lassen sich nur vor dem ersten Turnierstart ändern.' };
   }
+  if (expectedFingerprint !== undefined && expectedFingerprint !== prestartPlanningFingerprint(previous)) {
+    return { ok: false, error: 'Die Turnierplanung, die Teilnehmer oder die Auslosung wurden in einem anderen Tab geändert. Bitte die aktuelle Planung neu öffnen und deine Änderungen überprüfen.' };
+  }
+  if (samePrestartPlan(previous, drafts)) return { ok: true, tournament: previous, unchanged: true };
 
   const active = getRuntimeParticipantNames(previous).filter((name) => !isParticipantWithdrawn(previous, name));
   const errors = validatePrestartPhases(drafts, active.length);
@@ -416,21 +492,26 @@ export function updatePrestartTournamentPhases(
     lastUpdate: 'gerade eben',
   };
 
-  // A failed storage write must not invalidate a previously saved draw.
+  let transaction: { ok: boolean; rollbackFailed: boolean };
   try {
-    writeLocalTournaments(all.map((item) => item.id === tournamentId ? updated : item));
-    clearPrestartTournamentDraws(tournamentId);
-    resetPrestartPhaseLifecycle(previous);
-    recordMockAudit({
-      tournamentId, actor: 'Turnierleitung (lokal)', action: 'PRESTART_PHASES_CHANGED',
-      description: `Phasenplanung vor Turnierstart angepasst: ${active.length} aktive Teilnehmer; neue Auslosung erforderlich.`,
-      before: previous.phasesLabel, after: label,
+    transaction = withPrestartRollback(() => {
+      writeLocalTournaments(all.map((item) => item.id === tournamentId ? updated : item));
+      clearPrestartTournamentDraws(tournamentId);
+      resetPrestartPhaseLifecycle(previous);
+      recordMockAudit({
+        tournamentId, actor: 'Turnierleitung (lokal)', action: 'PRESTART_PHASES_CHANGED',
+        description: `Phasenplanung vor Turnierstart angepasst: ${active.length} aktive Teilnehmer; neue Auslosung erforderlich.`,
+        before: previous.phasesLabel, after: label,
+      });
     });
-    window.dispatchEvent(new CustomEvent('mock-runtime-change'));
-    return { ok: true, tournament: updated };
   } catch {
-    return { ok: false, error: 'Die Änderungen konnten im Browser nicht vollständig gespeichert werden. Bitte Seite neu laden und den Stand prüfen.' };
+    return { ok: false, error: 'Der vorherige Turnierstand konnte nicht gesichert werden. Es wurden keine Änderungen vorgenommen.' };
   }
+  if (!transaction.ok) return { ok: false, error: transaction.rollbackFailed
+    ? 'Speicherfehler: Die Wiederherstellung war nicht vollständig möglich. Bitte den Browser-Speicher prüfen und die Seite neu laden.'
+    : 'Speicherfehler: Der ursprüngliche Turnierstand einschließlich der Auslosung wurde wiederhergestellt.' };
+  window.dispatchEvent(new CustomEvent('mock-runtime-change'));
+  return { ok: true, tournament: updated };
 }
 
 export function getAllMockTournaments(): DemoTournament[] {
