@@ -6928,3 +6928,88 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   color: #1e40af;
 }
 .qualification-rule-recommendation > p { margin: 4px 0 0; font-size: .83rem; line-height: 1.45; }
+
+/* Turnierform: einheitliche Zahlenregler mit ±1 und Zeitregler mit ±15 Min.
+ * Keine native Spinner-Steuerung; die Eingabe bleibt trotzdem direkt editierbar. */
+.wizard-workspace .format-step .recommendation-number-stepper,
+.wizard-workspace .format-step .recommendation-duration-stepper {
+  display: grid;
+  grid-template-columns: 41px minmax(0, 1fr) 41px;
+  gap: 6px;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+}
+.wizard-workspace .format-step .recommendation-number-stepper > input {
+  min-width: 0;
+  width: 100%;
+  min-height: 39px;
+  text-align: center;
+  font-size: .9rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.wizard-workspace .format-step .recommendation-number-stepper > input::-webkit-inner-spin-button,
+.wizard-workspace .format-step .recommendation-number-stepper > input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.wizard-workspace .format-step .recommendation-number-stepper-button {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 39px;
+  padding: 0;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: #344054;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.wizard-workspace .format-step .recommendation-number-stepper-button:not(:disabled):hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #175cd3;
+}
+.wizard-workspace .format-step .recommendation-number-stepper-button:focus-visible,
+.wizard-workspace .format-step .recommendation-duration-trigger:focus-visible {
+  outline: 2px solid #175cd3;
+  outline-offset: 2px;
+}
+.wizard-workspace .format-step .recommendation-number-stepper-button:disabled {
+  background: #f2f4f7;
+  color: #98a2b3;
+  cursor: not-allowed;
+}
+.wizard-workspace .format-step .recommendation-duration-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 39px;
+  padding: 4px 7px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: #101828;
+  cursor: pointer;
+}
+.wizard-workspace .format-step .recommendation-duration-trigger:hover {
+  border-color: #93c5fd;
+  background: #f8fbff;
+}
+.wizard-workspace .format-step .recommendation-duration-trigger strong {
+  font-size: .96rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.wizard-workspace .format-step .recommendation-duration-trigger svg {
+  display: block;
+  color: #667085;
+}
+.recommendation-duration-dialog .clock-picker-dialog-note { text-align: center; }
