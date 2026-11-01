@@ -892,6 +892,16 @@ export function addMockParticipant(
 
 export function removeLocalPrototypeTournaments() {
   if (typeof window === 'undefined') return;
+  if (supportsShardedTournaments(window.localStorage)) {
+    const keys: string[] = [];
+    for (let index = 0; index < window.localStorage.length; index++) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(TOURNAMENT_RECORD_PREFIX)) keys.push(key);
+    }
+    keys.forEach((key) => window.localStorage.removeItem(key));
+    window.localStorage.removeItem(TOURNAMENT_MIGRATION_KEY);
+  }
+  previousTournamentRead.clear();
   window.localStorage.removeItem(STORAGE_KEY);
   window.localStorage.removeItem('online-tournament:mock-audit:v1');
   window.localStorage.removeItem('online-tournament:mock-match-results:v2');
