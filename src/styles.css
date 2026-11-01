@@ -7112,3 +7112,16 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .creation-draft-actions > .field-hint { text-align: left; }
   .creation-undo-remove .btn { min-height: 32px; }
 }
+
+/* The director reuses the real wizard phase editor, not a second approximation.
+   There is deliberately no wizard navigation or right-hand summary card. */
+.is-prestart-phase-editor { width: 100%; max-width: none; }
+.is-prestart-phase-editor .wizard-workspace { display: block; }
+.is-prestart-phase-editor .wizard-card { width: 100%; }
+.is-prestart-phase-editor .prestart-phase-save-panel {
+  display: grid; gap: 12px; margin-top: 16px; padding: 18px;
+  border: 1px solid var(--border, #d9e2ec); border-radius: 12px;
+}
+.is-prestart-phase-editor .prestart-editor-actions {
+  display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px;
+}
