@@ -37,6 +37,19 @@ describe('replan before tournament start', () => {
     expect(validatePrestartPhases(phases, 4)).toEqual([]);
   });
 
+  it('enforces two Swiss rounds in the pre-start editor and requires three entrants', () => {
+    const swiss = createPrestartPhase('SWISS', 3);
+    expect(swiss.swissRounds).toBe(2);
+    expect(validatePrestartPhases([swiss], 3)).toEqual([]);
+    swiss.swissRounds = 1;
+    expect(validatePrestartPhases([swiss], 3)).toContain(
+      'Phase 1: Schweizer Runden müssen zwischen 2 und 2 liegen.');
+    swiss.swissRounds = 2;
+    swiss.entrantCount = 2;
+    expect(validatePrestartPhases([swiss], 2)).toContain(
+      'Phase 1: Für das Schweizer System sind mindestens 3 Teilnehmer erforderlich.');
+  });
+
   it('recommends groups with the following qualification count', () => {
     const phases = normalizePrestartPhases(initialPrestartPhases(tournament), 19);
     expect(recommendedPrestartGroupCount(phases, 0)).toBe(4);
