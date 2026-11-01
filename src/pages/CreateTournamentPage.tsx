@@ -263,7 +263,7 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
     label: template.label,
     bestOf: phaseBestOfForSport(sport, template.type),
     groupCount: Math.max(2, template.groupCount ?? Math.min(4, Math.max(2, Math.ceil(participantCount / 4)))),
-    swissRounds: Math.max(2, template.swissRounds ?? Math.ceil(Math.log2(Math.max(2, participantCount)))),,
+    swissRounds: Math.max(2, template.swissRounds ?? Math.ceil(Math.log2(Math.max(2, participantCount)))),
     entrantCount,
     knockoutBestOf: Array.from({ length: knockoutRounds }, () => phaseBestOfForSport(sport, template.type)),
     customEntrants: isTerminalStage(template.type) && !knockoutEntrantPresets(participantCount).includes(entrantCount),
