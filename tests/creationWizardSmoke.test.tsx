@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { CreateTournamentPage } from '@/pages/CreateTournamentPage';
 import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { TestParticipantsDialog } from '@/components/TestParticipantsDialog';
+import { DiscardDraftDialog } from '@/components/DiscardDraftDialog';
 import { CREATION_DRAFT_KEY, type CreationDraft } from '@/domain/creationDraft';
 import { createVenueLayout } from '@/domain/venueLayout';
 
@@ -31,6 +32,22 @@ describe('five-step tournament creation smoke test', () => {
     expect(html).toContain('„Jetzt“ übernimmt die aktuelle Uhrzeit und aktualisiert sie fortlaufend.');
     expect(html).toContain('Den tatsächlichen Spielstart löst später die Turnierleitung aus.');
     expect(html).not.toContain('Entwurf wird in diesem Browser automatisch gespeichert.');
+  });
+
+  it('renders a dismissible destructive confirmation before discarding a draft', () => {
+    const modal = renderToStaticMarkup(createElement(DiscardDraftDialog, {
+      onCancel: () => {}, onConfirm: () => {},
+    }));
+    expect(modal).toContain('role="dialog"');
+    expect(modal).toContain('aria-modal="true"');
+    expect(modal).toContain('Entwurf verwerfen?');
+    expect(modal).toContain('Teilnehmer und Phasen gehen verloren');
+    expect(modal).toContain('Aktion kann nicht rückgängig gemacht werden');
+    expect(modal).toContain('Bereits erstellte Turniere bleiben davon unberührt');
+    expect(modal).toContain('>Abbrechen</button>');
+    expect(modal).toContain('class="btn danger"');
+    expect(modal).toContain('>Entwurf endgültig verwerfen</button>');
+    expect(modal).not.toContain('window.confirm');
   });
 
   it('renders sport-change confirmation as an accessible dialog with explicit choices', () => {
