@@ -414,6 +414,24 @@ try {
   await draftPage.getByRole('alertdialog', { name: 'Dieser Entwurf wurde zwischenzeitlich geändert' }).waitFor();
   await draftPage.getByRole('button', { name: 'Meine Fassung als Kopie speichern' }).click();
   await draftPage.waitForFunction(() => document.querySelectorAll('.sidebar-draft-item').length === 3);
+  // Two genuinely concurrent writes must serialize in one IDB transaction.
+  // Exactly one tab may update the shared revision; the other must conflict.
+  const racingTab = await draftsContext.newPage();
+  await racingTab.goto(draftPage.url());
+  await draftPage.locator('#name').fill('Gleichzeitig A');
+  await racingTab.locator('#name').fill('Gleichzeitig B');
+  await Promise.all([
+    draftPage.getByRole('button', { name: 'Entwurf speichern' }).click(),
+    racingTab.getByRole('button', { name: 'Entwurf speichern' }).click(),
+  ]);
+  await Promise.all([draftPage, racingTab].map((tab) => tab.waitForFunction(() =>
+    Boolean(document.querySelector('[aria-labelledby="draft-conflict-title"]'))
+    || [...document.querySelectorAll('[role="status"]')].some((element) => element.textContent?.includes('Entwurf gespeichert.')))));
+  const simultaneousConflicts = await draftPage.getByRole('alertdialog', { name: 'Dieser Entwurf wurde zwischenzeitlich geändert' }).count()
+    + await racingTab.getByRole('alertdialog', { name: 'Dieser Entwurf wurde zwischenzeitlich geändert' }).count();
+  assert.equal(simultaneousConflicts, 1, 'transactional competing saves must not both succeed');
+  await racingTab.close();
+
   const legacySnapshot = await draftPage.evaluate(() => localStorage.getItem('online-tournament:saved-creation-drafts:v1'));
   await secondTab.close();
   await draftsContext.close();
