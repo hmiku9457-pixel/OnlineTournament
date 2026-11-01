@@ -6,7 +6,7 @@ import { isStageCompleted, getPreviousCompetitionStage } from '@/services/mockPh
 import { getPhaseLifecycle, getStageEntrants, isStageEditable } from '@/services/mockPhaseLifecycle';
 import { buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
 import { recordMockAudit } from '@/services/mockAudit';
-import { refreshPrestartSchedule, persistStartedGroupCount } from '@/services/mockTournamentStore';
+import { persistStartedGroupCount } from '@/services/mockTournamentStore';
 
 const DRAW_KEY = 'online-tournament:mock-draw-config:v1';
 
@@ -177,7 +177,6 @@ export function setParticipantGroup(tournament: DemoTournament, stage: Tournamen
   current[participant] = groupIndex;
   upsert({ tournamentId: tournament.id, stageId: stage.id, groupAssignments: current });
   auditDraw(tournament, stage, `${participant} von Gruppe ${groupLetter(previous)} in Gruppe ${groupLetter(groupIndex)} verschoben`);
-  if (!tournament.hasStarted) refreshPrestartSchedule(tournament.id);
   return true;
 }
 
@@ -194,7 +193,6 @@ export function resetGroupAssignments(tournament: DemoTournament, stage: Tournam
     ...current.filter((item) => !(item.tournamentId === tournament.id && item.stageId === stage.id)),
   ]);
   auditDraw(tournament, stage, 'Gruppeneinteilung auf Ausgangsverteilung zurückgesetzt');
-  if (!tournament.hasStarted) refreshPrestartSchedule(tournament.id);
   return true;
 }
 
@@ -206,7 +204,6 @@ export function randomizeGroupAssignments(tournament: DemoTournament, stage: Tou
   const assignments = Object.fromEntries(randomized.map((participant, index) => [participant, index % groupCount]));
   upsert({ tournamentId: tournament.id, stageId: stage.id, groupAssignments: assignments });
   auditDraw(tournament, stage, 'Gruppen neu ausgelost');
-  if (!tournament.hasStarted) refreshPrestartSchedule(tournament.id);
   return true;
 }
 
@@ -261,7 +258,6 @@ export function applySeededGroupAssignments(tournament: DemoTournament, stage: T
   if (Object.keys(assignments).length !== entrants.length) return false;
   upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, groupAssignments: assignments });
   auditDraw(tournament, stage, 'Gruppen anhand der Schweizer Rangliste gesetzt');
-  if (!tournament.hasStarted) refreshPrestartSchedule(tournament.id);
   return true;
 }
 
