@@ -34,7 +34,7 @@ describe('creation wizard: safe durations and minimum actual matches', () => {
     expect(swiss?.minimumGuaranteedMatches).toBe(3);
     expect(swiss?.minimumMatchShortfall).toBe(1);
     const groups = recommendTournamentFormats(
-      { playerCount: 19, tableCount: 9, minimumMatches: 4, sport: 'table_tennis', matchDurationMinutes: 5 },
+      { playerCount: 9, tableCount: 9, minimumMatches: 4, sport: 'table_tennis', matchDurationMinutes: 5 },
       { maxRecommendedDurationMinutes: 5000 },
     ).find((candidate) => candidate.id === 'groups');
     expect(groups?.minimumGuaranteedMatches).toBe(3);
