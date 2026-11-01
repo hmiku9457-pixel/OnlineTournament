@@ -3,6 +3,7 @@ import type { TournamentSystemId } from './tournamentCreation';
 import type { VenueLayout } from './venueLayout';
 
 export const CREATION_DRAFT_KEY = 'online-tournament:creation-draft:v1';
+export const SAVED_CREATION_DRAFTS_KEY = 'online-tournament:saved-creation-drafts:v1';
 
 export interface CreationDraftParticipant {
   id: string;
@@ -10,6 +11,7 @@ export interface CreationDraftParticipant {
   lastName: string;
   partnerFirstName: string;
   partnerLastName: string;
+  teamName?: string;
 }
 
 export interface CreationDraftPhase {
@@ -126,10 +128,10 @@ export function highestDraftSequence(items: readonly { id: string }[], prefix: s
   }, 0);
 }
 
-export function loadCreationDraft(storage?: Pick<Storage, 'getItem'>): CreationDraft | null {
+export function loadCreationDraft(storage?: Pick<Storage, 'getItem'>, key = CREATION_DRAFT_KEY): CreationDraft | null {
   try {
     const store = storage ?? (typeof window !== 'undefined' ? window.localStorage : undefined);
-    const raw = store?.getItem(CREATION_DRAFT_KEY);
+    const raw = store?.getItem(key);
     if (!raw) return null;
     const decoded: unknown = JSON.parse(raw);
     if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) return null;
@@ -138,18 +140,66 @@ export function loadCreationDraft(storage?: Pick<Storage, 'getItem'>): CreationD
   } catch { return null; }
 }
 
-export function saveCreationDraft(draft: CreationDraft, storage?: Pick<Storage, 'setItem'>): boolean {
+export function saveCreationDraft(draft: CreationDraft, storage?: Pick<Storage, 'setItem'>, key = CREATION_DRAFT_KEY): boolean {
   try {
     const store = storage ?? (typeof window !== 'undefined' ? window.localStorage : undefined);
     if (!store) return false;
-    store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft }));
+    store.setItem(key, JSON.stringify({ version: 1, draft }));
     return true;
   } catch { return false; }
 }
 
-export function clearCreationDraft(storage?: Pick<Storage, 'removeItem'>): void {
+export function clearCreationDraft(storage?: Pick<Storage, 'removeItem'>, key = CREATION_DRAFT_KEY): void {
   try {
     const store = storage ?? (typeof window !== 'undefined' ? window.localStorage : undefined);
-    store?.removeItem(CREATION_DRAFT_KEY);
+    store?.removeItem(key);
   } catch { /* No storage access; creation can still proceed. */ }
+}
+
+/** Explicitly saved drafts are independent of the per-tab temporary autosave.
+ * This permits multiple drafts and prevents two browser tabs from silently
+ * overwriting one shared unfinished creation. */
+export interface SavedCreationDraft {
+  id: string;
+  savedAt: string;
+  draft: CreationDraft;
+}
+
+export function listSavedCreationDrafts(): SavedCreationDraft[] {
+  try {
+    const raw = window.localStorage.getItem(SAVED_CREATION_DRAFTS_KEY);
+    if (!raw) return [];
+    const items: unknown = JSON.parse(raw);
+    if (!Array.isArray(items)) return [];
+    return items.filter((item): item is SavedCreationDraft => Boolean(item && typeof item === 'object'
+      && typeof item.id === 'string' && typeof item.savedAt === 'string'
+      && validDraft(item.draft))).sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  } catch { return []; }
+}
+
+export function getSavedCreationDraft(id: string): SavedCreationDraft | null {
+  return listSavedCreationDrafts().find((item) => item.id === id) ?? null;
+}
+
+function emitDraftChange() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('creation-drafts-change'));
+}
+
+export function saveNamedCreationDraft(draft: CreationDraft, existingId?: string | null): string {
+  if (!validDraft(draft)) throw new Error('Der Entwurf enthält ungültige Angaben.');
+  const all = listSavedCreationDrafts();
+  const id = existingId && all.some((item) => item.id === existingId)
+    ? existingId : (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID() : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const entry: SavedCreationDraft = { id, savedAt: new Date().toISOString(), draft };
+  window.localStorage.setItem(SAVED_CREATION_DRAFTS_KEY, JSON.stringify([entry, ...all.filter((item) => item.id !== id)]));
+  emitDraftChange();
+  return id;
+}
+
+export function removeSavedCreationDraft(id: string): void {
+  const all = listSavedCreationDrafts();
+  if (!all.some((item) => item.id === id)) return;
+  window.localStorage.setItem(SAVED_CREATION_DRAFTS_KEY, JSON.stringify(all.filter((item) => item.id !== id)));
+  emitDraftChange();
 }
