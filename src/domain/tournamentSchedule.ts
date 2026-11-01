@@ -10,6 +10,8 @@ export interface PlannedScheduleItem {
   durationMinutes?: number;
   /** Clock-target breaks are only approximate because real rounds can end later. */
   durationApproximate?: boolean;
+  /** Preserves the kind of interruption for appropriate display in the timetable. */
+  breakKind?: 'minutes' | 'until' | 'overnight';
 }
 
 /** The browser's local wall clock is used intentionally, not Date.toISOString(). */
@@ -173,6 +175,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
       at: toLocalDateTime(cursor),
       title: phase.label,
       type: isBreak ? 'break' : 'competition',
+      ...(isBreak ? { breakKind: phase.breakKind ?? 'minutes' } : {}),
     });
     if (!isBreak) {
       const totalDuration = Math.max(0, phase.estimatedMinutes);
