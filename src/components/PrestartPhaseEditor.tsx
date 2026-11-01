@@ -72,6 +72,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
     const next = drafts[index];
     const previousPlaying = [...drafts.slice(0, index)].reverse().find((phase) => phase.type !== 'BREAK');
     const players = previousPlaying?.entrantCount ?? activeParticipants;
+    if (type === 'SWISS' && players < 3) return;
     const stage = createPrestartPhase(type, players, next);
     const candidate = [...drafts.slice(0, index), stage, ...drafts.slice(index)];
     const kinds = candidate.map((phase) => phase.type);
@@ -132,7 +133,8 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
           <div className="prestart-editor-insert-choices">
             {types.filter((option) => option.type !== 'BREAK').map((option) => (
               <button type="button" className="btn small" key={option.type}
-                disabled={option.type === 'GROUPS' && activeParticipants < 4}
+                disabled={(option.type === 'GROUPS' && activeParticipants < 4)
+                  || (option.type === 'SWISS' && activeParticipants < 3)}
                 onClick={() => insert(0, option.type)}>+ {option.name}</button>
             ))}
           </div>
@@ -145,7 +147,8 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
             {insertAfter === -1 && <div className="prestart-editor-insert-choices">
               {types.filter((option) => option.type !== 'BREAK' && !isKnockoutPhase(option.type)).map((option) => (
                 <button className="btn small" type="button" key={option.type}
-                  disabled={option.type === 'GROUPS' && activeParticipants < 4}
+                  disabled={(option.type === 'GROUPS' && activeParticipants < 4)
+                  || (option.type === 'SWISS' && activeParticipants < 3)}
                   onClick={() => insert(0, option.type)}>{option.name}</button>
               ))}
               <button className="btn small" type="button" onClick={() => setInsertAfter(null)}>Abbrechen</button>
@@ -218,6 +221,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                         <select value={phase.type} onChange={(event) => {
                           const type = event.target.value as StageType;
                           if (type === 'BREAK' && (index === 0 || index === drafts.length - 1)) return;
+                          if (type === 'SWISS' && available < 3) return;
                           const draft = createPrestartPhase(type, available, nextPlaying);
                           draft.id = phase.id;
                           draft.label = stageLabel(type);
@@ -225,7 +229,8 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                         }}>
                           {types.map((option) => <option key={option.type} value={option.type}
                             disabled={(isKnockoutPhase(option.type) && index !== drafts.length - 1)
-                              || (option.type === 'BREAK' && (index === 0 || index === drafts.length - 1))}>
+                              || (option.type === 'BREAK' && (index === 0 || index === drafts.length - 1))
+                              || (option.type === 'SWISS' && available < 3)}>
                             {option.name}
                           </option>)}
                         </select>
@@ -266,7 +271,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                             value={phase.groupCount} onChange={(event) => edit(phase.id, { groupCount: Number(event.target.value) })}/>
                         </label>}
                         {phase.type === 'SWISS' && <label>Schweizer Runden
-                          <input type="number" min={1} max={Math.min(30, phase.entrantCount - 1)}
+                          <input type="number" min={2} max={Math.max(2, Math.min(30, phase.entrantCount - 1))}
                             value={phase.swissRounds} onChange={(event) => edit(phase.id, { swissRounds: Number(event.target.value) })}/>
                         </label>}
                         {!scoreSport && <label>Best-of
@@ -319,7 +324,8 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                 {insertAfter === index && <div className="prestart-editor-insert-choices">
                   {types.filter((option) => !isKnockoutPhase(option.type)).map((option) =>
                     <button type="button" className="btn small" key={option.type} disabled={
-                      option.type === 'BREAK' && (phase.type === 'BREAK' || drafts[index + 1]?.type === 'BREAK')
+                      (option.type === 'BREAK' && (phase.type === 'BREAK' || drafts[index + 1]?.type === 'BREAK'))
+                      || (option.type === 'SWISS' && phase.entrantCount < 3)
                     } onClick={() => insert(index + 1, option.type)}>{option.name}</button>)}
                   <button className="btn small" type="button" onClick={() => setInsertAfter(null)}>Abbrechen</button>
                 </div>}
@@ -334,7 +340,9 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
             onClick={() => setInsertAfter(insertAfter === drafts.length ? null : drafts.length)}>+ nächste Phase hinzufügen</button>
           {insertAfter === drafts.length && <div className="prestart-editor-insert-choices">
             {types.filter((option) => option.type !== 'BREAK').map((option) =>
-              <button className="btn small" type="button" key={option.type} onClick={() => insert(drafts.length, option.type)}>{option.name}</button>)}
+              <button className="btn small" type="button" key={option.type}
+                disabled={option.type === 'SWISS' && drafts[drafts.length - 1].entrantCount < 3}
+                onClick={() => insert(drafts.length, option.type)}>{option.name}</button>)}
           </div>}
         </div>}
       {errors.length > 0 && <div className="prestart-editor-errors" role="alert">
