@@ -71,7 +71,7 @@ export function TournamentPlannedSchedule({
       return <span className="planned-schedule-duration">Ende ca. {formatPlannedClockTime(item.at)} {extra}</span>;
     }
     if (item.type === 'break') {
-      return <span className="planned-schedule-duration">{formatPlannedBreakDuration(item)} {extra}</span>;
+      return <span className="planned-schedule-duration">{formatPlannedBreakDuration(item)}{extra ? <> {extra}</> : null}</span>;
     }
     return <span className="planned-schedule-clock"><time dateTime={item.at}>{formatPlannedClockTime(item.at)}</time>{extra}</span>;
   };
