@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildPlannedTimeline } from '@/domain/tournamentSchedule';
 import { initialPrestartPhases } from '@/domain/prestartPhasePlanning';
-import { addMockParticipant, createMockTournament, getMockTournament, refreshPrestartSchedule, updatePrestartTournamentPhases } from '@/services/mockTournamentStore';
+import { addMockParticipant, createMockTournament, getMockTournament, refreshPrestartSchedule, updatePrestartTournamentPhases, prestartPlanningFingerprint } from '@/services/mockTournamentStore';
 import { saveParticipantWithdrawal } from '@/services/mockWithdrawals';
 import { getGroupAssignments, setParticipantGroup } from '@/services/mockDrawStore';
 import { startFirstStage } from '@/services/mockPhaseLifecycle';
@@ -91,6 +91,61 @@ describe('prestart schedule consistency after roster and phase edits', () => {
     expect(updatePrestartTournamentPhases(tournament.id, phases).ok).toBe(true);
     expect(getMockTournament(tournament.id).plannedSchedule?.find((item) => item.id === 'phase-2')?.at)
       .toBe('2026-11-21T09:15');
+  });
+
+  it('does not reset an existing draw or write an audit event when the phases are unchanged', () => {
+    const tournament = sample();
+    const stage = tournament.stages[0];
+    const groups = getGroupAssignments(tournament, stage);
+    const who = tournament.participantNames!.find((name) => groups[name] === 0)!;
+    expect(setParticipantGroup(tournament, stage, who, 1)).toBe(true);
+    const drawsBefore = storage.get('online-tournament:mock-draw-config:v1');
+    const auditBefore = storage.get('online-tournament:mock-audit:v1');
+    const phases = initialPrestartPhases(tournament);
+    const result = updatePrestartTournamentPhases(tournament.id, phases);
+    expect(result).toMatchObject({ ok: true, unchanged: true });
+    expect(storage.get('online-tournament:mock-draw-config:v1')).toBe(drawsBefore);
+    expect(storage.get('online-tournament:mock-audit:v1')).toBe(auditBefore);
+  });
+
+  it('rejects stale prestart editors when another tab changes phases or draw', () => {
+    const tournament = sample();
+    const fingerprint = prestartPlanningFingerprint(tournament);
+    const phases = initialPrestartPhases(tournament);
+    phases[0].label = 'Neue Vorrunde';
+    const changed = initialPrestartPhases(tournament);
+    changed[0].label = 'Andere Vorrunde';
+    expect(updatePrestartTournamentPhases(tournament.id, changed).ok).toBe(true);
+    const stale = updatePrestartTournamentPhases(tournament.id, phases, fingerprint);
+    expect(stale.ok).toBe(false);
+    expect(stale.error).toContain('anderen Tab');
+    expect(getMockTournament(tournament.id).stages[0].name).toBe('Andere Vorrunde');
+  });
+
+  it('rolls back all browser keys if clearing the old draw fails after saving the new stages', () => {
+    const tournament = sample();
+    const stages = initialPrestartPhases(tournament);
+    stages[0].label = 'Neue Vorrunde';
+    const keysBefore = new Map(storage);
+    let failNextDrawWrite = true;
+    vi.stubGlobal('window', Object.assign(new EventTarget(), {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          if (key === 'online-tournament:mock-draw-config:v1' && failNextDrawWrite) {
+            failNextDrawWrite = false;
+            throw new Error('Simulierter Speicherausfall');
+          }
+          storage.set(key, String(value));
+        },
+        removeItem: (key: string) => { storage.delete(key); },
+      },
+    }));
+    const result = updatePrestartTournamentPhases(tournament.id, stages);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('wiederhergestellt');
+    expect([...storage.entries()]).toEqual([...keysBefore.entries()]);
+    expect(getMockTournament(tournament.id).stages[0].name).toBe('Gruppen');
   });
 
   it('updates the forecast on registration and withdrawal, without rewriting configured group counts', () => {
