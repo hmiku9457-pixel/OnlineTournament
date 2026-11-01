@@ -29,7 +29,9 @@ import {
 } from '@/domain/tournamentCreation';
 import type { Discipline, StageType } from '@/domain/types';
 import { recommendTournamentFormats, type FormatRecommendation } from '@/engine/recommendations';
-import { createMockTournament, updatePrestartTournamentPhases } from '@/services/mockTournamentStore';
+import { createMockTournament, findTournamentNameConflict, updatePrestartTournamentPhases } from '@/services/mockTournamentStore';
+import { hasStartedAnyStage } from '@/domain/prestartPhasePlanning';
+import { getPhaseLifecycle } from '@/services/mockPhaseLifecycle';
 import type { DemoTournament } from '@/data/demoTournaments';
 import { initialPrestartPhases, validatePrestartPhases, type PrestartPhaseDraft } from '@/domain/prestartPhasePlanning';
 import { findSportOption } from '@/domain/sports';
@@ -412,6 +414,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   const [namedDraftMessage, setNamedDraftMessage] = useState('');
   const [confirmPrestartSave, setConfirmPrestartSave] = useState(false);
   const [confirmPrestartDiscard, setConfirmPrestartDiscard] = useState(false);
+  const [overwriteTournamentId, setOverwriteTournamentId] = useState<string | null>(null);
   const [prestartSaveError, setPrestartSaveError] = useState('');
   const [step, setStep] = useState<WizardStep>((restoredDraft?.step ?? 1) as WizardStep);
   const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>((restoredDraft?.maxReachedStep ?? 1) as WizardStep);
@@ -1131,8 +1134,17 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
     } else window.location.reload();
   }
 
-  function submitTournament() {
+  function submitTournament(overwriteExistingId?: string) {
     if (step !== 5 || !canCreate || scheduleIssues.length > 0) return;
+    const collision = findTournamentNameConflict(name);
+    if (collision && !overwriteExistingId) {
+      if (hasStartedAnyStage(collision, getPhaseLifecycle(collision).startedStageIds)) {
+        setCreationError('Ein bereits gestartetes Turnier trägt diesen Namen. Bitte einen anderen Namen wählen.');
+        return;
+      }
+      setOverwriteTournamentId(collision.id);
+      return;
+    }
     const submitStart = useCurrentTime ? toLocalDateTime(new Date()) : scheduledStart;
     if (!isStartAtOrAfterNow(submitStart)) {
       setCreationError('Der geplante Turnierstart muss jetzt oder in der Zukunft liegen. Bitte Datum und Uhrzeit korrigieren.');
@@ -1146,6 +1158,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       discipline,
       scheduledStart: submitStart,
       requireFutureStart: true,
+      overwriteTournamentId: overwriteExistingId,
       plannedSchedule: plannedSchedule.map((entry) => ({ ...entry, title: entry.title.trim(), note: entry.note?.trim() })),
       tables,
       minimumMatches,
@@ -2333,7 +2346,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
                 </div>
                 <div className="creation-review-final-actions">
                   <button className="btn" type="button" onClick={goBack}>← Zurück</button>
-                  <button className="btn primary wizard-create-button" type="button" onClick={submitTournament}
+                  <button className="btn primary wizard-create-button" type="button" onClick={() => submitTournament()}
                     disabled={!canCreate || scheduleIssues.length > 0}>Turnier erstellen</button>
                 </div>
               </div>
@@ -2512,6 +2525,20 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
       </div>}
       </div>
       </div>
+      {overwriteTournamentId && <div className="prototype-modal-backdrop" role="presentation">
+        <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="overwrite-tournament-title">
+          <h2 id="overwrite-tournament-title">Vorhandenes Turnier überschreiben?</h2>
+          <p>Ein noch nicht gestartetes Turnier mit dem Namen „{name.trim()}“ ist bereits gespeichert. Beim Überschreiben wird das bisherige Turnier durch die neue Planung ersetzt. Vorstart-Auslosungen und frühere Einstellungen werden verworfen.</p>
+          <div className="actions">
+            <button className="btn danger" type="button" onClick={() => {
+              const id = overwriteTournamentId;
+              setOverwriteTournamentId(null);
+              submitTournament(id);
+            }}>Vorhandenes Turnier überschreiben</button>
+            <button className="btn" type="button" onClick={() => setOverwriteTournamentId(null)}>Abbrechen</button>
+          </div>
+        </section>
+      </div>}
       {confirmPrestartDiscard && prestart && <div className="prototype-modal-backdrop" role="presentation">
         <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-label="Ungespeicherte Phasenänderungen">
           <h2>Ungespeicherte Phasenänderungen verwerfen?</h2>
