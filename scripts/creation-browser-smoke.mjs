@@ -274,7 +274,7 @@ try {
   await page4.goto(base + '/#/tournaments/new');
   await page4.locator('#name').fill('Diesen Entwurf nicht verlieren');
   await page4.waitForFunction(() =>
-    localStorage.getItem('online-tournament:creation-draft:v1')?.includes('Diesen Entwurf nicht verlieren'));
+    sessionStorage.getItem('online-tournament:creation-draft:v1:new')?.includes('Diesen Entwurf nicht verlieren'));
   await page4.getByRole('button', { name: 'Entwurf verwerfen', exact: true }).click();
   const discardDialog = page4.getByRole('dialog', { name: 'Entwurf verwerfen?' });
   await discardDialog.waitFor();
