@@ -34,8 +34,11 @@ function DraftEditorLoader({ draftId }: { draftId: string }) {
     let cancelled = false;
     getSavedCreationDraftAtomic(draftId).then((draft) => {
       if (!cancelled) setSaved(draft);
-    }).catch(() => {
-      if (!cancelled) setError('Die gespeicherten Entwürfe konnten nicht geöffnet werden. Bitte Browser-Speicher prüfen.');
+    }).catch((error: unknown) => {
+      if (!cancelled) {
+        const detail = error instanceof Error ? error.message : '';
+        setError(`Die gespeicherten Entwürfe sind nicht verfügbar. IndexedDB ist möglicherweise blockiert. Bitte den Browserspeicher freigeben und die Seite erneut öffnen.${detail ? ` (${detail})` : ''}`);
+      }
     });
     return () => { cancelled = true; };
   }, [draftId]);
