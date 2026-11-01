@@ -1,3 +1,4 @@
+import { localTournamentStorage } from '@/services/localTournamentStorage';
 import { groupLetter } from '@/domain/groupLabels';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
@@ -26,7 +27,7 @@ interface PhaseLifecycleState {
 function readAll(): PhaseLifecycleState[] {
   if (typeof window === 'undefined') return [];
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(PHASE_KEY) ?? '[]') as PhaseLifecycleState[];
+    const parsed = JSON.parse(localTournamentStorage.getItem(PHASE_KEY) ?? '[]') as PhaseLifecycleState[];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -35,7 +36,7 @@ function readAll(): PhaseLifecycleState[] {
 
 function writeAll(states: PhaseLifecycleState[]) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(PHASE_KEY, JSON.stringify(states));
+  localTournamentStorage.setItem(PHASE_KEY, JSON.stringify(states));
   window.dispatchEvent(new CustomEvent('mock-phase-change'));
 }
 
@@ -407,5 +408,5 @@ export function resetPrestartPhaseLifecycle(tournament: DemoTournament): void {
 
 export function clearMockPhaseLifecycle() {
   if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(PHASE_KEY);
+  localTournamentStorage.removeItem(PHASE_KEY);
 }

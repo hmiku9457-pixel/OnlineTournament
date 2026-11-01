@@ -1,3 +1,4 @@
+import { localTournamentStorage, flushPendingLocalTournamentWrites } from '@/services/localTournamentStorage';
 import { buildPlannedTimeline, plannedActiveBreakMinutes, validatePlannedSchedule, isValidLocalDateTime, isStartAtOrAfterNow, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { getPhaseLifecycle, resetPrestartPhaseLifecycle } from '@/services/mockPhaseLifecycle';
 import { generatePlayerCodes, generateUniquePlayerCode } from '@/services/mockPlayerCodes';
@@ -66,7 +67,7 @@ let previousTournamentRead = new Map<string, string>();
 function recordKey(id: string): string { return TOURNAMENT_RECORD_PREFIX + id; }
 
 function readTournamentIds(): string[] {
-  const data: unknown = JSON.parse(window.localStorage.getItem(TOURNAMENT_INDEX_KEY) ?? '[]');
+  const data: unknown = JSON.parse(localTournamentStorage.getItem(TOURNAMENT_INDEX_KEY) ?? '[]');
   if (!Array.isArray(data) || !data.every((id) => typeof id === 'string')) {
     throw new Error('Ungültiger Turnierindex. Bitte den aktuellen Browser-Speicher prüfen.');
   }
@@ -77,7 +78,7 @@ function readLocalTournaments(): DemoTournament[] {
   if (typeof window === 'undefined') return [];
   const entries: StoredTournament[] = [];
   for (const id of readTournamentIds()) {
-    const raw = window.localStorage.getItem(recordKey(id));
+    const raw = localTournamentStorage.getItem(recordKey(id));
     if (!raw) throw new Error('Ein Turnierdatensatz fehlt. Bitte den Browser-Speicher prüfen.');
     const parsed: StoredTournament = JSON.parse(raw);
     if (!parsed?.tournament || parsed.tournament.id !== id || !Number.isFinite(parsed.sortOrder)) {
@@ -93,7 +94,7 @@ function readLocalTournaments(): DemoTournament[] {
 
 function writeLocalTournaments(tournaments: DemoTournament[]) {
   if (typeof window === 'undefined') return;
-  const storage = window.localStorage;
+  const storage = localTournamentStorage;
   const desired = new Map(tournaments.map((t) => [t.id, t]));
   const beforeIds = readTournamentIds();
   const existingIds = new Set(beforeIds);
@@ -240,30 +241,30 @@ export function cleanupReplacedTournamentData(tournamentId: string): void {
   ];
   for (const key of arraysWithTournamentId) {
     try {
-      const raw = window.localStorage.getItem(key);
+      const raw = localTournamentStorage.getItem(key);
       if (!raw) continue;
       const entries: unknown = JSON.parse(raw);
       if (!Array.isArray(entries)) continue;
       const remaining = entries.filter((record) => !record || typeof record !== 'object'
         || (record as { tournamentId?: unknown }).tournamentId !== tournamentId);
-      if (remaining.length !== entries.length) window.localStorage.setItem(key, JSON.stringify(remaining));
+      if (remaining.length !== entries.length) localTournamentStorage.setItem(key, JSON.stringify(remaining));
     } catch { /* Preserve unreadable storage rather than deleting unrelated records. */ }
   }
   for (const key of arraysWithMatchId) {
     try {
-      const raw = window.localStorage.getItem(key);
+      const raw = localTournamentStorage.getItem(key);
       if (!raw) continue;
       const entries: unknown = JSON.parse(raw);
       if (!Array.isArray(entries)) continue;
       const remaining = entries.filter((record) => !record || typeof record !== 'object'
         || typeof (record as { matchId?: unknown }).matchId !== 'string'
         || !(record as { matchId: string }).matchId.startsWith(`${tournamentId}-phase-`));
-      if (remaining.length !== entries.length) window.localStorage.setItem(key, JSON.stringify(remaining));
+      if (remaining.length !== entries.length) localTournamentStorage.setItem(key, JSON.stringify(remaining));
     } catch { /* Do not mutate malformed user data. */ }
   }
   for (const key of mapsByCompositeKey) {
     try {
-      const raw = window.localStorage.getItem(key);
+      const raw = localTournamentStorage.getItem(key);
       if (!raw) continue;
       const records: unknown = JSON.parse(raw);
       if (!records || typeof records !== 'object' || Array.isArray(records)) continue;
@@ -274,19 +275,19 @@ export function cleanupReplacedTournamentData(tournamentId: string): void {
         delete remaining[name];
         changed = true;
       }
-      if (changed) window.localStorage.setItem(key, JSON.stringify(remaining));
+      if (changed) localTournamentStorage.setItem(key, JSON.stringify(remaining));
     } catch { /* Do not mutate malformed data. */ }
   }
   for (const key of mapsByTournament) {
     try {
-      const raw = window.localStorage.getItem(key);
+      const raw = localTournamentStorage.getItem(key);
       if (!raw) continue;
       const records: unknown = JSON.parse(raw);
       if (!records || typeof records !== 'object' || Array.isArray(records)
         || !Object.prototype.hasOwnProperty.call(records, tournamentId)) continue;
       const remaining = { ...(records as Record<string, unknown>) };
       delete remaining[tournamentId];
-      window.localStorage.setItem(key, JSON.stringify(remaining));
+      localTournamentStorage.setItem(key, JSON.stringify(remaining));
     } catch { /* Do not delete other tournaments' records. */ }
   }
 }
@@ -353,6 +354,14 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
   // lifecycle snapshots cannot accidentally attach to the replacement.
   writeLocalTournaments([tournament, ...existing.filter((item) => item.id !== id && item.id !== input.overwriteTournamentId)]);
   if (input.overwriteTournamentId) cleanupReplacedTournamentData(input.overwriteTournamentId);
+  return tournament;
+}
+
+/** Interactive creations wait for the canonical multi-key IndexedDB commit
+ * before the wizard clears its draft or navigates away. */
+export async function createMockTournamentAtomic(input: CreateMockTournamentInput): Promise<DemoTournament> {
+  const tournament = createMockTournament(input);
+  await flushPendingLocalTournamentWrites();
   return tournament;
 }
 
@@ -448,7 +457,7 @@ export function refreshPrestartSchedule(tournamentId: string): void {
 export function prestartPlanningFingerprint(tournament: DemoTournament): string {
   let draws: unknown = [];
   try {
-    const value: unknown = JSON.parse(window.localStorage.getItem('online-tournament:mock-draw-config:v1') ?? '[]');
+    const value: unknown = JSON.parse(localTournamentStorage.getItem('online-tournament:mock-draw-config:v1') ?? '[]');
     draws = Array.isArray(value) ? value.filter((entry) => entry && typeof entry === 'object'
       && (entry as { tournamentId?: string }).tournamentId === tournament.id) : [];
   } catch { /* Leave malformed draws out of the stamp; writes still validate. */ }
@@ -492,7 +501,7 @@ const PRESTART_SHARED_RECORD_KEYS = [
 ] as const;
 
 function withPrestartRollback(tournamentId: string, action: () => void): { ok: boolean; rollbackFailed: boolean } {
-  const storage = window.localStorage;
+  const storage = localTournamentStorage;
   const tournamentKey = recordKey(tournamentId);
   const originalTournament = storage.getItem(tournamentKey);
   const snapshots = PRESTART_SHARED_RECORD_KEYS.map((key) => {
@@ -613,7 +622,10 @@ export async function updatePrestartTournamentPhasesSafely(
 ): Promise<ReturnType<typeof updatePrestartTournamentPhases>> {
   const perform = () => updatePrestartTournamentPhases(tournamentId, drafts, expectedFingerprint);
   if (typeof navigator !== 'undefined' && navigator.locks?.request) {
-    return navigator.locks.request('online-tournament:prestart:shared-storage', { mode: 'exclusive' }, perform);
+    return navigator.locks.request('online-tournament:prestart:shared-storage', { mode: 'exclusive' }, perform).then(async (result) => {
+      if (result.ok) await flushPendingLocalTournamentWrites();
+      return result;
+    });
   }
   if (typeof indexedDB === 'undefined') {
     return { ok: false, error: 'Die sichere Speichersperre ist in diesem Browser nicht verfügbar.' };
@@ -640,6 +652,9 @@ export async function updatePrestartTournamentPhasesSafely(
       tx.onerror = () => { db.close(); resolve({ ok: false, error: 'Fehler beim Sperren des Turnierspeichers.' }); };
       tx.onabort = () => { db.close(); resolve({ ok: false, error: 'Die Speichersperre wurde abgebrochen.' }); };
     };
+  }).then(async (result) => {
+    if (result.ok) await flushPendingLocalTournamentWrites();
+    return result;
   });
 }
 
@@ -738,20 +753,20 @@ export function updateMockParticipantName(tournamentId: string, oldName: string,
     };
     configKeys.forEach((key) => {
       try {
-        const parsed: unknown = JSON.parse(window.localStorage.getItem(key) ?? '[]');
+        const parsed: unknown = JSON.parse(localTournamentStorage.getItem(key) ?? '[]');
         if (!Array.isArray(parsed)) return;
         const renamed = parsed.map((entry: { tournamentId?: string }) => entry.tournamentId === tournamentId ? renameValue(entry) : entry);
-        window.localStorage.setItem(key, JSON.stringify(renamed));
+        localTournamentStorage.setItem(key, JSON.stringify(renamed));
       } catch { /* Alte, fehlerhafte Testdaten nicht übernehmen. */ }
     });
 
     // Match IDs stay unchanged, but walkover winners contain the display name.
     const resultKey = 'online-tournament:mock-match-results:v2';
     try {
-      const results: unknown = JSON.parse(window.localStorage.getItem(resultKey) ?? '[]');
+      const results: unknown = JSON.parse(localTournamentStorage.getItem(resultKey) ?? '[]');
       if (Array.isArray(results)) {
         const prefixes = tournament.stages.map((stage) => `${stage.id}-`);
-        window.localStorage.setItem(resultKey, JSON.stringify(results.map((result: { matchId?: string }) =>
+        localTournamentStorage.setItem(resultKey, JSON.stringify(results.map((result: { matchId?: string }) =>
           prefixes.some((prefix) => result.matchId?.startsWith(prefix)) ? renameValue(result) : result)));
       }
     } catch { /* Broken local test records are ignored. */ }
@@ -760,46 +775,46 @@ export function updateMockParticipantName(tournamentId: string, oldName: string,
     // are keyed by tournamentId:stageId.
     for (const key of ['online-tournament:swiss-cutoff-decisions:v1', 'online-tournament:swiss-round-robin-history:v1']) {
       try {
-        const all: unknown = JSON.parse(window.localStorage.getItem(key) ?? '{}');
+        const all: unknown = JSON.parse(localTournamentStorage.getItem(key) ?? '{}');
         if (!all || typeof all !== 'object' || Array.isArray(all)) continue;
         const records = all as Record<string, unknown>;
         for (const recordKey of Object.keys(records)) {
           if (recordKey.startsWith(`${tournamentId}:`)) records[recordKey] = renameValue(records[recordKey]);
         }
-        window.localStorage.setItem(key, JSON.stringify(records));
+        localTournamentStorage.setItem(key, JSON.stringify(records));
       } catch { /* Broken local test records are ignored. */ }
     }
   }
 
   if (name !== oldName) {
     try {
-      const withdrawn = JSON.parse(window.localStorage.getItem('online-tournament:withdrawn-participants:v1') ?? '{}') as Record<string, string[]>;
+      const withdrawn = JSON.parse(localTournamentStorage.getItem('online-tournament:withdrawn-participants:v1') ?? '{}') as Record<string, string[]>;
       if (withdrawn[tournamentId]) {
         withdrawn[tournamentId] = withdrawn[tournamentId].map((entry) => entry === oldName ? name : entry);
-        window.localStorage.setItem('online-tournament:withdrawn-participants:v1', JSON.stringify(withdrawn));
+        localTournamentStorage.setItem('online-tournament:withdrawn-participants:v1', JSON.stringify(withdrawn));
       }
     } catch { /* Keine gespeicherten Rückzüge vorhanden. */ }
   }
   if (name !== oldName) {
     try {
       const timingKey = 'online-tournament:withdrawal-timing:v1';
-      const timings = JSON.parse(window.localStorage.getItem(timingKey) ?? '{}') as Record<string, Record<string, unknown>>;
+      const timings = JSON.parse(localTournamentStorage.getItem(timingKey) ?? '{}') as Record<string, Record<string, unknown>>;
       if (timings[tournamentId]?.[oldName]) {
         timings[tournamentId][name] = timings[tournamentId][oldName];
         delete timings[tournamentId][oldName];
-        window.localStorage.setItem(timingKey, JSON.stringify(timings));
+        localTournamentStorage.setItem(timingKey, JSON.stringify(timings));
       }
     } catch { /* No recorded withdrawal timing. */ }
   }
   if (name !== oldName) {
     try {
       const key = 'online-tournament:withdrawal-restore:v1';
-      const records = JSON.parse(window.localStorage.getItem(key) ?? '{}') as Record<string, Record<string, unknown>>;
+      const records = JSON.parse(localTournamentStorage.getItem(key) ?? '{}') as Record<string, Record<string, unknown>>;
       const current = records[tournamentId];
       if (current?.[oldName]) {
         current[name] = current[oldName];
         delete current[oldName];
-        window.localStorage.setItem(key, JSON.stringify(records));
+        localTournamentStorage.setItem(key, JSON.stringify(records));
       }
     } catch { /* Ignore broken legacy mock data. */ }
   }
@@ -883,7 +898,7 @@ export function removeLocalPrototypeTournaments() {
   if (typeof window === 'undefined') return;
   // Clear all current record keys, including unindexed orphans from a
   // best-effort replacement cleanup. The browser storage API supports this.
-  const store = window.localStorage;
+  const store = localTournamentStorage;
   if (typeof store.key === 'function' && typeof store.length === 'number') {
     const recordKeys: string[] = [];
     for (let index = 0; index < store.length; index++) {
@@ -896,19 +911,19 @@ export function removeLocalPrototypeTournaments() {
   }
   previousTournamentRead.clear();
   store.removeItem(TOURNAMENT_INDEX_KEY);
-  window.localStorage.removeItem('online-tournament:mock-audit:v1');
-  window.localStorage.removeItem('online-tournament:mock-match-results:v2');
-  window.localStorage.removeItem('online-tournament:mock-match-runtime:v1');
-  window.localStorage.removeItem('online-tournament:mock-blocked-tables:v1');
-  window.localStorage.removeItem('online-tournament:mock-draw-config:v1');
-  window.localStorage.removeItem('online-tournament:mock-phase-lifecycle:v1');
-  window.localStorage.removeItem('online-tournament:withdrawn-participants:v1');
-  window.localStorage.removeItem('online-tournament:withdrawal-restore:v1');
-  window.localStorage.removeItem('online-tournament:withdrawal-timing:v1');
-  window.localStorage.removeItem('online-tournament:swiss-round-fixtures:v1');
-  window.localStorage.removeItem('online-tournament:swiss-cutoff-decisions:v1');
-  window.localStorage.removeItem('online-tournament:swiss-extra-rounds:v1');
-  window.localStorage.removeItem('online-tournament:swiss-round-robin-history:v1');
+  localTournamentStorage.removeItem('online-tournament:mock-audit:v1');
+  localTournamentStorage.removeItem('online-tournament:mock-match-results:v2');
+  localTournamentStorage.removeItem('online-tournament:mock-match-runtime:v1');
+  localTournamentStorage.removeItem('online-tournament:mock-blocked-tables:v1');
+  localTournamentStorage.removeItem('online-tournament:mock-draw-config:v1');
+  localTournamentStorage.removeItem('online-tournament:mock-phase-lifecycle:v1');
+  localTournamentStorage.removeItem('online-tournament:withdrawn-participants:v1');
+  localTournamentStorage.removeItem('online-tournament:withdrawal-restore:v1');
+  localTournamentStorage.removeItem('online-tournament:withdrawal-timing:v1');
+  localTournamentStorage.removeItem('online-tournament:swiss-round-fixtures:v1');
+  localTournamentStorage.removeItem('online-tournament:swiss-cutoff-decisions:v1');
+  localTournamentStorage.removeItem('online-tournament:swiss-extra-rounds:v1');
+  localTournamentStorage.removeItem('online-tournament:swiss-round-robin-history:v1');
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
 }
 

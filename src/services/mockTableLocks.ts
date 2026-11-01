@@ -1,3 +1,4 @@
+import { localTournamentStorage } from '@/services/localTournamentStorage';
 import type { DemoTournament } from '@/data/demoTournaments';
 import { recordMockAudit } from '@/services/mockAudit';
 
@@ -10,7 +11,7 @@ type StoredTableLocks = Record<string, string[]>;
 function readTableLocks(): StoredTableLocks {
   if (typeof window === 'undefined') return {};
   try {
-    const value: unknown = JSON.parse(window.localStorage.getItem(TABLE_LOCK_KEY) ?? '{}');
+    const value: unknown = JSON.parse(localTournamentStorage.getItem(TABLE_LOCK_KEY) ?? '{}');
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
     return value as StoredTableLocks;
   } catch {
@@ -41,7 +42,7 @@ export function setMockTableBlocked(tournament: DemoTournament, table: string, b
   if (blocked) current.add(table);
   else current.delete(table);
   all[tournament.id] = [...current];
-  window.localStorage.setItem(TABLE_LOCK_KEY, JSON.stringify(all));
+  localTournamentStorage.setItem(TABLE_LOCK_KEY, JSON.stringify(all));
   if (wasBlocked !== blocked) {
     recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)',
       action: blocked ? 'TABLE_BLOCKED' : 'TABLE_UNBLOCKED',

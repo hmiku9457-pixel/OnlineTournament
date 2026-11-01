@@ -1,3 +1,4 @@
+import { localTournamentStorage } from '@/services/localTournamentStorage';
 /** Director-resolved qualification tie in a GROUPS stage.
  * A choice is valid only for the exact completed group results/draw signature.
  * No alphabetic ordering may silently break a sporting tie at the cutoff. */
@@ -15,7 +16,7 @@ export interface GroupCutoffDecision {
 function readAll(): GroupCutoffDecision[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = JSON.parse(window.localStorage.getItem(KEY) || '[]') as unknown;
+    const raw = JSON.parse(localTournamentStorage.getItem(KEY) || '[]') as unknown;
     return Array.isArray(raw) ? raw.filter((x): x is GroupCutoffDecision =>
       Boolean(x && typeof x === 'object' && typeof (x as GroupCutoffDecision).stageId === 'string')) : [];
   } catch { return []; }
@@ -30,6 +31,6 @@ export function saveGroupCutoffDecision(decision: GroupCutoffDecision): void {
   // decisions for the same results, but replace a corrected choice for this signature.
   const prior = readAll().filter((x) => !(x.tournamentId === decision.tournamentId && x.stageId === decision.stageId && x.signature === decision.signature));
   if (typeof window === 'undefined') throw new Error('Eine Speicherung ist nur im Turnierbrowser möglich.');
-  window.localStorage.setItem(KEY, JSON.stringify([...prior, decision]));
+  localTournamentStorage.setItem(KEY, JSON.stringify([...prior, decision]));
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
 }

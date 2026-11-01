@@ -1,3 +1,4 @@
+import { localTournamentStorage } from '@/services/localTournamentStorage';
 import { groupLetter } from '@/domain/groupLabels';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
@@ -22,7 +23,7 @@ interface StageDrawConfig {
 function readAll(): StageDrawConfig[] {
   if (typeof window === 'undefined') return [];
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(DRAW_KEY) ?? '[]') as StageDrawConfig[];
+    const parsed = JSON.parse(localTournamentStorage.getItem(DRAW_KEY) ?? '[]') as StageDrawConfig[];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -31,7 +32,7 @@ function readAll(): StageDrawConfig[] {
 
 function writeAll(configs: StageDrawConfig[]) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(DRAW_KEY, JSON.stringify(configs));
+  localTournamentStorage.setItem(DRAW_KEY, JSON.stringify(configs));
   window.dispatchEvent(new CustomEvent('mock-draw-change'));
 }
 
@@ -472,5 +473,5 @@ export function clearPrestartTournamentDraws(tournamentId: string): void {
 
 export function clearMockDraws() {
   if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(DRAW_KEY);
+  localTournamentStorage.removeItem(DRAW_KEY);
 }

@@ -1,3 +1,4 @@
+import { localTournamentStorage } from '@/services/localTournamentStorage';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
@@ -28,7 +29,7 @@ export interface InlineBreakConfiguration {
 function readAll(): InlineBreakRecord[] {
   if (typeof window === 'undefined') return [];
   try {
-    const value = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '[]');
+    const value = JSON.parse(localTournamentStorage.getItem(STORAGE_KEY) ?? '[]');
     return Array.isArray(value) ? value : [];
   } catch {
     return [];
@@ -37,7 +38,7 @@ function readAll(): InlineBreakRecord[] {
 function save(record: InlineBreakRecord) {
   if (typeof window === 'undefined') return;
   const entries = readAll();
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify([record, ...entries.filter((entry) =>
+  localTournamentStorage.setItem(STORAGE_KEY, JSON.stringify([record, ...entries.filter((entry) =>
     !(entry.tournamentId === record.tournamentId && entry.stageId === record.stageId))]));
   window.dispatchEvent(new CustomEvent('mock-phase-change'));
 }

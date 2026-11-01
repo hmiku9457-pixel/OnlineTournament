@@ -1,3 +1,4 @@
+import { localTournamentStorage } from '@/services/localTournamentStorage';
 import { groupLetter } from '@/domain/groupLabels';
 import { isParticipantWithdrawn, saveParticipantWithdrawal, removeParticipantWithdrawal, markWithdrawalRestoreEligibility, getWithdrawalRestoreEligibility, saveWithdrawalTiming, type WithdrawalTiming } from '@/services/mockWithdrawals';
 import { reconcilePrestartDraws, reconcileQualifiedDraw } from '@/services/mockDrawStore';
@@ -95,7 +96,7 @@ interface SwissFixture { tournamentId: string; stageId: string; round: number; p
 
 function readSwissFixtures(): SwissFixture[] {
   if (typeof window === 'undefined') return [];
-  try { return JSON.parse(window.localStorage.getItem(SWISS_FIXTURE_KEY) ?? '[]') as SwissFixture[]; } catch { return []; }
+  try { return JSON.parse(localTournamentStorage.getItem(SWISS_FIXTURE_KEY) ?? '[]') as SwissFixture[]; } catch { return []; }
 }
 
 export function isMockParticipantWithdrawn(tournament: DemoTournament, name: string) {
@@ -167,7 +168,7 @@ function invalidateUnstartedLaterRounds(tournament: DemoTournament, stage: Tourn
   if (stage.type === 'SWISS' && typeof window !== 'undefined') {
     const fixtures = readSwissFixtures();
     if (fixtures.some((entry) => entry.tournamentId === tournament.id && entry.stageId === stage.id && entry.round > round)) {
-      window.localStorage.setItem(SWISS_FIXTURE_KEY, JSON.stringify(fixtures.filter((entry) =>
+      localTournamentStorage.setItem(SWISS_FIXTURE_KEY, JSON.stringify(fixtures.filter((entry) =>
         entry.tournamentId !== tournament.id || entry.stageId !== stage.id || entry.round <= round)));
     }
   }
@@ -207,7 +208,7 @@ export function canEditMockMatch(tournament: DemoTournament, matchId: string) {
 function readResults(): StoredMatchResult[] {
   if (typeof window === 'undefined') return [];
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(RESULT_KEY) ?? '[]') as StoredMatchResult[];
+    const parsed = JSON.parse(localTournamentStorage.getItem(RESULT_KEY) ?? '[]') as StoredMatchResult[];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -216,14 +217,14 @@ function readResults(): StoredMatchResult[] {
 
 function writeResults(results: StoredMatchResult[]) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(RESULT_KEY, JSON.stringify(results));
+  localTournamentStorage.setItem(RESULT_KEY, JSON.stringify(results));
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
 }
 
 function readRuntime(): StoredMatchRuntime[] {
   if (typeof window === 'undefined') return [];
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(RUNTIME_KEY) ?? '[]') as StoredMatchRuntime[];
+    const parsed = JSON.parse(localTournamentStorage.getItem(RUNTIME_KEY) ?? '[]') as StoredMatchRuntime[];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -232,7 +233,7 @@ function readRuntime(): StoredMatchRuntime[] {
 
 function writeRuntime(states: StoredMatchRuntime[]) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(RUNTIME_KEY, JSON.stringify(states));
+  localTournamentStorage.setItem(RUNTIME_KEY, JSON.stringify(states));
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
 }
 
@@ -479,7 +480,7 @@ function swissMatches(tournament: DemoTournament, stage: TournamentStage, result
       ? swissRoundPairings(eligible, [], results, tournament.sport)
       : swissRoundPairings(eligible, matches, results, tournament.sport));
     if (!savedRound && isStageStarted(tournament, stage) && typeof window !== 'undefined') {
-      window.localStorage.setItem(SWISS_FIXTURE_KEY, JSON.stringify([
+      localTournamentStorage.setItem(SWISS_FIXTURE_KEY, JSON.stringify([
         ...readSwissFixtures().filter((item) => !(item.tournamentId === tournament.id && item.stageId === stage.id && item.round === round)),
         { tournamentId: tournament.id, stageId: stage.id, round, pairs: pairings },
       ]));

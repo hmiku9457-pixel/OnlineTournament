@@ -1,10 +1,11 @@
+import { localTournamentStorage } from '@/services/localTournamentStorage';
 /** Persisted number of extra full-field Swiss rounds granted by the tournament director.
  * These are real Swiss rounds: pairings, match history, BHZ and qualification all include them. */
 const KEY = 'online-tournament:swiss-extra-rounds:v1';
 function records(): Record<string, number> {
   if (typeof window === 'undefined') return {};
   try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(KEY) ?? '{}');
+    const parsed: unknown = JSON.parse(localTournamentStorage.getItem(KEY) ?? '{}');
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, number> : {};
   } catch { return {}; }
 }
@@ -20,7 +21,7 @@ export function addSwissExtraRound(tournamentId: string, stageId: string): numbe
   const next = getSwissExtraRoundCount(tournamentId, stageId) + 1;
   if (next > 50) return 0;
   current[id(tournamentId, stageId)] = next;
-  window.localStorage.setItem(KEY, JSON.stringify(current));
+  localTournamentStorage.setItem(KEY, JSON.stringify(current));
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
   return next;
 }

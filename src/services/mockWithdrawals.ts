@@ -1,3 +1,4 @@
+import { localTournamentStorage } from '@/services/localTournamentStorage';
 import type { DemoTournament } from '@/data/demoTournaments';
 
 export const WITHDRAWAL_KEY = 'online-tournament:withdrawn-participants:v1';
@@ -10,7 +11,7 @@ export type WithdrawalTiming =
 function readTimingRecords(): Record<string, Record<string, WithdrawalTiming>> {
   if (typeof window === 'undefined') return {};
   try {
-    const data: unknown = JSON.parse(window.localStorage.getItem(WITHDRAWAL_TIMING_KEY) ?? '{}');
+    const data: unknown = JSON.parse(localTournamentStorage.getItem(WITHDRAWAL_TIMING_KEY) ?? '{}');
     return data && typeof data === 'object' && !Array.isArray(data)
       ? data as Record<string, Record<string, WithdrawalTiming>> : {};
   } catch { return {}; }
@@ -19,7 +20,7 @@ function readTimingRecords(): Record<string, Record<string, WithdrawalTiming>> {
 export function saveWithdrawalTiming(tournamentId: string, name: string, timing: WithdrawalTiming): void {
   const all = readTimingRecords();
   all[tournamentId] = { ...(all[tournamentId] ?? {}), [name]: timing };
-  window.localStorage.setItem(WITHDRAWAL_TIMING_KEY, JSON.stringify(all));
+  localTournamentStorage.setItem(WITHDRAWAL_TIMING_KEY, JSON.stringify(all));
 }
 
 /** Existing between-phase withdrawals can be identified from their restore record. */
@@ -63,7 +64,7 @@ export function getStageWithdrawalLabel(tournament: DemoTournament, name: string
 export function readWithdrawnParticipants(): Record<string, string[]> {
   if (typeof window === 'undefined') return {};
   try {
-    const data: unknown = JSON.parse(window.localStorage.getItem(WITHDRAWAL_KEY) ?? '{}');
+    const data: unknown = JSON.parse(localTournamentStorage.getItem(WITHDRAWAL_KEY) ?? '{}');
     return data && typeof data === 'object' && !Array.isArray(data)
       ? data as Record<string, string[]> : {};
   } catch { return {}; }
@@ -76,7 +77,7 @@ export function isParticipantWithdrawn(tournament: DemoTournament, name: string)
 export function saveParticipantWithdrawal(tournament: DemoTournament, name: string): void {
   const current = readWithdrawnParticipants();
   current[tournament.id] = [...new Set([...(current[tournament.id] ?? []), name])];
-  window.localStorage.setItem(WITHDRAWAL_KEY, JSON.stringify(current));
+  localTournamentStorage.setItem(WITHDRAWAL_KEY, JSON.stringify(current));
 }
 
 
@@ -87,7 +88,7 @@ export interface WithdrawalRestoreRecord { phaseId: string | null; kind: 'PRESTA
 
 function readRestoreRecords(): Record<string, Record<string, WithdrawalRestoreRecord>> {
   if (typeof window === 'undefined') return {};
-  try { return JSON.parse(window.localStorage.getItem(RESTORE_KEY) ?? '{}') as Record<string, Record<string, WithdrawalRestoreRecord>>; }
+  try { return JSON.parse(localTournamentStorage.getItem(RESTORE_KEY) ?? '{}') as Record<string, Record<string, WithdrawalRestoreRecord>>; }
   catch { return {}; }
 }
 
@@ -97,7 +98,7 @@ export function markWithdrawalRestoreEligibility(tournamentId: string, name: str
   if (record) entries[name] = record;
   else delete entries[name];
   records[tournamentId] = entries;
-  window.localStorage.setItem(RESTORE_KEY, JSON.stringify(records));
+  localTournamentStorage.setItem(RESTORE_KEY, JSON.stringify(records));
 }
 
 export function getWithdrawalRestoreEligibility(tournamentId: string, name: string) {
@@ -107,11 +108,11 @@ export function getWithdrawalRestoreEligibility(tournamentId: string, name: stri
 export function removeParticipantWithdrawal(tournament: DemoTournament, name: string) {
   const all = readWithdrawnParticipants();
   all[tournament.id] = (all[tournament.id] ?? []).filter((entry) => entry !== name);
-  window.localStorage.setItem(WITHDRAWAL_KEY, JSON.stringify(all));
+  localTournamentStorage.setItem(WITHDRAWAL_KEY, JSON.stringify(all));
   markWithdrawalRestoreEligibility(tournament.id, name, null);
   const timings = readTimingRecords();
   if (timings[tournament.id]) {
     delete timings[tournament.id][name];
-    window.localStorage.setItem(WITHDRAWAL_TIMING_KEY, JSON.stringify(timings));
+    localTournamentStorage.setItem(WITHDRAWAL_TIMING_KEY, JSON.stringify(timings));
   }
 }
