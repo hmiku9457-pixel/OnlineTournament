@@ -5,7 +5,7 @@ import { formatPlannedDateTime } from '@/domain/tournamentSchedule';
 import { disciplineLabel } from '@/domain/sports';
 import type { TournamentStage } from '@/domain/types';
 import { getVenueTerminology } from '@/domain/venueTerminology';
-import { isStageCompleted, isStageStarted } from '@/services/mockPhaseLifecycle';
+import { isStageCompleted } from '@/services/mockPhaseLifecycle';
 
 interface SummaryProgress {
   percent: number;
@@ -41,7 +41,9 @@ function stageDetails(stage: TournamentStage): string {
   const parts: string[] = [];
   if (stage.type === 'BREAK') {
     return stage.settings.breakKind === 'overnight'
-      ? `Spieltagsende · Fortsetzung am Folgetag um ${stage.settings.nextDayStart} Uhr`
+      ? (stage.settings.nextDayDate
+        ? `Spieltagsende · Fortsetzung ${formatPlannedDateTime(`${stage.settings.nextDayDate}T${stage.settings.nextDayStart ?? '09:00'}`)}`
+        : `Spieltagsende · Fortsetzung am Folgetag um ${stage.settings.nextDayStart} Uhr`)
       : stage.settings.breakKind === 'until'
         ? `Pause bis ${stage.settings.breakUntil} Uhr`
         : `${stage.settings.breakMinutes} Minuten Pause`;
