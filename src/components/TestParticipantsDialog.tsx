@@ -65,7 +65,7 @@ export function TestParticipantsDialog({ discipline, existingCount, incompleteCo
             <span>Bereits vollständig: <strong>{existingCount}</strong></span>
             <span>Werden ergänzt: <strong>{remaining}</strong></span>
             <span>Danach vollständig: <strong>19</strong></span>
-            {incompleteCount > 0 && <span>Zusätzlich unvollständig: <strong>{incompleteCount}</strong></span>
+            {incompleteCount > 0 && <span>Zusätzlich unvollständig: <strong>{incompleteCount}</strong></span>}
           </div>
           <p>Vorhandene Teilnehmer bleiben unverändert. Die neuen Testeinträge erhalten eindeutige Namen und können später wieder entfernt werden.</p>
         </div>
