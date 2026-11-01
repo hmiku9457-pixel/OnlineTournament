@@ -278,6 +278,51 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(markup).toContain('aria-expanded="false"');
   });
 
+  it('vereint Phasenplan und Zeitplan mit Live-, Abgeschlossen- und Ausstehend-Status', () => {
+    const start = '2026-11-01T10:00';
+    const items: PlannedScheduleItem[] = [
+      { id: 'phase-1', at: start, title: 'Alte Gruppenphase', type: 'competition' },
+      { id: 'phase-2', at: '2026-11-01T11:30', title: 'Mittagspause', type: 'break', breakKind: 'minutes', durationMinutes: 20 },
+      { id: 'phase-3', at: '2026-11-01T11:50', title: 'Schweizer System', type: 'competition' },
+      { id: 'awards-ceremony', at: '2026-11-01T15:00', title: 'Siegerehrung', type: 'other' },
+    ];
+    const stages = [
+      { id: 'group-id', name: 'Gruppenphase', type: 'GROUPS', status: 'completed' as const, details: '3 Gruppen', advancement: '9 qualifizieren sich' },
+      { id: 'break-id', name: 'Mittagspause', type: 'BREAK', status: 'live' as const, details: '20 Minuten Pause' },
+      { id: 'swiss-id', name: 'Schweizer System', type: 'SWISS', status: 'pending' as const, details: '4 Runden' },
+    ];
+    const html = renderToStaticMarkup(createElement(TournamentPlannedSchedule, {
+      scheduledStart: start, items, stages, onStage: () => {},
+    }));
+    expect((html.match(/class="planned-schedule-stage-button"/g) ?? [])).toHaveLength(3);
+    expect(html).toContain('class="planned-schedule-live-dot"');
+    expect(html).toContain('status-completed');
+    expect(html).toContain('status-live');
+    expect(html).toContain('status-pending');
+    expect(html).toContain('Läuft gerade');
+    expect(html).toContain('Abgeschlossen');
+    expect(html).toContain('Ausstehend');
+    expect(html).toContain('Gruppenphase, Abgeschlossen. Im Turnierverlauf öffnen');
+    expect(html).toContain('3 Gruppen');
+    expect(html).toContain('9 qualifizieren sich');
+    expect(html).toContain('Siegerehrung');
+    expect(html).not.toContain('Alte Gruppenphase');
+  });
+
+  it('zeigt und verlinkt sämtliche Phasen auch ohne veröffentlichten Zeitplan', () => {
+    const html = renderToStaticMarkup(createElement(TournamentPlannedSchedule, {
+      stages: [
+        { id: 'phase-a', name: 'Vorrunde', type: 'GROUPS', status: 'pending' },
+        { id: 'phase-b', name: 'Finale', type: 'KNOCKOUT', status: 'pending' },
+      ], onStage: () => {},
+    }));
+    expect(html).toContain('Vorrunde');
+    expect(html).toContain('Finale');
+    expect(html).toContain('Zeit noch offen');
+    expect((html.match(/class="planned-schedule-stage-button"/g) ?? [])).toHaveLength(2);
+    expect(html).not.toContain('Für dieses Turnier wurde kein detaillierter Ablauf veröffentlicht.');
+  });
+
   it('zeigt auch öffentlich das Spieltagsende statt einer 40-Stunden-Pause und übernimmt Hinweise', () => {
     const start = '2026-11-01T10:00';
     const timeline = buildPlannedTimeline(start, [
