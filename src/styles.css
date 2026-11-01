@@ -6295,3 +6295,31 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
     white-space: normal;
   }
 }
+
+/* Turniererstellung: automatisch gespeicherter Entwurf und Reset-Aktion */
+.page-head .creation-draft-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  margin-top: 5px;
+  color: #667085;
+  font-size: .74rem;
+}
+.page-head .creation-draft-actions [role="alert"] {
+  color: #b42318;
+  font-weight: 750;
+}
+.page-head .creation-draft-actions .btn {
+  padding: 3px 9px;
+  min-height: 29px;
+  border-color: #d0d5dd;
+  background: #fff;
+  font-size: .72rem;
+  line-height: 1.25;
+}
+.page-head .creation-draft-actions .btn:hover {
+  border-color: #f97066;
+  color: #b42318;
+  background: #fff5f4;
+}
