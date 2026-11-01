@@ -52,6 +52,8 @@ export interface CreateMockTournamentInput {
   venueLayout?: VenueLayout;
   matchDurationMinutes?: number;
   venueTurnoverMinutes?: number;
+  /** Allowed only after the user confirms replacing an unstarted tournament. */
+  overwriteTournamentId?: string;
 }
 
 function readLocalTournaments(): DemoTournament[] {
@@ -138,6 +140,19 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
   }
   const scheduleIssues = validatePlannedSchedule(input.plannedSchedule ?? []);
   if (scheduleIssues.length) throw new Error(scheduleIssues[0]);
+  const existing = readLocalTournaments();
+  const normalizedName = input.name.trim().toLocaleLowerCase('de-DE');
+  const nameMatches = existing.filter((item) => item.name.trim().toLocaleLowerCase('de-DE') === normalizedName);
+  const protectedMatch = nameMatches.find((item) => hasStartedAnyStage(item, getPhaseLifecycle(item).startedStageIds));
+  if (protectedMatch) throw new Error('Ein bereits gestartetes oder abgeschlossenes Turnier trägt diesen Namen. Bitte einen anderen Turniernamen wählen.');
+  if (nameMatches.length && (!input.overwriteTournamentId
+    || !nameMatches.some((item) => item.id === input.overwriteTournamentId))) {
+    throw new Error('Ein nicht gestartetes Turnier trägt diesen Namen. Bitte das Überschreiben bestätigen.');
+  }
+  if (input.overwriteTournamentId && (nameMatches.length !== 1
+    || nameMatches[0].id !== input.overwriteTournamentId)) {
+    throw new Error('Das zuvor ausgewählte Turnier wurde zwischenzeitlich verändert. Bitte den Namenskonflikt erneut prüfen.');
+  }
   const id = createId();
   const stages = input.phases.map((phase, index) => {
     const nextCompetition = input.phases.slice(index + 1).find((next) => next.type !== 'BREAK');
@@ -173,8 +188,9 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
     plannedSchedule: input.plannedSchedule?.map((entry) => ({ ...entry })) ?? [],
   };
 
-  const existing = readLocalTournaments();
-  writeLocalTournaments([tournament, ...existing.filter((item) => item.id !== id)]);
+  // Replace the unstarted record with a NEW identity; old prestart draws and
+  // lifecycle snapshots cannot accidentally attach to the replacement.
+  writeLocalTournaments([tournament, ...existing.filter((item) => item.id !== id && item.id !== input.overwriteTournamentId)]);
   return tournament;
 }
 
