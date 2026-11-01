@@ -11,12 +11,19 @@ const DRAW_KEY = 'online-tournament:mock-draw-config:v1';
 const data = new Map<string, string>();
 let failDrawOnce = false;
 let failIndexOnce = false;
+let failRecordRemovalOnce = false;
 let injectExternalDraw: (() => void) | null = null;
 const storage = {
   get length() { return data.size; },
   key(index: number) { return [...data.keys()][index] ?? null; },
   getItem(key: string) { return data.get(key) ?? null; },
-  removeItem(key: string) { data.delete(key); },
+  removeItem(key: string) {
+    if (failRecordRemovalOnce && key.startsWith(`${STORAGE_KEY}:record:`)) {
+      failRecordRemovalOnce = false;
+      throw new Error('Simulierter Bereinigungsfehler');
+    }
+    data.delete(key);
+  },
   setItem(key: string, value: string) {
     if (key === INDEX_KEY && failIndexOnce) {
       failIndexOnce = false;
@@ -34,6 +41,7 @@ beforeEach(() => {
   data.clear();
   failDrawOnce = false;
   failIndexOnce = false;
+  failRecordRemovalOnce = false;
   injectExternalDraw = null;
   vi.stubGlobal('window', Object.assign(new EventTarget(), { localStorage: storage }));
   vi.stubGlobal('CustomEvent', class<T> extends Event {
@@ -96,6 +104,17 @@ describe('sharded local tournament storage', () => {
     expect(data.get(originalKey)).toBe(originalData);
     expect(getAllMockTournaments().map((item) => item.id)).toEqual([original.id]);
     expect([...data.keys()].filter((key) => key.startsWith(`${STORAGE_KEY}:record:`))).toEqual([originalKey]);
+  });
+
+  it('keeps the replacement tournament readable if removing its obsolete record fails', () => {
+    const original = createMockTournament(input('Turnier ersetzen'));
+    failRecordRemovalOnce = true;
+    const replacement = createMockTournament({ ...input('Turnier ersetzen'), overwriteTournamentId: original.id });
+    expect(getAllMockTournaments().map((t) => t.id)).toEqual([replacement.id]);
+    expect(getMockTournament(replacement.id).name).toBe('Turnier ersetzen');
+    expect(data.has(`${STORAGE_KEY}:record:${original.id}`)).toBe(true);
+    removeLocalPrototypeTournaments();
+    expect([...data.keys()].some((key) => key.startsWith(`${STORAGE_KEY}:record:`))).toBe(false);
   });
 
   it('rolls back only the failing tournament while preserving external draw edits for another event', () => {
