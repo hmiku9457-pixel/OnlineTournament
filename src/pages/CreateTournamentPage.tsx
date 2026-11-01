@@ -1807,7 +1807,7 @@ export function CreateTournamentPage() {
                                   onChange={(event) => updatePhase(phase.id, { swissRounds: Math.max(1, Math.min(30, Number(event.target.value))) })}
                                 />
                                 {!isValidSwissRoundCount(phase.swissRounds, phase.entrantCount) &&
-                                  <span className="field-error" role="alert">Für {phase.entrantCount} Teilnehmer sind höchstens {Math.min(30, phase.entrantCount - 1)} Schweizer Runden möglich.</span>
+                                  <span className="field-error" role="alert">Für {phase.entrantCount} Teilnehmer sind höchstens {Math.min(30, phase.entrantCount - 1)} Schweizer Runden möglich.</span>}
                               </div>
                             )}
 
