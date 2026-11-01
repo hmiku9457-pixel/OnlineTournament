@@ -402,6 +402,7 @@ export function CreateTournamentPage() {
   const [pendingDiscipline, setPendingDiscipline] = useState<Discipline | null>(null);
   const [testParticipantsDialogOpen, setTestParticipantsDialogOpen] = useState(false);
   const [discardDraftDialogOpen, setDiscardDraftDialogOpen] = useState(false);
+  const [focusStartSettings, setFocusStartSettings] = useState(false);
   const discardDraftButtonRef = useRef<HTMLButtonElement>(null);
   const testParticipantsButtonRef = useRef<HTMLButtonElement>(null);
   const sportSelectRef = useRef<HTMLSelectElement>(null);
@@ -901,6 +902,20 @@ export function CreateTournamentPage() {
     navigateToStep((step - 1) as WizardStep);
   }
 
+  function goToDateTimeSettings() {
+    if (step !== 1 && !confirmLeaveParticipantEditor()) return;
+    setStep(1);
+    setFocusStartSettings(true);
+  }
+
+  useEffect(() => {
+    if (!focusStartSettings || step !== 1) return;
+    const dateField = document.getElementById('tournament-date');
+    dateField?.scrollIntoView({ behavior: 'auto', block: 'center' });
+    dateField?.focus({ preventScroll: true });
+    setFocusStartSettings(false);
+  }, [step, focusStartSettings]);
+
   function confirmDisciplineChange() {
     if (!pendingDiscipline) return;
     setDiscipline(pendingDiscipline);
@@ -1119,7 +1134,10 @@ export function CreateTournamentPage() {
             <strong>Der geplante Turnierstart liegt in der Vergangenheit.</strong>
             <p>Bitte wähle einen zukünftigen Termin oder verwende die aktuelle Uhrzeit.</p>
           </div>
-          <button type="button" className="btn small" onClick={selectCurrentTime}>Jetzt verwenden</button>
+          <div className="wizard-start-past-banner-actions">
+            <button type="button" className="btn small" onClick={selectCurrentTime}>Stattdessen das aktuelle Datum und Uhrzeit verwenden</button>
+            <button type="button" className="btn small" onClick={goToDateTimeSettings}>Zur Datums und Uhrzeiteinstellung</button>
+          </div>
         </div>
       )}
 
