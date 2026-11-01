@@ -515,7 +515,9 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   const [venueLayoutEnabled, setVenueLayoutEnabled] = useState(restoredDraft?.venueLayoutEnabled ?? false);
   const [venueLayoutEditorOpen, setVenueLayoutEditorOpen] = useState(false);
   const [venueLayout, setVenueLayout] = useState(() => restoredDraft?.venueLayout ?? createVenueLayout(8));
-  const [venueLayoutCustomized, setVenueLayoutCustomized] = useState(Boolean(restoredDraft?.venueLayoutEnabled));
+  const [venueLayoutCustomized, setVenueLayoutCustomized] = useState(() =>
+    restoredDraft?.venueLayoutCustomized ?? Boolean(restoredDraft
+      && JSON.stringify(restoredDraft.venueLayout) !== JSON.stringify(createVenueLayout(restoredDraft.tables))));
   useEffect(() => {
     setVenueLayout((current) => venueLayoutCustomized
       ? resizeVenueLayout(current, current.columns, Math.max(current.rows, Math.ceil(tables / current.columns)), tables)
@@ -564,7 +566,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   const draftSnapshot = useMemo<CreationDraft>(() => ({
     step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
     sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
-    customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
+    customTables, venueLayoutEnabled, venueLayout, venueLayoutCustomized, participants, participantForm,
     editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
     knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
@@ -1497,7 +1499,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
                       {venueLayoutEditorOpen ? 'Plan einklappen' : 'Plan bearbeiten'}
                     </button>
                   </div>
-                  {venueLayoutEditorOpen && <VenueLayoutEditor layout={venueLayout} tableCount={tables} sport={sport} onChange={(next) => { setVenueLayout(next); setVenueLayoutCustomized(true); }} />}
+                  {venueLayoutEditorOpen && <VenueLayoutEditor layout={venueLayout} tableCount={tables} sport={sport} onChange={(next) => { setVenueLayout(next); setVenueLayoutCustomized(JSON.stringify(next) !== JSON.stringify(createVenueLayout(tables))); }} />}
                 </>
               )}
             </div>
