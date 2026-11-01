@@ -103,7 +103,7 @@ function validDraft(value: unknown): value is CreationDraft {
     && ['round-robin', 'groups', 'swiss', 'knockout'].every((key) =>
       typeof (data.enabledSystems as unknown as Record<string, unknown>)[key] === 'boolean')
     && [data.maxGroups, data.maxSwissRounds, data.knockoutQualifierCount]
-      .every((v) => v === null || Number.isInteger(v))
+      .every((v) => v === null || (typeof v === 'number' && Number.isInteger(v)))
     && (data.selectedRecommendationId === null || typeof data.selectedRecommendationId === 'string')
     && typeof data.awardsEnabled === 'boolean'
     && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string');
