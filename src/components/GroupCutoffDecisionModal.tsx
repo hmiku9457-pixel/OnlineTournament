@@ -10,9 +10,9 @@ export function GroupCutoffDecisionModal({ status, onResolve, onClose }: {
 }) {
   const title = useId();
   const first = useRef<HTMLSelectElement>(null);
-  const [chosen, setChosen] = useState<string[]>([]);
-  const [method, setMethod] = useState<'PLAYOFF' | 'LOT'>('PLAYOFF');
-  const [explanation, setExplanation] = useState('');
+  const [chosen, setChosen] = useState<string[]>(status.decision?.winners ?? []);
+  const [method, setMethod] = useState<'PLAYOFF' | 'LOT'>(status.decision?.method ?? 'PLAYOFF');
+  const [explanation, setExplanation] = useState(status.decision?.explanation ?? '');
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const oldOverflow = document.body.style.overflow;
@@ -45,9 +45,9 @@ export function GroupCutoffDecisionModal({ status, onResolve, onClose }: {
     <div className="prototype-modal-backdrop group-cutoff-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="prototype-modal group-cutoff-dialog" role="dialog" aria-modal="true" aria-labelledby={title} onKeyDown={trapFocus}>
         <span className="badge">QUALIFIKATION ENTSCHEIDEN</span>
-        <h2 id={title}>Sportlicher Gleichstand am Qualifikationsplatz</h2>
-        <p>Die Gruppenphase ist abgeschlossen. {status.tie.players.length} Teilnehmer sind in allen sportlichen Vergleichskriterien gleichauf. Für {status.tie.slots} {status.tie.slots === 1 ? 'freien Platz' : 'freie Plätze'} muss die Turnierleitung einen Stichentscheid dokumentieren.</p>
-        <p className="muted">Alphabetische Sortierung entscheidet nicht über das Weiterkommen. Das gewöhnliche Gruppenergebnis bleibt unverändert.</p>
+        <h2 id={title}>{status.decision ? 'Qualifikations-Stichentscheid korrigieren' : 'Sportlicher Gleichstand am Qualifikationsplatz'}</h2>
+        <p>Die {status.scope === 'round-robin' ? 'Jeder-gegen-jeden-Phase' : 'Gruppenphase'} ist abgeschlossen. {status.tie.players.length} Teilnehmer sind in allen sportlichen Vergleichskriterien gleichauf. Für {status.tie.slots} {status.tie.slots === 1 ? 'freien Platz' : 'freie Plätze'} muss die Turnierleitung einen Stichentscheid dokumentieren.</p>
+        <p className="muted">{status.groupLabel ? `${status.groupLabel}: Gleichstand innerhalb dieser Gruppe. ` : ''}Alphabetische Sortierung entscheidet nicht über das Weiterkommen. Das gewöhnliche Ergebnis bleibt unverändert.</p>
         <div className="field">
           <label htmlFor="group-cutoff-method">Entscheidungsverfahren</label>
           <select ref={first} id="group-cutoff-method" value={method} onChange={(event) => setMethod(event.target.value as 'PLAYOFF' | 'LOT')}>
@@ -77,7 +77,7 @@ export function GroupCutoffDecisionModal({ status, onResolve, onClose }: {
           <button className="btn primary" type="button"
             disabled={chosen.length !== status.tie.slots || explanation.trim().length < 3}
             onClick={() => setError(onResolve(chosen, method, explanation))}>
-            Entscheidung dokumentieren und Qualifikation freigeben
+            {status.decision ? 'Korrektur speichern und Qualifikation aktualisieren' : 'Entscheidung dokumentieren und Qualifikation freigeben'}
           </button>
           <button className="btn" type="button" onClick={onClose}>Später entscheiden</button>
         </div>
