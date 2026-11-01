@@ -30,7 +30,7 @@ export function GroupMatchDayList({
           <div className={`group-match-row${match.status === 'live' ? ' live' : ''} ${matchVisualClass(match.status)}`} key={match.id}
             role="group" aria-label={`${match.sideA} gegen ${match.sideB}: ${matchVisualLabel(match.status)}`}
             title={matchVisualLabel(match.status)}>
-            <span className="group-match-state-dot" aria-hidden="true" />
+            <span className={`group-match-state-dot${match.status === 'live' ? ' group-match-live-dot' : ''}`} aria-hidden="true" />
             <span className="group-match-side" title={match.sideA}>{sideLabel?.(match.sideA, match) ?? match.sideA}</span>
             <MatchResultDetails score={match.score} sets={match.sets} sport={sport}
               onOpenResult={match.status !== 'open' && onEditResult ? () => onEditResult(match.id) : undefined} />
