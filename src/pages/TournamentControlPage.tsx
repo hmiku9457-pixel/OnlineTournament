@@ -6,7 +6,7 @@ import { StageCard } from '@/components/StageCard';
 import { TournamentSummaryPanel } from '@/components/TournamentSummaryPanel';
 
 import { PrestartPhaseEditor } from '@/components/PrestartPhaseEditor';
-import { initialPrestartPhases, normalizePrestartPhases, validatePrestartPhases } from '@/domain/prestartPhasePlanning';
+import { getFirstPhaseRecommendationWarning } from '@/domain/prestartPhasePlanning';
 import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
@@ -629,16 +629,12 @@ export function TournamentControlPage() {
   const matchFilterTables = useMemo(() => [...new Set(allTournamentMatches.map((match) => match.table).filter((table) => table.startsWith('Tisch ')))], [allTournamentMatches]);
   const participants = useMemo(() => getRuntimeParticipantNames(participantSource.tournament), [participantSource]);
   const activePrestartParticipants = participants.filter((name) => !isParticipantWithdrawn(tournament, name)).length;
-  const originalFirstField = tournament.stages.find((stage) => stage.type !== 'BREAK')?.settings.entrants;
-  // Registration changes are a warning, not an implicit requirement to
-  // reopen and reapprove the wizard. The actual draw remains authoritative.
-  const prestartPlanNeedsReview = !tournament.hasStarted && (
-    Number(originalFirstField) !== activePrestartParticipants
-    || validatePrestartPhases(
-      normalizePrestartPhases(initialPrestartPhases(tournament), activePrestartParticipants),
-      activePrestartParticipants,
-    ).length > 0
-  );
+  // The roster changes the first phase's field automatically. Only a different
+  // recommended phase configuration calls for a review.
+  const firstPhaseRecommendationWarning = getFirstPhaseRecommendationWarning(tournament, activePrestartParticipants);
+  const pendingPrestartRecommendationWarning = pendingWithdrawal && !tournament.hasStarted
+    ? getFirstPhaseRecommendationWarning(tournament, activePrestartParticipants - 1)
+    : null;
   const participantProgress = useMemo(() => participants.map((name) => ({
     name,
     progress: getMockParticipantProgress(progressSource.tournament, name),
@@ -833,8 +829,10 @@ export function TournamentControlPage() {
 
   function requestParticipantWithdrawal(name: string) {
     if (!canWithdrawMockParticipant(tournament, name)) return;
-    // Only an ongoing phase needs the explicit destructive-action warning.
-    if (getActiveStage(tournament)) {
+    // Keep the ongoing-phase confirmation. Before the tournament starts,
+    // show a modal only if the withdrawal changes the recommended first phase.
+    if (getActiveStage(tournament)
+      || (!tournament.hasStarted && getFirstPhaseRecommendationWarning(tournament, activePrestartParticipants - 1))) {
       setPendingWithdrawal(name);
       return;
     }
@@ -1789,10 +1787,20 @@ export function TournamentControlPage() {
       {pendingWithdrawal && (
         <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setPendingWithdrawal(null)}>
           <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="withdrawal-warning-title" onMouseDown={(event) => event.stopPropagation()}>
-            <span className="badge">RÜCKZUG WÄHREND EINER PHASE</span>
+            <span className="badge">{pendingPrestartRecommendationWarning ? 'PHASENPLANUNG PRÜFEN' : 'RÜCKZUG WÄHREND EINER PHASE'}</span>
             <h2 id="withdrawal-warning-title">{pendingWithdrawal} zurückziehen?</h2>
-            <p>Die aktuelle Phase läuft bereits. Der Rückzug kann danach nicht mehr rückgängig gemacht werden. Betroffene Spiele werden kampflos gewertet.</p>
-            {activeStage?.type === 'GROUPS' && <p className="muted">In der Gruppenphase werden auch bereits gespielte Begegnungen mit 0:11 je Satz gegen diesen Teilnehmer gewertet. Tabellen und Qualifikation ändern sich entsprechend.</p>}
+            {pendingPrestartRecommendationWarning ? (
+              <>
+                <p>Nach diesem Rückzug weicht die empfohlene Konfiguration der ersten Phase von der Planung ab:</p>
+                <p className="break-prestart-warning">{pendingPrestartRecommendationWarning}</p>
+                <p className="muted">Bitte prüfe vor dem Turnierstart die Phaseneinstellungen. Die Planung wird durch den Rückzug nicht automatisch verändert.</p>
+              </>
+            ) : (
+              <>
+                <p>Die aktuelle Phase läuft bereits. Der Rückzug kann danach nicht mehr rückgängig gemacht werden. Betroffene Spiele werden kampflos gewertet.</p>
+                {activeStage?.type === 'GROUPS' && <p className="muted">In der Gruppenphase werden auch bereits gespielte Begegnungen mit 0:11 je Satz gegen diesen Teilnehmer gewertet. Tabellen und Qualifikation ändern sich entsprechend.</p>}
+              </>
+            )}
             <div className="actions">
               <button className="btn danger" type="button" onClick={confirmParticipantWithdrawal}>Zurückziehen</button>
               <button className="btn" type="button" onClick={() => setPendingWithdrawal(null)}>Abbrechen</button>
@@ -1912,7 +1920,7 @@ export function TournamentControlPage() {
               </div>
             )}
             {pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind === 'overnight' && <p className="muted">Der nächste Spieltag beginnt planmäßig morgen um {pendingStartStage.settings.nextDayStart} Uhr.</p>}
-            {prestartPlanNeedsReview && startModal.kind === 'tournament' && <p className="break-prestart-warning" role="status">Hinweis: Die Teilnehmerzahl hat sich geändert. Bitte prüfe Auslosung und Folgephasen. Ein erneutes Bestätigen der Phasenplanung ist für gültige Konstellationen nicht erforderlich.</p>}
+            {firstPhaseRecommendationWarning && startModal.kind === 'tournament' && <p className="break-prestart-warning" role="status">Hinweis zur ersten Phase: {firstPhaseRecommendationWarning} Bitte prüfe vor dem Start die Phaseneinstellungen. Ein erneutes Bestätigen der Phasenplanung ist für gültige Konstellationen nicht erforderlich.</p>}
             {pendingPauseIssue && <p className="field-error" role="alert">{pendingPauseIssue}</p>}
             {pendingStartIssue && <p className="field-error" role="alert">{pendingStartIssue}</p>}
             <div className="actions">
