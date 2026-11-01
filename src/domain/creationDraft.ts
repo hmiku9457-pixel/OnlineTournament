@@ -52,6 +52,7 @@ export interface CreationDraft {
   tables: number;
   customTables: boolean;
   venueLayoutEnabled: boolean;
+  venueLayoutCustomized?: boolean;
   venueLayout: VenueLayout;
   participants: CreationDraftParticipant[];
   participantForm: Omit<CreationDraftParticipant, 'id'>;
@@ -87,6 +88,7 @@ function validDraft(value: unknown): value is CreationDraft {
     && typeof data.timedMatchMinutes === 'string' && typeof data.venueTurnoverMinutes === 'string'
     && Number.isInteger(Number(data.tables)) && Number(data.tables) >= 1 && Number(data.tables) <= 9999
     && typeof data.customTables === 'boolean' && typeof data.venueLayoutEnabled === 'boolean'
+    && (data.venueLayoutCustomized === undefined || typeof data.venueLayoutCustomized === 'boolean')
     && Boolean(data.venueLayout && Number.isInteger(data.venueLayout.columns)
       && data.venueLayout.columns > 0 && Number.isInteger(data.venueLayout.rows)
       && data.venueLayout.rows > 0 && Array.isArray(data.venueLayout.cells)
