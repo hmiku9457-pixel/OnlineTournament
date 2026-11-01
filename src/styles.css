@@ -6694,3 +6694,25 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   background: var(--match-status-bg);
   border: 1px solid var(--match-status-border);
 }
+/* Wizard: present actual-match and schedule warnings without shifting layout. */
+.wizard-review-warning {
+  color: #9a6700; font-size: .79rem; line-height: 1.45; font-weight: 600;
+}
+.recommendation-metric-tag.wizard-metric-warning {
+  color: #92400e; background: #fffbeb; border-color: #fcd34d;
+}
+.recommendation .recommendation-reason {
+  font-size: .76rem; line-height: 1.45; color: #475467;
+}
+.wizard-review-check {
+  display: grid; gap: 6px; margin: 0 0 14px;
+  padding: 12px 14px; border: 1px solid #fcd34d;
+  border-left: 3px solid #d97706; border-radius: 8px; background: #fffbeb;
+  color: #78350f;
+}
+.wizard-review-check > p { margin: 0; font-size: .84rem; line-height: 1.5; }
+.phase-qualification-explanation {
+  width: 100%; margin: 6px 0; padding: 6px 9px;
+  background: #eff6ff; border-left: 3px solid #60a5fa;
+  border-radius: 4px; color: #1e40af; font-size: .76rem; line-height: 1.45;
+}
