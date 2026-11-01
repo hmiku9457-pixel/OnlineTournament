@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { clearCreationDraft, CREATION_DRAFT_KEY, highestDraftSequence, loadCreationDraft, saveCreationDraft, type CreationDraft } from '@/domain/creationDraft';
+import { describe, expect, it, vi } from 'vitest';
+import { clearCreationDraft, CREATION_DRAFT_KEY, highestDraftSequence, loadCreationDraft, saveCreationDraft, listSavedCreationDrafts, saveNamedCreationDraft, getSavedCreationDraft, removeSavedCreationDraft, type CreationDraft } from '@/domain/creationDraft';
 import { resizeVenueLayout, createVenueLayout } from '@/domain/venueLayout';
 
 function makeDraft(): CreationDraft {
@@ -93,6 +93,25 @@ describe('tournament creation draft recovery', () => {
     expect(highestDraftSequence([{ id: 'participant-3' }, { id: 'participant-19' }, { id: 'other' }], 'participant')).toBe(19);
     expect(highestDraftSequence([{ id: 'phase-2' }, { id: 'phase-6' }], 'phase')).toBe(6);
     expect(highestDraftSequence([], 'phase')).toBe(0);
+  });
+
+  it('keeps saved drafts separately, updates them by ID and can remove just one', () => {
+    const store = fakeStorage();
+    vi.stubGlobal('window', Object.assign(new EventTarget(), { localStorage: store }));
+    try {
+      const first = saveNamedCreationDraft(makeDraft());
+      const second = saveNamedCreationDraft({ ...makeDraft(), name: 'Zweite Veranstaltung' });
+      expect(first).not.toBe(second);
+      expect(listSavedCreationDrafts()).toHaveLength(2);
+      expect(getSavedCreationDraft(second)?.draft.name).toBe('Zweite Veranstaltung');
+      expect(saveNamedCreationDraft({ ...makeDraft(), name: 'Aktualisiert' }, first)).toBe(first);
+      expect(getSavedCreationDraft(first)?.draft.name).toBe('Aktualisiert');
+      removeSavedCreationDraft(first);
+      expect(listSavedCreationDrafts()).toHaveLength(1);
+      expect(getSavedCreationDraft(second)).not.toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('allows creation to proceed if the browser refuses a draft write', () => {
