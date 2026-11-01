@@ -421,12 +421,12 @@ try {
   // A separate browser profile with an existing saved-draft list imports it
   // once into IndexedDB and retains it after repeated page loads.
   const legacyContext = await browser.newContext();
+  await legacyContext.addInitScript((raw) => {
+    const key = 'online-tournament:saved-creation-drafts:v1';
+    if (raw && !localStorage.getItem(key)) localStorage.setItem(key, raw);
+  }, legacySnapshot);
   const legacyPage = await legacyContext.newPage();
   await legacyPage.goto(base + '/#/tournaments/new');
-  await legacyPage.evaluate((raw) => {
-    if (raw) localStorage.setItem('online-tournament:saved-creation-drafts:v1', raw);
-  }, legacySnapshot);
-  await legacyPage.reload();
   await legacyPage.locator('.sidebar-draft-item').first().waitFor();
   const migratedCount = await legacyPage.locator('.sidebar-draft-item').count();
   await legacyPage.locator('.sidebar-draft-item').first().click();
