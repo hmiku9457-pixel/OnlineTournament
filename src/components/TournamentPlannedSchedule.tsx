@@ -28,13 +28,15 @@ export function TournamentPlannedSchedule({
   // Use actual stage data as the source of truth for labels and status; after
   // pre-start edits, extra stages still appear even if no timetable was saved.
   const plannedIndices = new Set<number>();
-  const combined: PlannedScheduleItem[] = items.map((item) => {
+  const combined: PlannedScheduleItem[] = items.flatMap((item) => {
     const match = /^phase-(\d+)$/.exec(item.id);
     const index = match ? Number(match[1]) - 1 : -1;
     const stage = index >= 0 ? stages?.[index] : undefined;
-    if (!stage) return item;
+    // An edited phase plan can have fewer stages than its old preview.
+    if (match && stages && !stage) return [];
+    if (!stage) return [item];
     plannedIndices.add(index);
-    return { ...item, title: stage.name, type: stage.type === 'BREAK' ? 'break' : 'competition' };
+    return [{ ...item, title: stage.name, type: stage.type === 'BREAK' ? 'break' : 'competition' }];
   });
   stages?.forEach((stage, index) => {
     if (!plannedIndices.has(index)) {
@@ -48,6 +50,10 @@ export function TournamentPlannedSchedule({
   });
 
   const grouped = groupPlannedScheduleDays(combined, scheduledStart);
+  const displayDays = [
+    ...grouped.days.filter((day) => day.date !== 'unknown'),
+    ...grouped.days.filter((day) => day.date === 'unknown'),
+  ];
   const stageFor = (item: PlannedScheduleItem): TimetableStage | undefined => {
     const match = /^phase-(\d+)$/.exec(item.id);
     return match ? stages?.[Number(match[1]) - 1] : undefined;
@@ -67,7 +73,7 @@ export function TournamentPlannedSchedule({
     <section className="card tournament-planned-schedule" aria-label="Unverbindlicher Zeitplan">
       <div className="planned-schedule-heading">
         <div>
-          <span className="planned-schedule-eyebrow">Vorabinformation · unverbindlich</span>
+          <span className="planned-schedule-eyebrow">{stages?.length ? 'Phasenstatus · Zeiten unverbindlich' : 'Vorabinformation · unverbindlich'}</span>
           <h2>{title}</h2>
         </div>
         {scheduledStart && <div className="planned-schedule-start">
@@ -81,9 +87,10 @@ export function TournamentPlannedSchedule({
           : 'Orientierung für Teilnehmer und Gäste. Spielbeginn, Phasen und Pausen können am Turniertag abweichen; maßgeblich ist die aktuelle Turnierleitung.'}
       </p>
       {combined.length > 0 && <ol className="planned-schedule-list">
-        {grouped.days.map((day) => (
+        {displayDays.map((day) => (
           <li className="planned-schedule-day-group" key={day.date}>
-            {grouped.multipleDays && <h3 className="planned-schedule-day-heading">{day.label}</h3>}
+            {(grouped.multipleDays || day.date === 'unknown') &&
+              <h3 className="planned-schedule-day-heading">{day.date === 'unknown' ? 'Phasen ohne geplante Uhrzeit' : day.label}</h3>}
             <ol className="planned-schedule-day-entries">{day.items.map((item) => {
               const stage = stageFor(item);
               const stateLabel = stage?.status === 'live' ? 'Läuft gerade'
