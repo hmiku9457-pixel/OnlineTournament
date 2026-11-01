@@ -7133,3 +7133,15 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   font-size: .75rem; color: #475467;
 }
 .hall-grid-page-navigation .btn:disabled { opacity: .45; }
+
+/* Navigate very large venues without horizontal scrolling to find controls. */
+.hall-grid-paged { min-width: 0; width: 100%; }
+.hall-grid-paged > .hall-grid-page-navigation {
+  position: sticky; left: 0; z-index: 2; width: 100%; max-width: 100%;
+  justify-content: flex-start; box-sizing: border-box; margin: 0 0 10px;
+}
+.hall-grid-jump-form { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hall-grid-jump-form input {
+  width: 70px; max-width: 85px; border-radius: 6px;
+  border: 1px solid var(--border, #cbd5e1); padding: 5px;
+}
