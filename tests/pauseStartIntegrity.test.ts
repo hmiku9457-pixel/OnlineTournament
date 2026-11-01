@@ -96,6 +96,18 @@ describe('turnierweite Sperren und verbindliche Platzierungen', () => {
 });
 
 describe('steuerbare Pause', () => {
+  it('resumes on the explicitly configured later date', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2030, 10, 7, 18));
+    const t = approvedGroupsWithBreak();
+    t.stages[1].settings.breakKind = 'overnight';
+    t.stages[1].settings.nextDayDate = '2030-11-14';
+    t.stages[1].settings.nextDayStart = '09:30';
+    expect(startStage(t, t.stages[1])).toBe(true);
+    expect(getBreakResumeAt(t, t.stages[1])?.getDate()).toBe(14);
+    vi.useRealTimers();
+  });
+
   it('berechnet eine präzise lokale Uhrzeit und schiebt vergangene Uhrzeiten auf morgen', () => {
     const start = new Date(2026, 9, 31, 14, 5, 0);
     expect(computeBreakResumeAt(start, { kind: 'minutes', minutes: 25 })!.getTime() - start.getTime()).toBe(25 * 60000);
