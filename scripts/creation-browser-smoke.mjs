@@ -66,6 +66,19 @@ try {
     await page.getByRole('button', { name: 'Spieler hinzufügen' }).click();
   }
   assert.equal(await page.locator('.participant-roster-row').count(), 4);
+  // Switching wizard steps with an uncommitted participant opens our styled
+  // confirmation, without silently discarding the entry.
+  await page.locator('#participant-first').fill('Unfertig');
+  await page.locator('.wizard-step').first().click();
+  const leaveDialog = page.getByRole('dialog', { name: 'Ungespeicherte Teilnehmerdaten' });
+  await leaveDialog.waitFor();
+  await leaveDialog.getByRole('button', { name: 'Weiter bearbeiten' }).click();
+  assert.equal(await page.locator('#participant-first').inputValue(), 'Unfertig');
+  await page.locator('.wizard-step').first().click();
+  await page.getByRole('dialog', { name: 'Ungespeicherte Teilnehmerdaten' })
+    .getByRole('button', { name: 'Eingaben verwerfen' }).click();
+  await page.locator('.wizard-step').nth(1).click();
+  assert.equal(await page.locator('#participant-first').inputValue(), '');
   await page.reload();
   assert.equal(await page.locator('.participant-roster-row').count(), 4, 'draft survives browser reload');
   await next(page);
@@ -282,6 +295,40 @@ try {
     'confirming discard resets the creation wizard');
   assert.equal(await page4.locator('.wizard-step.active').count(), 1);
   await context4.close();
+
+  // Editing a displayed team label must not destroy the originally saved
+  // person's first and last names when switching back to a singles sport.
+  const context5 = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  const page5 = await context5.newPage();
+  await page5.goto(base + '/#/tournaments/new');
+  await page5.locator('#name').fill('Sportarten Namenstest');
+  await page5.locator('#tournament-date').click();
+  await page5.locator('.calendar-picker-dialog input[aria-label="Jahr"]').fill('2030');
+  await page5.locator('.calendar-picker-dialog select[aria-label="Monat"]').selectOption('10');
+  await page5.locator('.calendar-picker-day').filter({ hasText: /^21$/ }).click();
+  await page5.locator('#sport').selectOption('table_tennis');
+  await next(page5);
+  await page5.locator('#participant-first').fill('Anna');
+  await page5.locator('#participant-last').fill('Müller');
+  await page5.getByRole('button', { name: 'Spieler hinzufügen' }).click();
+  await page5.locator('.wizard-step').first().click();
+  await page5.locator('#sport').selectOption('football');
+  await page5.getByRole('dialog', { name: 'Sportart wechseln?' })
+    .getByRole('button', { name: 'Sportart wechseln' }).click();
+  await page5.locator('.wizard-step').nth(1).click();
+  await page5.getByRole('button', { name: 'Anna Müller bearbeiten' }).click();
+  assert.equal(await page5.locator('#participant-first').inputValue(), 'Anna Müller');
+  await page5.locator('#participant-first').fill('FC Nord');
+  await page5.getByRole('button', { name: 'Änderungen speichern' }).click();
+  await page5.locator('.wizard-step').first().click();
+  await page5.locator('#sport').selectOption('table_tennis');
+  await page5.getByRole('dialog', { name: 'Sportart wechseln?' })
+    .getByRole('button', { name: 'Sportart wechseln' }).click();
+  await page5.locator('.wizard-step').nth(1).click();
+  await page5.getByRole('button', { name: 'Anna Müller bearbeiten' }).click();
+  assert.equal(await page5.locator('#participant-first').inputValue(), 'Anna');
+  assert.equal(await page5.locator('#participant-last').inputValue(), 'Müller');
+  await context5.close();
 
   process.stdout.write('Creation wizard browser smoke tests passed.\n');
 } finally {
