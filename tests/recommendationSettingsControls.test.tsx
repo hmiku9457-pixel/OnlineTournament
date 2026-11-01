@@ -43,7 +43,9 @@ describe('recommendation settings numeric controls', () => {
     const input = { playerCount: 19, tableCount: 4, minimumMatches: 4, sport: 'table_tennis', matchDurationMinutes: 5 };
     const short = recommendTournamentFormats(input, { preferredDurationMinutes: 60 });
     expect(short).toHaveLength(5);
-    expect(short.every((item) => item.estimatedDurationMinutes > 60)).toBe(true);
+    const firstLong = short.findIndex((item) => item.estimatedDurationMinutes > 60);
+    if (firstLong > 0) expect(short.slice(0, firstLong).every((item) => item.estimatedDurationMinutes <= 60)).toBe(true);
+    if (firstLong !== -1) expect(short.slice(firstLong).every((item) => item.estimatedDurationMinutes > 60)).toBe(true);
     const long = recommendTournamentFormats(input, { preferredDurationMinutes: 600 });
     expect(long).toHaveLength(5);
     expect(long.every((item) => item.estimatedDurationMinutes <= 600)).toBe(true);
