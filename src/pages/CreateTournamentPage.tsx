@@ -430,8 +430,8 @@ export function CreateTournamentPage() {
   const timedSport = sportScoring(sport).mode === 'score';
   const [timedMatchMinutes, setTimedMatchMinutes] = useState(restoredDraft?.timedMatchMinutes ?? '');
   const [venueTurnoverMinutes, setVenueTurnoverMinutes] = useState(restoredDraft?.venueTurnoverMinutes ?? '');
-  const validMatchDuration = !timedSport || (timedMatchMinutes.trim() !== '' && Number.isInteger(Number(timedMatchMinutes)) && Number(timedMatchMinutes) > 0);
-  const validTurnover = venueTurnoverMinutes.trim() === '' || (Number.isInteger(Number(venueTurnoverMinutes)) && Number(venueTurnoverMinutes) >= 0);
+  const validMatchDuration = !timedSport || (timedMatchMinutes.trim() !== '' && Number.isInteger(Number(timedMatchMinutes)) && Number(timedMatchMinutes) > 0 && Number(timedMatchMinutes) <= 1440);
+  const validTurnover = venueTurnoverMinutes.trim() === '' || (Number.isInteger(Number(venueTurnoverMinutes)) && Number(venueTurnoverMinutes) >= 0 && Number(venueTurnoverMinutes) <= 240);
   const matchDurationMinutes = timedSport ? Number(timedMatchMinutes) || 15 : planningMinutesPerSet(sport);
   const breakMinutes = timedSport ? Number(venueTurnoverMinutes) || 0 : 0;
   const [discipline, setDiscipline] = useState<Discipline>(restoredDraft?.discipline ?? 'SINGLES');
@@ -1318,7 +1318,7 @@ export function CreateTournamentPage() {
                   <label htmlFor="venue-turnover">Zeitpuffer zwischen Spielen (Minuten) <span className="wizard-optional-tag">Optional</span></label>
                   <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => setVenueTurnoverMinutes(event.target.value)} />
                   <span className="field-hint">Zusätzliche Zeit zwischen zwei Spielen auf derselben Spielfläche. Ein leeres Feld entspricht 0 Minuten.</span>
-                  {(!validMatchDuration || !validTurnover) && <span className="field-error">Die Spieldauer muss eine positive ganze Zahl sein; der optionale Zeitpuffer darf nicht negativ sein.</span>}
+                  {(!validMatchDuration || !validTurnover) && <span className="field-error">Die Spieldauer muss zwischen 1 und 1440 Minuten liegen; der Zeitpuffer zwischen 0 und 240 Minuten.</span>}
                 </>}
               </div>
             </div>
