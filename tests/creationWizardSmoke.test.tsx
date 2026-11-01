@@ -20,7 +20,9 @@ describe('five-step tournament creation smoke test', () => {
     expect(html).toContain('Turniername eingeben');
     expect(html).toContain('Turnierdatum auswählen');
     expect(html).toContain('Entwurf verwerfen');
-    expect(html).toContain('Entwurf wird in diesem Browser automatisch gespeichert.');
+    expect(html).toContain('class="btn danger creation-discard-button"');
+    expect(html).toContain('class="page-head creation-page-head"');
+    expect(html).not.toContain('Entwurf wird in diesem Browser automatisch gespeichert.');
   });
 
   it('restores a complete five-step configuration into the final review', () => {
