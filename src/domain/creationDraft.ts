@@ -41,6 +41,8 @@ export interface CreationDraft {
   name: string;
   scheduledDate: string;
   scheduledTime: string;
+  /** Live current-time mode (optional for older drafts). */
+  useCurrentTime?: boolean;
   sport: string;
   discipline: Discipline;
   timedMatchMinutes: string;
@@ -72,7 +74,9 @@ function validDraft(value: unknown): value is CreationDraft {
     && Number.isInteger(Number(data.maxReachedStep)) && Number(data.maxReachedStep) >= Number(data.step)
     && Number(data.maxReachedStep) <= 5
     && typeof data.name === 'string' && typeof data.scheduledDate === 'string'
-    && typeof data.scheduledTime === 'string' && typeof data.sport === 'string'
+    && typeof data.scheduledTime === 'string'
+    && (data.useCurrentTime === undefined || typeof data.useCurrentTime === 'boolean')
+    && typeof data.sport === 'string'
     && ['SINGLES', 'DOUBLES', 'TEAMS'].includes(String(data.discipline))
     && typeof data.timedMatchMinutes === 'string' && typeof data.venueTurnoverMinutes === 'string'
     && Number.isInteger(Number(data.tables)) && Number(data.tables) >= 1 && Number(data.tables) <= 9999
