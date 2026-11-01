@@ -47,6 +47,12 @@ function signalError(message: string): void {
   window.dispatchEvent(new Event('tournament-storage-integrity-change'));
 }
 export function getTournamentStorageError(): string { return currentError; }
+/** When IndexedDB is unavailable, retain the editor for draft inspection but
+ * reject every local tournament mutation instead of silently falling back. */
+export function markLocalTournamentStorageUnavailable(error: unknown): void {
+  ready = true;
+  signalError(error instanceof Error ? error.message : 'Der sichere Turnierspeicher ist nicht verfügbar.');
+}
 export function listCorruptLocalRecords(): CorruptLocalRecord[] { return [...quarantine]; }
 
 async function openDatabase(): Promise<IDBDatabase> {
