@@ -6671,6 +6671,10 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   border-bottom-color: var(--match-status-border);
   padding-left: 8px; padding-right: 8px; border-radius: 5px;
 }
+.participant-games-table tbody tr.match-state-finished > td,
+.participant-games-table tbody tr.match-state-live > td,
+.participant-games-table tbody tr.match-state-waiting > td,
+.participant-games-table tbody tr.match-state-cancelled > td,
 .control-tab-panel .table-wrap tbody tr.match-state-finished > td,
 .control-tab-panel .table-wrap tbody tr.match-state-live > td,
 .control-tab-panel .table-wrap tbody tr.match-state-waiting > td,
@@ -6678,6 +6682,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   background: var(--match-status-bg);
   border-bottom-color: var(--match-status-border);
 }
+.participant-games-table tbody tr[class*="match-state-"] > td:first-child,
 .control-tab-panel .table-wrap tbody tr[class*="match-state-"] > td:first-child {
   box-shadow: inset 3px 0 var(--match-status-accent);
 }
