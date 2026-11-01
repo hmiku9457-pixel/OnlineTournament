@@ -68,14 +68,14 @@ function validDraft(value: unknown): value is CreationDraft {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const data = value as Partial<CreationDraft>;
   const allowedTypes = ['ROUND_ROBIN', 'GROUPS', 'SWISS', 'KNOCKOUT', 'BREAK'];
-  return Number.isInteger(data.step) && Number(data.step) >= 1 && Number(data.step) <= 5
-    && Number.isInteger(data.maxReachedStep) && Number(data.maxReachedStep) >= Number(data.step)
+  return Number.isInteger(Number(data.step)) && Number(data.step) >= 1 && Number(data.step) <= 5
+    && Number.isInteger(Number(data.maxReachedStep)) && Number(data.maxReachedStep) >= Number(data.step)
     && Number(data.maxReachedStep) <= 5
     && typeof data.name === 'string' && typeof data.scheduledDate === 'string'
     && typeof data.scheduledTime === 'string' && typeof data.sport === 'string'
     && ['SINGLES', 'DOUBLES', 'TEAMS'].includes(String(data.discipline))
     && typeof data.timedMatchMinutes === 'string' && typeof data.venueTurnoverMinutes === 'string'
-    && Number.isInteger(data.tables) && Number(data.tables) >= 1 && Number(data.tables) <= 9999
+    && Number.isInteger(Number(data.tables)) && Number(data.tables) >= 1 && Number(data.tables) <= 9999
     && typeof data.customTables === 'boolean' && typeof data.venueLayoutEnabled === 'boolean'
     && Boolean(data.venueLayout && Number.isInteger(data.venueLayout.columns)
       && data.venueLayout.columns > 0 && Number.isInteger(data.venueLayout.rows)
@@ -98,7 +98,7 @@ function validDraft(value: unknown): value is CreationDraft {
       .every((key) => typeof (data.participantForm as unknown as Record<string, unknown>)[key] === 'string')
     && (data.editingParticipantId === null || typeof data.editingParticipantId === 'string')
     && typeof data.hasVisitedPhaseStep === 'boolean' && typeof data.customMinimumMatches === 'boolean'
-    && Number.isInteger(data.minimumMatches) && Number(data.minimumMatches) >= 1
+    && Number.isInteger(Number(data.minimumMatches)) && Number(data.minimumMatches) >= 1
     && data.enabledSystems !== null && typeof data.enabledSystems === 'object'
     && ['round-robin', 'groups', 'swiss', 'knockout'].every((key) =>
       typeof (data.enabledSystems as unknown as Record<string, unknown>)[key] === 'boolean')
