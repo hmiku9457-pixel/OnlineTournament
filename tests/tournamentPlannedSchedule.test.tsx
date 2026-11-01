@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, formatPlannedBreakDuration, groupPlannedScheduleDays, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { isValidLocalDateTime, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, plannedActiveBreakMinutes, formatPlannedBreakDuration, groupPlannedScheduleDays, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
@@ -68,6 +68,44 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(playingMinutes).toBe(140);
     expect(totalMinutes).toBe(230);
     expect(totalMinutes! - playingMinutes).toBe(90);
+  });
+
+  it('zählt Spieltagswechsel nicht zur Spielzeit, Pausenzeit oder Gesamtdauer', () => {
+    const start = '2026-11-01T10:00';
+    const timeline = buildPlannedTimeline(start, [
+      { type: 'GROUPS', label: 'Gruppenphase', estimatedMinutes: 60 },
+      { type: 'BREAK', label: 'Mittagspause', estimatedMinutes: 0, breakKind: 'minutes', breakMinutes: 15 },
+      { type: 'SWISS', label: 'Schweizer System', estimatedMinutes: 80,
+        roundCount: 4, inlineBreakAfterRound: 2, inlineBreakKind: 'minutes', inlineBreakMinutes: 20 },
+      { type: 'BREAK', label: 'Spieltagswechsel', estimatedMinutes: 0, breakKind: 'overnight',
+        nextDayDate: '2026-11-03', nextDayStart: '09:00' },
+      { type: 'KNOCKOUT', label: 'Finale', estimatedMinutes: 45 },
+    ]);
+    expect(timeline.warnings).toEqual([]);
+    expect(timeline.estimatedEnd).toBe('2026-11-03T09:45');
+    expect(timeline.items.find((item) => item.id === 'phase-4')?.durationMinutes).toBeGreaterThan(24 * 60);
+    expect(timeline.items.find((item) => item.id === 'inline-break-3')?.durationMinutes).toBe(20);
+
+    const playingMinutes = 60 + 80 + 45;
+    const activeBreakMinutes = plannedActiveBreakMinutes(timeline);
+    expect(playingMinutes).toBe(185);
+    expect(activeBreakMinutes).toBe(35);
+    expect(playingMinutes + activeBreakMinutes).toBe(220);
+    expect(plannedTimelineDurationMinutes(start, timeline.estimatedEnd)).toBeGreaterThan(220);
+  });
+
+  it('zählt zeitgebundene Pausen am Spieltag vollständig, aber keine Nachtunterbrechung', () => {
+    const timeline = buildPlannedTimeline('2026-11-01T10:00', [
+      { type: 'GROUPS', label: 'Gruppenphase', estimatedMinutes: 30 },
+      { type: 'BREAK', label: 'Mittag', estimatedMinutes: 0, breakKind: 'until', breakUntil: '12:00' },
+      { type: 'BREAK', label: 'Spieltagsende', estimatedMinutes: 0, breakKind: 'overnight',
+        nextDayDate: '2026-11-05', nextDayStart: '09:00' },
+      { type: 'KNOCKOUT', label: 'Finale', estimatedMinutes: 60 },
+    ]);
+    expect(timeline.warnings).toEqual([]);
+    expect(plannedActiveBreakMinutes(timeline)).toBe(90);
+    expect(30 + plannedActiveBreakMinutes(timeline) + 60).toBe(180);
+    expect(timeline.estimatedEnd).toBe('2026-11-05T10:00');
   });
 
   it('setzt Spieltagsende auf frei gewähltes späteres Datum statt automatisch auf morgen', () => {
