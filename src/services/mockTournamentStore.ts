@@ -168,6 +168,7 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
     venueLayout: input.venueLayout,
     matchDurationMinutes: input.matchDurationMinutes ?? 15,
     venueTurnoverMinutes: input.venueTurnoverMinutes ?? 0,
+    minimumMatches: input.minimumMatches,
     scheduledStart: input.scheduledStart,
     plannedSchedule: input.plannedSchedule?.map((entry) => ({ ...entry })) ?? [],
   };
