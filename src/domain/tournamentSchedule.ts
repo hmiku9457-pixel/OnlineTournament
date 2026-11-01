@@ -249,7 +249,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
 export function plannedActiveBreakMinutes(timeline: PlannedTimeline): number {
   return timeline.items.reduce((total, item) => {
     if (item.type !== 'break' || item.breakKind === 'overnight'
-      || !Number.isFinite(item.durationMinutes) || item.durationMinutes === undefined) return total;
+      || item.durationMinutes === undefined || !Number.isFinite(item.durationMinutes)) return total;
     return total + Math.max(0, Math.round(item.durationMinutes));
   }, 0);
 }
