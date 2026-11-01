@@ -84,7 +84,7 @@ try {
   await page2.getByRole('button', { name: '19 Testspieler erzeugen' }).click();
   const testDialog = page2.getByRole('dialog', { name: '19 Testspieler erzeugen?' });
   await testDialog.waitFor();
-  assert.match(await testDialog.innerText(), /Werden ergänzt:\\s*18/);
+  assert.match(await testDialog.innerText(), /Werden ergänzt:\s*18/);
   await testDialog.getByRole('button', { name: 'Abbrechen' }).click();
   assert.equal(await page2.locator('.participant-roster-row').count(), 1, 'cancel leaves roster unchanged');
   await page2.getByRole('button', { name: '19 Testspieler erzeugen' }).click();
