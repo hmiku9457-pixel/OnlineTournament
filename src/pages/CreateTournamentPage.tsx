@@ -1013,11 +1013,12 @@ export function CreateTournamentPage() {
                 <label htmlFor="sport">Sportart <span className="wizard-required-mark" aria-hidden="true">*</span></label>
                 <select id="sport" required value={sport} onChange={(event) => {
                   const selectedSport = event.target.value;
+                  if (selectedSport !== sport && (participants.length > 0 || phaseDrafts.length > 0)
+                    && !window.confirm('Sportart wechseln? Bestehende Teilnehmer müssen gegebenenfalls überprüft werden und die Best-of-Einstellungen werden auf die neue Sportart angepasst.')) return;
                   const allowed = disciplineOptionsForSport(selectedSport);
                   const nextDiscipline = allowed.some((option) => option.value === discipline)
                     ? discipline : allowed[0]?.value ?? 'SINGLES';
                   if (nextDiscipline !== discipline) {
-                    if (participants.length > 0 && !window.confirm('Die Wettbewerbsart ändert sich. Vorhandene Teilnehmereinträge müssen anschließend überprüft werden. Fortfahren?')) return;
                     setDiscipline(nextDiscipline);
                     resetParticipantEditor();
                     // Bei Mannschaftssportarten ist der Name des Teams ein eigener Eintrag.
