@@ -59,6 +59,8 @@ export interface CreationDraft {
   minimumMatches: number;
   customMinimumMatches: boolean;
   phaseDrafts: CreationDraftPhase[];
+  /** Phase settings automatically reduced after roster changes, awaiting review. */
+  reviewRequiredPhaseIds?: string[];
   selectedRecommendationId: string | null;
   enabledSystems: Record<TournamentSystemId, boolean>;
   maxGroups: number | null;
@@ -95,6 +97,7 @@ function validDraft(value: unknown): value is CreationDraft {
     && data.participants.every((entry) => entry && typeof entry.id === 'string'
       && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
         .every((key) => typeof (entry as unknown as Record<string, unknown>)[key] === 'string'))
+    && (data.reviewRequiredPhaseIds === undefined || (Array.isArray(data.reviewRequiredPhaseIds) && data.reviewRequiredPhaseIds.every((id) => typeof id === 'string')))
     && Array.isArray(data.phaseDrafts) && data.phaseDrafts.length <= 80
     && data.phaseDrafts.every((entry) => entry && typeof entry.id === 'string'
       && allowedTypes.includes(entry.type) && Number.isInteger(entry.entrantCount)
