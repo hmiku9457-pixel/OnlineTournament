@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
 import { DrawActionButton } from '@/components/DrawActionButton';
 import { StageCard } from '@/components/StageCard';
@@ -54,6 +54,36 @@ import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableL
 import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration } from '@/services/mockDuration';
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
 import type { MockAuditEntry } from '@/services/mockAudit';
+
+/** Block sidebar links, browser Back and programmatic route changes while a
+ * director has uncommitted changes. Unlike an anchor-only guard this also
+ * catches navigation not initiated by a click. */
+function PrestartNavigationGuard({ dirty, tournamentId }: { dirty: boolean; tournamentId: string }) {
+  const blocker = useBlocker(dirty);
+  useEffect(() => {
+    if (!dirty) return;
+    const protectReload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', protectReload);
+    return () => window.removeEventListener('beforeunload', protectReload);
+  }, [dirty]);
+  if (blocker.state !== 'blocked') return null;
+  return <div className="prototype-modal-backdrop" role="presentation">
+    <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="prestart-navigation-warning">
+      <h2 id="prestart-navigation-warning">Ungespeicherte Phasenänderungen</h2>
+      <p>Du verlässt die Turnierleitung, ohne die Phasenplanung zu speichern. Die Änderungen gehen verloren.</p>
+      <div className="actions">
+        <button type="button" className="btn danger" onClick={() => {
+          try { window.sessionStorage.removeItem(`online-tournament:prestart-recovery:${tournamentId}`); } catch { /* blocked storage */ }
+          blocker.proceed();
+        }}>Änderungen verwerfen und verlassen</button>
+        <button type="button" className="btn primary" onClick={() => blocker.reset()}>Weiter bearbeiten</button>
+      </div>
+    </section>
+  </div>;
+}
 
 type ControlTab = 'summary' | 'overview' | 'flow' | 'matches' | 'participants' | 'final' | 'audit' | 'prestart';
 
@@ -531,6 +561,7 @@ export function TournamentControlPage() {
   const venueMessage = (message: string) => displayVenueMessage(tournament.sport, message);
   const [tab, setTab] = useState<ControlTab>('summary');
   const [showPrestartPhaseEditor, setShowPrestartPhaseEditor] = useState(false);
+  const [prestartDirty, setPrestartDirty] = useState(false);
   const [tableView, setTableView] = useState<'cards' | 'hall'>('cards');
   const [selectedHallTable, setSelectedHallTable] = useState<string | null>(null);
   const [helpTopic, setHelpTopic] = useState<ControlHelpTopic | null>(null);
@@ -1291,6 +1322,9 @@ export function TournamentControlPage() {
       )}
 
         {showPrestartPhaseEditor && !tournament.hasStarted && (
+          <PrestartNavigationGuard dirty={prestartDirty} tournamentId={tournament.id} />
+        )}
+        {showPrestartPhaseEditor && !tournament.hasStarted && (
           <div style={{ display: tab === 'prestart' ? undefined : 'none' }}>
             <CreateTournamentPage
               key={tournament.id}
@@ -1298,14 +1332,16 @@ export function TournamentControlPage() {
                 tournament,
                 activeParticipants: activePrestartParticipants,
                 withdrawnParticipants: participants.length - activePrestartParticipants,
+                onDirtyChange: setPrestartDirty,
                 onSaved: () => {
+                  setPrestartDirty(false);
                   setShowPrestartPhaseEditor(false);
                   setTab('summary');
                   setSelectedStageId(tournament.stages[0]?.id ?? '');
                   setDrawVersion((value) => value + 1);
                   refreshRuntime();
                 },
-                onCancel: () => { setShowPrestartPhaseEditor(false); setTab('summary'); },
+                onCancel: () => { setPrestartDirty(false); setShowPrestartPhaseEditor(false); setTab('summary'); },
               }}
             />
           </div>
