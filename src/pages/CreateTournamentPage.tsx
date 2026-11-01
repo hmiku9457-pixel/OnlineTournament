@@ -789,14 +789,14 @@ export function CreateTournamentPage() {
     navigateToStep((step - 1) as WizardStep);
   }
 
-  function submitTournament(skipSchedule = false) {
-    if ((step !== 4 && step !== 5) || !canCreate || (!skipSchedule && scheduleIssues.length > 0)) return;
+  function submitTournament() {
+    if (step !== 5 || !canCreate || scheduleIssues.length > 0) return;
     const tournament = createMockTournament({
       name,
       sport,
       discipline,
       scheduledStart,
-      plannedSchedule: skipSchedule ? [] : plannedSchedule.map((entry) => ({ ...entry, title: entry.title.trim(), note: entry.note?.trim() })),
+      plannedSchedule: plannedSchedule.map((entry) => ({ ...entry, title: entry.title.trim(), note: entry.note?.trim() })),
       tables,
       minimumMatches,
       matchDurationMinutes,
@@ -2030,7 +2030,7 @@ export function CreateTournamentPage() {
         {step < 5 ? (
           <button className="btn primary wizard-continue-button" type="button" onClick={goNext} disabled={!canContinue}>{step === 4 ? 'Weiter zur Zusammenfassung →' : 'Weiter →'}</button>
         ) : (
-          <button className="btn primary wizard-continue-button wizard-create-button" type="button" onClick={() => submitTournament(false)} disabled={!canCreate || scheduleIssues.length > 0}>Turnier erstellen</button>
+          <button className="btn primary wizard-continue-button wizard-create-button" type="button" onClick={submitTournament} disabled={!canCreate || scheduleIssues.length > 0}>Turnier erstellen</button>
         )}
         </div>
       </div>
