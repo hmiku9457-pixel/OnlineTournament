@@ -511,8 +511,13 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
   const [customTables, setCustomTables] = useState(restoredDraft?.customTables ?? false);
   const [venueLayoutEnabled, setVenueLayoutEnabled] = useState(restoredDraft?.venueLayoutEnabled ?? false);
   const [venueLayoutEditorOpen, setVenueLayoutEditorOpen] = useState(false);
-  const [venueLayout, setVenueLayout] = useState(() => restoredDraft?.venueLayout ?? resizeVenueLayout(createVenueLayout(8), 4, 2, 8));
-  useEffect(() => { setVenueLayout((current) => resizeVenueLayout(current, current.columns, Math.max(current.rows, Math.ceil(tables / current.columns)), tables)); }, [tables]);
+  const [venueLayout, setVenueLayout] = useState(() => restoredDraft?.venueLayout ?? createVenueLayout(8));
+  const [venueLayoutCustomized, setVenueLayoutCustomized] = useState(Boolean(restoredDraft?.venueLayoutEnabled));
+  useEffect(() => {
+    setVenueLayout((current) => venueLayoutCustomized
+      ? resizeVenueLayout(current, current.columns, Math.max(current.rows, Math.ceil(tables / current.columns)), tables)
+      : createVenueLayout(tables));
+  }, [tables, venueLayoutCustomized]);
   const [participants, setParticipants] = useState<ParticipantDraft[]>(restoredDraft?.participants ?? []);
   const [recentlyRemovedParticipant, setRecentlyRemovedParticipant] = useState<{ participant: ParticipantDraft; index: number } | null>(null);
   const [groupRecommendationNotice, setGroupRecommendationNotice] = useState<string | null>(null);
@@ -1470,7 +1475,7 @@ export function CreateTournamentPage({ prestart }: { prestart?: PrestartPhaseMod
                       {venueLayoutEditorOpen ? 'Plan einklappen' : 'Plan bearbeiten'}
                     </button>
                   </div>
-                  {venueLayoutEditorOpen && <VenueLayoutEditor layout={venueLayout} tableCount={tables} sport={sport} onChange={setVenueLayout} />}
+                  {venueLayoutEditorOpen && <VenueLayoutEditor layout={venueLayout} tableCount={tables} sport={sport} onChange={(next) => { setVenueLayout(next); setVenueLayoutCustomized(true); }} />}
                 </>
               )}
             </div>
