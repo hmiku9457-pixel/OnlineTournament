@@ -459,6 +459,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const prestartConfirmationSignature = useRef<string | null>(null);
   const [confirmPrestartDiscard, setConfirmPrestartDiscard] = useState(false);
   const [overwriteTournamentId, setOverwriteTournamentId] = useState<string | null>(null);
+  const [createdTournamentWithDraftNotice, setCreatedTournamentWithDraftNotice] = useState<{ id: string; message: string } | null>(null);
+  const [submittingTournament, setSubmittingTournament] = useState(false);
   const [prestartSaveError, setPrestartSaveError] = useState('');
   const [prestartSaveBusy, setPrestartSaveBusy] = useState(false);
   const [step, setStep] = useState<WizardStep>((restoredDraft?.step ?? 1) as WizardStep);
@@ -1297,8 +1299,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     }
   }
 
-  function submitTournament(overwriteExistingId?: string) {
-    if (step !== 5 || !canCreate || scheduleIssues.length > 0) return;
+  async function submitTournament(overwriteExistingId?: string) {
+    if (step !== 5 || !canCreate || scheduleIssues.length > 0 || submittingTournament || createdTournamentWithDraftNotice) return;
     const collision = findTournamentNameConflict(name);
     if (collision && !overwriteExistingId) {
       if (hasStartedAnyStage(collision, getPhaseLifecycle(collision).startedStageIds)) {
@@ -1314,6 +1316,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       return;
     }
     setCreationError(null);
+    setSubmittingTournament(true);
     try {
     const tournament = createMockTournament({
       name,
@@ -1352,11 +1355,25 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     });
     clearCreationDraft(window.sessionStorage, sessionDraftKey);
     clearCreationDraft();
-    if (savedDraftId) void removeSavedCreationDraftAtomic(savedDraftId, savedDraftRevision.current ?? undefined)
-      .catch(() => { /* The tournament is already created; do not delete edits from another tab. */ });
+    if (savedDraftId) {
+      try {
+        await removeSavedCreationDraftAtomic(savedDraftId, savedDraftRevision.current ?? undefined);
+      } catch (error) {
+        const conflict = error instanceof Error && error.message === 'DRAFT_CONFLICT';
+        setCreatedTournamentWithDraftNotice({
+          id: tournament.id,
+          message: conflict
+            ? 'Der gespeicherte Entwurf wurde in einem anderen Tab geändert. Deine neue Turniererstellung war erfolgreich, aber der neuere Entwurf wurde zur Sicherheit nicht gelöscht.'
+            : 'Das Turnier wurde erstellt. Der bisherige Entwurf konnte jedoch nicht gelöscht werden und bleibt vorerst in deiner Entwurfsliste erhalten.',
+        });
+        return;
+      }
+    }
     navigate(`/tournaments/${tournament.id}/control`, { replace: true });
     } catch (error) {
       setCreationError(error instanceof Error ? error.message : 'Das Turnier konnte nicht gespeichert werden. Bitte Speicherplatz prüfen und erneut versuchen.');
+    } finally {
+      setSubmittingTournament(false);
     }
   }
 
@@ -2525,8 +2542,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 </div>
                 <div className="creation-review-final-actions">
                   <button className="btn" type="button" onClick={goBack}>← Zurück</button>
-                  <button className="btn primary wizard-create-button" type="button" onClick={() => submitTournament()}
-                    disabled={!canCreate || scheduleIssues.length > 0}>Turnier erstellen</button>
+                  <button className="btn primary wizard-create-button" type="button" onClick={() => { void submitTournament(); }}
+                    disabled={!canCreate || scheduleIssues.length > 0 || submittingTournament || Boolean(createdTournamentWithDraftNotice)}>Turnier erstellen</button>
                 </div>
               </div>
             </div>
@@ -2727,6 +2744,18 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             <button type="button" className="btn primary" disabled={prestartSaveBusy} onClick={() => { void savePrestartPhases(); }}>
               {prestartSaveBusy ? 'Speichern …' : 'Ja, Phasen und Auslosung aktualisieren'}</button>
             <button type="button" className="btn" onClick={() => { setConfirmPrestartSave(false); prestartConfirmationSignature.current = null; }}>Weiter bearbeiten</button>
+          </div>
+        </section>
+      </div>}
+      {createdTournamentWithDraftNotice && <div className="prototype-modal-backdrop" role="presentation">
+        <section className="prototype-modal" role="alertdialog" aria-modal="true" aria-labelledby="created-draft-notice-title">
+          <h2 id="created-draft-notice-title">Turnier erstellt – Entwurf bleibt erhalten</h2>
+          <p>{createdTournamentWithDraftNotice.message}</p>
+          <p>Das neu erstellte Turnier wurde erfolgreich gespeichert. Du kannst es jetzt unabhängig vom weiterhin vorhandenen Entwurf verwalten.</p>
+          <div className="actions">
+            <button type="button" className="btn primary" onClick={() => navigate(`/tournaments/${createdTournamentWithDraftNotice.id}/control`, { replace: true })}>
+              Zur Turnierleitung
+            </button>
           </div>
         </section>
       </div>}
