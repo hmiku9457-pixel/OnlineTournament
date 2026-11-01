@@ -278,6 +278,23 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(markup).toContain('aria-expanded="false"');
   });
 
+  it('zeigt auch öffentlich das Spieltagsende statt einer 40-Stunden-Pause und übernimmt Hinweise', () => {
+    const start = '2026-11-01T10:00';
+    const timeline = buildPlannedTimeline(start, [
+      { label: 'Vorrunde', type: 'GROUPS', estimatedMinutes: 120 },
+      { label: 'Spieltagswechsel', type: 'BREAK', estimatedMinutes: 0,
+        breakKind: 'overnight', nextDayDate: '2026-11-03', nextDayStart: '09:00',
+        note: 'Treffpunkt am Haupteingang' },
+      { label: 'Finalrunde', type: 'KNOCKOUT', estimatedMinutes: 60 },
+    ]);
+    const publicHtml = renderToStaticMarkup(createElement(TournamentPlannedSchedule, {
+      scheduledStart: start, items: timeline.items,
+    }));
+    expect(publicHtml).toContain('Ende ca. 12:00 Uhr');
+    expect(publicHtml).toContain('Treffpunkt am Haupteingang');
+    expect(publicHtml).not.toContain('45 Std.');
+  });
+
   it('zeigt beim Spieltagswechsel statt der mehrtägigen Pausendauer das Tagesende', () => {
     const start = '2026-11-01T10:00';
     const timeline = buildPlannedTimeline(start, [
