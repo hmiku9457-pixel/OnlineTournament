@@ -51,6 +51,11 @@ export function recommendedEqualGroupQualifiers(
   return candidates.sort((a, b) => Math.abs(a - requested) - Math.abs(b - requested) || b - a)[0] ?? null;
 }
 
-export function needsGroupStreichungsregel(entrants: number, groups: number, qualifiers: number): boolean {
-  return groups >= 2 && entrants % groups !== 0 && qualifiers < entrants && qualifiers % groups !== 0;
+export function needsGroupStreichungsregel(
+  entrants: number, groups: number, qualifiers: number, actualGroupSizes?: readonly number[],
+): boolean {
+  const differentSizes = actualGroupSizes?.length === groups
+    ? actualGroupSizes.some((count) => count !== actualGroupSizes[0])
+    : entrants % groups !== 0;
+  return groups >= 2 && differentSizes && qualifiers < entrants && qualifiers % groups !== 0;
 }
