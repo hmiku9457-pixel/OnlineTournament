@@ -595,7 +595,8 @@ export function CreateTournamentPage() {
     }));
     setParticipantErrors((current) => {
       const next = { ...current };
-      if (field === 'firstName' || field === 'lastName') {
+      if (field === 'firstName' || field === 'lastName' || field === 'teamName') {
+        delete next.teamName;
         delete next.firstName;
         delete next.lastName;
       } else {
@@ -1367,7 +1368,7 @@ export function CreateTournamentPage() {
                         className={participantErrors.firstName || participantErrors.teamName ? 'input-error' : ''}
                         value={discipline === 'TEAMS' ? (participantForm.teamName || displayPersonName(participantForm.firstName, participantForm.lastName)) : participantForm.firstName}
                         onChange={(event) => updateParticipantForm(discipline === 'TEAMS' ? 'teamName' : 'firstName', event.target.value)}
-                        aria-invalid={Boolean(participantErrors.firstName)}
+                        aria-invalid={Boolean(participantErrors.firstName || participantErrors.teamName)}
                         autoFocus
                       />
                     </div>
@@ -2375,6 +2376,7 @@ export function CreateTournamentPage() {
         <TestParticipantsDialog
           discipline={discipline}
           existingCount={participantCount}
+          incompleteCount={incompleteSavedParticipants}
           onCancel={() => {
             setTestParticipantsDialogOpen(false);
             testParticipantsButtonRef.current?.focus();
