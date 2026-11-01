@@ -14,6 +14,23 @@ try {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(base + '/#/tournaments/new');
+  // Check the creation wizard is centered within the content area at
+  // ultra-wide widths, while the main navigation stays at the far left.
+  await page.setViewportSize({ width: 2560, height: 960 });
+  const geometry = await page.evaluate(() => {
+    const main = document.querySelector('.main')?.getBoundingClientRect();
+    const container = document.querySelector('.creation-page-container')?.getBoundingClientRect();
+    const sidebar = document.querySelector('.sidebar')?.getBoundingClientRect();
+    if (!main || !container || !sidebar) return null;
+    return { leftGap: container.left - main.left, rightGap: main.right - container.right,
+      sidebarLeft: sidebar.left, sidebarRight: sidebar.right, maxWidth: container.width };
+  });
+  assert.ok(geometry, 'creation shell and sidebar must exist');
+  assert.ok(Math.abs(geometry.leftGap - geometry.rightGap) <= 1,
+    'wizard should have equal horizontal margins in the content area');
+  assert.ok(geometry.maxWidth <= 1550, 'wizard must not exceed its readable maximum width');
+  assert.equal(geometry.sidebarLeft, 0, 'navigation stays anchored to the left side');
+  await page.setViewportSize({ width: 1440, height: 960 });
   await page.locator('#name').fill('Browser-Smoke-Turnier');
   await page.locator('#tournament-date').click();
   await page.locator('.calendar-picker-dialog input[aria-label="Jahr"]').fill('2030');
