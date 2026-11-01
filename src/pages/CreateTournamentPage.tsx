@@ -1318,6 +1318,7 @@ export function CreateTournamentPage() {
                   <label htmlFor="venue-turnover">Zeitpuffer zwischen Spielen (Minuten) <span className="wizard-optional-tag">Optional</span></label>
                   <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => setVenueTurnoverMinutes(event.target.value)} />
                   <span className="field-hint">Zusätzliche Zeit zwischen zwei Spielen auf derselben Spielfläche. Ein leeres Feld entspricht 0 Minuten.</span>
+                  {(Number(timedMatchMinutes) > 240 || Number(venueTurnoverMinutes) > 60) && validMatchDuration && validTurnover && <span className="field-hint" role="status">Ungewöhnlich lange Spieldauer oder Wechselpause – bitte kontrolliere die Zeitangabe.</span>}
                   {(!validMatchDuration || !validTurnover) && <span className="field-error">Die Spieldauer muss zwischen 1 und 1440 Minuten liegen; der Zeitpuffer zwischen 0 und 240 Minuten.</span>}
                 </>}
               </div>
@@ -1414,7 +1415,7 @@ export function CreateTournamentPage() {
                     </button>
                   </div>
                 </div>
-                <p className="field-hint">Namen: nur Buchstaben (auch Ø, ø, Ä usw.), Leerzeichen und Bindestriche.</p>
+                <p className="field-hint">Namen: Buchstaben, Zahlen, Punkte, Bindestriche und Klammern – z. B. Max Müller (TSV) oder 1. FC Köln.</p>
                 <div className="participant-validation" aria-live="polite">
                   {participantErrorMessages.map((message) => (
                     <span className="field-error" key={message}>{message}</span>
