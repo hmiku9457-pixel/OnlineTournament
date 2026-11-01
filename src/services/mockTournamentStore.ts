@@ -9,7 +9,7 @@ import { reconcilePrestartDraws, clearPrestartTournamentDraws } from '@/services
 import type { VenueLayout } from '@/domain/venueLayout';
 import { disciplineLabel, getSportLabel, planningMinutesPerSet } from '@/domain/sports';
 import { sportScoring } from '@/domain/sportScoring';
-import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
+import { estimatePhaseMetrics, estimateKnockoutRoundMinutes } from '@/domain/tournamentCreation';
 import { type DemoTournament } from '@/data/demoTournaments';
 import type { Discipline, StageType, TournamentStage, TournamentStatus } from '@/domain/types';
 
@@ -198,6 +198,9 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
       nextDayDate: phase.nextDayDate,
       roundCount: phase.type === 'SWISS' ? phase.swissRounds
         : phase.type === 'KNOCKOUT' ? Math.ceil(Math.log2(phase.entrantCount)) : undefined,
+      roundDurationsMinutes: phase.type === 'KNOCKOUT'
+        ? estimateKnockoutRoundMinutes(phase.entrantCount, tournament.tables, phase.bestOf, phase.knockoutBestOf, timing)
+        : undefined,
       inlineBreakAfterRound: phase.inlineBreakAfterRound,
       inlineBreakKind: phase.inlineBreakKind,
       inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
