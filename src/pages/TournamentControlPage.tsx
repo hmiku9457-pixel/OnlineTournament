@@ -34,7 +34,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, getPendingGroupCutoff, getEditableGroupCutoff, resolveGroupCutoff, getPendingMockApproval, approveMockProgress, abortMockTournament, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, getPendingGroupCutoff, getEditableGroupCutoffs, resolveGroupCutoff, getPendingMockApproval, approveMockProgress, abortMockTournament, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
 import { canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getStageWithdrawalLabel, getWithdrawalLabel, isParticipantWithdrawn } from '@/services/mockWithdrawals';
 import { getMockConfirmedFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
@@ -599,6 +599,7 @@ export function TournamentControlPage() {
   const [confirmEarlyBreak, setConfirmEarlyBreak] = useState(false);
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
   const [groupCutoffModalOpen, setGroupCutoffModalOpen] = useState(false);
+  const [editingGroupCutoffSignature, setEditingGroupCutoffSignature] = useState<string | null>(null);
   const [abortModalOpen, setAbortModalOpen] = useState(false);
   const [abortReason, setAbortReason] = useState('');
   const [skipThirdMatchId, setSkipThirdMatchId] = useState<string | null>(null);
@@ -685,7 +686,9 @@ export function TournamentControlPage() {
   const activeStage = useMemo(() => getActiveStage(phaseSource.tournament), [phaseSource]);
   const pendingApproval = useMemo(() => getPendingMockApproval(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   const pendingGroupCutoff = useMemo(() => getPendingGroupCutoff(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
-  const editableGroupCutoff = useMemo(() => getEditableGroupCutoff(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
+  const editableGroupCutoffs = useMemo(() => getEditableGroupCutoffs(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
+  const editableGroupCutoff = editableGroupCutoffs.find((item) => item.signature === editingGroupCutoffSignature)
+    ?? editableGroupCutoffs[0] ?? null;
   const activeBreak = activeStage?.type === 'BREAK' ? activeStage : null;
   const inlineBreak = activeStage ? getInlineBreakStatus(tournament, activeStage, getMockStageMatches(tournament, activeStage)) : null;
   const inlineBreakRunning = inlineBreak?.state === 'running' ? inlineBreak : null;
@@ -1228,7 +1231,16 @@ export function TournamentControlPage() {
           <div><strong>Qualifikations-Stichentscheid dokumentiert</strong>
             <p>Bis zum Start der nächsten Spielphase kannst du die Entscheidung korrigieren. Die Korrektur wird protokolliert.</p>
           </div>
-          <button type="button" className="btn" onClick={() => setGroupCutoffModalOpen(true)}>Stichentscheid korrigieren</button>
+          <div className="actions">
+            {editableGroupCutoffs.map((cutoff, index) => (
+              <button key={cutoff.signature} type="button" className="btn small"
+                onClick={() => { setEditingGroupCutoffSignature(cutoff.signature); setGroupCutoffModalOpen(true); }}>
+                {editableGroupCutoffs.length > 1
+                  ? `${cutoff.groupLabel ?? 'Gruppenvergleich'} · Entscheid ${index + 1} korrigieren`
+                  : 'Stichentscheid korrigieren'}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       {pendingGroupCutoff && (
@@ -1975,11 +1987,12 @@ export function TournamentControlPage() {
       )}
       {(pendingGroupCutoff || editableGroupCutoff) && groupCutoffModalOpen && (
         <GroupCutoffDecisionModal key={(pendingGroupCutoff ?? editableGroupCutoff)!.signature} status={(pendingGroupCutoff ?? editableGroupCutoff)!}
-          onClose={() => setGroupCutoffModalOpen(false)}
+          onClose={() => { setGroupCutoffModalOpen(false); setEditingGroupCutoffSignature(null); }}
           onResolve={(winners, method, explanation) => {
-            const error = resolveGroupCutoff(tournament, winners, method, explanation);
+            const error = resolveGroupCutoff(tournament, winners, method, explanation, editingGroupCutoffSignature ?? undefined);
             if (!error) {
               setGroupCutoffModalOpen(false);
+              setEditingGroupCutoffSignature(null);
               refreshRuntime();
             }
             return error;
