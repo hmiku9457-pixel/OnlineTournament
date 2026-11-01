@@ -30,7 +30,6 @@ import { createMockTournament } from '@/services/mockTournamentStore';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
-import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, plannedTimelineDurationMinutes, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
@@ -1894,7 +1893,7 @@ export function CreateTournamentPage() {
         {step === 5 && (
           <section className="schedule-wizard-step">
             <h2>Zeitplan <span className="wizard-optional-tag">Optional</span></h2>
-            <p className="muted">Der Zeitplan wird automatisch aus deinen Phasen und deren geschätzter Dauer berechnet. Er ist eine unverbindliche Vorabinformation und hat keinen Einfluss auf den tatsächlichen Ablauf.</p>
+            <p className="muted">Automatisch erstellt und unverbindlich – der tatsächliche Ablauf bleibt bei der Turnierleitung.</p>
             <PlannedScheduleEditor
               scheduledStart={scheduledStart}
               timeline={plannedTimeline}
@@ -1907,7 +1906,6 @@ export function CreateTournamentPage() {
               <strong>Bitte diese Zeitplan-Angaben korrigieren:</strong>
               <ul>{scheduleIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
             </div>}
-            <TournamentPlannedSchedule scheduledStart={scheduledStart} items={plannedSchedule.filter((entry) => isValidLocalDateTime(entry.at) && Boolean(entry.title.trim()))} title="Vorschau für Spieler und Gäste" />
           </section>
         )}
       </div>
