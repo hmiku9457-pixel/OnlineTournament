@@ -191,7 +191,10 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(ui).toContain('Schweizer System');
     expect(ui).toContain('K.-o.-Phase');
     expect(ui).toContain('Voraussichtliches Turnierende');
-    expect(ui).toContain('Siegerehrung hinzufügen');
+    expect(ui).toContain('Siegerehrung');
+    expect(ui).toContain('+ Hinzufügen');
+    expect(ui).toContain('class="planned-schedule-ceremony-toggle"');
+    expect(ui).not.toContain('id="planned-ceremony-settings"');
     expect(ui).toContain('ca. 1 Std.');
     expect(ui).toContain('Pause · geschätzte Dauer');
     expect(ui).toContain('class="planned-schedule-duration"');
@@ -202,17 +205,40 @@ describe('optionaler vorläufiger Zeitplan', () => {
       awardsEnabled: true, awardsAt: timeline.estimatedEnd,
       onToggleAwards: () => {}, onAwardsAtChange: () => {},
     }));
-    expect(withAwards).toContain('value="2026-11-01"');
-    expect(withAwards).toContain('min="2026-11-01"');
+    expect(withAwards).toContain('01.11.2026');
+    expect(withAwards).toContain('id="awards-ceremony-date"');
     expect(withAwards).toContain('id="awards-ceremony-time"');
     expect(withAwards).toContain('15:30');
     expect(withAwards).toContain('aria-haspopup="dialog"');
     expect(withAwards).toContain('Siegerehrung entfernen');
     expect(withAwards).toContain('class="planned-schedule-phase-row is-ceremony"');
-    expect(withAwards).toContain('<strong>Siegerehrung</strong>');
+    expect(withAwards).toContain('Siegerehrung <span');
+    expect(withAwards).toContain('id="planned-ceremony-settings"');
     const list = withAwards.indexOf('class="planned-schedule-phase-row is-ceremony"');
     expect(list).toBeGreaterThan(withAwards.indexOf('Voraussichtliches Turnierende'));
-    expect(list).toBeLessThan(withAwards.indexOf('class="planned-schedule-ceremony"'));
+    expect(list).toBeLessThan(withAwards.indexOf('class="planned-schedule-ceremony-details"'));
+  });
+
+  it('zeigt beim Spieltagswechsel statt der mehrtägigen Pausendauer das Tagesende', () => {
+    const start = '2026-11-01T10:00';
+    const timeline = buildPlannedTimeline(start, [
+      { label: 'Gruppenphase', type: 'GROUPS', estimatedMinutes: 35 },
+      { label: 'Spieltagswechsel', type: 'BREAK', estimatedMinutes: 0,
+        breakKind: 'overnight', nextDayDate: '2026-11-03', nextDayStart: '09:00' },
+      { label: 'Finale', type: 'KNOCKOUT', estimatedMinutes: 60 },
+    ]);
+    expect(timeline.items[1].breakKind).toBe('overnight');
+    expect(timeline.items[1].durationMinutes).toBeGreaterThan(24 * 60);
+    const editor = renderToStaticMarkup(createElement(PlannedScheduleEditor, {
+      scheduledStart: start, timeline, awardsEnabled: false, awardsAt: timeline.estimatedEnd,
+      onToggleAwards: () => {}, onAwardsAtChange: () => {},
+    }));
+    expect(editor).toContain('Ende ca. 10:35 Uhr');
+    expect(editor).toContain('Spieltagsende · Fortsetzung am geplanten Datum');
+    expect(editor).not.toContain('ca. 46 Std.');
+    expect(editor).toContain('Dienstag, 3. November 2026');
+    expect(editor).toContain('class="planned-schedule-phase-row is-ceremony"');
+    expect(editor).not.toContain('planned-schedule-ceremony-details');
   });
 
   it('zeigt in der Seitenkarte dieselbe Gesamtdauer wie im Zeitplan, inklusive Pause bis', () => {
