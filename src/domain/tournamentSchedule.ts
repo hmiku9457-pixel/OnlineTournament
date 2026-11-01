@@ -45,6 +45,15 @@ export function toLocalDateTime(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+/** Creation accepts the current calendar minute (seconds are not editable)
+ * or a future minute. Compare Date values to respect DST boundaries. */
+export function isStartAtOrAfterNow(start: string, now = new Date()): boolean {
+  const scheduled = parseLocalDateTime(start);
+  if (!scheduled || Number.isNaN(now.getTime())) return false;
+  const thisMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
+  return scheduled.getTime() >= thisMinute.getTime();
+}
+
 export function formatPlannedDateTime(value: string, withDate = true): string {
   const date = parseLocalDateTime(value);
   if (!date) return 'Termin nicht festgelegt';
