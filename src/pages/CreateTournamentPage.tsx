@@ -354,7 +354,7 @@ export function CreateTournamentPage() {
   const savedDraftId = new URLSearchParams(location.search).get('draft');
   const sessionDraftKey = `${CREATION_DRAFT_KEY}:${savedDraftId ?? 'new'}`;
   const [restoredDraft] = useState(() => {
-    const draft = loadCreationDraft(window.sessionStorage, sessionDraftKey)
+    const draft = loadCreationDraft(typeof window !== 'undefined' ? window.sessionStorage : undefined, sessionDraftKey)
       ?? (savedDraftId ? getSavedCreationDraft(savedDraftId)?.draft ?? null : loadCreationDraft());
     if (draft) {
       participantSequence = Math.max(participantSequence, highestDraftSequence(draft.participants, 'participant'));
