@@ -96,6 +96,12 @@ function knockoutRoundMatchCounts(entrantCount: number): number[] {
   return counts;
 }
 
+/** Shared creation/pre-start constraint: Swiss pairings need distinct possible opponents. */
+export function isValidSwissRoundCount(rounds: number, entrantCount: number): boolean {
+  return Number.isInteger(rounds) && Number.isInteger(entrantCount)
+    && entrantCount >= 2 && rounds >= 1 && rounds <= Math.min(30, entrantCount - 1);
+}
+
 export function recommendedSwissRounds(entrantCount: number, minimumMatches = 1): number {
   const entrants = Math.max(2, Math.trunc(entrantCount));
   const desired = Math.max(Math.ceil(Math.log2(entrants)), Math.max(1, Math.trunc(minimumMatches)));
