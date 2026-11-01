@@ -61,6 +61,8 @@ describe('wizard recommendations and phase editor use compatible timing', () => 
     expect(isValidSwissRoundCount(2, 2)).toBe(false);
     expect(isValidSwissRoundCount(2, 3)).toBe(true);
     expect(isValidSwissRoundCount(30, 3)).toBe(false);
+    expect(isValidSwissRoundCount(39, 40)).toBe(true);
+    expect(isValidSwissRoundCount(40, 40)).toBe(false);
     expect(isValidSwissRoundCount(1.5, 9)).toBe(false);
     expect(isValidSwissRoundCount(0, 9)).toBe(false);
   });
