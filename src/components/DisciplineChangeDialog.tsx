@@ -51,7 +51,7 @@ export function DisciplineChangeDialog({
         </div>
         <div className="sport-change-dialog-notes">
           <p>Die gespeicherten Teilnehmer bleiben erhalten, ihre Felder werden jedoch nach der neuen Wettbewerbsart ausgewertet. Unvollständige oder doppelte Einträge blockieren die Erstellung, bis sie korrigiert wurden.</p>
-          {changingTeams && <p>Mannschaftsnamen und Spielernamen sind unterschiedlich aufgebaut. Prüfe nach dem Wechsel besonders die Namen in der Teilnehmerliste.</p>}
+          {changingTeams && <p>Mannschaftsnamen und Spielernamen werden unterschiedlich angezeigt. Ursprüngliche Vor- und Nachnamen bleiben getrennt gespeichert und beim Zurückwechseln erhalten. Prüfe die Teilnehmerliste vor Turnierstart.</p>}
           {droppingPartner && <p>Beim Wechsel von Doppel zu Einzel wird nur Spieler 1 als Teilnehmer angezeigt. Die bisherigen Partnerdaten bleiben intern gespeichert, erscheinen aber nicht in der Einzel-Liste.</p>}
           {nextDisciplineId === 'DOUBLES' && <p>Bei Doppel müssen anschließend für jeden Eintrag beide Partner vollständig erfasst werden.</p>}
         </div>
