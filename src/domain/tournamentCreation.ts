@@ -117,7 +117,7 @@ function knockoutRoundMatchCounts(entrantCount: number): number[] {
 /** Shared creation/pre-start constraint: Swiss pairings need distinct possible opponents. */
 export function isValidSwissRoundCount(rounds: number, entrantCount: number): boolean {
   return Number.isInteger(rounds) && Number.isInteger(entrantCount)
-    && entrantCount >= 3 && rounds >= 2 && rounds <= Math.min(30, entrantCount - 1);
+    && entrantCount >= 3 && rounds >= 2 && rounds <= entrantCount - 1;
 }
 
 export function recommendedSwissRounds(entrantCount: number, minimumMatches = 1): number {
@@ -125,7 +125,7 @@ export function recommendedSwissRounds(entrantCount: number, minimumMatches = 1)
   const desired = Math.max(Math.ceil(Math.log2(entrants)),
     Math.max(1, Math.trunc(minimumMatches)) + entrants % 2);
   // Repeated pairings become unavoidable past n-1 rounds; the editor allows 30.
-  return Math.max(2, Math.min(30, entrants - 1, desired));
+  return Math.max(2, Math.min(entrants - 1, desired));
 }
 
 /** A practical group count balances short groups with fair, per-group qualification.
