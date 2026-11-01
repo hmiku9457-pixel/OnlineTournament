@@ -21,6 +21,7 @@ import { SwissRoundCard } from '@/components/SwissRoundCard';
 import { SwissStandingsTable } from '@/components/SwissStandingsTable';
 import { SwissBuchholzHelpModal } from '@/components/SwissBuchholzHelpModal';
 import { SwissCutoffDecisionModal } from '@/components/SwissCutoffDecisionModal';
+import { GroupCutoffDecisionModal } from '@/components/GroupCutoffDecisionModal';
 import { SwissRoundRobinHistory } from '@/components/SwissRoundRobinHistory';
 import { RegularRoundRobinView } from '@/components/RegularRoundRobinView';
 import { getSwissCutoffRowIndex } from '@/components/SwissQualificationCutoff';
@@ -33,7 +34,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, getPendingMockApproval, approveMockProgress, abortMockTournament, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, getPendingGroupCutoff, resolveGroupCutoff, getPendingMockApproval, approveMockProgress, abortMockTournament, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
 import { canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getStageWithdrawalLabel, getWithdrawalLabel, isParticipantWithdrawn } from '@/services/mockWithdrawals';
 import { getMockConfirmedFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
@@ -682,6 +683,7 @@ export function TournamentControlPage() {
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table) && !blockedTables.has(table));
   const activeStage = useMemo(() => getActiveStage(phaseSource.tournament), [phaseSource]);
   const pendingApproval = useMemo(() => getPendingMockApproval(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
+  const pendingGroupCutoff = useMemo(() => getPendingGroupCutoff(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   const activeBreak = activeStage?.type === 'BREAK' ? activeStage : null;
   const inlineBreak = activeStage ? getInlineBreakStatus(tournament, activeStage, getMockStageMatches(tournament, activeStage)) : null;
   const inlineBreakRunning = inlineBreak?.state === 'running' ? inlineBreak : null;
@@ -1219,6 +1221,14 @@ export function TournamentControlPage() {
         ))}
       </nav>
 
+      {pendingGroupCutoff && (
+        <div className="control-review-alert no-print" role="status">
+          <div>
+            <strong>Sportlicher Gleichstand an der Qualifikationsgrenze</strong>
+            <p>Die Gruppenphase kann erst freigegeben werden, wenn das Entscheidungsergebnis dokumentiert ist. Alphabetische Namen entscheiden nicht.</p>
+          </div>
+        </div>
+      )}
       {pendingApproval && <div className="control-review-alert no-print" role="status">
         <div><strong>{pendingApproval.kind === 'ROUND'
           ? `Schweizer Runde ${pendingApproval.round} ist abgeschlossen – Freigabe erforderlich`
@@ -1950,6 +1960,12 @@ export function TournamentControlPage() {
           </section>
         </div>
       )}
+      {pendingGroupCutoff && <GroupCutoffDecisionModal status={pendingGroupCutoff}
+        onResolve={(winners, method, explanation) => {
+          const error = resolveGroupCutoff(tournament, winners, method, explanation);
+          if (!error) refreshRuntime();
+          return error;
+        }} />}
       {pendingSwissCutoff && !activeRoundRobinPlayoff && !activeCutoffSetMatch && <SwissCutoffDecisionModal
         status={pendingSwissCutoff}
         tournament={tournament}
