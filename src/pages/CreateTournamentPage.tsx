@@ -39,6 +39,7 @@ import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { DisciplineChangeDialog } from '@/components/DisciplineChangeDialog';
 import { TestParticipantsDialog } from '@/components/TestParticipantsDialog';
 import { DiscardDraftDialog } from '@/components/DiscardDraftDialog';
+import { UnsavedParticipantDialog } from '@/components/UnsavedParticipantDialog';
 import { QualificationRuleDialog } from '@/components/QualificationRuleDialog';
 import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/domain/groupQualification';
 import { isAllowedParticipantName, sanitizeParticipantName } from '@/domain/participantNames';
@@ -418,6 +419,7 @@ export function CreateTournamentPage() {
   const [pendingDiscipline, setPendingDiscipline] = useState<Discipline | null>(null);
   const [testParticipantsDialogOpen, setTestParticipantsDialogOpen] = useState(false);
   const [discardDraftDialogOpen, setDiscardDraftDialogOpen] = useState(false);
+  const [pendingStepNavigation, setPendingStepNavigation] = useState<{ target: WizardStep; focusDate: boolean; advance: boolean } | null>(null);
   const [qualificationRulePhaseId, setQualificationRulePhaseId] = useState<string | null>(null);
   const [focusStartSettings, setFocusStartSettings] = useState(false);
   const discardDraftButtonRef = useRef<HTMLButtonElement>(null);
@@ -490,12 +492,6 @@ export function CreateTournamentPage() {
     const key = field as ParticipantField;
     return participantForm[key] !== (editingSavedParticipant?.[key] ?? '');
   });
-  function confirmLeaveParticipantEditor(): boolean {
-    if (step !== 2 || !participantEditorDirty) return true;
-    if (!window.confirm('Es gibt noch nicht gespeicherte Teilnehmerdaten. Ohne Speichern zum anderen Schritt wechseln?')) return false;
-    resetParticipantEditor();
-    return true;
-  }
 
   const participantCount = participants.filter((participant) => participantIsComplete(participant, discipline)).length;
   const incompleteSavedParticipants = participants.length - participantCount;
@@ -920,35 +916,39 @@ export function CreateTournamentPage() {
     updatePhase(phase.id, { knockoutBestOf: next });
   }
 
-  function navigateToStep(target: WizardStep) {
-    if (target > maxReachedStep || (target !== step && !confirmLeaveParticipantEditor())) return;
-    setStep(target);
-    window.scrollTo({ top: 0, behavior: 'auto' });
-  }
-
-  function goNext() {
-    if (!canContinue || !confirmLeaveParticipantEditor()) return;
-    const next = (step + 1) as WizardStep;
-    if (step === 3) {
+  function applyStepNavigation(target: WizardStep, focusDate = false, advance = false) {
+    if (step === 3 && advance) {
       if (phaseDrafts.length === 0 && selectedRecommendation) {
         setPhaseDrafts(selectedRecommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
       }
       setHasVisitedPhaseStep(true);
     }
-    setMaxReachedStep((current) => Math.max(current, next) as WizardStep);
-    setStep(next);
+    if (advance) setMaxReachedStep((current) => Math.max(current, target) as WizardStep);
+    setStep(target);
+    if (focusDate) setFocusStartSettings(true);
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
+  function navigateToStep(target: WizardStep, focusDate = false, advance = false) {
+    if ((!advance && target > maxReachedStep) || target === step) return;
+    if (step === 2 && participantEditorDirty) {
+      setPendingStepNavigation({ target, focusDate, advance });
+      return;
+    }
+    applyStepNavigation(target, focusDate, advance);
+  }
+
+  function goNext() {
+    if (!canContinue) return;
+    navigateToStep((step + 1) as WizardStep, false, true);
+  }
+
   function goBack() {
-    if (step === 1) return;
-    navigateToStep((step - 1) as WizardStep);
+    if (step > 1) navigateToStep((step - 1) as WizardStep);
   }
 
   function goToDateTimeSettings() {
-    if (step !== 1 && !confirmLeaveParticipantEditor()) return;
-    setStep(1);
-    setFocusStartSettings(true);
+    navigateToStep(1, true);
   }
 
   useEffect(() => {
@@ -2350,6 +2350,17 @@ export function CreateTournamentPage() {
           />
         );
       })()}
+      {pendingStepNavigation && (
+        <UnsavedParticipantDialog
+          onStay={() => setPendingStepNavigation(null)}
+          onDiscard={() => {
+            const requested = pendingStepNavigation;
+            setPendingStepNavigation(null);
+            resetParticipantEditor();
+            applyStepNavigation(requested.target, requested.focusDate, requested.advance);
+          }}
+        />
+      )}
       {discardDraftDialogOpen && (
         <DiscardDraftDialog
           onCancel={() => {
