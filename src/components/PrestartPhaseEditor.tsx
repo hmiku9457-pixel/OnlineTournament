@@ -99,6 +99,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
     const previousPlaying = [...drafts.slice(0, index)].reverse().find((phase) => phase.type !== 'BREAK');
     const players = previousPlaying?.entrantCount ?? activeParticipants;
     if (type === 'SWISS' && players < 3) return;
+    if (type === 'GROUPS' && players < 4) return;
     const stage = createPrestartPhase(type, players, next);
     const candidate = [...drafts.slice(0, index), stage, ...drafts.slice(index)];
     const kinds = candidate.map((phase) => phase.type);
@@ -248,6 +249,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                           const type = event.target.value as StageType;
                           if (type === 'BREAK' && (index === 0 || index === drafts.length - 1)) return;
                           if (type === 'SWISS' && available < 3) return;
+                          if (type === 'GROUPS' && available < 4) return;
                           const draft = createPrestartPhase(type, available, nextPlaying);
                           draft.id = phase.id;
                           draft.label = stageLabel(type);
@@ -256,7 +258,8 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                           {types.map((option) => <option key={option.type} value={option.type}
                             disabled={(isKnockoutPhase(option.type) && index !== drafts.length - 1)
                               || (option.type === 'BREAK' && (index === 0 || index === drafts.length - 1))
-                              || (option.type === 'SWISS' && available < 3)}>
+                              || (option.type === 'SWISS' && available < 3)
+                              || (option.type === 'GROUPS' && available < 4)}>
                             {option.name}
                           </option>)}
                         </select>
@@ -396,6 +399,7 @@ export function PrestartPhaseEditor({ tournament, activeParticipants, withdrawnP
                     <button type="button" className="btn small" key={option.type} disabled={
                       (option.type === 'BREAK' && (phase.type === 'BREAK' || drafts[index + 1]?.type === 'BREAK'))
                       || (option.type === 'SWISS' && phase.entrantCount < 3)
+                      || (option.type === 'GROUPS' && phase.entrantCount < 4)
                     } onClick={() => insert(index + 1, option.type)}>{option.name}</button>)}
                   <button className="btn small" type="button" onClick={() => setInsertAfter(null)}>Abbrechen</button>
                 </div>}
