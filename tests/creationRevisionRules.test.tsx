@@ -56,14 +56,14 @@ describe('creation revision: group fairness and qualified participants', () => {
 });
 
 describe('creation revision: names, venues, timing and recommendations', () => {
-  it('allows Unicode letters and hyphenated names, but no special separators or digits', () => {
-    for (const name of ['Søren', 'Müller-Lüdenscheidt', 'Øyvind', 'Zoë', 'Jean-Luc', 'FC Nord']) {
+  it('allows Unicode, numbers, periods and balanced parenthesized club qualifiers', () => {
+    for (const name of ['Søren', 'Müller-Lüdenscheidt', 'Øyvind', 'Zoë', 'Jean-Luc', 'FC Nord', 'FC 08', 'A.B', 'Test 01', 'Max Müller (TSV)', '1. FC Köln']) {
       expect(isAllowedParticipantName(name)).toBe(true);
     }
-    for (const name of ['Hans/Erik', 'FC 08', 'Tom_Lee', 'A.B', 'Test 01', '-Hans']) {
+    for (const name of ['Hans/Erik', 'Tom_Lee', '-Hans', 'Max (TSV', 'Max )TSV(']) {
       expect(isAllowedParticipantName(name)).toBe(false);
     }
-    expect(sanitizeParticipantName('Løwe/Max_01')).toBe('LøweMax');
+    expect(sanitizeParticipantName('Løwe/Max_01')).toBe('LøweMax01');
   });
 
   it('uses Tische only for table sports and Plätze for court/field sports', () => {
