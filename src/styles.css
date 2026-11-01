@@ -7125,3 +7125,11 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .is-prestart-phase-editor .prestart-editor-actions {
   display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px;
 }
+
+/* Large venues show bounded, navigable row pages; avoid 10k buttons in DOM. */
+.hall-grid-page-navigation {
+  display: flex; align-items: center; justify-content: center;
+  flex-wrap: wrap; gap: 10px; margin-top: 10px; padding: 4px;
+  font-size: .75rem; color: #475467;
+}
+.hall-grid-page-navigation .btn:disabled { opacity: .45; }
