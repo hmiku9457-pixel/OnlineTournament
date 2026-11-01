@@ -10,11 +10,11 @@ describe('Sportabhängige Bezeichnungen von Spielorten', () => {
     expect(displayVenueName('Tischtennis', 'Tisch 3')).toBe('Tisch 3');
   });
 
-  it('zeigt Fußballplätze und Spielfelder für Handball und Basketball', () => {
+  it('zeigt Plätze für alle Sportarten ohne Tisch', () => {
     expect(getVenueTerminology('football').plural).toBe('Plätze');
     expect(displayVenueName('Fußball', 'Tisch 3')).toBe('Platz 3');
-    expect(displayVenueName('Handball', 'Tisch 3')).toBe('Spielfeld 3');
-    expect(displayVenueName('Basketball', 'Tisch 3')).toBe('Spielfeld 3');
+    expect(displayVenueName('Handball', 'Tisch 3')).toBe('Platz 3');
+    expect(displayVenueName('Basketball', 'Tisch 3')).toBe('Platz 3');
     expect(displayVenueName('Lacrosse', 'Tisch 3')).toBe('Platz 3');
   });
 
@@ -23,8 +23,8 @@ describe('Sportabhängige Bezeichnungen von Spielorten', () => {
     expect(sportOptions.every(({ label }) => !label.includes('('))).toBe(true);
     expect(getSportLabel('beach_volleyball')).toBe('Beachvolleyball');
     expect(getSportLabel('ice_hockey')).toBe('Eishockey');
-    expect(displayVenueName('Volleyball', 'Tisch 1')).toBe('Spielfeld 1');
-    expect(displayVenueName('Badminton', 'Tisch 2')).toBe('Spielfeld 2');
+    expect(displayVenueName('Volleyball', 'Tisch 1')).toBe('Platz 1');
+    expect(displayVenueName('Badminton', 'Tisch 2')).toBe('Platz 2');
     expect(displayVenueName('Tennis', 'Tisch 3')).toBe('Platz 3');
     expect(displayVenueName('Padel', 'Tisch 4')).toBe('Platz 4');
   });
@@ -32,7 +32,7 @@ describe('Sportabhängige Bezeichnungen von Spielorten', () => {
   it('übersetzt gespeicherte Hinweise, ohne die internen Tischkennungen zu verändern', () => {
     const stored = 'Tisch 4';
     expect(displayVenueMessage('Fußball', 'Wartet auf Tischzuweisung')).toBe('Wartet auf Platzzuweisung');
-    expect(displayVenueMessage('Handball', 'An Tischen 1 und 2')).toBe('An Spielfeldern 1 und 2');
+    expect(displayVenueMessage('Handball', 'An Tischen 1 und 2')).toBe('An Plätzen 1 und 2');
     expect(displayVenueMessage('Fußball', 'Tisch 4 ist gesperrt')).toBe('Platz 4 ist gesperrt');
     expect(displayVenueMessage('Tischtennis', 'Tisch 4 ist gesperrt')).toBe('Tisch 4 ist gesperrt');
     expect(stored).toBe('Tisch 4');
