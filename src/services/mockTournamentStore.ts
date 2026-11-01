@@ -130,6 +130,16 @@ function createId() {
   return `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** A started tournament has priority over any older unstarted duplicate.
+ * Used to decide whether the creation wizard must show an overwrite modal. */
+export function findTournamentNameConflict(name: string): DemoTournament | null {
+  const normalized = name.trim().toLocaleLowerCase('de-DE');
+  if (!normalized) return null;
+  const matches = readLocalTournaments().filter((item) => item.name.trim().toLocaleLowerCase('de-DE') === normalized);
+  return matches.find((item) => hasStartedAnyStage(item, getPhaseLifecycle(item).startedStageIds))
+    ?? matches[0] ?? null;
+}
+
 export function createMockTournament(input: CreateMockTournamentInput): DemoTournament {
   // Existing programmatic test fixtures without a public start time remain valid.
   if (input.scheduledStart !== undefined && !isValidLocalDateTime(input.scheduledStart)) {
@@ -144,12 +154,12 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
   const normalizedName = input.name.trim().toLocaleLowerCase('de-DE');
   const nameMatches = existing.filter((item) => item.name.trim().toLocaleLowerCase('de-DE') === normalizedName);
   const protectedMatch = nameMatches.find((item) => hasStartedAnyStage(item, getPhaseLifecycle(item).startedStageIds));
-  if (protectedMatch) throw new Error('Ein bereits gestartetes oder abgeschlossenes Turnier trägt diesen Namen. Bitte einen anderen Turniernamen wählen.');
-  if (nameMatches.length && (!input.overwriteTournamentId
+  if (input.requireFutureStart && protectedMatch) throw new Error('Ein bereits gestartetes oder abgeschlossenes Turnier trägt diesen Namen. Bitte einen anderen Turniernamen wählen.');
+  if (input.requireFutureStart && nameMatches.length && (!input.overwriteTournamentId
     || !nameMatches.some((item) => item.id === input.overwriteTournamentId))) {
     throw new Error('Ein nicht gestartetes Turnier trägt diesen Namen. Bitte das Überschreiben bestätigen.');
   }
-  if (input.overwriteTournamentId && (nameMatches.length !== 1
+  if (input.requireFutureStart && input.overwriteTournamentId && (nameMatches.length !== 1
     || nameMatches[0].id !== input.overwriteTournamentId)) {
     throw new Error('Das zuvor ausgewählte Turnier wurde zwischenzeitlich verändert. Bitte den Namenskonflikt erneut prüfen.');
   }
