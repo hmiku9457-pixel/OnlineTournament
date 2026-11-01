@@ -104,6 +104,8 @@ export function getFirstPhaseRecommendationWarning(tournament: DemoTournament, a
   const drafts = normalizePrestartPhases(initialPrestartPhases(tournament), activeCount);
   const index = drafts.findIndex(competitive);
   if (index < 0) return null;
+  const plannedEntrants = Number(tournament.stages[index]?.settings.entrants) || tournament.participants;
+  if (activeCount === plannedEntrants) return null;
   if (activeCount < 2) return 'Mit weniger als zwei aktiven Teilnehmern kann die erste Phase nicht starten.';
 
   const phase = drafts[index];
@@ -121,7 +123,6 @@ export function getFirstPhaseRecommendationWarning(tournament: DemoTournament, a
     }
   }
   if (phase.type === 'KNOCKOUT') {
-    const plannedEntrants = Number(tournament.stages[index]?.settings.entrants) || tournament.participants;
     const plannedRounds = knockoutRoundLabels(plannedEntrants).length;
     const recommendedRounds = knockoutRoundLabels(activeCount).length;
     if (plannedRounds !== recommendedRounds) {
