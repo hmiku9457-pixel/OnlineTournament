@@ -56,21 +56,98 @@ export interface CreateMockTournamentInput {
   overwriteTournamentId?: string;
 }
 
-function readLocalTournaments(): DemoTournament[] {
-  if (typeof window === 'undefined') return [];
+const TOURNAMENT_RECORD_PREFIX = `${STORAGE_KEY}:record:`;
+const TOURNAMENT_MIGRATION_KEY = `${STORAGE_KEY}:migrated:v2`;
+type StoredTournament = { tournament: DemoTournament; sortOrder: number };
+let previousTournamentRead = new Map<string, string>();
+
+/** Old lightweight storage mocks lack key()/length; preserve legacy behavior
+ * in tests while real browsers use independent, atomic per-tournament keys. */
+function supportsShardedTournaments(storage: Storage): boolean {
+  return typeof storage.length === 'number' && typeof storage.key === 'function';
+}
+function recordKey(id: string): string { return TOURNAMENT_RECORD_PREFIX + id; }
+
+function migrateLocalTournaments(storage: Storage) {
+  if (storage.getItem(TOURNAMENT_MIGRATION_KEY) === '1') return;
+  const raw = storage.getItem(STORAGE_KEY);
+  let old: DemoTournament[] = [];
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as DemoTournament[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+    const entries: unknown = JSON.parse(raw ?? '[]');
+    if (Array.isArray(entries)) old = entries.filter((entry): entry is DemoTournament =>
+      Boolean(entry && typeof entry.id === 'string'));
+  } catch { /* Preserve invalid legacy storage for diagnosis. */ }
+  const startOrder = Date.now() - old.length;
+  old.forEach((tournament, index) => {
+    if (!storage.getItem(recordKey(tournament.id))) {
+      storage.setItem(recordKey(tournament.id), JSON.stringify({
+        tournament, sortOrder: startOrder + old.length - index,
+      } satisfies StoredTournament));
+    }
+  });
+  storage.setItem(TOURNAMENT_MIGRATION_KEY, '1');
 }
 
+function readLocalTournaments(): DemoTournament[] {
+  if (typeof window === 'undefined') return [];
+  const storage = window.localStorage;
+  if (!supportsShardedTournaments(storage)) {
+    try {
+      const parsed: unknown = JSON.parse(storage.getItem(STORAGE_KEY) ?? '[]');
+      const tournaments = Array.isArray(parsed) ? parsed as DemoTournament[] : [];
+      previousTournamentRead = new Map(tournaments.map((t) => [t.id, JSON.stringify(t)]));
+      return tournaments;
+    } catch { return []; }
+  }
+  migrateLocalTournaments(storage);
+  const entries: StoredTournament[] = [];
+  for (let index = 0; index < storage.length; index++) {
+    const key = storage.key(index);
+    if (!key?.startsWith(TOURNAMENT_RECORD_PREFIX)) continue;
+    try {
+      const parsed = JSON.parse(storage.getItem(key) ?? 'null') as StoredTournament;
+      if (parsed?.tournament?.id && Number.isFinite(parsed.sortOrder)) entries.push(parsed);
+    } catch { /* Skip malformed records, never remove them. */ }
+  }
+  entries.sort((a, b) => b.sortOrder - a.sortOrder);
+  const tournaments = entries.map((entry) => entry.tournament);
+  previousTournamentRead = new Map(tournaments.map((t) => [t.id, JSON.stringify(t)]));
+  return tournaments;
+}
+
+/** Each edited tournament is persisted independently. The caller's last read
+ * is used to determine its own changes, rather than overwriting other
+ * tournaments from a stale whole-list snapshot. */
 function writeLocalTournaments(tournaments: DemoTournament[]) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tournaments));
+  const storage = window.localStorage;
+  if (!supportsShardedTournaments(storage)) {
+    storage.setItem(STORAGE_KEY, JSON.stringify(tournaments));
+    return;
+  }
+  migrateLocalTournaments(storage);
+  const desired = new Map(tournaments.map((t) => [t.id, t]));
+  for (const [id, oldJson] of previousTournamentRead) {
+    const next = desired.get(id);
+    if (next && JSON.stringify(next) === oldJson) continue;
+    const key = recordKey(id);
+    const stored = storage.getItem(key);
+    const existing: StoredTournament | null = stored ? JSON.parse(stored) as StoredTournament : null;
+    if (existing && JSON.stringify(existing.tournament) !== oldJson) {
+      throw new Error('Das Turnier wurde in einem anderen Tab geändert. Bitte die Seite aktualisieren.');
+    }
+    if (!next) storage.removeItem(key);
+    else storage.setItem(key, JSON.stringify({
+      tournament: next, sortOrder: existing?.sortOrder ?? Date.now(),
+    } satisfies StoredTournament));
+  }
+  for (const [id, next] of desired) {
+    if (previousTournamentRead.has(id)) continue;
+    const key = recordKey(id);
+    if (storage.getItem(key)) throw new Error('Ein Turnier mit dieser Kennung existiert bereits.');
+    storage.setItem(key, JSON.stringify({ tournament: next, sortOrder: Date.now() } satisfies StoredTournament));
+  }
+  previousTournamentRead = new Map(tournaments.map((t) => [t.id, JSON.stringify(t)]));
 }
 
 function durationLabel(minutes: number) {
