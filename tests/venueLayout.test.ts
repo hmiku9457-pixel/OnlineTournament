@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { createElement } from 'react';
 import { VenueLayoutEditor, makeVenuePreset } from '@/components/VenueLayout';
 import { createVenueLayout, dockVenueDesk, layoutTableNumbers, placeVenueCell, resizeVenueLayout } from '@/domain/venueLayout';
 
@@ -23,12 +24,14 @@ describe('optional hall layout', () => {
         expect(venue.cells[row * venue.columns + middle]).toBe('');
       }
     }
-    const html41 = renderToStaticMarkup(<VenueLayoutEditor layout={createVenueLayout(41)}
-      tableCount={41} sport="table_tennis" onChange={() => {}} />);
+    const html41 = renderToStaticMarkup(createElement(VenueLayoutEditor, {
+      layout: createVenueLayout(41), tableCount: 41, sport: 'table_tennis', onChange: () => {},
+    }));
     expect(html41).not.toContain('>Eine Reihe<');
     expect(html41).toContain('>Zwei Reihen<');
-    const html81 = renderToStaticMarkup(<VenueLayoutEditor layout={createVenueLayout(81)}
-      tableCount={81} sport="table_tennis" onChange={() => {}} />);
+    const html81 = renderToStaticMarkup(createElement(VenueLayoutEditor, {
+      layout: createVenueLayout(81), tableCount: 81, sport: 'table_tennis', onChange: () => {},
+    }));
     expect(html81).not.toContain('>Zwei Reihen<');
     expect(html81).toContain('>Mit Mittelgang<');
   });
