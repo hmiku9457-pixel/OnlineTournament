@@ -9,6 +9,8 @@ interface Props {
   timeline: PlannedTimeline;
   awardsEnabled: boolean;
   awardsAt: string;
+  /** Hide ceremony controls when this schedule is a read-only preview. */
+  showCeremony?: boolean;
   /** Concise competitive phase facts, in phase order; pauses have empty entries. */
   phaseSummaries?: readonly string[];
   onToggleAwards: (enabled: boolean) => void;
@@ -17,7 +19,7 @@ interface Props {
 
 /** The single non-binding timetable during creation, including inline ceremony editing. */
 export function PlannedScheduleEditor({
-  scheduledStart, timeline, awardsEnabled, awardsAt, phaseSummaries = [], onToggleAwards, onAwardsAtChange,
+  scheduledStart, timeline, awardsEnabled, awardsAt, showCeremony = true, phaseSummaries = [], onToggleAwards, onAwardsAtChange,
 }: Props) {
   const [ceremonyExpanded, setCeremonyExpanded] = useState(awardsEnabled);
   const expectedEnd = parseLocalDateTime(timeline.estimatedEnd);
@@ -30,8 +32,8 @@ export function PlannedScheduleEditor({
       ? [{ id: 'estimated-finish', at: timeline.estimatedEnd, title: 'Voraussichtliches Turnierende', type: 'other' as const }]
       : []),
     // Always show the optional ceremony inside this timeline, even before it is enabled.
-    { id: 'awards-ceremony', at: awardsEnabled ? awardsAt : (timeline.estimatedEnd || scheduledStart),
-      title: 'Siegerehrung', type: 'other' },
+    ...(showCeremony ? [{ id: 'awards-ceremony', at: awardsEnabled ? awardsAt : (timeline.estimatedEnd || scheduledStart),
+      title: 'Siegerehrung', type: 'other' as const }] : []),
   ];
   const grouped = groupPlannedScheduleDays(entries, scheduledStart);
   const renderRow = (item: PlannedScheduleItem) => {
