@@ -82,7 +82,7 @@ export function minimumPlayedMatches(type: StageType, entrants: number, groupCou
   if (type === 'ROUND_ROBIN') return count - 1;
   if (type === 'GROUPS') return Math.max(0, Math.floor(count / Math.max(2, groupCount)) - 1);
   if (type === 'SWISS') return Math.max(0, swissRounds - (count % 2));
-  if (type === 'KNOCKOUT') return knockoutByeCount(count) ? 0 : 1;
+  if (type === 'KNOCKOUT') return 1;
   return 0;
 }
 
@@ -229,6 +229,28 @@ export function knockoutByeCount(entrantCount: number): number {
 
 export interface TimedMatchSettings { matchDurationMinutes?: number; venueTurnoverMinutes?: number; minutesPerSet?: number }
 
+/** Individual knockout rounds are not equally long when Best-of varies.
+ * Keep cumulative rounding so the breakdown sums to the phase estimate. */
+export function estimateKnockoutRoundMinutes(
+  entrantCount: number, tableCount: number, bestOf: number,
+  knockoutBestOf?: number[], timing?: TimedMatchSettings,
+): number[] {
+  const tables = Math.max(1, Math.trunc(tableCount));
+  let cumulative = 0;
+  let previousRounded = 0;
+  return knockoutRoundMatchCounts(entrantCount).map((matches, index) => {
+    const sets = knockoutBestOf?.[index] ?? bestOf;
+    const waveMinutes = timing?.matchDurationMinutes
+      ? Math.ceil(matches / tables) * (Math.max(1, timing.matchDurationMinutes) + Math.max(0, timing.venueTurnoverMinutes ?? 0))
+      : Math.ceil(matches / tables) * averageSetsForBestOf(sets) * (timing?.minutesPerSet ?? MINUTES_PER_SET);
+    cumulative += waveMinutes;
+    const rounded = Math.round(cumulative);
+    const minutes = rounded - previousRounded;
+    previousRounded = rounded;
+    return minutes;
+  });
+}
+
 export function estimatePhaseMetrics(
   phase: TournamentDurationPhaseInput,
   tableCount: number,
@@ -271,14 +293,10 @@ export function estimatePhaseMetrics(
     }
     case 'KNOCKOUT': {
       const roundMatches = knockoutRoundMatchCounts(entrants);
-      let duration = 0;
-      roundMatches.forEach((matches, roundIndex) => {
-        const bestOf = phase.knockoutBestOf?.[roundIndex] ?? phase.bestOf;
-        duration += waveDurationForPhase(matches, bestOf);
-      });
+      const minutes = estimateKnockoutRoundMinutes(entrants, tables, phase.bestOf, phase.knockoutBestOf, timing);
       return {
         estimatedMatches: roundMatches.reduce((sum, matches) => sum + matches, 0),
-        estimatedDurationMinutes: Math.round(duration),
+        estimatedDurationMinutes: minutes.reduce((sum, value) => sum + value, 0),
         approximate: false,
       };
     }
