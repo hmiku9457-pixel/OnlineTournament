@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { sidebarTournaments, type SidebarTournament } from '@/domain/sidebarTournaments';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
+import { listSavedCreationDrafts } from '@/domain/creationDraft';
 
 type SidebarIconName = 'trophy' | 'grid' | 'plus' | 'user' | 'calendar' | 'chart' | 'settings';
 
@@ -63,15 +64,18 @@ export function AppShell() {
     window.addEventListener('mock-runtime-change', refresh);
     window.addEventListener('mock-phase-change', refresh);
     window.addEventListener('mock-audit-change', refresh);
+    window.addEventListener('creation-drafts-change', refresh);
     return () => {
       window.removeEventListener('focus', refresh);
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('mock-runtime-change', refresh);
       window.removeEventListener('mock-phase-change', refresh);
       window.removeEventListener('mock-audit-change', refresh);
+      window.removeEventListener('creation-drafts-change', refresh);
     };
   }, []);
 
+  const savedDrafts = useMemo(() => listSavedCreationDrafts(), [revision, location.key]);
   const yourTournaments = useMemo(
     () => sidebarTournaments(getAllMockTournaments()),
     [revision, location.key],
@@ -93,6 +97,25 @@ export function AppShell() {
               <NavLink to="/tournaments/new"><SidebarIcon name="plus"/><span>Turnier erstellen</span></NavLink>
               <NavLink to="/login" className="sidebar-mobile-login"><SidebarIcon name="user"/><span>Anmelden</span></NavLink>
             </nav>
+            {savedDrafts.length > 0 && (
+              <div className="sidebar-live-section sidebar-drafts-section" aria-label="Turnierentwürfe">
+                <div className="sidebar-section-heading">
+                  <h3>Turnierentwürfe</h3>
+                  <span className="sidebar-live-total">{savedDrafts.length}</span>
+                </div>
+                <div className="sidebar-live-items">
+                  {savedDrafts.map((item) => (
+                    <Link key={item.id} className="sidebar-live-item sidebar-draft-item"
+                      to={`/tournaments/new?draft=${encodeURIComponent(item.id)}`}
+                      title="Gespeicherten Turnierentwurf bearbeiten">
+                      <strong>{item.draft.name.trim() || 'Unbenannter Entwurf'}</strong>
+                      <span className="sidebar-live-phase">{item.draft.participants.length} Teilnehmer · Schritt {item.draft.step}/5</span>
+                      <span className="sidebar-live-progress-label">Zuletzt gespeichert: {new Date(item.savedAt).toLocaleString('de-DE')}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="sidebar-live-section" aria-label="Deine Turniere">
               <div className="sidebar-section-heading">
                 <h3>Deine Turniere</h3>
