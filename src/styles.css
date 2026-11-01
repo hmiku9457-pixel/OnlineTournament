@@ -6541,11 +6541,13 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .tournament-planned-schedule .planned-schedule-stage.is-completed {
   background: #f2f4f7;
 }
-.tournament-planned-schedule .planned-schedule-stage.is-completed .planned-schedule-stage-button {
-  opacity: .76;
+.tournament-planned-schedule .planned-schedule-stage.is-completed .planned-schedule-stage-button time,
+.tournament-planned-schedule .planned-schedule-stage.is-completed .planned-schedule-stage-button .planned-schedule-duration,
+.tournament-planned-schedule .planned-schedule-stage.is-completed .planned-schedule-stage-detail,
+.tournament-planned-schedule .planned-schedule-stage.is-completed .planned-schedule-stage-advancement {
+  color: #89919d;
 }
 .tournament-planned-schedule .planned-schedule-stage.is-completed .planned-schedule-stage-button:hover {
-  opacity: 1;
   background: #e9edf2;
 }
 .tournament-planned-schedule .planned-schedule-stage-status.status-completed {
