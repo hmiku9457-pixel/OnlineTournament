@@ -156,7 +156,14 @@ try {
   await page.locator('.control-tabs').getByRole('button', { name: 'Teilnehmer' }).click();
   await page.locator('.control-tabs').getByRole('button', { name: 'Phasen bearbeiten' }).click();
   assert.equal(await prestartBestOf.inputValue(), '3', 'prestart phase edits must survive director tab switches');
+  // The sidebar is also protected; rejecting navigation must retain all edits.
+  await page.locator('.sidebar-navigation').getByRole('link', { name: 'Alle Turniere anzeigen' }).click();
+  const navigationDialog = page.getByRole('alertdialog', { name: 'Ungespeicherte Phasenänderungen' });
+  await navigationDialog.waitFor();
+  await navigationDialog.getByRole('button', { name: 'Weiter bearbeiten' }).click();
+  assert.equal(await prestartBestOf.inputValue(), '3');
   await page.getByRole('button', { name: 'Änderungen prüfen und speichern' }).click();
+  await page.getByRole('alertdialog', { name: 'Vorstart-Planung wirklich übernehmen?' }).waitFor();
   await page.getByRole('button', { name: 'Ja, Phasen und Auslosung aktualisieren' }).click();
   await page.locator('.control-tabs').getByRole('button', { name: 'Übersicht' }).waitFor();
   assert.deepEqual(errors, [], 'no browser runtime errors');
@@ -377,6 +384,20 @@ try {
   await draftPage.getByRole('button', { name: 'Entwurf kopieren' }).click();
   await draftPage.waitForFunction(() => document.querySelectorAll('.sidebar-draft-item').length === 2);
   assert.match(await draftPage.locator('#name').inputValue(), /Kopie/);
+
+  // A second tab saving the same named draft must not silently replace the
+  // first tab's edits. The stale tab gets a conflict modal and can copy it.
+  const secondTab = await draftsContext.newPage();
+  await secondTab.goto(draftPage.url());
+  await secondTab.locator('#name').fill('Anderer Tab');
+  await secondTab.getByRole('button', { name: 'Entwurf speichern' }).click();
+  await secondTab.getByText('Entwurf gespeichert.', { exact: true }).waitFor();
+  await draftPage.locator('#name').fill('Meine nicht gespeicherte Fassung');
+  await draftPage.getByRole('button', { name: 'Entwurf speichern' }).click();
+  await draftPage.getByRole('alertdialog', { name: 'Dieser Entwurf wurde zwischenzeitlich geändert' }).waitFor();
+  await draftPage.getByRole('button', { name: 'Meine Fassung als Kopie speichern' }).click();
+  await draftPage.waitForFunction(() => document.querySelectorAll('.sidebar-draft-item').length === 3);
+  await secondTab.close();
   await draftsContext.close();
 
   process.stdout.write('Creation wizard browser smoke tests passed.\n');
