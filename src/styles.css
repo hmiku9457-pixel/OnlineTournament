@@ -7071,3 +7071,25 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   line-height: 1.4;
   font-variant-numeric: tabular-nums;
 }
+
+/* Explicitly saved tournament drafts: compact actions without disturbing the
+   existing red discard action or the sidebar's tournament navigation. */
+.creation-draft-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.creation-draft-actions > .field-hint { flex-basis: 100%; text-align: right; }
+.sidebar-drafts-section { margin-top: 13px; }
+.sidebar-draft-item { border-style: dashed; }
+.sidebar-draft-item > strong { font-size: .82rem; overflow-wrap: anywhere; }
+.creation-undo-remove { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 9px; margin-top: 8px; font-size: .82rem; }
+.prestart-editor { max-width: 100%; }
+.prestart-editor-phase { border-radius: 12px; padding: 13px 15px; }
+.prestart-editor-phase.is-open { box-shadow: 0 2px 12px rgba(17, 38, 72, .04); }
+.prestart-editor .phase-inline-break { display: grid; gap: 10px; padding: 9px 12px; border: 1px solid #dbe6f5; border-radius: 10px; }
+.prestart-editor .phase-inline-break-header { text-align: left; border: 0; background: transparent; color: inherit; font-weight: 700; }
+.prestart-editor .phase-inline-break-settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.prestart-editor .phase-inline-break-settings > label { display: grid; gap: 6px; font-size: .79rem; font-weight: 650; }
+.prestart-editor .phase-inline-break-settings input, .prestart-editor .phase-inline-break-settings select { width: 100%; }
+@media (max-width: 740px) {
+  .creation-draft-actions { width: 100%; justify-content: flex-start; }
+  .creation-draft-actions > .field-hint { text-align: left; }
+  .creation-undo-remove .btn { min-height: 32px; }
+}
