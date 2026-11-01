@@ -1018,8 +1018,12 @@ export function CreateTournamentPage() {
   }
 
   function discardCreationDraft() {
-    clearCreationDraft();
-    window.location.reload();
+    clearCreationDraft(window.sessionStorage, sessionDraftKey);
+    clearCreationDraft(); // Clear any legacy single-draft recovery copy.
+    if (savedDraftId) {
+      removeSavedCreationDraft(savedDraftId);
+      navigate('/tournaments/new', { replace: true });
+    } else window.location.reload();
   }
 
   function submitTournament() {
@@ -1065,7 +1069,9 @@ export function CreateTournamentPage() {
       estimatedDurationMinutes: estimatedTournamentDurationMinutes,
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
     });
+    clearCreationDraft(window.sessionStorage, sessionDraftKey);
     clearCreationDraft();
+    if (savedDraftId) removeSavedCreationDraft(savedDraftId);
     navigate(`/tournaments/${tournament.id}/control`, { replace: true });
     } catch (error) {
       setCreationError(error instanceof Error ? error.message : 'Das Turnier konnte nicht gespeichert werden. Bitte Speicherplatz prüfen und erneut versuchen.');
@@ -1149,17 +1155,20 @@ export function CreateTournamentPage() {
       <div className="creation-page-container">
       <header className="page-head creation-page-head">
         <div className="creation-page-heading">
-          <h1>Turnier erstellen</h1>
+          <h1>{savedDraftId ? 'Turnierentwurf bearbeiten' : 'Turnier erstellen'}</h1>
           <p className="muted">Schritt {step} von 5 · Einstellungen bleiben erhalten und können jederzeit über die bereits erreichten Schritte geändert werden.</p>
           {draftSaveFailed && (
             <p className="creation-draft-error" role="alert">
-              Entwurf konnte nicht automatisch gespeichert werden. Bitte Browser-Speicher prüfen.
+              Temporäre Wiederherstellung im aktuellen Tab fehlgeschlagen. Bitte Browser-Speicher prüfen.
             </p>
           )}
         </div>
-        <button ref={discardDraftButtonRef} className="btn danger creation-discard-button" type="button" onClick={() => setDiscardDraftDialogOpen(true)}>
-          Entwurf verwerfen
-        </button>
+        <div className="creation-draft-actions">
+          <button className="btn primary" type="button" onClick={() => saveNamedDraft()}>Entwurf speichern</button>
+          {savedDraftId && <button className="btn" type="button" onClick={() => saveNamedDraft(true)}>Entwurf kopieren</button>}
+          <button ref={discardDraftButtonRef} className="btn danger creation-discard-button" type="button" onClick={() => setDiscardDraftDialogOpen(true)}>Entwurf verwerfen</button>
+          {namedDraftMessage && <span className="field-hint" role="status">{namedDraftMessage}</span>}
+        </div>
       </header>
 
       <nav className="wizard-steps" aria-label="Erstellungsschritte">
