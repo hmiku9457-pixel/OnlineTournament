@@ -4915,6 +4915,18 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   min-height: 3em; /* zwei Zeilen bei der bestehenden Zeilenhöhe von 1.5 */
 }
 
+/* Turniererstellung · Datum und Beginn: wie Sportart/Wettbewerbsart
+ * gleich hohe Hilfstexte. Der längere Beginn-Hinweis belegt auf typischen
+ * Desktopbreiten drei Zeilen; die Datumsspalte erhält denselben Platz. */
+.wizard-workspace .wizard-date-hint,
+.wizard-workspace .wizard-start-hint {
+  min-height: 4.5em;
+}
+@media (max-width: 600px) {
+  .wizard-workspace .wizard-date-hint,
+  .wizard-workspace .wizard-start-hint { min-height: 0; }
+}
+
 /* Turniererstellung · Schritt 2: kompakte Teilnehmererfassung und einzeilige Spielerkarten */
 .wizard-workspace .participant-step .participant-step-head { margin-bottom: 10px; }
 .wizard-workspace .participant-step .participant-step-head h2 { margin: 0 0 3px; }
