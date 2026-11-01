@@ -13,6 +13,7 @@ import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLo
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
 import { rankStandings, type RankedParticipant } from '@/domain/standingRankings';
 import { discardedGroupOpponents, needsGroupStreichungsregel } from '@/domain/groupQualification';
+import { getGroupCutoffDecision, saveGroupCutoffDecision, type GroupCutoffDecision } from '@/services/mockGroupCutoffStore';
 import { compareRankingRows, resultScore, resultWinnerSide, scoreWithDecision, sportScoring, validateCompleteResult, validateScoreDecision, type ExtraTimeProgress, type ScoreDecision, type WinnerSide } from '@/domain/sportScoring';
 import { getWithdrawalAwardSets } from '@/domain/withdrawalScoring';
 import { newPlayoffRound, playoffBoundaryTie, playoffQualified, playoffRoundFinished, type PlayoffMode } from '@/domain/swissCutoffPlayoff';
@@ -1299,45 +1300,123 @@ export function resetSwissCutoffSets(tournament: DemoTournament): void {
   clearSwissCutoffDecision(tournament.id, current.stageId);
 }
 
+export interface GroupCutoffStatus {
+  stageId: string;
+  stageName: string;
+  tie: { players: string[]; slots: number; firstRank: number };
+  signature: string;
+  decision: GroupCutoffDecision | null;
+}
+
+/** Use final group placements for tier selection, but compare players within a
+ * partially filled tier with the Streichungsregel's comparable match results.
+ * Alphabetic order is presentation-only, never a sporting cutoff decision. */
+function groupQualifierResult(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]) {
+  const targetCount = stageQualifierCount(tournament, stage);
+  const matches = baseStageMatches(tournament, stage, results);
+  const rankings = groupMembers(tournament, stage).map((members, groupIndex) =>
+    rankParticipants(members, matches.filter((match) => match.round === `Gruppe ${groupLetter(groupIndex)}`), results, tournament.sport));
+  const groupSizes = rankings.map((ranking) => ranking.length);
+  const smallestSize = Math.min(...groupSizes);
+  const applyStreichung = needsGroupStreichungsregel(
+    groupSizes.reduce((sum, count) => sum + count, 0), rankings.length, targetCount, groupSizes);
+  const comparableRows = new Map<string, RankingRow>();
+  if (applyStreichung) {
+    rankings.forEach((ranking, groupIndex) => {
+      const ignored = discardedGroupOpponents(ranking, smallestSize);
+      const eligible = ranking.filter((row) => !ignored.has(row.name)).map((row) => row.name);
+      const groupMatches = matches.filter((match) => match.round === `Gruppe ${groupLetter(groupIndex)}`
+        && !ignored.has(match.sideA) && !ignored.has(match.sideB));
+      rankParticipants(eligible, groupMatches, results, tournament.sport)
+        .forEach((row) => comparableRows.set(row.name, row));
+    });
+  }
+  const compare = (a: RankingRow, b: RankingRow) =>
+    compareRankingRows(tournament.sport, comparableRows.get(a.name) ?? a, comparableRows.get(b.name) ?? b);
+  const sportingTie = (a: RankingRow, b: RankingRow) => {
+    const aScore = comparableRows.get(a.name) ?? a;
+    const bScore = comparableRows.get(b.name) ?? b;
+    return compareRankingRows(tournament.sport, { ...aScore, name: '' }, { ...bScore, name: '' }) === 0;
+  };
+  const qualified: string[] = [];
+  let tie: GroupCutoffStatus['tie'] | null = null;
+  for (let rankIndex = 0; qualified.length < targetCount; rankIndex += 1) {
+    const tier = rankings.map((ranking) => ranking[rankIndex])
+      .filter((row): row is RankingRow => Boolean(row) && !isMockParticipantWithdrawn(tournament, row.name));
+    if (!tier.length) break;
+    tier.sort(compare);
+    const slots = targetCount - qualified.length;
+    if (tier.length <= slots) {
+      qualified.push(...tier.map((row) => row.name));
+      continue;
+    }
+    if (sportingTie(tier[slots - 1], tier[slots])) {
+      let first = slots - 1;
+      let last = slots;
+      while (first > 0 && sportingTie(tier[first - 1], tier[slots - 1])) first -= 1;
+      while (last + 1 < tier.length && sportingTie(tier[last + 1], tier[slots - 1])) last += 1;
+      qualified.push(...tier.slice(0, first).map((row) => row.name));
+      tie = { players: tier.slice(first, last + 1).map((row) => row.name),
+        slots: slots - first, firstRank: rankIndex + 1 };
+    } else qualified.push(...tier.slice(0, slots).map((row) => row.name));
+    break;
+  }
+  if (!tie) return { qualified, cutoff: null as GroupCutoffStatus | null };
+  const signature = JSON.stringify({
+    targetCount, groupSizes, tie,
+    rankings: rankings.map((rows) => rows.map((row) => [
+      row.name, row.wins, row.losses, row.draws, row.setsWon, row.setsLost, row.ballsWon, row.ballsLost])),
+    games: matches.map((match) => {
+      const result = results.find((row) => row.matchId === match.id);
+      return [match.id, match.sideA, match.sideB, result?.status, result?.sets, result?.forcedWinner, result?.decisionSide];
+    }),
+  });
+  const decision = getGroupCutoffDecision(tournament.id, stage.id, signature);
+  if (decision && decision.winners.length === tie.slots
+    && new Set(decision.winners).size === tie.slots
+    && decision.winners.every((name) => tie.players.includes(name))) qualified.push(...decision.winners);
+  return { qualified, cutoff: { stageId: stage.id, stageName: stage.name, tie, signature, decision } };
+}
+
+/** Stage results must be complete before displaying a binding cutoff decision. */
+export function getPendingGroupCutoff(tournament: DemoTournament): GroupCutoffStatus | null {
+  if (['ABORTED', 'FINISHED'].includes(tournament.status)) return null;
+  const active = getActiveStage(tournament);
+  if (!active || active.type !== 'GROUPS' || !getNextCompetitionStage(tournament, active)) return null;
+  const matches = getMockStageMatches(tournament, active);
+  if (!matches.length || matches.some((match) => match.status !== 'FINISHED')) return null;
+  const cutoff = groupQualifierResult(tournament, active, readResults()).cutoff;
+  return cutoff && cutoff.decision?.winners.length !== cutoff.tie.slots ? cutoff : null;
+}
+
+/** Director records the outcome of a separately conducted tie-break or a lot.
+ * The decision is attached to the exact group results and automatically expires
+ * after any result correction that changes the qualification signature. */
+export function resolveGroupCutoff(tournament: DemoTournament,
+  winners: string[], method: 'PLAYOFF' | 'LOT', explanation: string): string | null {
+  const current = getPendingGroupCutoff(tournament);
+  if (!current) return 'Kein offener Gruppen-Stichentscheid vorhanden.';
+  if (new Set(winners).size !== current.tie.slots || winners.length !== current.tie.slots
+    || winners.some((name) => !current.tie.players.includes(name))) {
+    return `Bitte genau ${current.tie.slots} der betroffenen Teilnehmer auswählen.`;
+  }
+  if (explanation.trim().length < 3) return 'Bitte das Entscheidungsergebnis bzw. Losverfahren dokumentieren.';
+  saveGroupCutoffDecision({
+    tournamentId: tournament.id, stageId: current.stageId, signature: current.signature,
+    winners, method, explanation: explanation.trim(),
+  });
+  recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)', action: 'GROUP_TIE_RESOLVED',
+    description: `Gruppen-Qualifikationsgleichstand durch ${method === 'PLAYOFF' ? 'Stichentscheid' : 'Losentscheid'} gelöst: ${winners.join(', ')}. ${explanation.trim()}` });
+  return null;
+}
+
 function computeStageQualifiers(tournament: DemoTournament, stage: TournamentStage, results: StoredMatchResult[]) {
   const targetCount = stageQualifierCount(tournament, stage);
   if (targetCount <= 0) return [];
   const matches = baseStageMatches(tournament, stage, results);
 
   if (stage.type === 'GROUPS') {
-    const rankings = groupMembers(tournament, stage).map((members, groupIndex) => {
-      const groupLabel = `Gruppe ${groupLetter(groupIndex)}`;
-      return rankParticipants(members, matches.filter((match) => match.round === groupLabel), results, tournament.sport);
-    });
-    const groupSizes = rankings.map((ranking) => ranking.length);
-    const smallestSize = Math.min(...groupSizes);
-    const applyStreichung = needsGroupStreichungsregel(
-      rankings.reduce((sum, ranking) => sum + ranking.length, 0), rankings.length, targetCount,
-    );
-    // The published group tables and group places keep every match. For a
-    // partially qualifying placement (e.g. three of four runners-up), only
-    // the cross-group comparison discards results versus bottom-ranked
-    // opponents absent in the smallest group.
-    const comparableRows = new Map<string, RankingRow>();
-    if (applyStreichung) {
-      rankings.forEach((ranking, groupIndex) => {
-        const ignored = discardedGroupOpponents(ranking, smallestSize);
-        const eligible = ranking.filter((row) => !ignored.has(row.name)).map((row) => row.name);
-        const groupMatches = matches.filter((match) => match.round === `Gruppe ${groupLetter(groupIndex)}`
-          && !ignored.has(match.sideA) && !ignored.has(match.sideB));
-        rankParticipants(eligible, groupMatches, results, tournament.sport)
-          .forEach((row) => comparableRows.set(row.name, row));
-      });
-    }
-    const qualified: string[] = [];
-    for (let rankIndex = 0; qualified.length < targetCount; rankIndex += 1) {
-      const tier = rankings.map((ranking) => ranking[rankIndex]).filter((row): row is RankingRow => Boolean(row));
-      if (!tier.length) break;
-      tier.sort((a, b) => compareRankingRows(tournament.sport,
-        comparableRows.get(a.name) ?? a, comparableRows.get(b.name) ?? b));
-      qualified.push(...tier.filter((row) => !isMockParticipantWithdrawn(tournament, row.name)).slice(0, targetCount - qualified.length).map((row) => row.name));
-    }
-    return qualified;
+    return groupQualifierResult(tournament, stage, results).qualified;
   }
 
   if (stage.type === 'ROUND_ROBIN' || stage.type === 'SWISS') {
@@ -1415,6 +1494,7 @@ export function getPendingMockApproval(tournament: DemoTournament): MockProgress
   if (lastRound) {
     const cutoff = swissCutoffStatus(tournament, stage, readResults());
     if (cutoff && cutoff.decision?.winners?.length !== cutoff.tie.slots) return null;
+    if (stage.type === 'GROUPS' && getPendingGroupCutoff(tournament)) return null;
   }
   const index = tournament.stages.findIndex((entry) => entry.id === stage.id);
   return { stageId: stage.id, stageName: stage.name, kind: lastRound ? 'STAGE' : 'ROUND',
