@@ -427,7 +427,7 @@ export function CreateTournamentPage() {
 
   const recommendations = useMemo(
     () => recommendTournamentFormats(
-      { playerCount: participantCount, tableCount: tables, minimumMatches, matchDurationMinutes, venueTurnoverMinutes: breakMinutes },
+      { playerCount: participantCount, tableCount: tables, minimumMatches, sport, matchDurationMinutes, venueTurnoverMinutes: breakMinutes },
       {
         enabledSystems,
         maxGroups: effectiveMaxGroups,
@@ -1788,10 +1788,12 @@ export function CreateTournamentPage() {
                                   id={`swiss-rounds-${phase.id}`}
                                   type="number"
                                   min="1"
-                                  max="30"
+                                  max={Math.min(30, phase.entrantCount - 1)}
                                   value={phase.swissRounds}
-                                  onChange={(event) => updatePhase(phase.id, { swissRounds: Math.max(1, Number(event.target.value)) })}
+                                  onChange={(event) => updatePhase(phase.id, { swissRounds: Math.max(1, Math.min(30, Number(event.target.value))) })}
                                 />
+                                {!isValidSwissRoundCount(phase.swissRounds, phase.entrantCount) &&
+                                  <span className="field-error" role="alert">Für {phase.entrantCount} Teilnehmer sind höchstens {Math.min(30, phase.entrantCount - 1)} Schweizer Runden möglich.</span>
                               </div>
                             )}
 
