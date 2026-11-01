@@ -69,11 +69,6 @@ function freshId(): string {
     ? crypto.randomUUID() : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-async function refreshLegacyCache(): Promise<void> {
-  try { eventAndCache(await listSavedCreationDraftsAtomic()); }
-  catch { window.dispatchEvent(new Event('creation-drafts-change')); }
-}
-
 /** Atomic compare-and-swap: the revision check and put execute inside ONE
  * IndexedDB readwrite transaction, serialized across all browser tabs. */
 export async function saveNamedCreationDraftAtomic(
@@ -94,7 +89,7 @@ export async function saveNamedCreationDraftAtomic(
       }
       const entry: SavedCreationDraft = {
         id: previous?.id ?? freshId(), savedAt: new Date().toISOString(),
-        revision: previous ? (previous.revision ?? 0) + 1 : 1, draft: normalized,
+        revision: previous ? previous.revision + 1 : 1, draft: normalized,
       };
       store.put(entry);
       done(entry);
