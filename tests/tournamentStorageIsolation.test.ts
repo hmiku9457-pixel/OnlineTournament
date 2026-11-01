@@ -6,6 +6,7 @@ import {
 import { initialPrestartPhases } from '@/domain/prestartPhasePlanning';
 
 const STORAGE_KEY = 'online-tournament:local-prototype-tournaments:v1';
+const INDEX_KEY = `${STORAGE_KEY}:index:v3`;
 const DRAW_KEY = 'online-tournament:mock-draw-config:v1';
 const data = new Map<string, string>();
 let failDrawOnce = false;
@@ -69,22 +70,14 @@ describe('sharded local tournament storage', () => {
     expect(getAllMockTournaments()).toHaveLength(2);
   });
 
-  it('migrates an existing legacy tournament array once without reimporting obsolete records', () => {
-    const initial = createMockTournament(input('Vorhandenes Turnier'));
-    const recordKey = `${STORAGE_KEY}:record:${initial.id}`;
-    data.delete(recordKey);
-    data.delete(`${STORAGE_KEY}:migrated:v2`);
-    data.set(STORAGE_KEY, JSON.stringify([initial]));
-    expect(getAllMockTournaments().map((t) => t.id)).toEqual([initial.id]);
-    expect(data.has(recordKey)).toBe(true);
-    updateMockTournamentStatus(initial.id, 'PAUSED');
-    expect(getMockTournament(initial.id).status).toBe('PAUSED');
-    // Deliberately stale legacy snapshots can never resurrect the old state.
-    data.set(STORAGE_KEY, JSON.stringify([{ ...initial, status: 'READY' }]));
-    expect(getMockTournament(initial.id).status).toBe('PAUSED');
+  it('does not load old shared-array tournament lists', () => {
+    const a = createMockTournament(input('Aktuelles Turnier'));
+    data.set(STORAGE_KEY, JSON.stringify([{ ...a, id: 'old-import', name: 'Altes Turnier' }]));
+    expect(getAllMockTournaments().map((item) => item.id)).toEqual([a.id]);
+    expect(JSON.parse(data.get(INDEX_KEY) ?? '[]')).toEqual([a.id]);
     removeLocalPrototypeTournaments();
     expect(getAllMockTournaments()).toEqual([]);
-    expect(data.has(recordKey)).toBe(false);
+    expect(data.has(`${STORAGE_KEY}:record:${a.id}`)).toBe(false);
   });
 
   it('rolls back only the failing tournament while preserving external draw edits for another event', () => {
