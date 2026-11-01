@@ -10,6 +10,8 @@ import type { VenueLayout } from '@/domain/venueLayout';
 import { disciplineLabel, getSportLabel, planningMinutesPerSet } from '@/domain/sports';
 import { sportScoring } from '@/domain/sportScoring';
 import { estimatePhaseMetrics, estimateKnockoutRoundMinutes } from '@/domain/tournamentCreation';
+import { getStageEntrants } from '@/services/mockPhaseLifecycle';
+import { getGroupAssignments } from '@/services/mockDrawStore';
 import { type DemoTournament } from '@/data/demoTournaments';
 import type { Discipline, StageType, TournamentStage, TournamentStatus } from '@/domain/types';
 
@@ -189,7 +191,19 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
     ? { matchDurationMinutes: tournament.matchDurationMinutes ?? 15, venueTurnoverMinutes: tournament.venueTurnoverMinutes ?? 0 }
     : { minutesPerSet: planningMinutesPerSet(tournament.sport) };
   const scheduleFor = (stages: PrestartPhaseDraft[]) => {
-    const minutes = stages.map((phase) => estimatePhaseMetrics(phase, tournament.tables, timing).estimatedDurationMinutes);
+    const minutes = stages.map((phase, index) => {
+      const stored = tournament.stages[index];
+      const active = stored && phase.type === 'GROUPS' && stored.type === 'GROUPS'
+        && Number(stored.settings.groups) === phase.groupCount ? getStageEntrants(tournament, stored) : [];
+      const groupSizes = active.length === phase.entrantCount
+        ? (() => {
+          const assignment = getGroupAssignments(tournament, stored);
+          const counts = Array<number>(phase.groupCount).fill(0);
+          active.forEach((name) => { counts[assignment[name] ?? 0] += 1; });
+          return counts;
+        })() : undefined;
+      return estimatePhaseMetrics({ ...phase, groupSizes }, tournament.tables, timing).estimatedDurationMinutes;
+    });
     const timeline = buildPlannedTimeline(tournament.scheduledStart!, stages.map((phase, index) => ({
       label: phase.label, note: phase.type === 'BREAK' ? phase.note : undefined,
       type: phase.type, estimatedMinutes: minutes[index],
