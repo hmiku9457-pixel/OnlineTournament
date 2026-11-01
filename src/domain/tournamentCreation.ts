@@ -74,6 +74,36 @@ function groupMatchCount(entrantCount: number, groupCount: number): number {
   return total;
 }
 
+/** Minimum number of actual matches per participant; a Swiss bye is a
+ * ranking credit, not a played match. In an odd-sized field, any player
+ * might receive a bye in the planned rounds. */
+export function minimumPlayedMatches(type: StageType, entrants: number, groupCount = 2, swissRounds = 1): number {
+  const count = Math.max(2, Math.trunc(entrants));
+  if (type === 'ROUND_ROBIN') return count - 1;
+  if (type === 'GROUPS') return Math.max(0, Math.floor(count / Math.max(2, groupCount)) - 1);
+  if (type === 'SWISS') return Math.max(0, swissRounds - (count % 2));
+  if (type === 'KNOCKOUT') return knockoutByeCount(count) ? 0 : 1;
+  return 0;
+}
+
+/** Number of sequential competition waves in a round robin.
+ * Each group contributes at most floor(groupSize / 2) simultaneous games.
+ * Consecutive rounds cannot be collapsed merely because tables are free:
+ * participants would be scheduled to play two matches at once.
+ * Group rounds can run side by side on separate tables.
+ */
+export function roundRobinPlayingWaves(groupSizes: readonly number[], tableCount: number): number {
+  const tables = Math.max(1, Math.trunc(tableCount));
+  const rounds = Math.max(0, ...groupSizes.map((size) => size % 2 === 0 ? size - 1 : size));
+  let waves = 0;
+  for (let round = 0; round < rounds; round += 1) {
+    const matches = groupSizes.reduce((count, size) =>
+      count + (round < (size % 2 === 0 ? size - 1 : size) ? Math.floor(size / 2) : 0), 0);
+    waves += Math.ceil(matches / tables);
+  }
+  return waves;
+}
+
 function waveMinutes(matchCount: number, tableCount: number, bestOf: number, minutesPerSet = MINUTES_PER_SET): number {
   if (matchCount <= 0) return 0;
   const waves = Math.ceil(matchCount / Math.max(1, Math.trunc(tableCount)));
@@ -215,11 +245,19 @@ export function estimatePhaseMetrics(
   switch (phase.type) {
     case 'ROUND_ROBIN': {
       const matches = roundRobinMatchCount(entrants);
-      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waveDurationForPhase(matches, phase.bestOf)), approximate: false };
+      const waves = roundRobinPlayingWaves([entrants], tables);
+      const minutes = timing?.matchDurationMinutes
+        ? gameMinutes : averageSetsForBestOf(phase.bestOf) * (timing?.minutesPerSet ?? MINUTES_PER_SET);
+      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waves * minutes), approximate: true };
     }
     case 'GROUPS': {
-      const matches = groupMatchCount(entrants, phase.groupCount ?? 2);
-      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waveDurationForPhase(matches, phase.bestOf)), approximate: false };
+      const groups = Math.max(1, Math.min(entrants, Math.trunc(phase.groupCount ?? 2)));
+      const groupSizes = Array.from({ length: groups }, (_, i) => Math.floor(entrants / groups) + (i < entrants % groups ? 1 : 0));
+      const waves = roundRobinPlayingWaves(groupSizes, tables);
+      const matches = groupMatchCount(entrants, groups);
+      const minutes = timing?.matchDurationMinutes
+        ? gameMinutes : averageSetsForBestOf(phase.bestOf) * (timing?.minutesPerSet ?? MINUTES_PER_SET);
+      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waves * minutes), approximate: true };
     }
     case 'SWISS': {
       const matchesPerRound = Math.floor(entrants / 2);
