@@ -514,6 +514,44 @@ export function updatePrestartTournamentPhases(
   return { ok: true, tournament: updated };
 }
 
+/** Serialize prestart writes across tabs, including their fingerprint check and
+ * multi-key rollback. The browser's Web Locks API is preferred; IndexedDB
+ * provides an equivalent per-tournament cross-tab mutex when unavailable. */
+export async function updatePrestartTournamentPhasesSafely(
+  tournamentId: string, drafts: PrestartPhaseDraft[], expectedFingerprint: string,
+): Promise<ReturnType<typeof updatePrestartTournamentPhases>> {
+  const perform = () => updatePrestartTournamentPhases(tournamentId, drafts, expectedFingerprint);
+  if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+    return navigator.locks.request(`online-tournament:prestart:${tournamentId}`, { mode: 'exclusive' }, perform);
+  }
+  if (typeof indexedDB === 'undefined') {
+    return { ok: false, error: 'Die sichere Speichersperre ist in diesem Browser nicht verfügbar.' };
+  }
+  return new Promise((resolve) => {
+    const request = indexedDB.open('online-tournament:prestart-locks:v1', 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains('locks')) request.result.createObjectStore('locks');
+    };
+    request.onerror = () => resolve({ ok: false, error: 'Die Speichersperre konnte nicht geöffnet werden.' });
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction('locks', 'readwrite');
+      const store = tx.objectStore('locks');
+      let result: ReturnType<typeof updatePrestartTournamentPhases> = {
+        ok: false, error: 'Die Speichersperre wurde abgebrochen.',
+      };
+      const read = store.get(tournamentId);
+      read.onsuccess = () => {
+        result = perform();
+        store.put((Number(read.result) || 0) + 1, tournamentId);
+      };
+      tx.oncomplete = () => { db.close(); resolve(result); };
+      tx.onerror = () => { db.close(); resolve({ ok: false, error: 'Fehler beim Sperren des Turnierspeichers.' }); };
+      tx.onabort = () => { db.close(); resolve({ ok: false, error: 'Die Speichersperre wurde abgebrochen.' }); };
+    };
+  });
+}
+
 export function getAllMockTournaments(): DemoTournament[] {
   return readLocalTournaments();
 }
