@@ -12,6 +12,16 @@ export interface RosterReviewPhase {
   knockoutBestOf: readonly number[];
 }
 
+/** Review all previously existing phases whose entrant count was changed
+ * implicitly by insertion, removal, reordering or qualifier adjustment. */
+export function changedPhaseEntrantIds<T extends { id: string; entrantCount: number }>(
+  previous: readonly T[], normalized: readonly T[], manuallyEditedId?: string,
+): string[] {
+  const previousCount = new Map(previous.map((phase) => [phase.id, phase.entrantCount]));
+  return normalized.filter((phase) => phase.id !== manuallyEditedId && previousCount.has(phase.id)
+    && previousCount.get(phase.id) !== phase.entrantCount).map((phase) => phase.id);
+}
+
 export function needsRosterPhaseReview(before: RosterReviewPhase, after: RosterReviewPhase, index: number): boolean {
   return (index > 0 && before.type !== 'BREAK' && before.entrantCount !== after.entrantCount)
     || before.groupCount !== after.groupCount

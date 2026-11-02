@@ -38,7 +38,7 @@ import { initialPrestartPhases, validatePrestartPhases, type PrestartPhaseDraft 
 import { findSportOption } from '@/domain/sports';
 import { PlannedScheduleEditor } from '@/components/PlannedScheduleEditor';
 import { formatPhaseOverview } from '@/domain/creationOverview';
-import { needsRosterPhaseReview } from '@/domain/phaseReview';
+import { changedPhaseEntrantIds, needsRosterPhaseReview } from '@/domain/phaseReview';
 import { CREATION_DRAFT_KEY, loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence, type CreationDraft, type SavedCreationDraft } from '@/domain/creationDraft';
 import { saveNamedCreationDraftAtomic, removeSavedCreationDraftAtomic } from '@/domain/savedCreationDraftStore';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
@@ -1034,9 +1034,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
    * of inserting, removing or reordering phases (not just roster changes). */
   function normalizeAndTrackPhaseChanges(previous: PhaseDraft[], proposed: PhaseDraft[], manuallyEditedId?: string): PhaseDraft[] {
     const normalized = normalizePhaseEntrants(proposed);
-    const priorById = new Map(previous.map((phase) => [phase.id, phase.entrantCount]));
-    const changed = normalized.filter((phase) => phase.id !== manuallyEditedId
-      && priorById.has(phase.id) && priorById.get(phase.id) !== phase.entrantCount).map((phase) => phase.id);
+    const changed = changedPhaseEntrantIds(previous, normalized, manuallyEditedId);
     if (changed.length) setReviewRequiredPhaseIds((current) => [...new Set([...current, ...changed])]);
     return normalized;
   }
