@@ -1159,7 +1159,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   function changePhaseType(index: number, type: StageType) {
     setSelectedRecommendationId(null);
-    setPhaseDrafts((current) => {
+    const current = phaseDrafts;
+    {
       if (!current[index]) return current;
       if (current[index].type === type) return current;
       if (type === 'SWISS' && current[index].entrantCount < 3) return current;
@@ -1186,8 +1187,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         ? resizeKnockoutBestOf(phase.knockoutBestOf, knockoutRoundLabels(phase.entrantCount).length, bestOf)
         : [];
 
-      return normalizePhaseEntrants(next);
-    });
+      setPhaseDrafts(normalizeAndTrackPhaseChanges(current, next));
+    }
     setEditingPhaseTypeId(null);
   }
 
