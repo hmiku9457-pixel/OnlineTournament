@@ -1,10 +1,12 @@
 /** Unicode letters, numerals, dots and a parenthesized club qualifier are
  * permitted for individual players and teams. Slashes separate doubles. */
+export const MAX_PARTICIPANT_NAME_LENGTH = 200;
+
 const validName = /^[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N} .()-]*$/u;
 
 export function isAllowedParticipantName(value: string): boolean {
   const name = value.trim();
-  if (!validName.test(name)) return false;
+  if (name.length > MAX_PARTICIPANT_NAME_LENGTH || !validName.test(name)) return false;
   let nesting = 0;
   for (const char of name) {
     if (char === '(') nesting += 1;

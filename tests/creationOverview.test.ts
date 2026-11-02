@@ -32,6 +32,19 @@ describe('Kurzbeschreibung der Wettkampfphasen in der Turnierzusammenfassung', (
     expect(formatPhaseOverview(unchanged, 1, 'SINGLES')).toBe('8 Spieler · 3 Runden');
   });
 
+  it('zeigt sämtliche Best-of-Werte je K.-o.-Runde, ohne zeitbasierte Sportarten zu verfälschen', () => {
+    const detailed: CreationOverviewPhase[] = [
+      { type: 'SWISS', entrantCount: 8, swissRounds: 4, bestOf: 3 },
+      { type: 'KNOCKOUT', entrantCount: 8, bestOf: 3, knockoutBestOf: [3, 5, 7] },
+    ];
+    expect(formatPhaseOverview(detailed, 0, 'SINGLES')).toContain('Best-of-3');
+    const ko = formatPhaseOverview(detailed, 1, 'SINGLES');
+    expect(ko).toContain('Viertelfinale: Best-of-3');
+    expect(ko).toContain('Halbfinale: Best-of-5');
+    expect(ko).toContain('Finale: Best-of-7');
+    expect(formatPhaseOverview(detailed, 1, 'TEAMS', false)).not.toContain('Best-of');
+  });
+
   it('verwendet die richtige Teilnehmenden-Bezeichnung für Doppel und Mannschaften', () => {
     const input: CreationOverviewPhase[] = [
       { type: 'SWISS', entrantCount: 8, swissRounds: 3 },

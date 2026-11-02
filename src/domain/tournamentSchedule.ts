@@ -16,6 +16,23 @@ export interface PlannedScheduleItem {
   breakKind?: 'minutes' | 'until' | 'overnight';
 }
 
+/** A local clock hour can repeat when DST ends. The current draft format does not
+ * preserve a UTC offset, so never guess which occurrence the director intended. */
+export function isAmbiguousLocalDateTime(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+  if (!match) return false;
+  const [, y, mo, d, h, mi] = match.map(Number);
+  const first = new Date(y, mo - 1, d, h, mi);
+  if (first.getFullYear() !== y || first.getMonth() + 1 !== mo || first.getDate() !== d
+    || first.getHours() !== h || first.getMinutes() !== mi) return false;
+  const laterOffset = new Date(first.getTime() + 3 * 60 * 60000).getTimezoneOffset();
+  const extraMinutes = laterOffset - first.getTimezoneOffset();
+  if (extraMinutes <= 0) return false;
+  const repeated = new Date(first.getTime() + extraMinutes * 60000);
+  return repeated.getFullYear() === y && repeated.getMonth() + 1 === mo && repeated.getDate() === d
+    && repeated.getHours() === h && repeated.getMinutes() === mi;
+}
+
 /** The browser's local wall clock is used intentionally, not Date.toISOString(). */
 export function parseLocalDateTime(value: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
@@ -24,7 +41,7 @@ export function parseLocalDateTime(value: string): Date | null {
   const date = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi));
   if (date.getFullYear() !== Number(y) || date.getMonth() + 1 !== Number(mo)
     || date.getDate() !== Number(d) || date.getHours() !== Number(h)
-    || date.getMinutes() !== Number(mi)) return null;
+    || date.getMinutes() !== Number(mi) || isAmbiguousLocalDateTime(value)) return null;
   return date;
 }
 
@@ -132,7 +149,9 @@ export function validatePlannedSchedule(items: PlannedScheduleItem[]): string[] 
     const label = `Zeitplan-Eintrag ${index + 1}`;
     if (!item.id || seen.has(item.id)) issues.push(`${label}: ID fehlt oder ist doppelt.`);
     seen.add(item.id);
-    if (!isValidLocalDateTime(item.at)) issues.push(`${label}: Gültiges Datum und Uhrzeit erforderlich.`);
+    if (!isValidLocalDateTime(item.at)) issues.push(isAmbiguousLocalDateTime(item.at)
+      ? `${label}: Die Uhrzeit kommt bei der Winterzeitumstellung zweimal vor. Bitte eine eindeutige Uhrzeit wählen.`
+      : `${label}: Gültiges Datum und Uhrzeit erforderlich.`);
     if (!item.title.trim() || item.title.trim().length > 80) issues.push(`${label}: Bezeichnung muss 1 bis 80 Zeichen enthalten.`);
     if ((item.note?.length ?? 0) > 600) issues.push(`${label}: Hinweis darf höchstens 600 Zeichen enthalten.`);
     if (!['competition', 'break', 'other'].includes(item.type)) issues.push(`${label}: Unbekannter Eintragstyp.`);

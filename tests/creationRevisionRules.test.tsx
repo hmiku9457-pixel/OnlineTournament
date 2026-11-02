@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { recommendedEqualGroupQualifiers, needsGroupStreichungsregel, discardedGroupOpponents } from '@/domain/groupQualification';
-import { isAllowedParticipantName, sanitizeParticipantName } from '@/domain/participantNames';
+import { isAllowedParticipantName, sanitizeParticipantName, MAX_PARTICIPANT_NAME_LENGTH, validParticipantRoster } from '@/domain/participantNames';
 import { getVenueTerminology } from '@/domain/venueTerminology';
 import { estimateKnockoutRoundMinutes, estimatePhaseMetrics, minimumPlayedMatches } from '@/domain/tournamentCreation';
 import { buildPlannedTimeline } from '@/domain/tournamentSchedule';
@@ -64,6 +64,9 @@ describe('creation revision: names, venues, timing and recommendations', () => {
       expect(isAllowedParticipantName(name)).toBe(false);
     }
     expect(sanitizeParticipantName('Løwe/Max_01')).toBe('LøweMax01');
+    expect(isAllowedParticipantName('A'.repeat(MAX_PARTICIPANT_NAME_LENGTH))).toBe(true);
+    expect(isAllowedParticipantName('A'.repeat(MAX_PARTICIPANT_NAME_LENGTH + 1))).toBe(false);
+    expect(validParticipantRoster([{firstName: 'A'.repeat(201), lastName:'B', partnerFirstName:'', partnerLastName:''}], 'SINGLES')).toBe(false);
   });
 
   it('uses Tische only for table sports and Plätze for court/field sports', () => {

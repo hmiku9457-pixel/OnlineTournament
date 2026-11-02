@@ -6,6 +6,8 @@ export interface CreationOverviewPhase {
   entrantCount: number;
   groupCount?: number;
   swissRounds?: number;
+  bestOf?: number;
+  knockoutBestOf?: readonly number[];
 }
 
 /** Only the next competition determines who qualifies; breaks do not eliminate players. */
@@ -17,7 +19,7 @@ export function phaseQualificationPlaces(phases: readonly CreationOverviewPhase[
 }
 
 export function formatPhaseOverview(
-  phases: readonly CreationOverviewPhase[], index: number, discipline: Discipline,
+  phases: readonly CreationOverviewPhase[], index: number, discipline: Discipline, showBestOf = true,
 ): string {
   const phase = phases[index];
   if (!phase || phase.type === 'BREAK') return '';
@@ -43,5 +45,11 @@ export function formatPhaseOverview(
       parts.push(`${count} ${unit}`);
   }
   if (qualifiers !== null) parts.push(`${qualifiers} Qualifikationsplätze`);
+  if (showBestOf && phase.type === 'KNOCKOUT' && phase.knockoutBestOf?.length) {
+    parts.push(knockoutRoundLabels(count).map((label, round) =>
+      `${label}: Best-of-${phase.knockoutBestOf?.[round] ?? phase.bestOf ?? 1}`).join(' · '));
+  } else if (showBestOf && phase.bestOf && phase.type !== 'KNOCKOUT') {
+    parts.push(`Best-of-${phase.bestOf}`);
+  }
   return parts.join(' · ');
 }

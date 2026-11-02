@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { isValidLocalDateTime, isStartAtOrAfterNow, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, plannedActiveBreakMinutes, formatPlannedBreakDuration, groupPlannedScheduleDays, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, parseLocalDateTime, toLocalDateTime, suggestPlannedSchedule, buildPlannedTimeline, plannedTimelineDurationMinutes, plannedActiveBreakMinutes, formatPlannedBreakDuration, groupPlannedScheduleDays, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { TournamentPlannedSchedule } from '@/components/TournamentPlannedSchedule';
 import { TournamentSummaryPanel } from '@/components/TournamentSummaryPanel';
 import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
@@ -59,6 +59,38 @@ describe('optionaler vorläufiger Zeitplan', () => {
       if (before === undefined) delete process.env.TZ;
       else process.env.TZ = before;
     }
+  });
+
+  it('rejects both ambiguous autumn wall-clock hours instead of silently choosing the first', () => {
+    const before = process.env.TZ;
+    process.env.TZ = 'Europe/Berlin';
+    try {
+      expect(isAmbiguousLocalDateTime('2027-10-31T02:30')).toBe(true);
+      expect(isValidLocalDateTime('2027-10-31T02:30')).toBe(false);
+      expect(parseLocalDateTime('2027-10-31T02:30')).toBeNull();
+      expect(isStartAtOrAfterNow('2027-10-31T02:30', new Date('2027-10-30T10:00:00+02:00'))).toBe(false);
+      expect(isValidLocalDateTime('2027-10-31T01:30')).toBe(true);
+      expect(isValidLocalDateTime('2027-10-31T03:30')).toBe(true);
+      expect(validatePlannedSchedule([{ id:'start', at:'2027-10-31T02:30', title:'Start', type:'competition' }]).join(' ')).toContain('zweimal');
+      expect(buildPlannedTimeline('2027-10-31T02:30', [{type:'GROUPS', label:'Phase', estimatedMinutes: 15}]).items).toEqual([]);
+    } finally {
+      if (before === undefined) delete process.env.TZ;
+      else process.env.TZ = before;
+    }
+  });
+
+  it('keeps an explicitly fixed pause date when an earlier phase spills into another day', () => {
+    const phases = [
+      {type: 'SWISS', label: 'Vorrunde', estimatedMinutes: 120},
+      {type: 'BREAK', label: 'Pause', estimatedMinutes: 0, breakKind: 'until' as const, breakUntil: '12:00', breakUntilDate: '2027-11-20'},
+      {type: 'KNOCKOUT', label: 'Finale', estimatedMinutes: 60},
+    ];
+    const initial = buildPlannedTimeline('2027-11-20T09:00', phases);
+    expect(initial.warnings).toHaveLength(0);
+    const shifted = buildPlannedTimeline('2027-11-21T09:00', phases);
+    expect(shifted.warnings).toHaveLength(1);
+    expect(shifted.warnings[0].message).toContain('2027-11-20');
+    expect(shifted.items.find(x => x.id === 'phase-3')?.at).toBe('2027-11-21T11:00');
   });
 
   it('blocks past tournament starts at minute precision, including invalid timestamps', () => {
