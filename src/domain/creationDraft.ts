@@ -57,6 +57,8 @@ export interface CreationDraft {
   participants: CreationDraftParticipant[];
   participantForm: Omit<CreationDraftParticipant, 'id'>;
   editingParticipantId: string | null;
+  /** Require acknowledgement after reinterpreting names for a new discipline. */
+  rosterReviewRequired?: boolean;
   minimumMatches: number;
   customMinimumMatches: boolean;
   phaseDrafts: CreationDraftPhase[];
@@ -124,6 +126,7 @@ export function validDraft(value: unknown): value is CreationDraft {
     && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
       .every((key) => typeof (data.participantForm as unknown as Record<string, unknown>)[key] === 'string')
     && (data.participantForm.teamName === undefined || typeof data.participantForm.teamName === 'string')
+    && (data.rosterReviewRequired === undefined || typeof data.rosterReviewRequired === 'boolean')
     && (data.editingParticipantId === null || (typeof data.editingParticipantId === 'string'
       && data.participants.some((entry) => entry.id === data.editingParticipantId)))
     && typeof data.hasVisitedPhaseStep === 'boolean' && typeof data.customMinimumMatches === 'boolean'

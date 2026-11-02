@@ -40,7 +40,7 @@ export function UnsavedParticipantDialog({ onStay, onDiscard }: {
           </div>
         </div>
         <div className="sport-change-dialog-notes">
-          <p>Beim Wechseln des Schrittes gehen nur diese noch nicht gespeicherten Eingaben verloren. Bereits gespeicherte Teilnehmer bleiben erhalten.</p>
+          <p>Beim Wechseln des Schrittes, beim Bearbeiten eines anderen Eintrags oder beim Erzeugen von Testteilnehmern gehen nur diese noch nicht gespeicherten Eingaben verloren. Bereits gespeicherte Teilnehmer bleiben erhalten.</p>
         </div>
         <div className="sport-change-dialog-actions">
           <button ref={cancel} className="btn" type="button" onClick={onStay}>Weiter bearbeiten</button>

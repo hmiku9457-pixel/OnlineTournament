@@ -227,7 +227,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
               ?? new Date(NaN)
             : clockAt(inlineStart, phase.inlineBreakUntil ?? '13:00');
           if (Number.isNaN(target.getTime()) || target < inlineStart) {
-            warnings.push({ phaseIndex: index, message: `„${phase.label}“: Die Zwischenpause nach Runde ${afterRound} beginnt voraussichtlich um ${formatPlannedDateTime(toLocalDateTime(inlineStart), false)}. „Pause bis ${phase.inlineBreakUntil ?? '13:00'} Uhr“ liegt davor. Bitte eine spätere Uhrzeit wählen.` });
+            warnings.push({ phaseIndex: index, message: `„${phase.label}“: Die Zwischenpause nach Runde ${afterRound} beginnt voraussichtlich am ${formatPlannedDateTime(toLocalDateTime(inlineStart))}. Das feste Pausenziel ${formatPlannedDateTime(toLocalDateTime(target)) === 'Ungültiges Datum' ? `${phase.inlineBreakUntilDate ?? 'aktueller Tag'} ${phase.inlineBreakUntil ?? '13:00'} Uhr` : formatPlannedDateTime(toLocalDateTime(target))} liegt davor. Bitte Datum und Uhrzeit korrigieren.` });
             validDuration = false;
           } else resume = target;
         } else resume = new Date(inlineStart.getTime() + Math.max(1, phase.inlineBreakMinutes ?? 15) * 60000);
@@ -256,10 +256,12 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
       pause.durationApproximate = true;
       if (Number.isNaN(target.getTime()) || target.getTime() < cursor.getTime()) {
         const planned = String(phase.breakUntil ?? '12:00');
-        const earliest = formatPlannedDateTime(toLocalDateTime(cursor), false);
+        const earliest = formatPlannedDateTime(toLocalDateTime(cursor));
+        const targetLabel = phase.breakUntilDate ? `${phase.breakUntilDate} ${planned} Uhr`
+          : `${toLocalDateTime(cursor).slice(0, 10)} ${planned} Uhr`;
         warnings.push({
           phaseIndex: index,
-          message: `„${phase.label}“: Pause bis ${planned} Uhr liegt vor dem voraussichtlichen Pausenbeginn um ${earliest}. Bitte eine spätere Uhrzeit wählen. Für die Vorschau wird die nächste Phase frühestens nach dem vorherigen Spielende angesetzt.`,
+          message: `„${phase.label}“: Das feste Pausenziel am ${targetLabel} liegt vor dem voraussichtlichen Pausenbeginn am ${earliest}. Bitte Datum und Uhrzeit prüfen. Für die Vorschau beginnt die nächste Phase frühestens nach dem vorherigen Spielende.`,
         });
       } else {
         pause.durationMinutes = Math.max(0, Math.round((target.getTime() - cursor.getTime()) / 60000));
