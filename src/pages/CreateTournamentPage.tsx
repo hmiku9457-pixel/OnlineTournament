@@ -575,7 +575,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       const list = rosterRef.current?.querySelector<HTMLElement>('.participant-roster-multi');
       // Use the actually rendered CSS grid rather than guessing 1/2/3 columns
       // from fixed pixel thresholds (which disregard padding and grid gaps).
-      const columns = list ? Math.max(1, getComputedStyle(list).gridTemplateColumns.split(/\s+/).filter(Boolean).length) : 1;
+      const columns = list ? Math.max(1, getComputedStyle(list).gridTemplateColumns.split(/\s+/).filter((track) => parseFloat(track) > 0).length) : 1;
       const card = list?.querySelector<HTMLElement>('.participant-roster-row');
       const height = card?.getBoundingClientRect().height ?? 92;
       const gap = list ? parseFloat(getComputedStyle(list).rowGap) || 8 : 8;
