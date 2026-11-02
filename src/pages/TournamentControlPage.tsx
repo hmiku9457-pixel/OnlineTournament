@@ -46,7 +46,7 @@ import { TableStateLegend, TournamentHallView } from '@/components/TournamentHal
 import { ControlHelpButton, TournamentControlHelp } from '@/components/TournamentControlHelp';
 import type { ControlHelpTopic } from '@/domain/controlGuide';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
-import { addMockParticipant, updateMockParticipantName, getMockTournament, getPrestartScheduleIssues, updateMockTournamentStatus } from '@/services/mockTournamentStore';
+import { addMockParticipant, updateMockParticipantName, getMockTournament, getPrestartScheduleIssues, getPrestartScheduleProjection, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { generateUniquePlayerCode } from '@/services/mockPlayerCodes';
 import { toLocalDateTime } from '@/domain/tournamentSchedule';
 import { computeBreakResumeAt, getStageEntrants, getStageStartIssue, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage, completeStage, canFinishBreak, getBreakResumeAt, formatBreakCountdown, type BreakStartOptions } from '@/services/mockPhaseLifecycle';
@@ -500,17 +500,22 @@ function StageCompetitionView({
   return <StageCard stage={stage} />;
 }
 
-function ParticipantEditFields({ name, code, isTeam, usedCodes, onSave, onCancel }: {
+function ParticipantEditFields({ name, code, isTeam, isDouble, usedCodes, onSave, onCancel }: {
   name: string;
   code: string;
   isTeam: boolean;
+  isDouble: boolean;
   usedCodes: ReadonlySet<string>;
-  onSave: (firstName: string, lastName: string, playerCode: string) => boolean;
+  onSave: (firstName: string, lastName: string, playerCode: string, partnerFirst: string, partnerLast: string) => boolean;
   onCancel: () => void;
 }) {
-  const nameParts = name.trim().split(/\s+/);
+  const [primaryName, partnerName = ''] = isDouble ? name.split(/\s+\/\s+/, 2) : [name, ''];
+  const nameParts = primaryName.trim().split(/\s+/);
+  const partnerParts = partnerName.trim().split(/\s+/);
   const [firstName, setFirstName] = useState(isTeam ? name : nameParts[0] ?? '');
   const [lastName, setLastName] = useState(isTeam ? '' : nameParts.slice(1).join(' '));
+  const [partnerFirst, setPartnerFirst] = useState(partnerParts[0] ?? '');
+  const [partnerLast, setPartnerLast] = useState(partnerParts.slice(1).join(' '));
   const [playerCode, setPlayerCode] = useState(code);
   const [error, setError] = useState('');
   function generateNewCode() {
@@ -533,10 +538,14 @@ function ParticipantEditFields({ name, code, isTeam, usedCodes, onSave, onCancel
         setError('Dieser Spielercode ist bereits vergeben. Bitte einen anderen Code verwenden.');
         return;
       }
-      if (!onSave(firstName, lastName, trimmedCode)) setError('Bitte vollständigen, eindeutigen Teilnehmernamen und einen gültigen Spielercode angeben.');
+      if (!onSave(firstName, lastName, trimmedCode, partnerFirst, partnerLast)) setError('Bitte vollständigen, eindeutigen Teilnehmernamen und einen gültigen Spielercode angeben.');
     }}>
       <label className={`field${isTeam ? ' participant-team-name-field' : ''}`}><span>{isTeam ? 'Mannschaftsname' : 'Vorname'}</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="off" /></label>
       {!isTeam && <label className="field"><span>Nachname</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="off" /></label>}
+      {isDouble && <>
+        <label className="field"><span>Partner – Vorname</span><input value={partnerFirst} onChange={(event) => setPartnerFirst(event.target.value)} autoComplete="off" /></label>
+        <label className="field"><span>Partner – Nachname</span><input value={partnerLast} onChange={(event) => setPartnerLast(event.target.value)} autoComplete="off" /></label>
+      </>}
       <div className="field participant-code-field">
         <label htmlFor="participant-edit-code">Spielercode</label>
         <div className="participant-code-controls">
@@ -678,6 +687,7 @@ export function TournamentControlPage() {
   // recommended phase configuration calls for a review.
   const firstPhaseRecommendationWarning = getFirstPhaseRecommendationWarning(tournament, activePrestartParticipants);
   const prestartScheduleIssues = getPrestartScheduleIssues(tournament);
+  const unconfirmedSchedule = prestartScheduleIssues.length ? getPrestartScheduleProjection(tournament) : null;
   const pendingPrestartRecommendationWarning = pendingWithdrawal && !tournament.hasStarted
     ? getFirstPhaseRecommendationWarning(tournament, activePrestartParticipants - 1)
     : null;
@@ -1853,10 +1863,11 @@ export function TournamentControlPage() {
             {participantPanel.mode === 'edit' ? (
               <>
                 <ParticipantEditFields key={participantPanel.name} name={participantPanel.name} isTeam={tournament.discipline === 'TEAMS'}
+                  isDouble={tournament.discipline === 'DOUBLES'}
                   code={tournament.participantCodes?.[participantPanel.name] ?? String(4100 + selectedParticipantIndex).slice(-4)}
                   usedCodes={new Set(Object.entries(tournament.participantCodes ?? {}).filter(([owner]) => owner !== participantPanel.name).map(([, code]) => code))}
-                  onSave={(first, last, code) => {
-                    if (!updateMockParticipantName(tournament.id, participantPanel.name, first, last, code)) return false;
+                  onSave={(first, last, code, partnerFirst, partnerLast) => {
+                    if (!updateMockParticipantName(tournament.id, participantPanel.name, first, last, code, partnerFirst, partnerLast)) return false;
                     setParticipantPanel(null);
                     setParticipantVersion((value) => value + 1);
                     refreshRuntime();
@@ -2056,7 +2067,8 @@ export function TournamentControlPage() {
               </div>
             )}
             {prestartScheduleIssues.length > 0 && startModal.kind === 'tournament'
-              && <p className="break-prestart-warning" role="alert">Zeitplanung prüfen: {prestartScheduleIssues.join(' ')}</p>}
+              && <p className="break-prestart-warning" role="alert">Zeitplanung prüfen: {prestartScheduleIssues.join(' ')}
+                {unconfirmedSchedule?.estimatedEnd && <span> Neue Prognose (nicht bestätigt): Turnierende ca. {unconfirmedSchedule.estimatedEnd.replace('T', ' ')} Uhr. Der bisherige Zeitplan bleibt bis zur Korrektur unverändert.</span>}</p>}
             {firstPhaseRecommendationWarning && startModal.kind === 'tournament' && <p className="break-prestart-warning" role="status">Hinweis zur ersten Phase: {firstPhaseRecommendationWarning} Bitte prüfe vor dem Start die Phaseneinstellungen. Ein erneutes Bestätigen der Phasenplanung ist für gültige Konstellationen nicht erforderlich.</p>}
             {pendingPauseIssue && <p className="field-error" role="alert">{pendingPauseIssue}</p>}
             {pendingStartIssue && <p className="field-error" role="alert">{pendingStartIssue}</p>}
