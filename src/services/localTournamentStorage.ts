@@ -147,7 +147,7 @@ function validTournament(raw: string, id: string): boolean {
         Boolean(stage && typeof stage === 'object' && typeof (stage as { id?: unknown }).id === 'string'));
   } catch { return false; }
 }
-function inspectSnapshot(entries: StoredValue[]): { valid: StoredValue[]; corrupt: CorruptLocalRecord[] } {
+export function inspectSnapshot(entries: StoredValue[]): { valid: StoredValue[]; corrupt: CorruptLocalRecord[] } {
   const data = new Map(entries.filter((entry) => entry.key.startsWith(PREFIX)).map((entry) => [entry.key, entry.value]));
   const problems: CorruptLocalRecord[] = [];
   const quarantineKey = (key: string, reason: string) => {
