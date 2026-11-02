@@ -3248,7 +3248,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       {pendingRecommendationId && (
         <div className="sport-change-backdrop" role="presentation"
           onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingRecommendationId(null); }}>
-          <section className="sport-change-dialog" role="alertdialog" aria-modal="true" aria-label="Phasenplanung ersetzen?"
+          <section className="sport-change-dialog phase-replacement-dialog" role="alertdialog" aria-modal="true" aria-label="Phasenplanung ersetzen?"
             onKeyDown={(event) => { if (event.key === 'Escape') setPendingRecommendationId(null); }}>
             <h2>Bestehende Phasenplanung ersetzen?</h2>
             <p>Die ausgewählte Empfehlung ersetzt alle derzeit konfigurierten Phasen. Individuelle Best-of-Werte, Qualifikationsplätze und Pausen gehen verloren.</p>
