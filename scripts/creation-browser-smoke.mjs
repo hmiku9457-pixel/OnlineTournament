@@ -98,6 +98,18 @@ try {
   assert.equal(await page.locator('.participant-roster-row').count(), 4, 'draft survives browser reload');
   await next(page);
   await page.waitForSelector('.format-step');
+  const step3Layout = await page.evaluate(() => {
+    const settings = document.querySelector('.format-settings-panel')?.getBoundingClientRect();
+    const recommendations = document.querySelector('.recommendation-list')?.getBoundingClientRect();
+    return settings && recommendations ? { settingsTop: settings.top, settingsBottom: settings.bottom,
+      recommendationsTop: recommendations.top, settingsWidth: settings.width,
+      recommendationsWidth: recommendations.width } : null;
+  });
+  assert.ok(step3Layout, 'settings and recommendations must both be rendered');
+  assert.ok(step3Layout.settingsBottom <= step3Layout.recommendationsTop,
+    'settings sit above, rather than to the right of, recommendations');
+  assert.ok(Math.abs(step3Layout.settingsWidth - step3Layout.recommendationsWidth) <= 2,
+    'proposals use the same full available width as the settings');
   // Recommendation settings are directly editable and expose bounded
   // + / - actions. The duration is a soft preference, not a hard filter.
   assert.equal(await page.locator('#preferred-duration').innerText(), '03:30');
@@ -325,7 +337,7 @@ try {
 
   // Long names scroll inside fixed-height cards. Pagination must remain stable
   // and navigate backwards to precisely the previous page start.
-  await page2.setViewportSize({ width: 1280, height: 720 });
+  await page2.setViewportSize({ width: 1280, height: 600 });
   await page2.locator('#participant-first').fill('Alexander'.repeat(18));
   await page2.locator('#participant-last').fill('Lang');
   await page2.getByRole('button', { name: 'Spieler hinzufügen' }).click();
@@ -347,7 +359,8 @@ try {
   while (await nextRoster.isEnabled()) await nextRoster.click();
   await page2.locator('.participant-name-marquee.is-running').first().waitFor();
   const longCard = page2.locator('.participant-roster-row').filter({ hasText: 'AlexanderAlexander' }).first();
-  assert.equal(await longCard.evaluate((card) => getComputedStyle(card).height), '76px');
+  assert.equal(await longCard.evaluate((card) => getComputedStyle(card).height), '38px',
+    'single-player and team cards are half the height of doubles cards');
   assert.equal(await longCard.locator('.participant-name-marquee strong').first().evaluate((el) =>
     getComputedStyle(el).whiteSpace), 'nowrap');
   await backRoster.click();
@@ -358,6 +371,13 @@ try {
     .getByRole('button', { name: 'Sportart wechseln' }).click();
   await page2.locator('.wizard-step').nth(1).click();
   assert.equal(await page2.locator('.wizard-continue-button').isDisabled(), true);
+  const reviewColors = await page2.locator('.participant-review-warning').evaluate((el) => ({
+    background: getComputedStyle(el).backgroundColor,
+    border: getComputedStyle(el).borderLeftColor,
+    beforeRoster: el.getBoundingClientRect().bottom < document.querySelector('.participant-roster-grid-card').getBoundingClientRect().top,
+  }));
+  assert.equal(reviewColors.beforeRoster, true);
+  assert.notEqual(reviewColors.background, 'rgb(249, 250, 251)', 'roster review has a highlighted warning background');
   await page2.getByRole('button', { name: 'Teilnehmerliste geprüft' }).click();
   assert.equal(await page2.locator('.wizard-continue-button').isDisabled(), false);
   await context2.close();
@@ -767,6 +787,34 @@ try {
   await multiModeDialog.getByRole('button', { name: 'Bisherigen Modus behalten' }).click();
   assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägiges Turnier' }).isChecked(), true);
   await multiContext.close();
+
+  // Doubles keep the original taller card, with one player per line.
+  const doublesContext = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  const doublesPage = await doublesContext.newPage();
+  await doublesPage.goto(base + '/#/tournaments/new');
+  await doublesPage.locator('#name').fill('Zwei Spieler pro Karte');
+  await doublesPage.locator('#tournament-date').click();
+  await doublesPage.locator('.calendar-picker-dialog input[aria-label="Jahr"]').fill('2030');
+  await doublesPage.locator('.calendar-picker-dialog select[aria-label="Monat"]').selectOption('10');
+  await doublesPage.locator('.calendar-picker-day').filter({ hasText: /^24$/ }).click();
+  await doublesPage.locator('#sport').selectOption('table_tennis');
+  await doublesPage.locator('#discipline').selectOption('DOUBLES');
+  await next(doublesPage);
+  await doublesPage.locator('#participant-first').fill('Erika');
+  await doublesPage.locator('#participant-last').fill('Mustermann');
+  await doublesPage.locator('#participant-partner-first').fill('Max');
+  await doublesPage.locator('#participant-partner-last').fill('Beispiel');
+  await doublesPage.getByRole('button', { name: 'Doppel hinzufügen' }).click();
+  const doublesCard = doublesPage.locator('.participant-roster-row.is-double').first();
+  await doublesCard.waitFor();
+  assert.equal(await doublesCard.evaluate((el) => Math.round(el.getBoundingClientRect().height)), 76,
+    'doubles cards keep their 76px height');
+  assert.deepEqual(await doublesCard.locator('.participant-double-player strong:first-child').allInnerTexts(),
+    ['Erika Mustermann', 'Max Beispiel']);
+  const topNavigation = doublesPage.getByRole('navigation', { name: 'Teilnehmerseiten' });
+  assert.equal(await topNavigation.evaluate((el) => Boolean(el.nextElementSibling?.classList.contains('participant-roster-multi'))), true,
+    'pagination now sits between roster header and the first card');
+  await doublesContext.close();
 
   process.stdout.write('Creation wizard browser smoke tests passed.\n');
 } finally {
