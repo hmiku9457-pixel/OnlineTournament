@@ -1,3 +1,4 @@
+import { BYE_SLOT } from '@/domain/matchSlots';
 import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { seededKnockoutSlots, snakeSeededGroupOrder } from '@/engine/seededDraws';
@@ -108,7 +109,7 @@ describe('Seeded-Zuteilung zwischen Phasen', () => {
     const entrants = getStageEntrants(tournament, second);
     expect(toggleBracketPin(tournament, second, 0)).toBe(true);
     expect(applySeededBracketSlots(tournament, second)).toBe(true);
-    expect(getBracketSlots(tournament, second)).toEqual(seededKnockoutSlots(entrants));
+    expect(getBracketSlots(tournament, second)).toEqual(seededKnockoutSlots(entrants, BYE_SLOT));
     expect(getPinnedBracketSlots(tournament, second)).toEqual([]);
   });
 });

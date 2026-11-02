@@ -896,6 +896,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         participant.id === editingParticipantId ? { ...participant, ...participantForm } : participant
       )));
     } else {
+      setRosterPage(Math.max(1, Math.ceil((participants.length + 1) / rosterPageSize)));
       setParticipants((current) => [...current, newParticipant(participantForm)]);
     }
     resetParticipantEditor();

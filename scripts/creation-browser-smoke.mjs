@@ -264,8 +264,11 @@ try {
   await page2.getByRole('button', { name: '19 Testspieler erzeugen' }).click();
   await page2.getByRole('dialog', { name: '19 Testspieler erzeugen?' })
     .getByRole('button', { name: '18 Testspieler hinzufügen' }).click();
-  assert.equal(await page2.locator('.participant-roster-row').count(), 19,
+  assert.equal((await page2.locator('.participant-roster-head .badge').innerText()).trim(), '19',
     'confirmation adds exactly the missing test players');
+  assert.equal(await page2.locator('.participant-roster-row').count() <= 19, true,
+    'a long participant list is paginated instead of expanding the document');
+  await page2.getByRole('navigation', { name: 'Teilnehmerseiten' }).waitFor();
   await context2.close();
 
   // Date/time restrictions and live "Jetzt" mode with a deterministic
