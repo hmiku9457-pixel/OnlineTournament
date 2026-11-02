@@ -796,16 +796,28 @@ export function updateMockTournamentStatus(tournamentId: string, status: Tournam
   return { ...demo, status, lastUpdate: 'gerade eben' };
 }
 
-export function updateMockParticipantName(tournamentId: string, oldName: string, firstName: string, lastName: string, code: string) {
+export function updateMockParticipantName(tournamentId: string, oldName: string, firstName: string, lastName: string, code: string, partnerFirstName = '', partnerLastName = '') {
   const first = firstName.trim();
   const last = lastName.trim();
   const tournaments = readLocalTournaments();
   const tournament = tournaments.find((item) => item.id === tournamentId);
   if (!tournament || !tournament.participantNames?.includes(oldName)) return false;
   const teamMode = tournament.discipline === 'TEAMS';
-  const name = teamMode ? first : `${first} ${last}`;
+  const isDouble = tournament.discipline === 'DOUBLES';
+  const partnerFirst = partnerFirstName.trim();
+  const partnerLast = partnerLastName.trim();
+  const person = teamMode ? first : `${first} ${last}`;
+  const partner = `${partnerFirst} ${partnerLast}`;
+  const name = isDouble ? `${person} / ${partner}` : person;
   if (!first || (!teamMode && !last) || !/^\d{4,8}$/.test(code.trim())) return false;
   if (!isAllowedParticipantName(first) || (!teamMode && !isAllowedParticipantName(last))) return false;
+  if (isDouble) {
+    if (!partnerFirst || !partnerLast || !isAllowedParticipantName(partnerFirst)
+      || !isAllowedParticipantName(partnerLast) || participantNameKey(person) === participantNameKey(partner)) return false;
+    const otherPeople = new Set(tournament.participantNames.filter((entry) => entry !== oldName)
+      .flatMap((entry) => entry.split(/\s+\/\s+/)).map(participantNameKey));
+    if (otherPeople.has(participantNameKey(person)) || otherPeople.has(participantNameKey(partner))) return false;
+  }
   if (name !== oldName && tournament.participantNames.some((other) =>
     other !== oldName && participantNameKey(other) === participantNameKey(name))) return false;
   // Ein Spielercode darf immer nur einem Teilnehmer des Turniers gehören.
@@ -955,7 +967,7 @@ export function addMockParticipant(
       return { ok: false, error: 'Der Partnername enthält unzulässige Zeichen.' };
     }
     const partner = `${partnerFirst} ${partnerLast}`;
-    const normalize = (text: string) => text.toLocaleLowerCase('de').replace(/\s+/g, ' ').trim();
+    const normalize = participantNameKey;
     if (normalize(person) === normalize(partner)) return { ok: false, error: 'Ein Spieler kann nicht sein eigener Doppelpartner sein.' };
     const registered = new Set((tournament.participantNames ?? []).flatMap((pair) => pair.split(/\s+\/\s+/)).map(normalize));
     if (registered.has(normalize(person)) || registered.has(normalize(partner))) {
@@ -963,7 +975,7 @@ export function addMockParticipant(
     }
     displayName = `${person} / ${partner}`;
   } else if ((tournament.participantNames ?? []).some((name) =>
-    name.toLocaleLowerCase('de') === person.toLocaleLowerCase('de'))) {
+    participantNameKey(name) === participantNameKey(person))) {
     return { ok: false, error: teamMode ? 'Diese Mannschaft ist bereits angemeldet.' : 'Dieser Spieler ist bereits angemeldet.' };
   }
 
