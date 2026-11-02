@@ -1030,6 +1030,17 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participantCount]);
 
+  /** Explicitly acknowledge every participant count changed as a consequence
+   * of inserting, removing or reordering phases (not just roster changes). */
+  function normalizeAndTrackPhaseChanges(previous: PhaseDraft[], proposed: PhaseDraft[], manuallyEditedId?: string): PhaseDraft[] {
+    const normalized = normalizePhaseEntrants(proposed);
+    const priorById = new Map(previous.map((phase) => [phase.id, phase.entrantCount]));
+    const changed = normalized.filter((phase) => phase.id !== manuallyEditedId
+      && priorById.has(phase.id) && priorById.get(phase.id) !== phase.entrantCount).map((phase) => phase.id);
+    if (changed.length) setReviewRequiredPhaseIds((current) => [...new Set([...current, ...changed])]);
+    return normalized;
+  }
+
   function insertPhase(insertIndex: number, type: StageType) {
     if (insertIndex < 0 || insertIndex > phaseDrafts.length) return;
     if (type === 'GROUPS' && (insertIndex === 0 ? participantCount : phaseDrafts[insertIndex - 1].entrantCount) < 4) return;
@@ -1055,7 +1066,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     }
     const candidate = [...phaseDrafts.slice(0, insertIndex), phase, ...phaseDrafts.slice(insertIndex)];
     if (!hasValidTerminalStageOrder(candidate.map((item) => item.type)) || !hasValidBreakStageOrder(candidate.map((item) => item.type))) return;
-    setPhaseDrafts(normalizePhaseEntrants(candidate));
+    setPhaseDrafts(normalizeAndTrackPhaseChanges(phaseDrafts, candidate));
     setSelectedRecommendationId(null);
     setPhaseInsertIndex(null);
     setExpandedPhaseId(phase.id);
@@ -1066,7 +1077,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setReviewRequiredPhaseIds((ids) => ids.filter((candidate) => candidate !== id));
     if (editingPhaseTypeId === id) setEditingPhaseTypeId(null);
     if (expandedPhaseId === id) setExpandedPhaseId(null);
-    setPhaseDrafts((current) => normalizePhaseEntrants(current.filter((phase) => phase.id !== id)));
+    setPhaseDrafts(normalizeAndTrackPhaseChanges(phaseDrafts, phaseDrafts.filter((phase) => phase.id !== id)));
   }
 
   function reorderedPhases(fromIndex: number, toIndex: number): PhaseDraft[] | null {
@@ -1086,7 +1097,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const candidate = reorderedPhases(fromIndex, toIndex);
     if (!candidate) return;
     setSelectedRecommendationId(null);
-    setPhaseDrafts(normalizePhaseEntrants(candidate));
+    setPhaseDrafts(normalizeAndTrackPhaseChanges(phaseDrafts, candidate));
     setPhaseInsertIndex(null);
   }
 
@@ -1184,22 +1195,17 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   function updatePhaseEntrants(index: number, entrantCount: number, customEntrants = false) {
     setSelectedRecommendationId(null);
-    setPhaseDrafts((current) => {
-      const next = current.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
-      if (!next[index] || index === 0) return next;
-      const maximum = next[index - 1].entrantCount;
-      const nextEntrants = Math.max(2, Math.min(maximum, entrantCount));
-      next[index].entrantCount = nextEntrants;
-      next[index].customEntrants = customEntrants;
-      if (next[index].type === 'KNOCKOUT') {
-        next[index].knockoutBestOf = resizeKnockoutBestOf(
-          next[index].knockoutBestOf,
-          knockoutRoundLabels(nextEntrants).length,
-          next[index].bestOf,
-        );
-      }
-      return normalizePhaseEntrants(next);
-    });
+    const next = phaseDrafts.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
+    if (!next[index] || index === 0) return;
+    const maximum = next[index - 1].entrantCount;
+    const nextEntrants = Math.max(2, Math.min(maximum, entrantCount));
+    next[index].entrantCount = nextEntrants;
+    next[index].customEntrants = customEntrants;
+    if (next[index].type === 'KNOCKOUT') {
+      next[index].knockoutBestOf = resizeKnockoutBestOf(next[index].knockoutBestOf,
+        knockoutRoundLabels(nextEntrants).length, next[index].bestOf);
+    }
+    setPhaseDrafts(normalizeAndTrackPhaseChanges(phaseDrafts, next, next[index].id));
   }
 
   function updateKnockoutRoundBestOf(phase: PhaseDraft, roundIndex: number, bestOf: number) {
