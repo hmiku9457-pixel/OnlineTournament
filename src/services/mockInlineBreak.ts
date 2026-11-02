@@ -24,6 +24,7 @@ export interface InlineBreakConfiguration {
   kind: 'minutes' | 'until';
   minutes: number;
   until: string;
+  untilDate?: string;
 }
 
 function readAll(): InlineBreakRecord[] {
@@ -55,6 +56,7 @@ export function getInlineBreakConfig(stage: TournamentStage): InlineBreakConfigu
     kind: stage.settings.inlineBreakKind === 'minutes' ? 'minutes' : 'until',
     minutes: Math.max(1, Number(stage.settings.inlineBreakMinutes) || 15),
     until: String(stage.settings.inlineBreakUntil ?? '13:00'),
+    untilDate: String(stage.settings.inlineBreakUntilDate ?? '') || undefined,
   };
 }
 
@@ -105,7 +107,7 @@ export function startInlineBreak(
   if (status?.state !== 'ready') return false;
   const started = new Date();
   const options = override ?? (status.config.kind === 'until'
-    ? { kind: 'clock' as const, time: status.config.until }
+    ? { kind: 'clock' as const, time: status.config.until, date: status.config.untilDate }
     : { kind: 'minutes' as const, minutes: status.config.minutes });
   const resume = computeBreakResumeAt(started, options);
   if (!resume) return false;

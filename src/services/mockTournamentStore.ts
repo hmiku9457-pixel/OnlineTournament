@@ -31,11 +31,13 @@ export interface MockPhaseInput {
   nextDayStart?: string;
   nextDayDate?: string;
   breakUntil?: string;
+  breakUntilDate?: string;
   note?: string;
   inlineBreakAfterRound?: number;
   inlineBreakKind?: 'minutes' | 'until';
   inlineBreakMinutes?: number;
   inlineBreakUntil?: string;
+  inlineBreakUntilDate?: string;
 }
 
 export interface CreateMockTournamentInput {
@@ -165,6 +167,7 @@ function toStage(tournamentId: string, phase: MockPhaseInput, index: number, nex
     settings.nextDayStart = phase.nextDayStart ?? '09:00';
     settings.nextDayDate = phase.nextDayDate ?? '';
     settings.breakUntil = phase.breakUntil ?? '12:00';
+    settings.breakUntilDate = phase.breakUntilDate ?? '';
     settings.note = phase.note ?? '';
   }
   if ((phase.type === 'SWISS' || phase.type === 'KNOCKOUT') && phase.inlineBreakAfterRound) {
@@ -172,6 +175,7 @@ function toStage(tournamentId: string, phase: MockPhaseInput, index: number, nex
     settings.inlineBreakKind = phase.inlineBreakKind ?? 'until';
     settings.inlineBreakMinutes = phase.inlineBreakMinutes ?? 15;
     settings.inlineBreakUntil = phase.inlineBreakUntil ?? '13:00';
+    settings.inlineBreakUntilDate = phase.inlineBreakUntilDate ?? '';
   }
   if (phase.type === 'SWISS') settings.rounds = phase.swissRounds;
   if (phase.type === 'KNOCKOUT') {
@@ -581,9 +585,11 @@ export function updatePrestartTournamentPhases(
     groupCount: phase.groupCount, swissRounds: phase.swissRounds,
     bestOf: phase.bestOf, knockoutBestOf: [...phase.knockoutBestOf],
     breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
-    nextDayStart: phase.nextDayStart, nextDayDate: phase.nextDayDate, breakUntil: phase.breakUntil, note: phase.note,
-    inlineBreakAfterRound: phase.inlineBreakAfterRound, inlineBreakKind: phase.inlineBreakKind,
+    nextDayStart: phase.nextDayStart, nextDayDate: phase.nextDayDate, breakUntil: phase.breakUntil,
+    breakUntilDate: newPlan?.timeline.items.find((item) => item.id === `phase-${index + 1}`)?.at.slice(0, 10),
+    note: phase.note, inlineBreakAfterRound: phase.inlineBreakAfterRound, inlineBreakKind: phase.inlineBreakKind,
     inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
+    inlineBreakUntilDate: newPlan?.timeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at.slice(0, 10),
   }));
   const stages = phases.map((phase, index) => {
     const nextPlaying = phases.slice(index + 1).find((item) => item.type !== 'BREAK');

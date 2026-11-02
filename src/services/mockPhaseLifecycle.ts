@@ -154,6 +154,8 @@ export interface BreakStartOptions {
   kind: 'minutes' | 'clock';
   minutes?: number;
   time?: string;
+  /** Exact local calendar day for a fixed clock target. */
+  date?: string;
 }
 
 export function computeBreakResumeAt(start: Date, options: BreakStartOptions): Date | null {
@@ -165,9 +167,16 @@ export function computeBreakResumeAt(start: Date, options: BreakStartOptions): D
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(options.time ?? '')) return null;
   const [hour, minute] = options.time!.split(':').map(Number);
   const target = new Date(start);
+  if (options.date) {
+    const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(options.date);
+    if (!day) return null;
+    target.setFullYear(Number(day[1]), Number(day[2]) - 1, Number(day[3]));
+    if (target.getFullYear() !== Number(day[1]) || target.getMonth() !== Number(day[2]) - 1
+      || target.getDate() !== Number(day[3])) return null;
+  }
   target.setHours(hour, minute, 0, 0);
-  if (target.getTime() <= start.getTime()) target.setDate(target.getDate() + 1);
-  return target;
+  // An elapsed deadline must never silently turn into a 24-hour pause.
+  return target.getTime() <= start.getTime() ? null : target;
 }
 
 /** Respect an explicit return date even for multi-day tournament interruptions.
@@ -197,7 +206,8 @@ export function startStage(tournament: DemoTournament, stage: TournamentStage, p
     const options: BreakStartOptions = pauseOptions ?? (stage.settings.breakKind === 'overnight'
       ? { kind: 'clock', time: String(stage.settings.nextDayStart ?? '09:00') }
       : stage.settings.breakKind === 'until'
-        ? { kind: 'clock', time: String(stage.settings.breakUntil ?? '12:00') }
+        ? { kind: 'clock', time: String(stage.settings.breakUntil ?? '12:00'),
+            date: String(stage.settings.breakUntilDate ?? '') || undefined }
         : { kind: 'minutes', minutes: Number(stage.settings.breakMinutes) || 15 });
     pauseResume = computeBreakResumeAt(startDate, options);
     if (!pauseResume) return false;
@@ -297,7 +307,8 @@ export function getBreakResumeAt(tournament: DemoTournament, stage: TournamentSt
     return computeDayEndResumeAt(start, String(stage.settings.nextDayDate ?? ''), String(stage.settings.nextDayStart ?? '09:00'));
   }
   if (stage.settings.breakKind === 'until') {
-    return computeBreakResumeAt(start, { kind: 'clock', time: String(stage.settings.breakUntil ?? '12:00') });
+    return computeBreakResumeAt(start, { kind: 'clock', time: String(stage.settings.breakUntil ?? '12:00'),
+      date: String(stage.settings.breakUntilDate ?? '') || undefined });
   }
   return new Date(start.getTime() + Math.max(1, Number(stage.settings.breakMinutes) || 15) * 60000);
 }
