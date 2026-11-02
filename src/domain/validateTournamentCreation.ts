@@ -4,6 +4,7 @@ import { hasValidBreakStageOrder, hasValidTerminalStageOrder, isValidSwissRoundC
 import { validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { validateVenueLayout, type VenueLayout } from '@/domain/venueLayout';
 import type { Discipline, StageType } from '@/domain/types';
+import { configuredPlayingDays, playingRounds, validPlayingDayBreaks, type PlayingDayBreak } from '@/domain/playingDays';
 
 /** Shared creation rules: the wizard and the final write must agree. */
 export interface CreationValidationPhase {
@@ -24,6 +25,7 @@ export interface CreationValidationPhase {
   inlineBreakKind?: 'minutes' | 'until';
   inlineBreakMinutes?: number;
   inlineBreakUntil?: string;
+  dayBreaks?: PlayingDayBreak[];
 }
 export interface CreationValidationInput {
   name: string;
@@ -38,6 +40,8 @@ export interface CreationValidationInput {
   venueLayout?: VenueLayout;
   matchDurationMinutes?: number;
   venueTurnoverMinutes?: number;
+  tournamentMode?: 'single' | 'multi';
+  plannedDays?: number;
 }
 
 /** Validate tournament semantics, including constraints that UI components
@@ -65,6 +69,11 @@ export function validateTournamentCreation(input: CreationValidationInput): stri
     || input.matchDurationMinutes < 1 || input.matchDurationMinutes > 1440)) errors.push('Ungültige Spieldauer.');
   if (input.venueTurnoverMinutes !== undefined && (!Number.isInteger(input.venueTurnoverMinutes)
     || input.venueTurnoverMinutes < 0 || input.venueTurnoverMinutes > 240)) errors.push('Ungültiger Spielflächenwechselpuffer.');
+  const mode = input.tournamentMode ?? 'single';
+  const expectedDays = mode === 'multi' ? input.plannedDays ?? 2 : 1;
+  if (mode === 'multi' && (!Number.isInteger(expectedDays) || expectedDays < 2 || expectedDays > 14)) errors.push('Die Anzahl der Spieltage muss zwischen 2 und 14 liegen.');
+  const actualDays = configuredPlayingDays(input.phases);
+  if (actualDays !== expectedDays) errors.push(`Es sind ${expectedDays} Spieltage geplant, aber ${actualDays} im Phasenplan eingerichtet.`);
   if (!input.phases.some((phase) => phase.type !== 'BREAK')) errors.push('Mindestens eine Spielphase ist erforderlich.');
   if (input.phases.length > 80) errors.push('Es dürfen höchstens 80 Phasen angelegt werden.');
   if (input.phases.some((phase) => !['BREAK', 'ROUND_ROBIN', 'GROUPS', 'SWISS', 'KNOCKOUT'].includes(phase.type)))
@@ -87,6 +96,8 @@ export function validateTournamentCreation(input: CreationValidationInput): stri
       if (!['minutes', 'until', 'overnight'].includes(phase.breakKind ?? '')) errors.push(`${prefix}: Unbekannte Unterbrechungsart.`);
       return;
     }
+    if (!validPlayingDayBreaks(phase.dayBreaks, playingRounds(phase))) errors.push(`${prefix}: Spieltagswechsel dürfen nur nach einer abgeschlossenen Runde liegen und benötigen ein gültiges Datum und eine Uhrzeit.`);
+    if (phase.dayBreaks?.some((item) => item.afterRound === phase.inlineBreakAfterRound)) errors.push(`${prefix}: Zwischenpause und Spieltagswechsel dürfen nicht nach derselben Runde liegen.`);
     if (!Number.isSafeInteger(phase.entrantCount) || phase.entrantCount < 2 || phase.entrantCount > available
       || (firstPlaying && phase.entrantCount !== available)) errors.push(`${prefix}: Ungültige Teilnehmerzahl.`);
     firstPlaying = false;

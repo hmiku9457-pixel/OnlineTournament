@@ -35,6 +35,7 @@ export interface CreationDraftPhase {
   inlineBreakMinutes: number;
   inlineBreakUntil: string;
   inlineBreakUntilDate?: string;
+  dayBreaks?: import('./playingDays').PlayingDayBreak[];
 }
 
 export interface CreationDraft {
@@ -70,6 +71,8 @@ export interface CreationDraft {
   maxSwissRounds: number | null;
   knockoutQualifierCount: number | null;
   preferredDurationMinutes: number;
+  tournamentMode?: 'single' | 'multi';
+  plannedDays?: number;
   awardsEnabled: boolean;
   awardsAtOverride: string | null;
 }
@@ -121,7 +124,9 @@ export function validDraft(value: unknown): value is CreationDraft {
       && Number.isInteger(entry.inlineBreakAfterRound) && entry.inlineBreakAfterRound >= 0
       && ['minutes', 'until'].includes(entry.inlineBreakKind)
       && Number.isInteger(entry.inlineBreakMinutes)
-      && typeof entry.inlineBreakUntil === 'string' && (entry.inlineBreakUntilDate === undefined || typeof entry.inlineBreakUntilDate === 'string'))
+      && typeof entry.inlineBreakUntil === 'string' && (entry.inlineBreakUntilDate === undefined || typeof entry.inlineBreakUntilDate === 'string')
+      && (entry.dayBreaks === undefined || (Array.isArray(entry.dayBreaks) && entry.dayBreaks.length <= 13
+        && entry.dayBreaks.every((item) => item && Number.isInteger(item.afterRound) && typeof item.date === 'string' && typeof item.time === 'string'))))
     && data.participantForm !== null && typeof data.participantForm === 'object'
     && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
       .every((key) => typeof (data.participantForm as unknown as Record<string, unknown>)[key] === 'string')
@@ -136,6 +141,8 @@ export function validDraft(value: unknown): value is CreationDraft {
       typeof (data.enabledSystems as unknown as Record<string, unknown>)[key] === 'boolean')
     && [data.maxGroups, data.maxSwissRounds, data.knockoutQualifierCount]
       .every((v) => v === null || (typeof v === 'number' && Number.isInteger(v)))
+    && (data.tournamentMode === undefined || data.tournamentMode === 'single' || data.tournamentMode === 'multi')
+    && (data.plannedDays === undefined || (Number.isInteger(data.plannedDays) && data.plannedDays >= 2 && data.plannedDays <= 14))
     && typeof data.preferredDurationMinutes === 'number'
     && Number.isInteger(data.preferredDurationMinutes) && data.preferredDurationMinutes >= 15
     && data.preferredDurationMinutes <= 1439

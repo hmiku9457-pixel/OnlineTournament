@@ -33,6 +33,7 @@ export interface PrestartPhaseDraft {
   inlineBreakMinutes: number;
   inlineBreakUntil: string;
   inlineBreakUntilDate: string;
+  dayBreaks?: import('./playingDays').PlayingDayBreak[];
 }
 
 const competitive = (phase: PrestartPhaseDraft) => phase.type !== 'BREAK';
@@ -61,6 +62,7 @@ export function initialPrestartPhases(tournament: DemoTournament): PrestartPhase
     inlineBreakMinutes: Number(stage.settings.inlineBreakMinutes) || 15,
     inlineBreakUntil: String(stage.settings.inlineBreakUntil ?? '13:00'),
     inlineBreakUntilDate: String(stage.settings.inlineBreakUntilDate ?? ''),
+    dayBreaks: Array.isArray(stage.settings.dayBreaks) ? stage.settings.dayBreaks as import('./playingDays').PlayingDayBreak[] : [],
   }));
 }
 
@@ -224,7 +226,7 @@ export function createPrestartPhase(type: StageType, participants: number, next?
     swissRounds: recommendedSwissRounds(entrants),
     knockoutBestOf: Array.from({ length: knockoutRoundLabels(entrants).length }, () => bestOf),
     breakKind: 'minutes', breakMinutes: 15, nextDayStart: '09:00', nextDayDate: '', breakUntil: '12:00', breakUntilDate: '', note: '',
-    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '',
+    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '', dayBreaks: [],
   };
 }
 
