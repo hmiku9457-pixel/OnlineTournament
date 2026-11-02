@@ -616,7 +616,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [minimumMatches, setMinimumMatches] = useState(restoredDraft?.minimumMatches ?? 4);
   const [customMinimumMatches, setCustomMinimumMatches] = useState(restoredDraft?.customMinimumMatches ?? false);
   const [selectedRecommendationId, setSelectedRecommendationId] = useState<string | null>(restoredDraft?.selectedRecommendationId ?? null);
-  const [phaseDrafts, setPhaseDrafts] = useState<PhaseDraft[]>(restoredDraft?.phaseDrafts ?? []);
+  const [phaseDrafts, setPhaseDrafts] = useState<PhaseDraft[]>(restoredDraft?.phaseDrafts.map((phase) => ({
+    ...phase, breakUntilDate: phase.breakUntilDate ?? '', inlineBreakUntilDate: phase.inlineBreakUntilDate ?? '',
+  })) ?? []);
   const [reviewRequiredPhaseIds, setReviewRequiredPhaseIds] = useState<string[]>(restoredDraft?.reviewRequiredPhaseIds ?? []);
   const [editingPhaseTypeId, setEditingPhaseTypeId] = useState<string | null>(null);
   const [expandedPhaseId, setExpandedPhaseId] = useState<string | null>(null);
