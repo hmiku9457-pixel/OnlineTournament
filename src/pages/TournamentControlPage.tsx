@@ -1333,6 +1333,14 @@ export function TournamentControlPage() {
 
       {tab === 'summary' && (
         <>
+        {unconfirmedSchedule && <div className="control-review-alert no-print" role="status">
+          <div>
+            <strong>Zeitprognose nicht bestätigt</strong>
+            <p>Durch Änderungen am Teilnehmerfeld passt der bisherige Zeitplan nicht mehr. {unconfirmedSchedule.issues.join(' ')}</p>
+            <p>Neue Prognose: Turnierende ca. {unconfirmedSchedule.estimatedEnd.replace('T', ' ')} Uhr. Die bisherige Planung bleibt bis zur ausdrücklichen Korrektur erhalten.</p>
+          </div>
+          <button type="button" className="btn" onClick={() => { setShowPrestartPhaseEditor(true); setTab('prestart'); }}>Zeitplanung bearbeiten</button>
+        </div>}
         <TournamentSummaryPanel
           tournament={tournament}
           participants={participants.length}

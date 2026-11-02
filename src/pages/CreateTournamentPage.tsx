@@ -572,16 +572,25 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       const rect = rosterRef.current?.getBoundingClientRect();
       // Each rendered row may hold 1, 2, or 3 cards depending on the real
       // available width. The page budget must count GRID ROWS, not entries.
-      const width = rect?.width ?? window.innerWidth;
-      const columns = width > 720 ? 3 : width > 460 ? 2 : 1;
-      const available = Math.max(44, window.innerHeight - Math.max(0, rect?.top ?? 0) - 155);
-      const rows = Math.max(1, Math.floor(available / 56));
+      const list = rosterRef.current?.querySelector<HTMLElement>('.participant-roster-multi');
+      // Use the actually rendered CSS grid rather than guessing 1/2/3 columns
+      // from fixed pixel thresholds (which disregard padding and grid gaps).
+      const columns = list ? Math.max(1, getComputedStyle(list).gridTemplateColumns.split(/\s+/).filter(Boolean).length) : 1;
+      const card = list?.querySelector<HTMLElement>('.participant-roster-row');
+      const height = card?.getBoundingClientRect().height ?? 92;
+      const gap = list ? parseFloat(getComputedStyle(list).rowGap) || 8 : 8;
+      const available = Math.max(height, window.innerHeight - Math.max(0, rect?.top ?? 0) - 155);
+      const rows = Math.max(1, Math.floor((available + gap) / (height + gap)));
       setRosterPageSize(Math.max(1, Math.min(48, rows * columns)));
     };
     updatePageSize();
     window.addEventListener('resize', updatePageSize);
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updatePageSize);
-    if (rosterRef.current && observer) observer.observe(rosterRef.current);
+    if (rosterRef.current && observer) {
+      observer.observe(rosterRef.current);
+      const list = rosterRef.current.querySelector('.participant-roster-multi');
+      if (list) observer.observe(list);
+    }
     return () => { window.removeEventListener('resize', updatePageSize); observer?.disconnect(); };
   }, [step, prestart]);
   const rosterPageCount = Math.max(1, Math.ceil(participants.length / rosterPageSize));
