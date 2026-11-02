@@ -2719,12 +2719,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                     </select>
                                   </label>
                                   <label className="field">Fortsetzungsdatum
-                                    <CalendarDatePicker label="Fortsetzungsdatum" value={boundary.date}
+                                    <CalendarDatePicker id={`day-break-date-${phase.id}-${position}`} label="Fortsetzungsdatum" value={boundary.date}
                                       minDate={followingPlayingDate((boundaryTime ?? scheduledStart).slice(0,10), 1)}
                                       onChange={(date) => updatePhase(phase.id, { dayBreaks: phase.dayBreaks.map((item,i) => i === position ? { ...item, date } : item) })}/>
                                   </label>
                                   <label className="field">Fortsetzungsuhrzeit
-                                    <ClockTimePicker label="Fortsetzungsuhrzeit" value={boundary.time}
+                                    <ClockTimePicker id={`day-break-time-${phase.id}-${position}`} label="Fortsetzungsuhrzeit" value={boundary.time}
                                       onChange={(time) => updatePhase(phase.id, { dayBreaks: phase.dayBreaks.map((item,i) => i === position ? { ...item, time } : item) })}/>
                                   </label>
                                   <button type="button" className="btn small danger-outline" onClick={() => updatePhase(phase.id, {
