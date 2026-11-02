@@ -1,3 +1,4 @@
+import { UNCLAIMED_WINNER } from '@/domain/matchSlots';
 import type { MatchSet } from '@/domain/types';
 import { compareRankingRows, resultMetrics, resultWinnerSide, type WinnerSide } from '@/domain/sportScoring';
 
@@ -63,7 +64,7 @@ export function rankStandings(
       b.ballsLost += set.sideAScore;
     });
     const winnerSide = resultWinnerSide(sport, sets, match.decisionSide);
-    if (match.forcedWinner === 'Freilos') {
+    if (match.forcedWinner === UNCLAIMED_WINNER) {
       a.losses += 1;
       b.losses += 1;
     } else if (match.forcedWinner === match.sideA || (!match.forcedWinner && winnerSide === 'A')) {
@@ -78,9 +79,9 @@ export function rankStandings(
     }
     const resultA = match.forcedWinner === match.sideA || (!match.forcedWinner && winnerSide === 'A') ? 1
       : match.forcedWinner === match.sideB || (!match.forcedWinner && winnerSide === 'B')
-        || match.forcedWinner === 'Freilos' ? 0 : 0.5;
+        || match.forcedWinner === UNCLAIMED_WINNER ? 0 : 0.5;
     opponents.get(match.sideA)!.push({ name: match.sideB, unplayed: Boolean(match.forcedWinner), result: resultA });
-    opponents.get(match.sideB)!.push({ name: match.sideA, unplayed: Boolean(match.forcedWinner), result: match.forcedWinner === 'Freilos' ? 0 : 1 - resultA });
+    opponents.get(match.sideB)!.push({ name: match.sideA, unplayed: Boolean(match.forcedWinner), result: match.forcedWinner === UNCLAIMED_WINNER ? 0 : 1 - resultA });
   });
 
   // Schweizer Freilos: ein Spiel und ein Sieg, aber keine Satz-/Ballpunkte und kein Gegner.

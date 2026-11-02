@@ -9,6 +9,7 @@ import { getAllMockTournaments, updateMockTournamentStatus, refreshPrestartSched
 import { blocksInlineBreakRound, isInlineBreakReleased } from '@/services/mockInlineBreak';
 import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, getNextCompetitionStage, getPreviousCompetitionStage, isStageCompleted, isStageStarted, setStageEntrants, reopenStageForQualification, isSwissRoundApproved, approveSwissRound, revokeSwissRoundApprovals, reopenStageAfterCorrection } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
+import { BYE_SLOT, PENDING_SLOT, UNCLAIMED_WINNER } from '@/domain/matchSlots';
 import { getBracketSlots, getGroupAssignments, getSwissOrder } from '@/services/mockDrawStore';
 import { getBlockedMockTables, isMockTableBlocked } from '@/services/mockTableLocks';
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
@@ -347,15 +348,15 @@ function knockoutMatches(tournament: DemoTournament, stage: TournamentStage, res
     const nextSides: string[] = [];
 
     for (let index = 0; index < matchesInRound; index += 1) {
-      const sideA = currentSides[index * 2] ?? 'TBD';
-      const sideB = currentSides[index * 2 + 1] ?? 'TBD';
+      const sideA = currentSides[index * 2] ?? PENDING_SLOT;
+      const sideB = currentSides[index * 2 + 1] ?? PENDING_SLOT;
       const id = `${stage.id}-r${roundIndex + 1}-m${index + 1}`;
       let autoWinner: string | undefined;
-      if (sideA === 'Freilos' && sideB !== 'Freilos' && sideB !== 'TBD') autoWinner = sideB;
-      if (sideB === 'Freilos' && sideA !== 'Freilos' && sideA !== 'TBD') autoWinner = sideA;
+      if (sideA === BYE_SLOT && sideB !== BYE_SLOT && sideB !== PENDING_SLOT) autoWinner = sideB;
+      if (sideB === BYE_SLOT && sideA !== BYE_SLOT && sideA !== PENDING_SLOT) autoWinner = sideA;
       const winner = autoWinner ?? resultWinner(results.find((item) => item.matchId === id), sideA, sideB, tournament.sport);
       rounds.push({ id, sideA, sideB, round: label, autoWinner, bestOf: knockoutRoundBestOf(stage, roundIndex) });
-      nextSides.push(winner ?? 'TBD');
+      nextSides.push(winner ?? PENDING_SLOT);
     }
 
     currentSides = nextSides;
@@ -363,14 +364,14 @@ function knockoutMatches(tournament: DemoTournament, stage: TournamentStage, res
     roundIndex += 1;
   }
 
-  if (stage.type === 'KNOCKOUT' && slots.filter((name) => name !== 'Freilos').length >= 4) {
+  if (stage.type === 'KNOCKOUT' && slots.filter((name) => name !== BYE_SLOT).length >= 4) {
     const semiFinals = rounds.filter((match) => match.round === 'Halbfinale');
     if (semiFinals.length === 2) {
       const losers = semiFinals.map((match) => {
         const winner = match.autoWinner ?? resultWinner(results.find((item) => item.matchId === match.id), match.sideA, match.sideB, tournament.sport);
-        if (!winner) return 'TBD';
+        if (!winner) return PENDING_SLOT;
         const loser = winner === match.sideA ? match.sideB : match.sideA;
-        return loser === 'Freilos' ? 'TBD' : loser;
+        return loser === BYE_SLOT ? PENDING_SLOT : loser;
       });
       rounds.push({
         id: `${stage.id}-third-place`,
@@ -404,7 +405,7 @@ function swissScoreState(participants: string[], matches: BaseStageMatch[], resu
   matches.forEach((match) => {
     const a = state.get(match.sideA);
     if (!a) return;
-    if (match.autoWinner === match.sideA && match.sideB === 'Freilos') {
+    if (match.autoWinner === match.sideA && match.sideB === BYE_SLOT) {
       a.wins += 1;
       a.byes += 1;
       return;
@@ -451,7 +452,7 @@ function swissRoundPairings(
       opponents: row.opponents,
     };
   });
-  return generateScoreGroupedSwissPairings(players);
+  return generateScoreGroupedSwissPairings(players, BYE_SLOT);
 }
 
 export function getTotalSwissRoundCount(tournament: DemoTournament, stage: TournamentStage): number {
@@ -492,7 +493,7 @@ function swissMatches(tournament: DemoTournament, stage: TournamentStage, result
         sideA,
         sideB,
         round: `Runde ${round}`,
-        autoWinner: sideB === 'Freilos' ? sideA : undefined,
+        autoWinner: sideB === BYE_SLOT ? sideA : undefined,
       });
     });
   }
@@ -571,7 +572,7 @@ export function getMockStageMatches(tournament: DemoTournament, stage: Tournamen
   const lastFinishByParticipant = getLatestFinishedTimes(tournament, results);
   const now = Date.now();
   return baseStageMatches(tournament, stage, results)
-    .filter((match) => match.sideA !== 'TBD' && match.sideB !== 'TBD' && match.sideA !== 'Freilos' && match.sideB !== 'Freilos')
+    .filter((match) => match.sideA !== PENDING_SLOT && match.sideB !== PENDING_SLOT && match.sideA !== BYE_SLOT && match.sideB !== BYE_SLOT)
     .map((match) => applyStoredState({
       id: match.id,
       table: 'Noch offen',
@@ -848,7 +849,7 @@ function settleWithdrawnMatches(tournament: DemoTournament) {
         match.bestOf ?? active.bestOf,
         aWithdrawn && bWithdrawn ? 'BOTH' : aWithdrawn ? 'A' : 'B',
       );
-      const forcedWinner = aWithdrawn && bWithdrawn ? 'Freilos' : aWithdrawn ? match.sideB : match.sideA;
+      const forcedWinner = aWithdrawn && bWithdrawn ? UNCLAIMED_WINNER : aWithdrawn ? match.sideB : match.sideA;
       // Nicht bei jeder Ansicht erneut identische Resultate überschreiben.
       if (existing?.status === 'FINISHED' && existing.forcedWinner === forcedWinner
         && JSON.stringify(existing.sets) === JSON.stringify(sets)) continue;
@@ -873,7 +874,7 @@ function settleWithdrawnMatches(tournament: DemoTournament) {
       const aWithdrawn = isMockParticipantWithdrawn(tournament, match.sideA);
       const bWithdrawn = isMockParticipantWithdrawn(tournament, match.sideB);
       if (saved.some((item) => item.matchId === match.id && item.status === 'FINISHED')) continue;
-      saved.unshift({ matchId: match.id, sets: [], status: 'FINISHED', forcedWinner: aWithdrawn && bWithdrawn ? 'Freilos' : aWithdrawn ? match.sideB : match.sideA });
+      saved.unshift({ matchId: match.id, sets: [], status: 'FINISHED', forcedWinner: aWithdrawn && bWithdrawn ? UNCLAIMED_WINNER : aWithdrawn ? match.sideB : match.sideA });
       changed = true;
     }
     if (!changed) break;
@@ -1026,7 +1027,7 @@ type RankingRow = RankedParticipant;
 function rankParticipants(participants: string[], matches: BaseStageMatch[], results: StoredMatchResult[], sport: string, swiss = false, plannedRounds?: number): RankingRow[] {
   const resultById = new Map(results.map((result) => [result.matchId, result]));
   const automaticWins = matches
-    .filter((match) => match.sideB === 'Freilos' && match.autoWinner)
+    .filter((match) => match.sideB === BYE_SLOT && match.autoWinner)
     .map((match) => match.autoWinner!);
   const rankingMatches = matches.map((match) => {
     const result = resultById.get(match.id);
@@ -1062,7 +1063,7 @@ function swissCutoffStatus(tournament: DemoTournament, stage: TournamentStage, r
   const base = baseStageMatches(tournament, stage, results);
   const roundCount = getTotalSwissRoundCount(tournament, stage);
   if (!base.some((match) => match.round === `Runde ${roundCount}`)) return null;
-  const scheduled = base.filter((match) => !match.autoWinner && match.sideA !== 'TBD' && match.sideB !== 'TBD');
+  const scheduled = base.filter((match) => !match.autoWinner && match.sideA !== PENDING_SLOT && match.sideB !== PENDING_SLOT);
   if (scheduled.length === 0 || scheduled.some((match) => results.find((result) => result.matchId === match.id)?.status !== 'FINISHED')) return null;
   const participants = getStageEntrants(tournament, stage);
   const ranked = rankParticipants(participants, base, results, tournament.sport, true, roundCount);
@@ -1614,7 +1615,7 @@ export function getPendingMockApproval(tournament: DemoTournament): MockProgress
   const matches = getMockStageMatches(tournament, stage);
   if (matches.some((match) => match.status !== 'FINISHED')) return null;
   const swissFixtures = stage.type === 'SWISS' ? getMockStageBaseMatches(tournament, stage) : [];
-  const allBye = stage.type === 'SWISS' && swissFixtures.some((match) => match.autoWinner && match.sideB === 'Freilos');
+  const allBye = stage.type === 'SWISS' && swissFixtures.some((match) => match.autoWinner && match.sideB === BYE_SLOT);
   if (!matches.length && !allBye) return null;
   const totalRounds = stage.type === 'SWISS' ? getTotalSwissRoundCount(tournament, stage) : 0;
   const round = stage.type === 'SWISS'

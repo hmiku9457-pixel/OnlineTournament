@@ -25,6 +25,7 @@ import { GroupCutoffDecisionModal } from '@/components/GroupCutoffDecisionModal'
 import { SwissRoundRobinHistory } from '@/components/SwissRoundRobinHistory';
 import { RegularRoundRobinView } from '@/components/RegularRoundRobinView';
 import { getSwissCutoffRowIndex } from '@/components/SwissQualificationCutoff';
+import { isByeSlot, displayMatchSlot } from '@/domain/matchSlots';
 import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
@@ -424,7 +425,7 @@ function StageCompetitionView({
                           const winner = match.winner === side;
                           return (
                             <div
-                              className={`${winner ? 'winner ' : ''}${!scoreSport && match.sets?.length ? 'bracket-set-row ' : ''}${scoreStages.length ? 'bracket-stage-row ' : ''}${isEditableSlot ? 'editable-bracket-slot' : ''}${isEditableSlot && pinnedSlots.has(slotIndex) ? ' pinned-slot' : ''}${side === 'Freilos' ? ' bye' : ''}`.trim()}
+                              className={`${winner ? 'winner ' : ''}${!scoreSport && match.sets?.length ? 'bracket-set-row ' : ''}${scoreStages.length ? 'bracket-stage-row ' : ''}${isEditableSlot ? 'editable-bracket-slot' : ''}${isEditableSlot && pinnedSlots.has(slotIndex) ? ' pinned-slot' : ''}${isByeSlot(side) ? ' bye' : ''}`.trim()}
                               key={`${match.id}-${sideIndex}`}
                               draggable={isEditableSlot && !pinnedSlots.has(slotIndex)}
                               onDragStart={(event) => {
@@ -440,7 +441,7 @@ function StageCompetitionView({
                               onDrop={(event) => handleBracketDrop(event, slotIndex)}
                             >
                               <span>
-                                <span className="bracket-name-inline">{match.score === 'W.O.' && getStageWithdrawalLabel(tournament, side, stage.id) ? `Rückzug (${side})` : side}{isEditableSlot && side !== 'Freilos' && (
+                                <span className="bracket-name-inline">{match.score === 'W.O.' && getStageWithdrawalLabel(tournament, side, stage.id) ? `Rückzug (${displayMatchSlot(side)})` : displayMatchSlot(side)}{isEditableSlot && !isByeSlot(side) && (
                                   <button className={pinnedSlots.has(slotIndex) ? 'bracket-pin pinned' : 'bracket-pin'} type="button"
                                     aria-label={`${side} ${pinnedSlots.has(slotIndex) ? 'lösen' : 'fixieren'}`}
                                     title={pinnedSlots.has(slotIndex) ? 'Fixierung lösen' : 'Platz fixieren'}
@@ -452,7 +453,7 @@ function StageCompetitionView({
                               </span>
                               {scoreStages.length ? <BracketStageValues stages={scoreStages} sideIndex={sideIndex as 0 | 1} onOpenResult={openBracketResult} /> : <BracketScoreCells onOpenResult={openBracketResult}>
                                 {!scoreSport && <BracketSetScores sets={match.sets ?? []} sideIndex={sideIndex as 0 | 1} />}
-                                <strong>{match.score === 'W.O.' ? (winner ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : match.score === 'Freilos' && side === 'Freilos' ? 'BYE' : ''}</strong>
+                                <strong>{match.score === 'W.O.' ? (winner ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : match.score === 'Freilos' && isByeSlot(side) ? 'BYE' : ''}</strong>
                               </BracketScoreCells>}
                             </div>
                           );
@@ -476,7 +477,7 @@ function StageCompetitionView({
                           <BracketStageHeader stages={scoreStages} />
                           {[match.sideA, match.sideB].map((side, sideIndex) => (
                             <div className={`${match.winner === side ? 'winner ' : ''}${!scoreSport && match.sets?.length ? 'bracket-set-row ' : ''}${scoreStages.length ? 'bracket-stage-row' : ''}`.trim()} key={`${match.id}-${sideIndex}`}>
-                              <span>{side}</span>
+                              <span>{displayMatchSlot(side)}</span>
                               {scoreStages.length ? <BracketStageValues stages={scoreStages} sideIndex={sideIndex as 0 | 1} onOpenResult={openBracketResult} /> : <BracketScoreCells onOpenResult={openBracketResult}>
                                 {!scoreSport && <BracketSetScores sets={match.sets ?? []} sideIndex={sideIndex as 0 | 1} />}
                                 <strong>{match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : ''}</strong>

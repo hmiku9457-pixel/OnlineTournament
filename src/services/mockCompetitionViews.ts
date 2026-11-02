@@ -1,3 +1,4 @@
+import { BYE_SLOT } from '@/domain/matchSlots';
 import { groupLetter } from '@/domain/groupLabels';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
@@ -187,7 +188,7 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
  *  Ein Name kann mehrfach vorkommen, wenn ein Spieler mehr als ein Freilos erhalten hat. */
 export function getSwissByeWinners(tournament: DemoTournament, stage: TournamentStage): string[] {
   return getMockStageBaseMatches(tournament, stage)
-    .filter((match) => match.autoWinner && match.sideB === 'Freilos')
+    .filter((match) => match.autoWinner && match.sideB === BYE_SLOT)
     .map((match) => match.autoWinner!);
 }
 
