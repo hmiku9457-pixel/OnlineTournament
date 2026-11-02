@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BYE_SLOT, PENDING_SLOT, decodeMatchSlot, displayMatchSlot, encodeMatchSlot } from '@/domain/matchSlots';
 import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
+import { buildPlannedTimeline } from '@/domain/tournamentSchedule';
+import { saveParticipantWithdrawal } from '@/services/mockWithdrawals';
 import { createMockTournament } from '@/services/mockTournamentStore';
 import { getBracketSlots } from '@/services/mockDrawStore';
 import { getMockStageBaseMatches, getMockStageMatches } from '@/services/mockRuntime';
-import { startFirstStage } from '@/services/mockPhaseLifecycle';
+import { startFirstStage, getStageStartIssue } from '@/services/mockPhaseLifecycle';
 
 const records = new Map<string, string>();
 beforeEach(() => {
@@ -78,5 +80,32 @@ describe('optional third place match is not part of creation estimate', () => {
       bestOf: 1, knockoutBestOf: [1, 1] }, 1, { minutesPerSet: 5 });
     expect(estimate.estimatedMatches).toBe(3);
     expect(estimate.estimatedDurationMinutes).toBe(15);
+  });
+});
+
+describe('post-creation plans remain valid after registration changes', () => {
+  it('refuses four Swiss rounds after the field shrinks from five to three', () => {
+    const t = createMockTournament({
+      name: 'Rundenlimit bei Absagen', sport: 'table_tennis', discipline: 'SINGLES',
+      tables: 2, minimumMatches: 1, participantNames: ['A', 'B', 'C', 'D', 'E'],
+      phases: [{ type: 'SWISS', label: 'Schweizer System', entrantCount: 5,
+        groupCount: 2, swissRounds: 4, bestOf: 1, knockoutBestOf: [] }],
+      estimatedDurationMinutes: 60,
+    });
+    saveParticipantWithdrawal(t, 'D');
+    saveParticipantWithdrawal(t, 'E');
+    expect(getStageStartIssue(t, t.stages[0])).toContain('höchstens 2');
+    expect(startFirstStage(t)).toBe(false);
+  });
+
+  it('does not shift a fixed calendar-day pause when the new forecast overruns it', () => {
+    const timeline = buildPlannedTimeline('2026-11-14T12:00', [
+      { label: 'Vorrunde', type: 'ROUND_ROBIN', estimatedMinutes: 90 },
+      { label: 'Mittagspause', type: 'BREAK', estimatedMinutes: 0,
+        breakKind: 'until', breakUntil: '13:00', breakUntilDate: '2026-11-14' },
+      { label: 'Endrunde', type: 'KNOCKOUT', estimatedMinutes: 30 },
+    ]);
+    expect(timeline.warnings.some((issue) => issue.message.includes('Pause bis'))).toBe(true);
+    expect(timeline.items.find((item) => item.id === 'phase-3')?.at).toBe('2026-11-14T13:30');
   });
 });
