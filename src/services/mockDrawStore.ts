@@ -1,4 +1,5 @@
 import { BYE_SLOT } from '@/domain/matchSlots';
+import { participantId, participantName, restoreMatchSlot, storeMatchSlot, type StoredMatchSlot } from '@/domain/participantIdentity';
 import { localTournamentStorage } from '@/services/localTournamentStorage';
 import { groupLetter } from '@/domain/groupLabels';
 import type { DemoTournament } from '@/data/demoTournaments';
@@ -8,7 +9,7 @@ import { isStageCompleted, getPreviousCompetitionStage } from '@/services/mockPh
 import { getPhaseLifecycle, getStageEntrants, isStageEditable } from '@/services/mockPhaseLifecycle';
 import { buildMockGroups, buildSwissStandings } from '@/services/mockCompetitionViews';
 import { recordMockAudit } from '@/services/mockAudit';
-import { persistStartedGroupCount } from '@/services/mockTournamentStore';
+import { getAllMockTournaments, persistStartedGroupCount } from '@/services/mockTournamentStore';
 
 const DRAW_KEY = 'online-tournament:mock-draw-config:v1';
 
@@ -21,11 +22,36 @@ interface StageDrawConfig {
   swissOrder?: string[];
 }
 
+/** Only IDs and typed slot objects are committed to the draw store.
+ * Read boundaries restore display names for the existing React components. */
+type StoredDrawConfig = Omit<StageDrawConfig, 'groupAssignments' | 'swissOrder' | 'bracketSlots'> & {
+  groupAssignments?: Record<string, number>;
+  swissOrder?: string[];
+  bracketSlots?: StoredMatchSlot[];
+};
+function participantsForDraws() {
+  return new Map(getAllMockTournaments().map((tournament) => [tournament.id, tournament]));
+}
 function readAll(): StageDrawConfig[] {
   if (typeof window === 'undefined') return [];
   try {
-    const parsed = JSON.parse(localTournamentStorage.getItem(DRAW_KEY) ?? '[]') as StageDrawConfig[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed = JSON.parse(localTournamentStorage.getItem(DRAW_KEY) ?? '[]') as StoredDrawConfig[];
+    if (!Array.isArray(parsed)) return [];
+    const tournaments = participantsForDraws();
+    return parsed.map((entry) => {
+      const tournament = tournaments.get(entry.tournamentId);
+      if (!tournament) return {
+        ...entry,
+        bracketSlots: entry.bracketSlots?.map((slot) => typeof slot === 'string' ? slot : restoreMatchSlot({ participantIds: {} } as DemoTournament, slot)),
+      };
+      return {
+        ...entry,
+        groupAssignments: entry.groupAssignments && Object.fromEntries(Object.entries(entry.groupAssignments)
+          .map(([id, group]) => [participantName(tournament, id), group])),
+        swissOrder: entry.swissOrder?.map((id) => participantName(tournament, id)),
+        bracketSlots: entry.bracketSlots?.map((slot) => restoreMatchSlot(tournament, slot)),
+      };
+    });
   } catch {
     return [];
   }
@@ -33,7 +59,18 @@ function readAll(): StageDrawConfig[] {
 
 function writeAll(configs: StageDrawConfig[]) {
   if (typeof window === 'undefined') return;
-  localTournamentStorage.setItem(DRAW_KEY, JSON.stringify(configs));
+  const tournaments = participantsForDraws();
+  const stored: StoredDrawConfig[] = configs.map((entry) => {
+    const tournament = tournaments.get(entry.tournamentId) ?? { participantIds: {} } as DemoTournament;
+    return {
+      ...entry,
+      groupAssignments: entry.groupAssignments && Object.fromEntries(Object.entries(entry.groupAssignments)
+        .map(([name, group]) => [participantId(tournament, name), group])),
+      swissOrder: entry.swissOrder?.map((name) => participantId(tournament, name)),
+      bracketSlots: entry.bracketSlots?.map((name) => storeMatchSlot(tournament, name)),
+    };
+  });
+  localTournamentStorage.setItem(DRAW_KEY, JSON.stringify(stored));
   window.dispatchEvent(new CustomEvent('mock-draw-change'));
 }
 
