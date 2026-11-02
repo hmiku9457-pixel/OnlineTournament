@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clearCreationDraft, CREATION_DRAFT_KEY, highestDraftSequence, loadCreationDraft, saveCreationDraft, type CreationDraft } from '@/domain/creationDraft';
+import { clearCreationDraft, CREATION_DRAFT_KEY, highestDraftSequence, loadCreationDraft, saveCreationDraft, validDraft, type CreationDraft } from '@/domain/creationDraft';
 import { resizeVenueLayout, createVenueLayout } from '@/domain/venueLayout';
 
 function makeDraft(): CreationDraft {
@@ -114,6 +114,21 @@ describe('tournament creation draft recovery', () => {
     (brokenForm.participantForm as unknown as Record<string, unknown>).teamName = {};
     store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft: brokenForm }));
     expect(loadCreationDraft(store)).toBeNull();
+  });
+
+  it('rejects type-coerced steps and duplicate participant/phase identities', () => {
+    const stringStep = makeDraft();
+    (stringStep as unknown as Record<string, unknown>).step = '2';
+    expect(validDraft(stringStep)).toBe(false);
+    const duplicateParticipant = makeDraft();
+    duplicateParticipant.participants[1].id = duplicateParticipant.participants[0].id;
+    expect(validDraft(duplicateParticipant)).toBe(false);
+    const duplicatePhase = makeDraft();
+    duplicatePhase.phaseDrafts.push({ ...duplicatePhase.phaseDrafts[0] });
+    expect(validDraft(duplicatePhase)).toBe(false);
+    const staleEditor = makeDraft();
+    staleEditor.editingParticipantId = 'unknown';
+    expect(validDraft(staleEditor)).toBe(false);
   });
 
   it('starts new internal identifiers after the highest restored identifier', () => {

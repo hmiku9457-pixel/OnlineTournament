@@ -108,6 +108,20 @@ describe('steuerbare Pause', () => {
     vi.useRealTimers();
   });
 
+  it('warns when overnight deadline is already past and accepts explicit replacement', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2030, 10, 7, 11, 0));
+      const t = approvedGroupsWithBreak();
+      t.stages[1].settings.breakKind = 'overnight';
+      t.stages[1].settings.nextDayDate = '2030-11-07';
+      t.stages[1].settings.nextDayStart = '09:30';
+      expect(startStage(t, t.stages[1])).toBe(false);
+      expect(startStage(t, t.stages[1], { kind: 'minutes', minutes: 15 })).toBe(true);
+      expect(getBreakResumeAt(t, t.stages[1])?.getTime()).toBe(new Date(2030, 10, 7, 11, 15).getTime());
+    } finally { vi.useRealTimers(); }
+  });
+
   it('berechnet eine präzise lokale Uhrzeit und lehnt vergangene feste Uhrzeiten ab', () => {
     const start = new Date(2026, 9, 31, 14, 5, 0);
     expect(computeBreakResumeAt(start, { kind: 'minutes', minutes: 25 })!.getTime() - start.getTime()).toBe(25 * 60000);

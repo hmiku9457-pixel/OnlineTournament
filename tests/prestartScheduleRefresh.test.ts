@@ -172,6 +172,20 @@ describe('prestart schedule consistency after roster and phase edits', () => {
     expect(removed.plannedSchedule?.find((item) => item.id === 'award-ceremony')?.at).toBe('2026-11-21T09:25');
   });
 
+  it('preserves a manually chosen ceremony and requires explicit correction after schedule grows', () => {
+    const t = sample(false, true);
+    const oldTime = t.plannedSchedule!.find((item) => item.id === 'award-ceremony')!.at;
+    const phases = initialPrestartPhases(t);
+    phases[0].bestOf = 7;
+    const refused = updatePrestartTournamentPhases(t.id, phases);
+    expect(refused.ok).toBe(false);
+    expect(refused.error).toContain('manuell');
+    expect(getMockTournament(t.id).plannedSchedule?.find((item) => item.id === 'award-ceremony')?.at).toBe(oldTime);
+    const shifted = updatePrestartTournamentPhases(t.id, phases, undefined, '2026-11-21T16:00');
+    expect(shifted.ok).toBe(true);
+    expect(getMockTournament(t.id).plannedSchedule?.find((item) => item.id === 'award-ceremony')?.at).toBe('2026-11-21T16:00');
+  });
+
   it('rejects impossible break-until settings before saving a modified phase plan', () => {
     const tournament = sample(true);
     const phases = initialPrestartPhases(tournament);

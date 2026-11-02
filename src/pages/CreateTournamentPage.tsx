@@ -629,7 +629,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     customTables, venueLayoutEnabled, venueLayout, venueLayoutCustomized, participants, participantForm,
     editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
-    knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
+    knockoutQualifierCount, preferredDurationMinutes, awardsEnabled,
+    awardsAtOverride: prestartManualCeremony ? prestartCeremonyAt : awardsAtOverride,
   }), [
     step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
     sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
@@ -637,6 +638,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
     knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
+    prestartCeremonyAt, prestartManualCeremony?.at,
   ]);
   useEffect(() => {
     if (prestart) return; // Never save a director's prestart edits as a new tournament draft.
