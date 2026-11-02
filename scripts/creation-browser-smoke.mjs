@@ -761,7 +761,7 @@ try {
   await multiPage.locator('.wizard-step').nth(2).click();
   assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägiges Turnier' }).isChecked(), true);
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
-  await multiPage.getByRole('radio', { name: 'Eintägiges Turnier' }).check();
+  await multiPage.getByRole('radio', { name: 'Eintägiges Turnier' }).click();
   const multiModeDialog = multiPage.getByRole('alertdialog', { name: 'Turniermodus wechseln?' });
   await multiModeDialog.waitFor();
   await multiModeDialog.getByRole('button', { name: 'Bisherigen Modus behalten' }).click();
