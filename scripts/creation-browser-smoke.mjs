@@ -67,6 +67,19 @@ try {
     await page.getByRole('button', { name: 'Spieler hinzufügen' }).click();
   }
   assert.equal(await page.locator('.participant-roster-row').count(), 4);
+  // Switching between saved participants must not silently discard edits.
+  await page.getByRole('button', { name: 'Ada Lovelace bearbeiten' }).click();
+  await page.locator('#participant-first').fill('Verändert');
+  await page.getByRole('button', { name: 'Grace Hopper bearbeiten' }).click();
+  const switchDialog = page.getByRole('dialog', { name: 'Ungespeicherte Teilnehmerdaten' });
+  await switchDialog.waitFor();
+  await switchDialog.getByRole('button', { name: 'Weiter bearbeiten' }).click();
+  assert.equal(await page.locator('#participant-first').inputValue(), 'Verändert');
+  await page.getByRole('button', { name: 'Grace Hopper bearbeiten' }).click();
+  await page.getByRole('dialog', { name: 'Ungespeicherte Teilnehmerdaten' })
+    .getByRole('button', { name: 'Eingaben verwerfen' }).click();
+  assert.equal(await page.locator('#participant-first').inputValue(), 'Grace');
+  await page.locator('.participant-editor-head-actions').getByRole('button', { name: 'Abbrechen' }).click();
   // Switching wizard steps with an uncommitted participant opens our styled
   // confirmation, without silently discarding the entry.
   await page.locator('#participant-first').fill('Unfertig');
@@ -242,6 +255,16 @@ try {
   await page2.locator('.calendar-picker-dialog select[aria-label="Monat"]').selectOption('10');
   await page2.locator('.calendar-picker-day').filter({ hasText: /^22$/ }).click();
   await page2.locator('#sport').selectOption('table_tennis');
+  // Custom numeric values are editable character by character, not clamped
+  // to 13 the moment an input is temporarily blank.
+  await page2.locator('.number-choice').first().getByRole('button', { name: 'Eigene' }).click();
+  const customTables = page2.locator('.number-choice').first().locator('.custom-number-input');
+  await customTables.fill('');
+  assert.equal(await customTables.inputValue(), '');
+  await customTables.pressSequentially('100');
+  assert.equal(await customTables.inputValue(), '100');
+  await customTables.blur();
+  assert.equal(await customTables.inputValue(), '100');
   await next(page2);
   await page2.locator('#participant-first').fill('Ada');
   await page2.locator('#participant-last').fill('Lovelace');
@@ -296,6 +319,24 @@ try {
       'pagination is accessible unless the entire roster fits on one page');
     if (layout.controlsReachable) await page2.getByRole('navigation', { name: 'Teilnehmerseiten' }).scrollIntoViewIfNeeded();
   }
+
+  // Real row heights must drive pagination, including unusually tall names.
+  await page2.setViewportSize({ width: 1280, height: 720 });
+  const beforeTall = await page2.locator('.participant-roster-row').count();
+  await page2.addStyleTag({ content: '.participant-roster-row:nth-child(2) { min-height: 220px !important; }' });
+  await page2.waitForFunction((initial) =>
+    (document.querySelectorAll('.participant-roster-row').length < initial), beforeTall);
+  assert.ok(await page2.locator('.participant-roster-row').count() < beforeTall,
+    'pagination reacts to the actual height of a tall rendered card');
+  // A sport change that reinterprets players as teams requires roster review.
+  await page2.locator('.wizard-step').first().click();
+  await page2.locator('#sport').selectOption('football');
+  await page2.getByRole('dialog', { name: 'Sportart wechseln?' })
+    .getByRole('button', { name: 'Sportart wechseln' }).click();
+  await page2.locator('.wizard-step').nth(1).click();
+  assert.equal(await page2.locator('.wizard-continue-button').isDisabled(), true);
+  await page2.getByRole('button', { name: 'Teilnehmerliste geprüft' }).click();
+  assert.equal(await page2.locator('.wizard-continue-button').isDisabled(), false);
   await context2.close();
 
   // Date/time restrictions and live "Jetzt" mode with a deterministic
@@ -380,6 +421,57 @@ try {
   assert.match(await page3.locator('.clock-picker-trigger-value').innerText(), /Jetzt · 12:36/,
     'banner action re-enables live current time and resolves the issue');
   await context3.close();
+
+  // Replacing a carefully configured recommendation requires explicit consent.
+  const recContext = await browser.newContext();
+  const recPage = await recContext.newPage();
+  await recPage.goto(base + '/#/tournaments/new');
+  await recPage.locator('#name').fill('Empfehlungswechsel');
+  await recPage.locator('#tournament-date').click();
+  await recPage.locator('.calendar-picker-dialog input[aria-label="Jahr"]').fill('2030');
+  await recPage.locator('.calendar-picker-dialog select[aria-label="Monat"]').selectOption('10');
+  await recPage.locator('.calendar-picker-day').filter({ hasText: /^24$/ }).click();
+  await recPage.locator('#sport').selectOption('table_tennis');
+  await next(recPage);
+  for (const [first, last] of [['Ada', 'Lovelace'], ['Grace', 'Hopper'], ['Alan', 'Turing'], ['Linus', 'Torvalds']]) {
+    await recPage.locator('#participant-first').fill(first);
+    await recPage.locator('#participant-last').fill(last);
+    await recPage.getByRole('button', { name: 'Spieler hinzufügen' }).click();
+  }
+  await next(recPage);
+  const options = recPage.locator('.recommendation-list .recommendation');
+  assert.ok(await options.count() >= 2);
+  await options.first().click();
+  await options.nth(1).click();
+  const replaceDialog = recPage.getByRole('alertdialog', { name: 'Phasenplanung ersetzen?' });
+  await replaceDialog.waitFor();
+  await replaceDialog.getByRole('button', { name: 'Bisherige Planung behalten' }).click();
+  assert.equal(await replaceDialog.count(), 0);
+  await options.nth(1).click();
+  await recPage.getByRole('alertdialog', { name: 'Phasenplanung ersetzen?' })
+    .getByRole('button', { name: 'Phasen durch Empfehlung ersetzen' }).click();
+  await next(recPage);
+  assert.ok(await recPage.locator('.phase-config').count() >= 1);
+  await recContext.close();
+
+  // A non-existent clock hour during the DST jump must explain the failure.
+  const dstContext = await browser.newContext({ timezoneId: 'Europe/Berlin' });
+  const dstPage = await dstContext.newPage();
+  await dstPage.clock.install({ time: new Date('2026-11-02T14:00:00+01:00') });
+  await dstPage.goto(base + '/#/tournaments/new');
+  await dstPage.locator('#name').fill('Zeitumstellung');
+  await dstPage.locator('#sport').selectOption('table_tennis');
+  await dstPage.locator('#tournament-date').click();
+  await dstPage.locator('.calendar-picker-dialog input[aria-label="Jahr"]').fill('2027');
+  await dstPage.locator('.calendar-picker-dialog select[aria-label="Monat"]').selectOption('2');
+  await dstPage.locator('.calendar-picker-day').filter({ hasText: /^28$/ }).click();
+  await dstPage.locator('#tournament-start-time').click();
+  await dstPage.locator('.clock-picker-manual input').first().fill('02');
+  await dstPage.locator('.clock-picker-manual input').nth(1).fill('30');
+  await dstPage.getByRole('button', { name: 'Übernehmen', exact: true }).click();
+  await dstPage.getByRole('alert', { name: '' }).filter({ hasText: /Zeitumstellung/ }).waitFor();
+  assert.equal(await dstPage.locator('.wizard-continue-button').isDisabled(), true);
+  await dstContext.close();
 
   // Discard confirmation must never erase the draft on cancel, backdrop or
   // Escape. Only the destructive modal button clears it and resets the wizard.
