@@ -7200,3 +7200,174 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 /* Daily accounting makes long tournament plans scannable at a glance. */
 .planned-schedule-day-metrics { display: flex; flex-wrap: wrap; gap: 6px 15px; padding: 10px 15px; border-bottom: 1px solid #e4e7ec; background: #f8fafc; color: #475467; font-size: .75rem; }
 .planned-schedule-day-metrics strong { color: #344054; }
+
+/* Creation wizard refinements — keep the step description close to the step cards. */
+.creation-page-container > .creation-page-head {
+  margin-bottom: 12px; /* half of the original 24 px */
+}
+
+/* Roster review must be distinguishable from ordinary instructional notes. */
+.wizard-workspace .participant-step .participant-review-warning {
+  border: 1px solid #f2bd64;
+  border-left: 4px solid #d97706;
+  background: #fffbeb;
+  color: #78350f;
+  margin-bottom: 0;
+}
+.wizard-workspace .participant-step .participant-review-warning strong { color: #78350f; }
+.wizard-workspace .participant-step .participant-review-warning p { color: #92400e; }
+.wizard-workspace .participant-step .participant-review-warning .btn {
+  border-color: #e9b55c;
+  background: #fff;
+  color: #854d0e;
+}
+.wizard-workspace .participant-step .participant-review-warning .btn:hover:not(:disabled) {
+  background: #fef3c7;
+}
+
+/* Pagination is directly below the roster header and occupies a stable row. */
+.wizard-workspace .participant-roster-grid-card > .creation-roster-pagination {
+  margin: 0;
+  min-height: 40px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #e5eaf2;
+  background: #fff;
+}
+.wizard-workspace .participant-roster-grid-card > .creation-roster-pagination > span {
+  min-width: 0;
+  color: #475467;
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+}
+.wizard-workspace .participant-roster-grid-card > .creation-roster-pagination .btn:disabled {
+  opacity: .42;
+}
+
+/* All single-player and team cards are half the height of a doubles card.
+ * The marquee moves horizontally; it never changes the card's dimensions. */
+.wizard-workspace .participant-step .participant-roster-multi .participant-roster-row.is-compact {
+  box-sizing: border-box;
+  height: 38px;
+  min-height: 38px;
+  max-height: 38px;
+  padding: 2px 7px;
+  grid-template-rows: minmax(0, 1fr);
+}
+.wizard-workspace .participant-step .participant-roster-multi .participant-roster-row.is-double {
+  box-sizing: border-box;
+  height: 76px;
+  min-height: 76px;
+  max-height: 76px;
+  padding: 5px 7px;
+  grid-template-rows: minmax(0, 1fr);
+}
+.wizard-workspace .participant-step .participant-roster-multi .participant-double-players {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+.wizard-workspace .participant-step .participant-roster-multi .participant-double-player {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  gap: 6px;
+}
+.wizard-workspace .participant-step .participant-roster-multi .participant-double-player .participant-name-marquee-viewport {
+  flex: 1 1 auto;
+}
+.wizard-workspace .participant-step .participant-player-number {
+  flex: 0 0 14px;
+  color: #667085;
+  font-size: .66rem;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.wizard-workspace .participant-step .participant-roster-multi .participant-roster-row .participant-list-name {
+  min-height: 0;
+}
+
+/* Step 3: recommendations follow a full-width settings band, not a sidebar. */
+.wizard-workspace .format-step .format-step-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 0;
+}
+.wizard-workspace .format-step .format-settings-panel {
+  position: static;
+  top: auto;
+  width: 100%;
+  display: grid;
+  gap: 12px;
+  container: format-settings / inline-size;
+}
+.wizard-workspace .format-step .format-settings-content {
+  display: grid;
+  grid-template-columns: minmax(210px, .95fr) minmax(0, 1.7fr) minmax(185px, .95fr);
+  gap: 12px 17px;
+  align-items: start;
+  min-width: 0;
+}
+.wizard-workspace .format-step .format-settings-content > * { min-width: 0; }
+.wizard-workspace .format-step .format-settings-content .tournament-mode-setting {
+  margin: 0;
+  padding: 10px;
+  align-self: stretch;
+}
+.wizard-workspace .format-step .format-settings-content .format-setting-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 0;
+}
+.wizard-workspace .format-step .format-settings-content .format-toggle-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  align-content: start;
+}
+.wizard-workspace .format-step .format-toggle-group legend { margin-bottom: 7px; }
+.wizard-workspace .format-step .format-settings-footnote {
+  margin: 0;
+  padding-top: 9px;
+}
+.wizard-workspace .format-step .recommendation-section-title {
+  margin: 0;
+  color: #162b4b;
+  font-size: 1rem;
+}
+.wizard-workspace .format-step .recommendation-select {
+  width: 100%;
+  min-width: 0;
+}
+@container format-settings (max-width: 900px) {
+  .wizard-workspace .format-step .format-settings-content {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.65fr);
+  }
+  .wizard-workspace .format-step .format-settings-content .format-toggle-group {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(4, minmax(0, max-content));
+    column-gap: 18px;
+  }
+}
+@container format-settings (max-width: 590px) {
+  .wizard-workspace .format-step .format-settings-content {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .wizard-workspace .format-step .format-settings-content .format-toggle-group {
+    grid-column: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container format-settings (max-width: 390px) {
+  .wizard-workspace .format-step .format-settings-content .format-setting-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
