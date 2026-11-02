@@ -7196,3 +7196,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 
 /* Keep the roster page controls reachable instead of introducing a nested scroll area. */
 .creation-roster-pagination { min-height: 40px; }
+
+/* Daily accounting makes long tournament plans scannable at a glance. */
+.planned-schedule-day-metrics { display: flex; flex-wrap: wrap; gap: 6px 15px; padding: 10px 15px; border-bottom: 1px solid #e4e7ec; background: #f8fafc; color: #475467; font-size: .75rem; }
+.planned-schedule-day-metrics strong { color: #344054; }
