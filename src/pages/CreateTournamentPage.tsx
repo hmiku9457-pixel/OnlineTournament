@@ -563,8 +563,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     if (step !== 2 || prestart) return;
     const updatePageSize = () => {
       const rect = rosterRef.current?.getBoundingClientRect();
-      const space = rect ? Math.max(200, window.innerHeight - Math.max(0, rect.top) - 135) : window.innerHeight - 270;
-      setRosterPageSize(Math.max(3, Math.min(24, Math.floor(space / 53))));
+      // Each rendered row may hold 1, 2, or 3 cards depending on the real
+      // available width. The page budget must count GRID ROWS, not entries.
+      const width = rect?.width ?? window.innerWidth;
+      const columns = width > 720 ? 3 : width > 460 ? 2 : 1;
+      const available = Math.max(44, window.innerHeight - Math.max(0, rect?.top ?? 0) - 155);
+      const rows = Math.max(1, Math.floor(available / 56));
+      setRosterPageSize(Math.max(1, Math.min(48, rows * columns)));
     };
     updatePageSize();
     window.addEventListener('resize', updatePageSize);

@@ -74,16 +74,16 @@ export function validDraft(value: unknown): value is CreationDraft {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const data = value as Partial<CreationDraft>;
   const allowedTypes = ['ROUND_ROBIN', 'GROUPS', 'SWISS', 'KNOCKOUT', 'BREAK'];
-  return Number.isInteger(Number(data.step)) && Number(data.step) >= 1 && Number(data.step) <= 5
-    && Number.isInteger(Number(data.maxReachedStep)) && Number(data.maxReachedStep) >= Number(data.step)
-    && Number(data.maxReachedStep) <= 5
+  return typeof data.step === 'number' && Number.isInteger(data.step) && data.step >= 1 && data.step <= 5
+    && typeof data.maxReachedStep === 'number' && Number.isInteger(data.maxReachedStep) && data.maxReachedStep >= data.step
+    && data.maxReachedStep <= 5
     && typeof data.name === 'string' && typeof data.scheduledDate === 'string'
     && typeof data.scheduledTime === 'string'
     && typeof data.useCurrentTime === 'boolean'
     && typeof data.sport === 'string'
     && ['SINGLES', 'DOUBLES', 'TEAMS'].includes(String(data.discipline))
     && typeof data.timedMatchMinutes === 'string' && typeof data.venueTurnoverMinutes === 'string'
-    && Number.isInteger(Number(data.tables)) && Number(data.tables) >= 1 && Number(data.tables) <= 9999
+    && typeof data.tables === 'number' && Number.isInteger(data.tables) && data.tables >= 1 && data.tables <= 9999
     && typeof data.customTables === 'boolean' && typeof data.venueLayoutEnabled === 'boolean'
     && (data.venueLayoutCustomized === undefined || typeof data.venueLayoutCustomized === 'boolean')
     && Boolean(data.venueLayout && Number.isInteger(data.venueLayout.columns)
@@ -96,12 +96,14 @@ export function validDraft(value: unknown): value is CreationDraft {
       && data.venueLayout.cells.every((cell) => typeof cell === 'string')
       && ['none', 'top', 'right', 'bottom', 'left'].includes(data.venueLayout.deskDock))
     && Array.isArray(data.participants) && data.participants.length <= 10000
+    && new Set(data.participants.map((entry) => entry?.id)).size === data.participants.length
     && data.participants.every((entry) => entry && typeof entry.id === 'string'
       && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
         .every((key) => typeof (entry as unknown as Record<string, unknown>)[key] === 'string')
       && (entry.teamName === undefined || typeof entry.teamName === 'string'))
     && (data.reviewRequiredPhaseIds === undefined || (Array.isArray(data.reviewRequiredPhaseIds) && data.reviewRequiredPhaseIds.every((id) => typeof id === 'string')))
     && Array.isArray(data.phaseDrafts) && data.phaseDrafts.length <= 80
+    && new Set(data.phaseDrafts.map((entry) => entry?.id)).size === data.phaseDrafts.length
     && data.phaseDrafts.every((entry) => entry && typeof entry.id === 'string'
       && allowedTypes.includes(entry.type) && Number.isInteger(entry.entrantCount)
       && Number.isInteger(entry.groupCount) && Number.isInteger(entry.swissRounds)
@@ -120,9 +122,10 @@ export function validDraft(value: unknown): value is CreationDraft {
     && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
       .every((key) => typeof (data.participantForm as unknown as Record<string, unknown>)[key] === 'string')
     && (data.participantForm.teamName === undefined || typeof data.participantForm.teamName === 'string')
-    && (data.editingParticipantId === null || typeof data.editingParticipantId === 'string')
+    && (data.editingParticipantId === null || (typeof data.editingParticipantId === 'string'
+      && data.participants.some((entry) => entry.id === data.editingParticipantId)))
     && typeof data.hasVisitedPhaseStep === 'boolean' && typeof data.customMinimumMatches === 'boolean'
-    && Number.isInteger(Number(data.minimumMatches)) && Number(data.minimumMatches) >= 1
+    && typeof data.minimumMatches === 'number' && Number.isInteger(data.minimumMatches) && data.minimumMatches >= 1
     && data.enabledSystems !== null && typeof data.enabledSystems === 'object'
     && ['round-robin', 'groups', 'swiss', 'knockout'].every((key) =>
       typeof (data.enabledSystems as unknown as Record<string, unknown>)[key] === 'boolean')

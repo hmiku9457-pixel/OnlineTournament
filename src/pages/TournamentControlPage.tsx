@@ -761,8 +761,7 @@ export function TournamentControlPage() {
     : pauseMode === 'clock' && !computeBreakResumeAt(new Date(), chosenPauseOptions)
       ? 'Der gewählte Pausentermin ist bereits vorbei oder ungültig. Bitte ein neues Datum und eine zukünftige Uhrzeit wählen oder eine Dauer in Minuten festlegen.'
       : null;
-  const pendingPauseIssue = pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind !== 'overnight'
-    ? pauseDecisionError : null;
+  const pendingPauseIssue = pendingStartStage?.type === 'BREAK' ? pauseDecisionError : null;
   const expiredInlineBreak = inlineBreakReady?.config.kind === 'until'
     && !computeBreakResumeAt(new Date(), { kind: 'clock',
       date: inlineBreakReady.config.untilDate, time: inlineBreakReady.config.until });
@@ -932,7 +931,7 @@ export function TournamentControlPage() {
   }
 
   function performStartNextPhase() {
-    const options: BreakStartOptions | undefined = nextStartableStage?.type === 'BREAK' && nextStartableStage.settings.breakKind !== 'overnight'
+    const options: BreakStartOptions | undefined = nextStartableStage?.type === 'BREAK'
       ? chosenPauseOptions : undefined;
     if (!nextStartableStage || !startStage(tournament, nextStartableStage, options)) {
       setAssignmentMessage(nextStartableStage ? getStageStartIssue(tournament, nextStartableStage) ?? 'Diese Phase kann derzeit nicht starten.' : 'Es ist keine startbare Phase vorhanden.');
@@ -1001,14 +1000,20 @@ export function TournamentControlPage() {
     if (nextStartableStage.type === 'BREAK') {
       const minutes = Number(nextStartableStage.settings.breakMinutes) || 15;
       setPauseMinutes(minutes);
-      const clockTarget = nextStartableStage.settings.breakKind === 'until';
-      setPauseMode(clockTarget ? 'clock' : 'minutes');
+      const isUntil = nextStartableStage.settings.breakKind === 'until';
+      const overnight = nextStartableStage.settings.breakKind === 'overnight';
+      setPauseMode(isUntil || overnight ? 'clock' : 'minutes');
       const future = new Date(Date.now() + minutes * 60000);
-      setPauseTime(clockTarget ? String(nextStartableStage.settings.breakUntil ?? '12:00')
-        : `${String(future.getHours()).padStart(2, '0')}:${String(future.getMinutes()).padStart(2, '0')}`);
-      setPauseDate(clockTarget
-        ? String(nextStartableStage.settings.breakUntilDate ?? '') || toLocalDateTime(new Date()).slice(0, 10)
-        : toLocalDateTime(future).slice(0, 10));
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setPauseTime(overnight
+        ? String(nextStartableStage.settings.nextDayStart ?? '09:00')
+        : isUntil ? String(nextStartableStage.settings.breakUntil ?? '12:00')
+          : `${String(future.getHours()).padStart(2, '0')}:${String(future.getMinutes()).padStart(2, '0')}`);
+      setPauseDate(overnight
+        ? String(nextStartableStage.settings.nextDayDate ?? '') || toLocalDateTime(tomorrow).slice(0, 10)
+        : isUntil ? String(nextStartableStage.settings.breakUntilDate ?? '') || toLocalDateTime(new Date()).slice(0, 10)
+          : toLocalDateTime(future).slice(0, 10));
     }
     setStartModal({ kind: 'phase', stageName: nextStartableStage.name });
   }
@@ -2034,10 +2039,11 @@ export function TournamentControlPage() {
             <h2>{startModal.kind === 'tournament' ? 'Turnier starten?' : 'Nächste Phase starten?'}</h2>
             <p>„{startModal.stageName}“ wird gestartet. Die aktuelle Auslosung bzw. Setzung dieser Phase wird damit eingefroren.</p>
             <p className="muted">Nach dem Start können die Platzierungen dieser Phase nicht mehr per Drag & Drop verändert werden.</p>
-            {pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind !== 'overnight' && (
+            {pendingStartStage?.type === 'BREAK' && (
               <div className="break-start-settings">
                 <strong>Wann soll die Pause enden?</strong>
                 {pendingStartStage.settings.breakKind === 'until' && <p className="muted">Vorgabe aus der Turnierplanung: Pause bis {String(pendingStartStage.settings.breakUntilDate ?? 'geplanter Turniertag')} um {String(pendingStartStage.settings.breakUntil ?? '12:00')} Uhr.</p>}
+                {pendingStartStage.settings.breakKind === 'overnight' && <p className="muted">Vorgabe für den nächsten Spieltag: {String(pendingStartStage.settings.nextDayDate ?? 'Folgetag')} um {String(pendingStartStage.settings.nextDayStart ?? '09:00')} Uhr. Ist dieses Datum bereits verstrichen, bitte bewusst neu festlegen.</p>}
                 <div className="actions" role="group" aria-label="Pausenplanung">
                   <button className={pauseMode === 'minutes' ? 'btn small primary' : 'btn small'} type="button" aria-pressed={pauseMode === 'minutes'} onClick={() => setPauseMode('minutes')}>Dauer in Minuten</button>
                   <button className={pauseMode === 'clock' ? 'btn small primary' : 'btn small'} type="button" aria-pressed={pauseMode === 'clock'} onClick={() => setPauseMode('clock')}>Uhrzeit wählen</button>
@@ -2048,7 +2054,6 @@ export function TournamentControlPage() {
                 <p className="muted">{pauseMode === 'clock' ? 'Datum und Uhrzeit werden gemeinsam geprüft. Verstrichene Termine werden nicht automatisch auf morgen verschoben.' : 'Die Zeit läuft ab dem tatsächlichen Start der Pause.'}</p>
               </div>
             )}
-            {pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind === 'overnight' && <p className="muted">Der nächste Spieltag beginnt planmäßig {pendingStartStage.settings.nextDayDate ? `am ${pendingStartStage.settings.nextDayDate}` : 'am Folgetag'} um {pendingStartStage.settings.nextDayStart} Uhr.</p>}
             {firstPhaseRecommendationWarning && startModal.kind === 'tournament' && <p className="break-prestart-warning" role="status">Hinweis zur ersten Phase: {firstPhaseRecommendationWarning} Bitte prüfe vor dem Start die Phaseneinstellungen. Ein erneutes Bestätigen der Phasenplanung ist für gültige Konstellationen nicht erforderlich.</p>}
             {pendingPauseIssue && <p className="field-error" role="alert">{pendingPauseIssue}</p>}
             {pendingStartIssue && <p className="field-error" role="alert">{pendingStartIssue}</p>}

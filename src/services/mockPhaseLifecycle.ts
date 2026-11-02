@@ -5,7 +5,7 @@ import type { TournamentStage } from '@/domain/types';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { getGroupAssignments, compactStartedGroupAssignments } from '@/services/mockDrawStore';
 import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
-import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
+import { estimatePhaseMetrics, isValidSwissRoundCount } from '@/domain/tournamentCreation';
 import { planningMinutesPerSet } from '@/domain/sports';
 import { sportScoring } from '@/domain/sportScoring';
 
@@ -138,6 +138,11 @@ export function isStageLockedWaiting(tournament: DemoTournament, stage: Tourname
 export function getStageStartIssue(tournament: DemoTournament, stage: TournamentStage): string | null {
   const entrants = getStageEntrants(tournament, stage);
   if (entrants.length < 2) return 'Zum Starten müssen mindestens zwei aktive Teilnehmer vorhanden sein. Bitte Teilnehmer oder Phasenplanung prüfen; andernfalls kann das Turnier abgebrochen werden.';
+  if (stage.type === 'SWISS' && !isValidSwissRoundCount(Number(stage.settings.rounds), entrants.length)) {
+    return entrants.length < 3
+      ? 'Für das Schweizer System müssen mindestens drei aktive Teilnehmer vorhanden sein.'
+      : `Bei ${entrants.length} aktiven Teilnehmern sind höchstens ${entrants.length - 1} Schweizer Runden zulässig. Bitte die Phasenplanung vor dem Start korrigieren.`;
+  }
   if (stage.type === 'GROUPS') {
     const assignments = getGroupAssignments(tournament, stage);
     const counts = Array<number>(Math.max(1, Number(stage.settings.groups) || 1)).fill(0);
@@ -192,7 +197,8 @@ function computeDayEndResumeAt(start: Date, dateText: string, timeText: string):
     if (resume.getFullYear() !== Number(day[1]) || resume.getMonth() !== Number(day[2]) - 1 || resume.getDate() !== Number(day[3])) return null;
   } else resume.setDate(resume.getDate() + 1);
   resume.setHours(Number(time[1]), Number(time[2]), 0, 0);
-  return resume <= start ? new Date(start) : resume;
+  // A missed day-end deadline requires an explicit director decision.
+  return resume <= start ? null : resume;
 }
 
 export function startStage(tournament: DemoTournament, stage: TournamentStage, pauseOptions?: BreakStartOptions) {

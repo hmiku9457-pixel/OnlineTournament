@@ -7154,3 +7154,6 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   max-height: none;
   overscroll-behavior: auto;
 }
+
+/* Keep the roster page controls reachable instead of introducing a nested scroll area. */
+.creation-roster-pagination { min-height: 40px; }
