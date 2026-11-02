@@ -135,6 +135,14 @@ function validTournament(raw: string, id: string): boolean {
       && !!t && t.id === id && typeof t.name === 'string' && t.name.trim().length > 0
       && typeof t.tables === 'number' && Number.isInteger(t.tables) && t.tables >= 1
       && Array.isArray(t.participantNames) && t.participantNames.every((name) => typeof name === 'string')
+      && !!t.participantIds && typeof t.participantIds === 'object' && !Array.isArray(t.participantIds)
+      && Object.keys(t.participantIds).length === t.participantNames.length
+      && t.participantNames.every((name: string) => {
+        const participantId = (t.participantIds as Record<string, unknown>)[name];
+        return typeof participantId === 'string' && participantId.length > 0;
+      })
+      && new Set(Object.values(t.participantIds)).size === t.participantNames.length
+      && new Set(t.participantNames).size === t.participantNames.length
       && Array.isArray(t.stages) && t.stages.every((stage: unknown) =>
         Boolean(stage && typeof stage === 'object' && typeof (stage as { id?: unknown }).id === 'string'));
   } catch { return false; }
@@ -170,6 +178,47 @@ function inspectSnapshot(entries: StoredValue[]): { valid: StoredValue[]; corrup
     if (key.startsWith(RECORD_PREFIX) && !good.includes(key.slice(RECORD_PREFIX.length))) {
       quarantineKey(key, 'Turnierdatensatz ohne gültigen Indexeintrag.');
     }
+  }
+  // Validate current draw storage without accepting name-string slots.
+  // A malformed draw is isolated; other tournaments remain available.
+  const knownIds = new Map<string, Set<string>>();
+  for (const id of good) {
+    try {
+      const record = JSON.parse(data.get(RECORD_PREFIX + id)!) as {
+        tournament: { participantIds: Record<string, string> };
+      };
+      knownIds.set(id, new Set(Object.values(record.tournament.participantIds)));
+    } catch { /* The tournament validator already handled this record. */ }
+  }
+  const drawKey = 'online-tournament:mock-draw-config:v1';
+  const drawRaw = data.get(drawKey);
+  if (drawRaw) {
+    try {
+      const configs: unknown = JSON.parse(drawRaw);
+      const valid = Array.isArray(configs) && configs.every((value) => {
+        if (!value || typeof value !== 'object') return false;
+        const entry = value as { tournamentId?: unknown; groupAssignments?: unknown; swissOrder?: unknown; bracketSlots?: unknown };
+        if (typeof entry.tournamentId !== 'string') return false;
+        const ids = knownIds.get(entry.tournamentId);
+        if (!ids) return false;
+        if (entry.groupAssignments !== undefined && (!entry.groupAssignments
+          || typeof entry.groupAssignments !== 'object' || Array.isArray(entry.groupAssignments)
+          || !Object.entries(entry.groupAssignments).every(([id, group]) =>
+            ids.has(id) && Number.isInteger(group) && (group as number) >= 0))) return false;
+        if (entry.swissOrder !== undefined && (!Array.isArray(entry.swissOrder)
+          || entry.swissOrder.some((id: unknown) => typeof id !== 'string' || !ids.has(id)))) return false;
+        if (entry.bracketSlots !== undefined && (!Array.isArray(entry.bracketSlots)
+          || !entry.bracketSlots.every((slot: unknown) => {
+            if (!slot || typeof slot !== 'object' || Array.isArray(slot)) return false;
+            const typed = slot as { kind?: unknown; participantId?: unknown };
+            return typed.kind === 'participant'
+              ? typeof typed.participantId === 'string' && ids.has(typed.participantId)
+              : ['bye', 'pending', 'unclaimed'].includes(String(typed.kind));
+          }))) return false;
+        return true;
+      });
+      if (!valid) quarantineKey(drawKey, 'Auslosungsdatensatz mit ungültigen Teilnehmer-IDs oder KO-Plätzen.');
+    } catch { quarantineKey(drawKey, 'Beschädigter Auslosungsdatensatz.'); }
   }
   for (const key of ARRAY_KEYS) {
     const raw = data.get(key);
