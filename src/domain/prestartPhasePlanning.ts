@@ -1,3 +1,4 @@
+import { parseSavedPlayingDayBreaks } from './playingDays';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { StageType } from '@/domain/types';
 import {
@@ -62,7 +63,7 @@ export function initialPrestartPhases(tournament: DemoTournament): PrestartPhase
     inlineBreakMinutes: Number(stage.settings.inlineBreakMinutes) || 15,
     inlineBreakUntil: String(stage.settings.inlineBreakUntil ?? '13:00'),
     inlineBreakUntilDate: String(stage.settings.inlineBreakUntilDate ?? ''),
-    dayBreaks: Array.isArray(stage.settings.dayBreaks) ? stage.settings.dayBreaks as import('./playingDays').PlayingDayBreak[] : [],
+    dayBreaks: parseSavedPlayingDayBreaks(stage.settings.dayBreaks),
   }));
 }
 
