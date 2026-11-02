@@ -399,10 +399,7 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
       label: phase.label, note: phase.type === 'BREAK' ? phase.note : undefined,
       type: phase.type, estimatedMinutes: minutes[index],
       breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
-      breakUntil: phase.breakUntil,
-      breakUntilDate: tournament.stages.find((saved) => saved.id === phase.id)?.settings.breakUntilDate
-        ? String(tournament.stages.find((saved) => saved.id === phase.id)!.settings.breakUntilDate)
-        : undefined,
+      breakUntil: phase.breakUntil, breakUntilDate: phase.breakUntilDate || undefined,
       nextDayStart: phase.nextDayStart,
       nextDayDate: phase.nextDayDate,
       roundCount: phase.type === 'SWISS' ? phase.swissRounds
@@ -413,9 +410,7 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
       inlineBreakAfterRound: phase.inlineBreakAfterRound,
       inlineBreakKind: phase.inlineBreakKind,
       inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
-      inlineBreakUntilDate: tournament.stages.find((saved) => saved.id === phase.id)?.settings.inlineBreakUntilDate
-        ? String(tournament.stages.find((saved) => saved.id === phase.id)!.settings.inlineBreakUntilDate)
-        : undefined,
+      inlineBreakUntilDate: phase.inlineBreakUntilDate || undefined,
     })));
     const playing = minutes.reduce((total, value, index) => total + (stages[index].type === 'BREAK' ? 0 : value), 0);
     return { timeline, duration: playing + plannedActiveBreakMinutes(timeline) };
@@ -478,6 +473,21 @@ export function getPrestartScheduleIssues(tournament: DemoTournament): string[] 
   return recalculatedPrestartPlan(tournament, phases)?.timeline.warnings.map((warning) => warning.message) ?? [];
 }
 
+/** Current calculated forecast, including conflicts, without overwriting the
+ * last confirmed public timetable. A warning means this is unconfirmed. */
+export function getPrestartScheduleProjection(tournament: DemoTournament): {
+  estimatedEnd: string; issues: string[];
+} | null {
+  if (tournament.hasStarted) return null;
+  const activeCount = getRuntimeParticipantNames(tournament)
+    .filter((name) => !isParticipantWithdrawn(tournament, name)).length;
+  if (activeCount < 2) return null;
+  const phases = normalizePrestartPhases(initialPrestartPhases(tournament), activeCount);
+  const projection = recalculatedPrestartPlan(tournament, phases);
+  return projection ? { estimatedEnd: projection.timeline.estimatedEnd,
+    issues: projection.timeline.warnings.map((warning) => warning.message) } : null;
+}
+
 /** Reconfigure a local tournament only until its very first start.
  * Active participants are computed again at save-time to reject stale edits.
  * Draws and lifecycle snapshots are discarded, but registration/codes/withdrawals
@@ -495,7 +505,7 @@ export function prestartPlanningFingerprint(tournament: DemoTournament): string 
   } catch { /* Leave malformed draws out of the stamp; writes still validate. */ }
   const roster = getRuntimeParticipantNames(tournament);
   const active = roster.filter((name) => !isParticipantWithdrawn(tournament, name));
-  return JSON.stringify([tournament.stages, roster, active, draws]);
+  return JSON.stringify([tournament.stages, tournament.plannedSchedule ?? [], tournament.participantIds ?? {}, roster, active, draws]);
 }
 
 /** Compare only sporting settings. Cosmetic/generated stage IDs do not
@@ -514,11 +524,13 @@ function samePrestartPlan(tournament: DemoTournament, drafts: PrestartPhaseDraft
     nextDayStart: phase.type === 'BREAK' && phase.breakKind === 'overnight' ? phase.nextDayStart : null,
     nextDayDate: phase.type === 'BREAK' && phase.breakKind === 'overnight' ? phase.nextDayDate ?? '' : null,
     breakUntil: phase.type === 'BREAK' && phase.breakKind === 'until' ? phase.breakUntil : null,
+    breakUntilDate: phase.type === 'BREAK' && phase.breakKind === 'until' ? phase.breakUntilDate : null,
     note: phase.type === 'BREAK' ? phase.note : null,
     inlineBreakAfterRound: phase.type === 'SWISS' || phase.type === 'KNOCKOUT' ? phase.inlineBreakAfterRound : null,
     inlineBreakKind: phase.inlineBreakAfterRound ? phase.inlineBreakKind : null,
     inlineBreakMinutes: phase.inlineBreakAfterRound && phase.inlineBreakKind === 'minutes' ? phase.inlineBreakMinutes : null,
     inlineBreakUntil: phase.inlineBreakAfterRound && phase.inlineBreakKind === 'until' ? phase.inlineBreakUntil : null,
+    inlineBreakUntilDate: phase.inlineBreakAfterRound && phase.inlineBreakKind === 'until' ? phase.inlineBreakUntilDate : null,
   });
   return before.every((phase, index) => canonical(phase) === canonical(drafts[index]));
 }
@@ -592,7 +604,8 @@ export function updatePrestartTournamentPhases(
   if (expectedFingerprint !== undefined && expectedFingerprint !== prestartPlanningFingerprint(previous)) {
     return { ok: false, error: 'Die Turnierplanung, die Teilnehmer oder die Auslosung wurden in einem anderen Tab geändert. Bitte die aktuelle Planung neu öffnen und deine Änderungen überprüfen.' };
   }
-  if (samePrestartPlan(previous, drafts) && manuallyConfirmedCeremonyAt === undefined)
+  const sportingPhasesChanged = !samePrestartPlan(previous, drafts);
+  if (!sportingPhasesChanged && manuallyConfirmedCeremonyAt === undefined)
     return { ok: true, tournament: previous, unchanged: true };
 
   const active = getRuntimeParticipantNames(previous).filter((name) => !isParticipantWithdrawn(previous, name));
@@ -616,16 +629,32 @@ export function updatePrestartTournamentPhases(
     if (scheduleIssues.length) return { ok: false, error: scheduleIssues[0] };
   }
 
+  // A ceremony-only update must never replace stage identities or erase
+  // pre-start group/bracket draws. Only the itinerary is changed.
+  if (!sportingPhasesChanged && newPlan) {
+    const updated: DemoTournament = { ...previous, plannedSchedule: newPlan.plannedSchedule,
+      lastUpdate: 'gerade eben' };
+    try {
+      writeLocalTournaments(all.map((item) => item.id === tournamentId ? updated : item));
+      recordMockAudit({ tournamentId, actor: 'Turnierleitung (lokal)', action: 'PRESTART_CEREMONY_CHANGED',
+        description: 'Zeitpunkt der Siegerehrung manuell angepasst; Auslosung und Phasen unverändert.' });
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Siegerehrung konnte nicht gespeichert werden.' };
+    }
+    window.dispatchEvent(new CustomEvent('mock-runtime-change'));
+    return { ok: true, tournament: updated };
+  }
+
   const phases: MockPhaseInput[] = drafts.map((phase, index) => ({
     type: phase.type, label: phase.label.trim(), entrantCount: phase.entrantCount,
     groupCount: phase.groupCount, swissRounds: phase.swissRounds,
     bestOf: phase.bestOf, knockoutBestOf: [...phase.knockoutBestOf],
     breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
     nextDayStart: phase.nextDayStart, nextDayDate: phase.nextDayDate, breakUntil: phase.breakUntil,
-    breakUntilDate: newPlan?.timeline.items.find((item) => item.id === `phase-${index + 1}`)?.at.slice(0, 10),
+    breakUntilDate: phase.breakUntilDate || newPlan?.timeline.items.find((item) => item.id === `phase-${index + 1}`)?.at.slice(0, 10),
     note: phase.note, inlineBreakAfterRound: phase.inlineBreakAfterRound, inlineBreakKind: phase.inlineBreakKind,
     inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
-    inlineBreakUntilDate: newPlan?.timeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at.slice(0, 10),
+    inlineBreakUntilDate: phase.inlineBreakUntilDate || newPlan?.timeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at.slice(0, 10),
   }));
   const stages = phases.map((phase, index) => {
     const nextPlaying = phases.slice(index + 1).find((item) => item.type !== 'BREAK');
