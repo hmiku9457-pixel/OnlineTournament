@@ -2142,6 +2142,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     <div className="recommendation-metrics">
                       <span className="recommendation-metric-tag">{item.estimatedMatches} Spiele</span>
                       <span className="recommendation-metric-tag">ca. {formatDuration(item.estimatedDurationMinutes)}</span>
+                      {tournamentMode === 'multi' && <span className="recommendation-metric-tag">
+                        {suggestDaySplit(item.phases.map((phase) => ({
+                          ...phase, entrantCount: phase.entrantCount ?? participantCount,
+                        })), plannedDays).possible
+                          ? `${plannedDays} Rundentagesabschnitte möglich · Uhrzeiten in Schritt 4 prüfen`
+                          : 'Zu wenige teilbare Runden für diese Anzahl Spieltage'}
+                      </span>}
                       <span className={`recommendation-metric-tag ${item.minimumMatchShortfall ? 'wizard-metric-warning' : ''}`}>
                         mindestens {item.minimumGuaranteedMatches} gespielte Begegnungen
                       </span>
