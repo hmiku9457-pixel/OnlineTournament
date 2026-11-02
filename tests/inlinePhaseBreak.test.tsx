@@ -135,7 +135,9 @@ describe('Zwischenpause innerhalb einer Wettkampfphase', () => {
     expect(blocksInlineBreakRound(t,stage,next!.id)).toBe(true);
     expect(getMockAssignmentBlockReason(t,next!.id,'Tisch 1')).toContain('Zwischenpause');
     expect(getInlineBreakStatus(t,stage,getMockStageMatches(t,stage))?.state).toBe('ready');
-    expect(startInlineBreak(t,stage,getMockStageMatches(t,stage))).toBe(true);
+    // The previously fixed 13:00 deadline may have passed on the test host.
+    // The director intentionally chooses a new duration in that case.
+    expect(startInlineBreak(t,stage,getMockStageMatches(t,stage), { kind: 'minutes', minutes: 15 })).toBe(true);
     expect(finishInlineBreak(t,stage,true)).toBe(true);
     expect(blocksInlineBreakRound(t,stage,next!.id)).toBe(false);
     expect(getMockAssignmentBlockReason(t,next!.id,'Tisch 1')).toBeNull();
