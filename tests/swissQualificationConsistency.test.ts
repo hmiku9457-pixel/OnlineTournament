@@ -1,3 +1,4 @@
+import { BYE_SLOT } from '@/domain/matchSlots';
 import { approveMockProgress } from '@/services/mockRuntime';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { rankStandings } from '@/domain/standingRankings';
@@ -70,7 +71,7 @@ describe('Schweizer Qualifikation folgt exakt der sichtbaren Tabelle', () => {
     }
 
     expect(isStageCompleted(tournament, swiss)).toBe(true);
-    const allByes = getMockStageBaseMatches(tournament, swiss).filter((match) => match.sideB === 'Freilos');
+    const allByes = getMockStageBaseMatches(tournament, swiss).filter((match) => match.sideB === BYE_SLOT);
     expect(allByes).toHaveLength(5);
     const byeWinners = getSwissByeWinners(tournament, swiss);
     expect(byeWinners).toEqual(allByes.map((match) => match.autoWinner));

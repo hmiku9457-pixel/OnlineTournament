@@ -1,3 +1,4 @@
+import { BYE_SLOT } from '@/domain/matchSlots';
 import { describe, expect, it } from 'vitest';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
@@ -62,7 +63,7 @@ describe('knockout runtime', () => {
     const tournament = tournamentWith(stage, 12);
     const slots = getBracketSlots(tournament, stage);
     const byeMatchIndexes = Array.from({ length: slots.length / 2 }, (_, matchIndex) => matchIndex)
-      .filter((matchIndex) => slots[matchIndex * 2] === 'Freilos' || slots[matchIndex * 2 + 1] === 'Freilos');
+      .filter((matchIndex) => slots[matchIndex * 2] === BYE_SLOT || slots[matchIndex * 2 + 1] === BYE_SLOT);
 
     expect(byeMatchIndexes).toHaveLength(4);
     expect(new Set(byeMatchIndexes.map((matchIndex) => Math.floor(matchIndex / 2))).size).toBe(4);

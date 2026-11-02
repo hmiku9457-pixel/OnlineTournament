@@ -27,7 +27,7 @@ export function snakeSeededGroupOrder(rankedGroups: readonly (readonly string[])
  * Conventional bracket positions (1 vs N, 2 vs N-1 in opposite halves).
  * Non-power-of-two fields give first-round byes to seeds 1, 2, ... in order.
  */
-export function seededKnockoutSlots(rankOrderedPlayers: readonly string[]): string[] {
+export function seededKnockoutSlots(rankOrderedPlayers: readonly string[], byeToken = 'Freilos'): string[] {
   if (rankOrderedPlayers.length < 2) return [];
   let bracketSize = 2;
   while (bracketSize < rankOrderedPlayers.length) bracketSize *= 2;
@@ -36,7 +36,7 @@ export function seededKnockoutSlots(rankOrderedPlayers: readonly string[]): stri
     const nextSize = seeds.length * 2;
     seeds = seeds.flatMap((seed) => [seed, nextSize + 1 - seed]);
   }
-  return seeds.map((seed) => rankOrderedPlayers[seed - 1] ?? 'Freilos');
+  return seeds.map((seed) => rankOrderedPlayers[seed - 1] ?? byeToken);
 }
 
 
@@ -56,19 +56,19 @@ export function seededGroupAssignments(rankOrderedPlayers: readonly string[], gr
  * qualifier bracket, group winners/runners can be split across opposite halves.
  */
 export function seededKnockoutSlotsAvoidingGroups(
-  rankOrderedPlayers: readonly string[], groupByPlayer: Readonly<Record<string, string>>,
+  rankOrderedPlayers: readonly string[], groupByPlayer: Readonly<Record<string, string>>, byeToken = 'Freilos',
 ): string[] {
-  const original = seededKnockoutSlots(rankOrderedPlayers);
+  const original = seededKnockoutSlots(rankOrderedPlayers, byeToken);
   if (original.length < 4 || !rankOrderedPlayers.some((player) => groupByPlayer[player])) return original;
   const byes = new Set<string>();
   for (let i = 0; i < original.length; i += 2) {
-    if (original[i] === 'Freilos') byes.add(original[i + 1]);
-    if (original[i + 1] === 'Freilos') byes.add(original[i]);
+    if (original[i] === byeToken) byes.add(original[i + 1]);
+    if (original[i + 1] === byeToken) byes.add(original[i]);
   }
   // Keep seeds 1-2, the highest available seeds and all bye recipients fixed.
   const anchors = new Set(rankOrderedPlayers.slice(0, Math.min(4, rankOrderedPlayers.length)));
   for (const player of byes) anchors.add(player);
-  const movable = original.map((player, index) => player !== 'Freilos' && !anchors.has(player) ? index : -1).filter((index) => index >= 0);
+  const movable = original.map((player, index) => player !== byeToken && !anchors.has(player) ? index : -1).filter((index) => index >= 0);
   if (movable.length < 2) return original;
   const current = [...original];
   const roundCount = Math.log2(current.length);
@@ -91,7 +91,7 @@ export function seededKnockoutSlotsAvoidingGroups(
     }
     // Prefer conventional seeding when two allocations separate group mates equally well.
     for (const [player,index] of pos) {
-      if (player !== 'Freilos') penalty += Math.abs(index - (originalPositions.get(player) ?? index)) / 100;
+      if (player !== byeToken) penalty += Math.abs(index - (originalPositions.get(player) ?? index)) / 100;
     }
     return penalty;
   };

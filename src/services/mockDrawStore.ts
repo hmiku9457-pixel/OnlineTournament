@@ -276,8 +276,8 @@ export function applySeededBracketSlots(tournament: DemoTournament, stage: Tourn
     }));
   }
   const slots = previous.type === 'GROUPS'
-    ? seededKnockoutSlotsAvoidingGroups(entrants, groupByPlayer)
-    : seededKnockoutSlots(entrants);
+    ? seededKnockoutSlotsAvoidingGroups(entrants, groupByPlayer, BYE_SLOT)
+    : seededKnockoutSlots(entrants, BYE_SLOT);
   if (!validBracketConstraints(entrants, slots)) return false;
   // An explicit re-seeding supersedes old manual positions and pins.
   upsert({ ...findConfig(tournament.id, stage.id), tournamentId: tournament.id, stageId: stage.id, bracketSlots: slots, pinnedBracketSlots: [] });

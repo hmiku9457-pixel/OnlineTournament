@@ -1,3 +1,4 @@
+import { PENDING_SLOT } from '@/domain/matchSlots';
 import { getPendingGroupCutoff, resolveGroupCutoff } from '@/services/mockRuntime';
 import { approveMockProgress } from '@/services/mockRuntime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -72,7 +73,7 @@ describe('Teilnehmerstatus und K.-o.-Spiel um Platz 3', () => {
     const stage = tournament.stages[0];
     expect(startFirstStage(tournament)).toBe(true);
     updateMockTournamentStatus(tournament.id, 'RUNNING');
-    expect(getMockStageBaseMatches(tournament, stage).find((match) => match.id.endsWith('-third-place'))?.sideA).toBe('TBD');
+    expect(getMockStageBaseMatches(tournament, stage).find((match) => match.id.endsWith('-third-place'))?.sideA).toBe(PENDING_SLOT;
     const semis = getMockStageMatches(tournament, stage).filter((match) => match.round === 'Halbfinale');
     expect(semis).toHaveLength(2);
     for (const match of semis) completeMockMatch(match.id, [{ number: 1, sideAScore: 11, sideBScore: 7 }]);

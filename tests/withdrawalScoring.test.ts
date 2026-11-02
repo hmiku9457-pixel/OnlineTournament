@@ -1,3 +1,4 @@
+import { UNCLAIMED_WINNER } from '@/domain/matchSlots';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getWithdrawalAwardSets } from '@/domain/withdrawalScoring';
 import { buildMockGroups } from '@/services/mockCompetitionViews';
@@ -87,6 +88,6 @@ describe('Sportabhängige kampflose Wertungen', () => {
       [item.sideA, item.sideB].includes('Anna') && [item.sideA, item.sideB].includes('Ben'));
     expect(match).toBeDefined();
     expect(match?.score).toBe('W.O.');
-    expect(getMockStoredResult(match!.id)).toMatchObject({ forcedWinner: 'Freilos', sets: [], status: 'FINISHED' });
+    expect(getMockStoredResult(match!.id)).toMatchObject({ forcedWinner: UNCLAIMED_WINNER, sets: [], status: 'FINISHED' });
   });
 });
