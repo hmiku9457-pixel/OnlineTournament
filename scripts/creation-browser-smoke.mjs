@@ -345,7 +345,7 @@ try {
       'back navigation returns to the actual previous first item');
   }
   while (await nextRoster.isEnabled()) await nextRoster.click();
-  await page2.locator('.participant-name-marquee.is-running').waitFor();
+  await page2.locator('.participant-name-marquee.is-running').first().waitFor();
   const longCard = page2.locator('.participant-roster-row').filter({ hasText: 'AlexanderAlexander' }).first();
   assert.equal(await longCard.evaluate((card) => getComputedStyle(card).height), '76px');
   assert.equal(await longCard.locator('.participant-name-marquee strong').first().evaluate((el) =>
