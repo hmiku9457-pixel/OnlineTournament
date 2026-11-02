@@ -1,6 +1,6 @@
 import type { Discipline, StageType } from './types';
 import type { TournamentSystemId } from './tournamentCreation';
-import type { VenueLayout } from './venueLayout';
+import { MAX_VENUE_GRID_CELLS, MAX_VENUE_GRID_DIMENSION, type VenueLayout } from './venueLayout';
 
 export const CREATION_DRAFT_KEY = 'online-tournament:creation-draft:v1';
 
@@ -87,8 +87,11 @@ export function validDraft(value: unknown): value is CreationDraft {
     && typeof data.customTables === 'boolean' && typeof data.venueLayoutEnabled === 'boolean'
     && (data.venueLayoutCustomized === undefined || typeof data.venueLayoutCustomized === 'boolean')
     && Boolean(data.venueLayout && Number.isInteger(data.venueLayout.columns)
-      && data.venueLayout.columns > 0 && Number.isInteger(data.venueLayout.rows)
-      && data.venueLayout.rows > 0 && Array.isArray(data.venueLayout.cells)
+      && data.venueLayout.columns > 0 && data.venueLayout.columns <= MAX_VENUE_GRID_DIMENSION
+      && Number.isInteger(data.venueLayout.rows)
+      && data.venueLayout.rows > 0 && data.venueLayout.rows <= MAX_VENUE_GRID_DIMENSION
+      && data.venueLayout.columns * data.venueLayout.rows <= MAX_VENUE_GRID_CELLS
+      && Array.isArray(data.venueLayout.cells)
       && data.venueLayout.cells.length === data.venueLayout.columns * data.venueLayout.rows
       && data.venueLayout.cells.every((cell) => typeof cell === 'string')
       && ['none', 'top', 'right', 'bottom', 'left'].includes(data.venueLayout.deskDock))
@@ -101,8 +104,17 @@ export function validDraft(value: unknown): value is CreationDraft {
     && data.phaseDrafts.every((entry) => entry && typeof entry.id === 'string'
       && allowedTypes.includes(entry.type) && Number.isInteger(entry.entrantCount)
       && Number.isInteger(entry.groupCount) && Number.isInteger(entry.swissRounds)
-      && Array.isArray(entry.knockoutBestOf) && typeof entry.label === 'string'
-      && typeof entry.breakKind === 'string' && typeof entry.nextDayDate === 'string')
+      && Number.isInteger(entry.bestOf) && entry.bestOf >= 1
+      && Array.isArray(entry.knockoutBestOf) && entry.knockoutBestOf.every((best) => Number.isInteger(best) && best >= 1)
+      && typeof entry.label === 'string' && typeof entry.customEntrants === 'boolean'
+      && ['minutes', 'until', 'overnight'].includes(entry.breakKind)
+      && Number.isInteger(entry.breakMinutes)
+      && typeof entry.nextDayStart === 'string' && typeof entry.nextDayDate === 'string'
+      && typeof entry.breakUntil === 'string' && typeof entry.note === 'string'
+      && Number.isInteger(entry.inlineBreakAfterRound) && entry.inlineBreakAfterRound >= 0
+      && ['minutes', 'until'].includes(entry.inlineBreakKind)
+      && Number.isInteger(entry.inlineBreakMinutes)
+      && typeof entry.inlineBreakUntil === 'string')
     && data.participantForm !== null && typeof data.participantForm === 'object'
     && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
       .every((key) => typeof (data.participantForm as unknown as Record<string, unknown>)[key] === 'string')
