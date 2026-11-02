@@ -1,4 +1,4 @@
-import { isAllowedParticipantName, participantNameKey } from '@/domain/participantNames';
+import { participantNameKey } from '@/domain/participantNames';
 import { disciplineOptionsForSport } from '@/domain/sports';
 import { hasValidBreakStageOrder, hasValidTerminalStageOrder, isValidSwissRoundCount, knockoutRoundLabels } from '@/domain/tournamentCreation';
 import { validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
@@ -34,6 +34,7 @@ export interface CreationValidationInput {
   participantNames: readonly string[];
   phases: readonly CreationValidationPhase[];
   plannedSchedule?: PlannedScheduleItem[];
+  scheduledStart?: string;
   venueLayout?: VenueLayout;
   matchDurationMinutes?: number;
   venueTurnoverMinutes?: number;
@@ -66,6 +67,8 @@ export function validateTournamentCreation(input: CreationValidationInput): stri
     || input.venueTurnoverMinutes < 0 || input.venueTurnoverMinutes > 240)) errors.push('Ungültiger Spielflächenwechselpuffer.');
   if (!input.phases.some((phase) => phase.type !== 'BREAK')) errors.push('Mindestens eine Spielphase ist erforderlich.');
   if (input.phases.length > 80) errors.push('Es dürfen höchstens 80 Phasen angelegt werden.');
+  if (input.phases.some((phase) => !['BREAK', 'ROUND_ROBIN', 'GROUPS', 'SWISS', 'KNOCKOUT'].includes(phase.type)))
+    errors.push('Unbekanntes Turniersystem.');
   if (!hasValidTerminalStageOrder(input.phases.map((phase) => phase.type))) errors.push('K.-o. muss die letzte Phase sein.');
   if (!hasValidBreakStageOrder(input.phases.map((phase) => phase.type))) errors.push('Pausen dürfen nur zwischen Spielphasen liegen.');
   let available = input.participantNames.length;
@@ -107,5 +110,10 @@ export function validateTournamentCreation(input: CreationValidationInput): stri
     }
   });
   errors.push(...validatePlannedSchedule(input.plannedSchedule ?? []));
+  if (input.scheduledStart && input.plannedSchedule?.length) {
+    if (input.plannedSchedule.find((item) => item.id === 'phase-1')?.at !== input.scheduledStart) {
+      errors.push('Der erste Zeitplaneintrag stimmt nicht mit dem geplanten Turnierbeginn überein.');
+    }
+  }
   return errors;
 }

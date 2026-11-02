@@ -8,6 +8,7 @@ import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
 import { reconcilePrestartDraws, clearPrestartTournamentDraws } from '@/services/mockDrawStore';
 import type { VenueLayout } from '@/domain/venueLayout';
+import { validateTournamentCreation } from '@/domain/validateTournamentCreation';
 import { disciplineLabel, getSportLabel, planningMinutesPerSet } from '@/domain/sports';
 import { sportScoring } from '@/domain/sportScoring';
 import { estimatePhaseMetrics, estimateKnockoutRoundMinutes } from '@/domain/tournamentCreation';
@@ -302,6 +303,10 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
   }
   const scheduleIssues = validatePlannedSchedule(input.plannedSchedule ?? []);
   if (scheduleIssues.length) throw new Error(scheduleIssues[0]);
+  if (input.requireFutureStart) {
+    const creationIssues = validateTournamentCreation(input);
+    if (creationIssues.length) throw new Error(creationIssues[0]);
+  }
   const existing = readLocalTournaments();
   const normalizedName = input.name.trim().toLocaleLowerCase('de-DE');
   const nameMatches = existing.filter((item) => item.name.trim().toLocaleLowerCase('de-DE') === normalizedName);
@@ -567,6 +572,10 @@ export function updatePrestartTournamentPhases(
 
   const newPlan = recalculatedPrestartPlan(previous, drafts);
   if (newPlan?.timeline.warnings.length) return { ok: false, error: newPlan.timeline.warnings[0].message };
+  if (newPlan) {
+    const scheduleIssues = validatePlannedSchedule(newPlan.plannedSchedule);
+    if (scheduleIssues.length) return { ok: false, error: scheduleIssues[0] };
+  }
 
   const phases: MockPhaseInput[] = drafts.map((phase) => ({
     type: phase.type, label: phase.label.trim(), entrantCount: phase.entrantCount,

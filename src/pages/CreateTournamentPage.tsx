@@ -1,6 +1,7 @@
 import { VenueLayoutEditor } from '@/components/VenueLayout';
 import { createVenueLayout, resizeVenueLayoutForTableCount, validateVenueLayout } from '@/domain/venueLayout';
 import { getVenueTerminology } from '@/domain/venueTerminology';
+import { validateTournamentCreation } from '@/domain/validateTournamentCreation';
 import { disciplineLabel, disciplineOptionsForSport, planningMinutesPerSet, sportOptions } from '@/domain/sports';
 import { sportScoring } from '@/domain/sportScoring';
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
@@ -1311,6 +1312,18 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       return;
     }
     const submitStart = useCurrentTime ? toLocalDateTime(new Date()) : scheduledStart;
+    const finalTimeline = buildPlannedTimeline(submitStart, phaseScheduleProposals);
+    const finalAwardsAt = awardsAtOverride ?? finalTimeline.estimatedEnd;
+    const finalSchedule: PlannedScheduleItem[] = [
+      ...finalTimeline.items,
+      ...(awardsEnabled ? [{ id: 'award-ceremony', at: finalAwardsAt, title: 'Siegerehrung',
+        type: 'other' as const, autoTime: awardsAtOverride === null }] : []),
+    ];
+    if (finalTimeline.warnings.length || validatePlannedSchedule(finalSchedule).length
+      || (awardsEnabled && finalAwardsAt < finalTimeline.estimatedEnd)) {
+      setCreationError('Der Zeitplan ist zum tatsächlichen Speicherzeitpunkt nicht mehr gültig. Bitte Pausen und Siegerehrung prüfen.');
+      return;
+    }
     if (!isStartAtOrAfterNow(submitStart)) {
       setCreationError('Der geplante Turnierstart muss jetzt oder in der Zukunft liegen. Bitte Datum und Uhrzeit korrigieren.');
       return;
@@ -1325,7 +1338,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       scheduledStart: submitStart,
       requireFutureStart: true,
       overwriteTournamentId: overwriteExistingId,
-      plannedSchedule: plannedSchedule.map((entry) => ({ ...entry, title: entry.title.trim(), note: entry.note?.trim() })),
+      plannedSchedule: finalSchedule.map((entry) => ({ ...entry, title: entry.title.trim(), note: entry.note?.trim() })),
       tables,
       minimumMatches,
       matchDurationMinutes,
@@ -1350,7 +1363,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         inlineBreakMinutes: phase.inlineBreakMinutes,
         inlineBreakUntil: phase.inlineBreakUntil,
       })),
-      estimatedDurationMinutes: estimatedTournamentDurationMinutes,
+      estimatedDurationMinutes: estimatedPlayingMinutes + plannedActiveBreakMinutes(finalTimeline),
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
     });
     clearCreationDraft(window.sessionStorage, sessionDraftKey);
@@ -1394,7 +1407,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   // The timetable is derived on every phase/date edit. No manual "generate"
   // action or stale copy of the phases can remain in the wizard.
-  const plannedTimeline = useMemo(() => buildPlannedTimeline(scheduledStart, phaseDrafts.map((phase, index) => ({
+  const phaseScheduleProposals = useMemo(() => phaseDrafts.map((phase, index) => ({
     label: phase.label,
     note: phase.type === 'BREAK' ? phase.note : undefined,
     type: phase.type,
@@ -1413,7 +1426,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     inlineBreakKind: phase.inlineBreakKind,
     inlineBreakMinutes: phase.inlineBreakMinutes,
     inlineBreakUntil: phase.inlineBreakUntil,
-  }))), [scheduledStart, phaseDrafts, phaseEstimates]);
+  })), [phaseDrafts, phaseEstimates, tables, timedSport, matchDurationMinutes, breakMinutes, sport]);
+  const plannedTimeline = useMemo(() => buildPlannedTimeline(scheduledStart, phaseScheduleProposals),
+    [scheduledStart, phaseScheduleProposals]);
   // Only active competition and pauses during tournament days count toward
   // estimated duration. Overnight gaps still shift the preview calendar.
   const estimatedPlayingMinutes = phaseEstimates.reduce((total, estimate, index) =>
@@ -1430,7 +1445,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     ? 'Die Siegerehrung muss am oder nach dem voraussichtlichen Turnierende liegen.' : null;
   const scheduleIssues = [...validatePlannedSchedule(plannedSchedule), ...plannedTimelineConflicts(plannedTimeline), ...(ceremonyIssue ? [ceremonyIssue] : [])];
   const prestartIssues = prestart
-    ? [...validatePrestartPhases(prestartPhaseDrafts, prestart.activeParticipants), ...plannedTimelineConflicts(plannedTimeline),
+    ? [...validatePrestartPhases(prestartPhaseDrafts, prestart.activeParticipants), ...validatePlannedSchedule(plannedTimeline.items), ...plannedTimelineConflicts(plannedTimeline),
       ...(reviewRequiredPhaseIds.length ? ['Bitte alle automatisch veränderten Phasen als geprüft markieren.'] : [])]
     : [];
   const overnightDatesValid = phaseDrafts.every((phase, index) => {
@@ -1439,7 +1454,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     return !phase.nextDayDate || (Boolean(parseCalendarDate(phase.nextDayDate)) && Boolean(plannedStart)
       && phase.nextDayDate > plannedStart!.slice(0, 10));
   });
-  const canCreate = reviewRequiredPhaseIds.length === 0 && basicsValid && participantsValid && venueLayoutValid && gameSettingsValid
+  const centralCreationIssues = !prestart && phaseDrafts.length ? validateTournamentCreation({
+    name, sport, discipline, tables, minimumMatches,
+    participantNames: participants.map((participant) => participantDisplayName(participant, discipline)),
+    phases: phaseDrafts, plannedSchedule, scheduledStart, venueLayout: venueLayoutEnabled ? venueLayout : undefined,
+    matchDurationMinutes, venueTurnoverMinutes: breakMinutes,
+  }) : [];
+  const canCreate = centralCreationIssues.length === 0 && reviewRequiredPhaseIds.length === 0 && basicsValid && participantsValid && venueLayoutValid && gameSettingsValid
     && phaseConfigurationValid && phaseEntrantsValid && overnightDatesValid && hasVisitedPhaseStep
     && scheduleIssues.length === 0;
   const firstCompetition = phaseDrafts.find((phase) => phase.type !== 'BREAK');
@@ -2584,6 +2605,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               onToggleAwards={(enabled) => { setAwardsEnabled(enabled); setAwardsAtOverride(null); }}
               onAwardsAtChange={setAwardsAtOverride}
             />
+            {centralCreationIssues.length > 0 && basicsValid && participantsValid && <div className="wizard-schedule-errors" role="alert">
+              <strong>Bitte vor der Erstellung korrigieren:</strong>
+              <ul>{centralCreationIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
+            </div>}
             {creationError && <div className="wizard-schedule-errors" role="alert"><strong>Speichern fehlgeschlagen:</strong> {creationError}</div>}
             {scheduleIssues.length > 0 && <div className="wizard-schedule-errors" role="alert">
               <strong>Bitte diese Zeitplan-Angaben korrigieren:</strong>
