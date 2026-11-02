@@ -4,6 +4,7 @@ import { getPhaseLifecycle, resetPrestartPhaseLifecycle } from '@/services/mockP
 import { generatePlayerCodes, generateUniquePlayerCode } from '@/services/mockPlayerCodes';
 import { recordMockAudit } from '@/services/mockAudit';
 import { hasStartedAnyStage, validatePrestartPhases, estimatePrestartDuration, normalizePrestartPhases, initialPrestartPhases, type PrestartPhaseDraft } from '@/domain/prestartPhasePlanning';
+import { newParticipantId, newParticipantIds } from '@/domain/participantIdentity';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
 import { reconcilePrestartDraws, clearPrestartTournamentDraws } from '@/services/mockDrawStore';
@@ -348,6 +349,7 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
     stages,
     areas: [{ name: 'Standardbereich', tables: `1–${input.tables}`, preferred: 'Automatische Zuweisung', mode: 'offen' }],
     participantNames: input.participantNames,
+    participantIds: newParticipantIds(input.participantNames),
     participantCodes: generatePlayerCodes(input.participantNames),
     isLocalPrototype: true,
     hasStarted: false,
@@ -870,9 +872,11 @@ export function updateMockParticipantName(tournamentId: string, oldName: string,
   const oldCodes = tournament.participantCodes ?? {};
   const { [oldName]: _oldCode, ...restCodes } = oldCodes;
   void _oldCode;
+  const { [oldName]: previousId, ...otherIds } = tournament.participantIds ?? {};
   const updated: DemoTournament = {
     ...tournament,
     participantNames: tournament.participantNames.map((entry) => entry === oldName ? name : entry),
+    participantIds: { ...otherIds, [name]: previousId ?? newParticipantId() },
     participantCodes: { ...restCodes, [name]: code.trim() },
   };
   writeLocalTournaments(tournaments.map((entry) => entry.id === tournamentId ? updated : entry));
@@ -930,6 +934,7 @@ export function addMockParticipant(
   const updated: DemoTournament = {
     ...tournament,
     participantNames: [...(tournament.participantNames ?? []), displayName],
+    participantIds: { ...(tournament.participantIds ?? {}), [displayName]: newParticipantId() },
     participantCodes: { ...(tournament.participantCodes ?? {}), [displayName]: code },
     participants: (tournament.participantNames ?? []).length + 1,
     lastUpdate: 'gerade eben',

@@ -28,6 +28,8 @@ export interface DemoTournament {
   stages: TournamentStage[];
   areas: DemoArea[];
   participantNames?: string[];
+  /** Stable identity assigned on registration; only keys (visible names) change. */
+  participantIds?: Record<string, string>;
   participantCodes?: Record<string, string>;
   isLocalPrototype?: boolean;
   hasStarted?: boolean;
