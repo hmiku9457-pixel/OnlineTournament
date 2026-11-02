@@ -209,12 +209,10 @@ export function startStage(tournament: DemoTournament, stage: TournamentStage, p
         ? { kind: 'clock', time: String(stage.settings.breakUntil ?? '12:00'),
             date: String(stage.settings.breakUntilDate ?? '') || undefined }
         : { kind: 'minutes', minutes: Number(stage.settings.breakMinutes) || 15 });
-    pauseResume = computeBreakResumeAt(startDate, options);
+    pauseResume = stage.settings.breakKind === 'overnight' && !pauseOptions
+      ? computeDayEndResumeAt(startDate, String(stage.settings.nextDayDate ?? ''), String(stage.settings.nextDayStart ?? '09:00'))
+      : computeBreakResumeAt(startDate, options);
     if (!pauseResume) return false;
-    if (stage.settings.breakKind === 'overnight' && !pauseOptions) {
-      pauseResume = computeDayEndResumeAt(startDate, String(stage.settings.nextDayDate ?? ''), String(stage.settings.nextDayStart ?? '09:00'));
-      if (!pauseResume) return false;
-    }
   }
   let additionalMinutes = 0;
   if (stage.type === 'GROUPS') {

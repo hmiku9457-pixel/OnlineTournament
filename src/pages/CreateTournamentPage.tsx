@@ -1368,7 +1368,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       matchDurationMinutes,
       venueTurnoverMinutes: breakMinutes,
       participantNames: participants.map((participant) => participantDisplayName(participant, discipline)),
-      phases: phaseDrafts.map((phase) => ({
+      phases: phaseDrafts.map((phase, index) => ({
         type: phase.type,
         label: phase.label,
         bestOf: timedSport ? 1 : phase.bestOf,

@@ -108,12 +108,14 @@ describe('steuerbare Pause', () => {
     vi.useRealTimers();
   });
 
-  it('berechnet eine präzise lokale Uhrzeit und schiebt vergangene Uhrzeiten auf morgen', () => {
+  it('berechnet eine präzise lokale Uhrzeit und lehnt vergangene feste Uhrzeiten ab', () => {
     const start = new Date(2026, 9, 31, 14, 5, 0);
     expect(computeBreakResumeAt(start, { kind: 'minutes', minutes: 25 })!.getTime() - start.getTime()).toBe(25 * 60000);
     expect(computeBreakResumeAt(start, { kind: 'minutes', minutes: 0 })).toBeNull();
     expect(computeBreakResumeAt(start, { kind: 'clock', time: '15:30' })?.getDate()).toBe(31);
-    expect(computeBreakResumeAt(start, { kind: 'clock', time: '12:00' })?.getDate()).toBe(1);
+    expect(computeBreakResumeAt(start, { kind: 'clock', time: '12:00' })).toBeNull();
+    expect(computeBreakResumeAt(start, { kind: 'clock', time: '12:00', date: '2026-11-01' })?.getDate()).toBe(1);
+    expect(computeBreakResumeAt(start, { kind: 'clock', time: '17:30', date: '2026-10-30' })).toBeNull();
     expect(computeBreakResumeAt(start, { kind: 'clock', time: '25:99' })).toBeNull();
   });
 

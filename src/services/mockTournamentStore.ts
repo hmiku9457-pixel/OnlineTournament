@@ -580,7 +580,7 @@ export function updatePrestartTournamentPhases(
     if (scheduleIssues.length) return { ok: false, error: scheduleIssues[0] };
   }
 
-  const phases: MockPhaseInput[] = drafts.map((phase) => ({
+  const phases: MockPhaseInput[] = drafts.map((phase, index) => ({
     type: phase.type, label: phase.label.trim(), entrantCount: phase.entrantCount,
     groupCount: phase.groupCount, swissRounds: phase.swissRounds,
     bestOf: phase.bestOf, knockoutBestOf: [...phase.knockoutBestOf],
