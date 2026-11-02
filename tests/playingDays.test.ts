@@ -56,9 +56,9 @@ describe('explicit playing-day planning', () => {
       { type:'GROUPS', label:'Gruppen', estimatedMinutes:120 },
     ]);
     expect(playingDayOverflowWarnings(spill).join(' ')).toContain('Mitternacht');
-    const impossible = buildPlannedTimeline('2031-11-20T22:30', [{
+    const impossible = buildPlannedTimeline('2031-11-20T23:40', [{
       type:'SWISS', label:'Schweizer System', estimatedMinutes:120, roundCount:4,
-      dayBreaks:[{afterRound:1,date:'2031-11-21',time:'09:00'}],
+      dayBreaks:[{afterRound:1,date:'2031-11-22',time:'09:00'}],
     }]);
     expect(impossible.warnings).toEqual([]);
     expect(playingDayOverflowWarnings(impossible).join(' ')).toContain('Mitternacht');
