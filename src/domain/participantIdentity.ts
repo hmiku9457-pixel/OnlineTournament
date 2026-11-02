@@ -8,9 +8,18 @@ export function participantId(tournament: DemoTournament, name: string): string 
   if (name === BYE_SLOT || name === PENDING_SLOT || name === UNCLAIMED_WINNER) return name;
   return tournament.participantIds?.[name] ?? name;
 }
+// One reverse index per immutable tournament snapshot avoids O(n²) work
+// when restoring thousands of match slots and group assignments.
+const reverseIndex = new WeakMap<DemoTournament, Map<string, string>>();
 export function participantName(tournament: DemoTournament, id: string): string {
   if (id === BYE_SLOT || id === PENDING_SLOT || id === UNCLAIMED_WINNER) return id;
-  return Object.entries(tournament.participantIds ?? {}).find(([, value]) => value === id)?.[0] ?? id;
+  let lookup = reverseIndex.get(tournament);
+  if (!lookup) {
+    lookup = new Map(Object.entries(tournament.participantIds ?? {})
+      .map(([name, participantId]) => [participantId, name]));
+    reverseIndex.set(tournament, lookup);
+  }
+  return lookup.get(id) ?? id;
 }
 export function newParticipantId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
