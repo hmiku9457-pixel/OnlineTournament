@@ -729,6 +729,45 @@ try {
   assert.equal(await damagedPage.getByRole('heading', { name: 'Turnierspeicher überprüfen' }).count(), 0);
   await damagedContext.close();
 
+  // Explicit multi-day creation: a round-compatible recommendation must
+  // persist its mode, day count and scheduled day transitions through reload.
+  const multiContext = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  const multiPage = await multiContext.newPage();
+  await multiPage.goto(base + '/#/tournaments/new');
+  await multiPage.locator('#name').fill('Mehrtägige Vereinsrunde');
+  await multiPage.locator('#tournament-date').click();
+  await multiPage.locator('.calendar-picker-dialog input[aria-label="Jahr"]').fill('2030');
+  await multiPage.locator('.calendar-picker-dialog select[aria-label="Monat"]').selectOption('10');
+  await multiPage.locator('.calendar-picker-day').filter({ hasText: /^24$/ }).click();
+  await multiPage.locator('#sport').selectOption('table_tennis');
+  await next(multiPage);
+  for (let index = 1; index <= 8; index++) {
+    await multiPage.locator('#participant-first').fill('Spieler');
+    await multiPage.locator('#participant-last').fill(String(index));
+    await multiPage.getByRole('button', { name: 'Spieler hinzufügen' }).click();
+  }
+  await next(multiPage);
+  await multiPage.getByRole('radio', { name: 'Mehrtägiges Turnier' }).check();
+  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
+  assert.equal(await multiPage.locator('#preferred-duration').innerText(), '03:30',
+    'multi-day mode does not change the total active-duration preference');
+  await multiPage.locator('.recommendation-list .recommendation').first().click();
+  await next(multiPage);
+  await multiPage.locator('.phase-wizard-step').waitFor();
+  const daysInPlan = await multiPage.evaluate(() => [...document.querySelectorAll('.phase-config')].length);
+  assert.ok(daysInPlan >= 1, 'multi-day recommendation produces editable phases');
+  await multiPage.reload();
+  await multiPage.locator('.phase-wizard-step').waitFor();
+  await multiPage.locator('.wizard-step').nth(2).click();
+  assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägiges Turnier' }).isChecked(), true);
+  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
+  await multiPage.getByRole('radio', { name: 'Eintägiges Turnier' }).check();
+  const multiModeDialog = multiPage.getByRole('alertdialog', { name: 'Turniermodus wechseln?' });
+  await multiModeDialog.waitFor();
+  await multiModeDialog.getByRole('button', { name: 'Bisherigen Modus behalten' }).click();
+  assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägiges Turnier' }).isChecked(), true);
+  await multiContext.close();
+
   process.stdout.write('Creation wizard browser smoke tests passed.\n');
 } finally {
   await browser.close();
