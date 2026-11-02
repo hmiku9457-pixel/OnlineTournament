@@ -104,6 +104,18 @@ describe('tournament creation draft recovery', () => {
     }
   });
 
+  it('isolates a damaged optional team name instead of letting the editor crash', () => {
+    const store = fakeStorage();
+    const broken = makeDraft();
+    (broken.participants[0] as unknown as Record<string, unknown>).teamName = 123;
+    store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft: broken }));
+    expect(loadCreationDraft(store)).toBeNull();
+    const brokenForm = makeDraft();
+    (brokenForm.participantForm as unknown as Record<string, unknown>).teamName = {};
+    store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft: brokenForm }));
+    expect(loadCreationDraft(store)).toBeNull();
+  });
+
   it('starts new internal identifiers after the highest restored identifier', () => {
     expect(highestDraftSequence([{ id: 'participant-3' }, { id: 'participant-19' }, { id: 'other' }], 'participant')).toBe(19);
     expect(highestDraftSequence([{ id: 'phase-2' }, { id: 'phase-6' }], 'phase')).toBe(6);

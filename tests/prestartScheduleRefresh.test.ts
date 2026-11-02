@@ -53,6 +53,18 @@ function sample(withBreak = false) {
 }
 
 describe('prestart schedule consistency after roster and phase edits', () => {
+  it('retains an explicitly manual ceremony even when it matched the previous end', () => {
+    const tournament = sample();
+    const ceremony = tournament.plannedSchedule!.find((item) => item.id === 'award-ceremony')!;
+    ceremony.autoTime = false;
+    const originalTime = ceremony.at;
+    const phases = initialPrestartPhases(tournament);
+    phases[0].groupCount = 4;
+    expect(updatePrestartTournamentPhases(tournament.id, phases).ok).toBe(true);
+    expect(getMockTournament(tournament.id).plannedSchedule?.find((item) => item.id === 'award-ceremony')?.at)
+      .toBe(originalTime);
+  });
+
   it('regenerates saved phase timings and auto ceremony after changing a group plan', () => {
     const tournament = sample();
     const phases = initialPrestartPhases(tournament);
