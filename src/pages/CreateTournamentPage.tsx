@@ -899,8 +899,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   /** The editable phase plan is authoritative even when inputs change. */
   const recommendationPlanMatches = Boolean(selectedRecommendation
-    && phaseDrafts.length === selectedRecommendation.phases.length
-    && phaseDrafts.every((phase, index) => {
+    && phaseDrafts.filter((phase) => phase.type !== 'BREAK').length === selectedRecommendation.phases.length
+    && phaseDrafts.filter((phase) => phase.type !== 'BREAK').every((phase, index) => {
       const original = selectedRecommendation.phases[index];
       return original && phase.type === original.type
         && phase.entrantCount === (original.entrantCount ?? participantCount)
@@ -1073,9 +1073,38 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setSelectedRecommendationId(null);
   }
 
+  function recommendedPhaseDrafts(recommendation: FormatRecommendation): PhaseDraft[] {
+    const created = recommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport));
+    if (tournamentMode !== 'multi') return created;
+    const timing = timedSport
+      ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes }
+      : { minutesPerSet: planningMinutesPerSet(sport) };
+    const split = suggestDaySplit(created.map((phase) => ({
+      ...phase, estimatedMinutes: estimatePhaseMetrics(phase, tables, timing).estimatedDurationMinutes,
+    })), plannedDays);
+    if (!split.possible) return created;
+    const withBreaks: PhaseDraft[] = [];
+    let day = 0;
+    for (let index = 0; index < created.length; index++) {
+      const phase = created[index];
+      phase.dayBreaks = split.insidePhases.filter((item) => item.phaseIndex === index).map((item) => ({
+        afterRound: item.afterRound, date: followingPlayingDate(scheduledDate, ++day), time: '09:00',
+      }));
+      withBreaks.push(phase);
+      if (split.betweenPhases.includes(index)) {
+        const pause = phaseDraftFromTemplate(createPhaseTemplate('BREAK', index + 1, { entrantCount: phase.entrantCount }), participantCount, sport);
+        pause.label = 'Spieltagsende';
+        pause.breakKind = 'overnight';
+        pause.nextDayDate = followingPlayingDate(scheduledDate, ++day);
+        withBreaks.push(pause);
+      }
+    }
+    return withBreaks;
+  }
+
   function applyRecommendation(recommendation: FormatRecommendation) {
     setSelectedRecommendationId(recommendation.id);
-    setPhaseDrafts(recommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
+    setPhaseDrafts(recommendedPhaseDrafts(recommendation));
     setReviewRequiredPhaseIds([]);
     setExpandedPhaseId(null);
     setPhaseInsertIndex(null);
@@ -1340,7 +1369,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   function applyStepNavigation(target: WizardStep, focusDate = false, advance = false) {
     if (step === 3 && advance) {
       if (phaseDrafts.length === 0 && selectedRecommendation) {
-        setPhaseDrafts(selectedRecommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
+        setPhaseDrafts(recommendedPhaseDrafts(selectedRecommendation));
       }
       setHasVisitedPhaseStep(true);
     }
@@ -2099,6 +2128,25 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                   <p className="muted">Passe die Vorschläge an deine Veranstaltung an. Deine manuelle Phasenplanung bleibt unabhängig von diesen Vorgaben.</p>
                 </div>
 
+                <div className="tournament-mode-setting">
+                  <fieldset className="tournament-mode-choice">
+                    <legend>Turnierzeitraum</legend>
+                    <label><input type="radio" name="tournament-mode" checked={tournamentMode === 'single'}
+                      onChange={() => {
+                        if (configuredPlayingDays(phaseDrafts) > 1) setPendingTournamentMode('single');
+                        else setTournamentMode('single');
+                      }}/> Eintägiges Turnier</label>
+                    <label><input type="radio" name="tournament-mode" checked={tournamentMode === 'multi'}
+                      onChange={() => setTournamentMode('multi')}/> Mehrtägiges Turnier</label>
+                  </fieldset>
+                  {tournamentMode === 'multi' && <div className="field tournament-day-count">
+                    <label htmlFor="planned-playing-days">Geplante Anzahl an Spieltagen</label>
+                    <RecommendationNumberStepper id="planned-playing-days" label="Geplante Anzahl an Spieltagen"
+                      value={plannedDays} min={2} max={14} onChange={setPlannedDays}/>
+                    <span className="field-hint">Die konkreten Fortsetzungen werden in Schritt 4 geplant. Nächte zählen nicht zur aktiven Turnierdauer.</span>
+                  </div>}
+                  <p className="field-hint">Die gewünschte aktive Turnierdauer bleibt eine Gesamtsumme von maximal 23 Std. 59 Min.</p>
+                </div>
                 <div className="format-setting-fields">
                   <div className="field">
                     <label htmlFor="max-groups">Maximale Gruppenanzahl</label>
@@ -2769,10 +2817,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 <div><dt>Spielflächen</dt><dd>{tables} {venue.plural} · {venueLayoutEnabled ? 'Individueller Plan' : 'Automatische Nummerierung'}</dd></div>
                 {timedSport && <div><dt>Wechselpuffer</dt><dd>{breakMinutes} Min. pro Spielfläche</dd></div>}
                 <div><dt>Mindestspiele</dt><dd>{minimumMatches} pro Teilnehmer</dd></div>
+                <div><dt>Turniermodus</dt><dd>{tournamentMode === 'multi' ? `Mehrtägig · ${plannedDays} Spieltage` : 'Eintägig'}</dd></div>
+                {timedSport && <div><dt>Spielzeit je Begegnung</dt><dd>{matchDurationMinutes} Min.</dd></div>}
                 <div><dt>Turnierphasen</dt><dd>{phaseDrafts.filter((phase) => phase.type !== 'BREAK').length} Wettkampfphasen · {phaseDrafts.filter((phase) => phase.type === 'BREAK').length} {phaseDrafts.filter((phase) => phase.type === 'BREAK').length === 1 ? 'Pause' : 'Pausen'}</dd></div>
                 <div><dt>Geplante Spiele</dt><dd>{phaseEstimates.reduce((total, estimate) => total + estimate.estimatedMatches, 0)}</dd></div>
               </dl>
               <div className="creation-review-timing">
+                <div><span>Geplante Spieltage</span><strong>{configuredPlayingDays(phaseDrafts)} von {tournamentMode === 'multi' ? plannedDays : 1}</strong></div>
                 <div><span>Voraussichtliche Spielzeit</span><strong>ca. {formatDuration(estimatedPlayingMinutes)}</strong></div>
                 <div><span>Geplante Unterbrechungen</span><strong>{formatDuration(estimatedBreakMinutes)}</strong></div>
                 <div><span>Aktive Turnierdauer inkl. Pausen</span><strong>{formatDuration(estimatedTournamentDurationMinutes)}</strong></div>
