@@ -799,6 +799,23 @@ try {
   await next(multiPage);
   await multiPage.getByRole('radio', { name: 'Mehrtägig' }).check();
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
+  const dayControlGeometry = await multiPage.evaluate(() => {
+    const days = document.querySelector('.tournament-day-count .recommendation-number-stepper');
+    const groups = document.querySelector('.format-setting-fields .recommendation-number-stepper');
+    if (!days || !groups) return null;
+    const d = days.getBoundingClientRect(), g = groups.getBoundingClientRect();
+    const dayButtons = [...days.querySelectorAll('button')].map(button => button.getBoundingClientRect());
+    const groupButtons = [...groups.querySelectorAll('button')].map(button => button.getBoundingClientRect());
+    return { dayWidth: d.width, groupWidth: g.width,
+      buttonWidths: dayButtons.map((r) => r.width),
+      referenceWidths: groupButtons.map((r) => r.width) };
+  });
+  assert.ok(dayControlGeometry, 'days and groups steppers must both exist');
+  assert.ok(Math.abs(dayControlGeometry.dayWidth - dayControlGeometry.groupWidth) <= 16,
+    'playing days stepper should match the compact size of the other number steppers');
+  assert.ok(dayControlGeometry.buttonWidths.every((width, index) =>
+    Math.abs(width - dayControlGeometry.referenceWidths[index]) <= 1),
+    'playing-day +/- buttons should match the other numeric inputs');
   assert.equal(await multiPage.locator('#preferred-duration').innerText(), '03:30',
     'multi-day mode does not change the total active-duration preference');
   await multiPage.locator('.recommendation-list .recommendation').first().click();
@@ -809,6 +826,21 @@ try {
   await multiPage.reload();
   await multiPage.locator('.phase-wizard-step').waitFor();
   await multiPage.locator('.wizard-step').nth(2).click();
+  // Replacement confirmation must keep both actions on the same line.
+  await multiPage.locator('.recommendation-list .recommendation').nth(1).click();
+  const replaceDialog = multiPage.getByRole('alertdialog', { name: 'Phasenplanung ersetzen?' });
+  await replaceDialog.waitFor();
+  const replacementActionPositions = await replaceDialog.locator('.sport-change-dialog-actions .btn')
+    .evaluateAll(buttons => buttons.map(button => {
+      const r = button.getBoundingClientRect();
+      return {left: r.left, top: r.top, right: r.right, bottom: r.bottom};
+    }));
+  assert.equal(replacementActionPositions.length, 2);
+  assert.ok(Math.abs(replacementActionPositions[0].top - replacementActionPositions[1].top) <= 2,
+    'both replacement actions must be side by side');
+  assert.ok(replacementActionPositions[0].right <= replacementActionPositions[1].left,
+    'the cancel button is left of the destructive replacement action');
+  await replaceDialog.getByRole('button', { name: 'Bisherige Planung behalten' }).click();
   assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägig' }).isChecked(), true);
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
   const summaryBeforeModeSwitch = await multiPage.locator('.wizard-side-summary').innerText();
