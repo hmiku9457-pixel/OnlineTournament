@@ -5,6 +5,7 @@ import { generatePlayerCodes, generateUniquePlayerCode } from '@/services/mockPl
 import { recordMockAudit } from '@/services/mockAudit';
 import { hasStartedAnyStage, validatePrestartPhases, estimatePrestartDuration, normalizePrestartPhases, initialPrestartPhases, type PrestartPhaseDraft } from '@/domain/prestartPhasePlanning';
 import { newParticipantId, newParticipantIds } from '@/domain/participantIdentity';
+import { isAllowedParticipantName, participantNameKey } from '@/domain/participantNames';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
 import { reconcilePrestartDraws, clearPrestartTournamentDraws } from '@/services/mockDrawStore';
@@ -775,7 +776,9 @@ export function updateMockParticipantName(tournamentId: string, oldName: string,
   const teamMode = tournament.discipline === 'TEAMS';
   const name = teamMode ? first : `${first} ${last}`;
   if (!first || (!teamMode && !last) || !/^\d{4,8}$/.test(code.trim())) return false;
-  if (name !== oldName && tournament.participantNames.includes(name)) return false;
+  if (!isAllowedParticipantName(first) || (!teamMode && !isAllowedParticipantName(last))) return false;
+  if (name !== oldName && tournament.participantNames.some((other) =>
+    other !== oldName && participantNameKey(other) === participantNameKey(name))) return false;
   // Ein Spielercode darf immer nur einem Teilnehmer des Turniers gehören.
   if (Object.entries(tournament.participantCodes ?? {}).some(([participant, existingCode]) =>
     participant !== oldName && existingCode === code.trim())) return false;
@@ -910,12 +913,18 @@ export function addMockParticipant(
   if (!first || (!teamMode && !last)) return {
     ok: false, error: teamMode ? 'Ein Mannschaftsname ist erforderlich.' : 'Vorname und Nachname sind erforderlich.',
   };
+  if (!isAllowedParticipantName(first) || (!teamMode && !isAllowedParticipantName(last))) {
+    return { ok: false, error: 'Der Teilnehmername enthält unzulässige Zeichen.' };
+  }
   const person = teamMode ? first : `${first} ${last}`;
   let displayName = person;
   if (tournament.discipline === 'DOUBLES') {
     const partnerFirst = partnerFirstName.trim();
     const partnerLast = partnerLastName.trim();
     if (!partnerFirst || !partnerLast) return { ok: false, error: 'Für Doppel werden beide vollständigen Namen benötigt.' };
+    if (!isAllowedParticipantName(partnerFirst) || !isAllowedParticipantName(partnerLast)) {
+      return { ok: false, error: 'Der Partnername enthält unzulässige Zeichen.' };
+    }
     const partner = `${partnerFirst} ${partnerLast}`;
     const normalize = (text: string) => text.toLocaleLowerCase('de').replace(/\s+/g, ' ').trim();
     if (normalize(person) === normalize(partner)) return { ok: false, error: 'Ein Spieler kann nicht sein eigener Doppelpartner sein.' };
