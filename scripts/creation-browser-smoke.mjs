@@ -503,6 +503,34 @@ try {
   await freshPage.reload();
   await freshPage.locator('.sidebar-draft-item').first().waitFor();
   assert.equal(await freshPage.locator('.sidebar-draft-item').count(), 1);
+
+  // Current-format drafts are validated on read; one corrupted record must
+  // not hide a separately saved valid draft or block its editor.
+  await freshPage.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('online-tournament:named-creation-drafts:v2', 2);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('drafts', 'readwrite');
+      tx.objectStore('drafts').put({ id: 'corrupt-current-draft', revision: 1,
+        savedAt: new Date().toISOString(), draft: { step: 5 } });
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    db.close();
+  });
+  await freshPage.reload();
+  await freshPage.locator('.sidebar-draft-item').first().waitFor();
+  assert.equal(await freshPage.locator('.sidebar-draft-item').count(), 1,
+    'an invalid current draft must not hide a valid draft');
+  await freshPage.getByRole('button', { name: 'Entwurf zurücksetzen' }).waitFor();
+  freshPage.once('dialog', (dialog) => dialog.accept());
+  await freshPage.getByRole('button', { name: 'Entwurf zurücksetzen' }).click();
+  await freshPage.getByRole('button', { name: 'Entwurf zurücksetzen' }).waitFor({ state: 'hidden' });
+  assert.equal(await freshPage.locator('.sidebar-draft-item').count(), 1);
   await freshContext.close();
 
   // Blocked IndexedDB must visibly warn even when there are no old cached
