@@ -7,7 +7,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
 import { generateScoreGroupedSwissPairings, type SwissScorePlayer } from '@/engine/swissScoreGroups';
 import { getAllMockTournaments, updateMockTournamentStatus, refreshPrestartSchedule } from '@/services/mockTournamentStore';
-import { blocksInlineBreakRound, isInlineBreakReleased } from '@/services/mockInlineBreak';
+import { blocksInlineBreakRound, isScheduledInlineBreakPending } from '@/services/mockInlineBreak';
 import { completeStage, getActiveStage, getStageEntrants, getNextStartableStage, getNextCompetitionStage, getPreviousCompetitionStage, isStageCompleted, isStageStarted, setStageEntrants, reopenStageForQualification, isSwissRoundApproved, approveSwissRound, revokeSwissRoundApprovals, reopenStageAfterCorrection } from '@/services/mockPhaseLifecycle';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
 import { BYE_SLOT, PENDING_SLOT, UNCLAIMED_WINNER } from '@/domain/matchSlots';
@@ -502,8 +502,7 @@ function swissMatches(tournament: DemoTournament, stage: TournamentStage, result
       if (!previousDone || !isSwissRoundApproved(tournament, stage, round - 1)) break;
       // An approved Swiss round may require a director-controlled break before
       // any next-round fixtures are generated or assigned.
-      const pauseRound = Number(stage.settings.inlineBreakAfterRound) || 0;
-      if (pauseRound === round - 1 && !isInlineBreakReleased(tournament, stage)) break;
+      if (isScheduledInlineBreakPending(tournament, stage, round - 1)) break;
     }
 
     const savedRound = readSwissFixtures().find((item) => item.tournamentId === tournament.id && item.stageId === stage.id && item.round === round);
