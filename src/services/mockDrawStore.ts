@@ -1,3 +1,4 @@
+import { BYE_SLOT } from '@/domain/matchSlots';
 import { localTournamentStorage } from '@/services/localTournamentStorage';
 import { groupLetter } from '@/domain/groupLabels';
 import type { DemoTournament } from '@/data/demoTournaments';
@@ -96,11 +97,11 @@ function balancedBracketSlots(participants: string[], randomize = false) {
     const slotA = pairIndex * 2;
     const slotB = slotA + 1;
     if (byePairs.has(pairIndex)) {
-      slots[slotA] = players[playerIndex++] ?? 'Freilos';
-      slots[slotB] = 'Freilos';
+      slots[slotA] = players[playerIndex++] ?? BYE_SLOT;
+      slots[slotB] = BYE_SLOT;
     } else {
-      slots[slotA] = players[playerIndex++] ?? 'Freilos';
-      slots[slotB] = players[playerIndex++] ?? 'Freilos';
+      slots[slotA] = players[playerIndex++] ?? BYE_SLOT;
+      slots[slotB] = players[playerIndex++] ?? BYE_SLOT;
     }
   }
   return slots;
@@ -109,18 +110,18 @@ function balancedBracketSlots(participants: string[], randomize = false) {
 function validBracketConstraints(participants: string[], slots: string[]) {
   if (slots.length < 2) return false;
   const expectedByeCount = Math.max(0, slots.length - participants.length);
-  if (slots.filter((slot) => slot === 'Freilos').length !== expectedByeCount) return false;
-  const playerSlots = slots.filter((slot) => slot !== 'Freilos');
+  if (slots.filter((slot) => slot === BYE_SLOT).length !== expectedByeCount) return false;
+  const playerSlots = slots.filter((slot) => slot !== BYE_SLOT);
   if (playerSlots.length !== participants.length) return false;
   if (new Set(playerSlots).size !== participants.length) return false;
   if (participants.some((participant) => !playerSlots.includes(participant))) return false;
   for (let index = 0; index < slots.length; index += 2) {
-    if (slots[index] === 'Freilos' && slots[index + 1] === 'Freilos') return false;
+    if (slots[index] === BYE_SLOT && slots[index + 1] === BYE_SLOT) return false;
   }
 
   const midpoint = slots.length / 2;
-  const playersFirstHalf = slots.slice(0, midpoint).filter((slot) => slot !== 'Freilos').length;
-  const playersSecondHalf = slots.slice(midpoint).filter((slot) => slot !== 'Freilos').length;
+  const playersFirstHalf = slots.slice(0, midpoint).filter((slot) => slot !== BYE_SLOT).length;
+  const playersSecondHalf = slots.slice(midpoint).filter((slot) => slot !== BYE_SLOT).length;
   return Math.abs(playersFirstHalf - playersSecondHalf) <= 1;
 }
 
@@ -292,13 +293,13 @@ export function getPinnedBracketSlots(tournament: DemoTournament, stage: Tournam
   if (!config?.bracketSlots || !validBracketConstraints(getStageEntrants(tournament, stage), config.bracketSlots)
     || config.bracketSlots.some((name, index) => name !== slots[index])) return [];
   return (config.pinnedBracketSlots ?? [])
-    .filter((index) => Number.isInteger(index) && index >= 0 && index < slots.length && slots[index] !== 'Freilos');
+    .filter((index) => Number.isInteger(index) && index >= 0 && index < slots.length && slots[index] !== BYE_SLOT);
 }
 
 export function toggleBracketPin(tournament: DemoTournament, stage: TournamentStage, index: number) {
   if (!canEditDraw(tournament, stage)) return false;
   const slots = getBracketSlots(tournament, stage);
-  if (index < 0 || index >= slots.length || slots[index] === 'Freilos') return false;
+  if (index < 0 || index >= slots.length || slots[index] === BYE_SLOT) return false;
   const old = findConfig(tournament.id, stage.id);
   const pinned = new Set(getPinnedBracketSlots(tournament, stage));
   const wasPinned = pinned.has(index);
@@ -396,7 +397,7 @@ export function randomizeBracketSlots(tournament: DemoTournament, stage: Tournam
   // werden neu verteilt. Dadurch bleiben das Freilosmuster und die
   // Balance beider Hälften auch beim erneuten Würfeln unverändert.
   const movableIndexes = original.map((name, index) => ({ name, index }))
-    .filter(({ name, index }) => name !== 'Freilos' && !pinnedIndexes.has(index))
+    .filter(({ name, index }) => name !== BYE_SLOT && !pinnedIndexes.has(index))
     .map(({ index }) => index);
   const shuffledPlayers = shuffled(movableIndexes.map((index) => original[index]));
   const next = [...original];

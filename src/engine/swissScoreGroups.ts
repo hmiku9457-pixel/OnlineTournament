@@ -29,10 +29,10 @@ function pairBucket(players: string[], state: Map<string, SwissScorePlayer>) {
 
 /** Entfernt vermeidbare Wiederholungen, ohne die ursprüngliche Paarung bei bereits gültigem Plan zu verändern.
  *  Die Suche läuft nur als Fallback für Konfliktfälle und ist bewusst begrenzt. */
-function avoidRepeatPairings(pairings: SwissNamePairing[], players: SwissScorePlayer[]): SwissNamePairing[] {
+function avoidRepeatPairings(pairings: SwissNamePairing[], players: SwissScorePlayer[], byeToken: string): SwissNamePairing[] {
   const state = new Map(players.map((player) => [player.name, player]));
-  const bye = pairings.find(([, opponent]) => opponent === 'Freilos');
-  const matches = pairings.filter(([, opponent]) => opponent !== 'Freilos');
+  const bye = pairings.find(([, opponent]) => opponent === byeToken);
+  const matches = pairings.filter(([, opponent]) => opponent !== byeToken);
   const repeated = ([a, b]: SwissNamePairing) => state.get(a)?.opponents.has(b) ?? false;
   if (!matches.some(repeated)) return pairings;
 
@@ -85,7 +85,7 @@ function avoidRepeatPairings(pairings: SwissNamePairing[], players: SwissScorePl
   return search(remaining) ? (bye ? [...solution, bye] : solution) : (bye ? [...fixed, bye] : fixed);
 }
 
-export function generateScoreGroupedSwissPairings(players: SwissScorePlayer[]): SwissNamePairing[] {
+export function generateScoreGroupedSwissPairings(players: SwissScorePlayer[], byeToken = 'Freilos'): SwissNamePairing[] {
   const state = new Map(players.map((player) => [player.name, player]));
   const sorted = [...players].sort((a, b) => (
     (b.pairingPoints ?? b.wins) - (a.pairingPoints ?? a.wins)
@@ -120,18 +120,18 @@ export function generateScoreGroupedSwissPairings(players: SwissScorePlayer[]): 
   if (carry) {
     const carryState = state.get(carry)!;
     if (carryState.byes === 0) {
-      pairings.push([carry, 'Freilos']);
+      pairings.push([carry, byeToken]);
     } else {
-      const swapIndex = pairings.findIndex(([, b]) => b !== 'Freilos' && state.get(b)?.byes === 0);
+      const swapIndex = pairings.findIndex(([, b]) => b !== byeToken && state.get(b)?.byes === 0);
       if (swapIndex >= 0) {
         const [a, b] = pairings[swapIndex];
         pairings[swapIndex] = [a, carry];
-        pairings.push([b, 'Freilos']);
+        pairings.push([b, byeToken]);
       } else {
-        pairings.push([carry, 'Freilos']);
+        pairings.push([carry, byeToken]);
       }
     }
   }
 
-  return avoidRepeatPairings(pairings, players);
+  return avoidRepeatPairings(pairings, players, byeToken);
 }
