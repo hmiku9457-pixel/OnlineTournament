@@ -554,6 +554,27 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       : createVenueLayout(tables));
   }, [tables, venueLayoutCustomized]);
   const [participants, setParticipants] = useState<ParticipantDraft[]>(restoredDraft?.participants ?? []);
+  // Page size is derived from the available viewport, so the roster itself
+  // never adds a vertical scrollbar to the creation page.
+  const rosterRef = useRef<HTMLElement | null>(null);
+  const [rosterPage, setRosterPage] = useState(1);
+  const [rosterPageSize, setRosterPageSize] = useState(8);
+  useEffect(() => {
+    if (step !== 2 || prestart) return;
+    const updatePageSize = () => {
+      const rect = rosterRef.current?.getBoundingClientRect();
+      const space = rect ? Math.max(200, window.innerHeight - Math.max(0, rect.top) - 135) : window.innerHeight - 270;
+      setRosterPageSize(Math.max(3, Math.min(24, Math.floor(space / 53))));
+    };
+    updatePageSize();
+    window.addEventListener('resize', updatePageSize);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updatePageSize);
+    if (rosterRef.current && observer) observer.observe(rosterRef.current);
+    return () => { window.removeEventListener('resize', updatePageSize); observer?.disconnect(); };
+  }, [step, prestart]);
+  const rosterPageCount = Math.max(1, Math.ceil(participants.length / rosterPageSize));
+  const visibleRosterPage = Math.min(rosterPage, rosterPageCount);
+  const visibleRoster = participants.slice((visibleRosterPage - 1) * rosterPageSize, visibleRosterPage * rosterPageSize);
   const [recentlyRemovedParticipant, setRecentlyRemovedParticipant] = useState<{ participant: ParticipantDraft; index: number } | null>(null);
   const [groupRecommendationNotice, setGroupRecommendationNotice] = useState<string | null>(null);
   const previousRosterCount = useRef<number>(restoredDraft?.participants.length ?? 0);
@@ -1795,7 +1816,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               </div>
             </div>
 
-            <aside className="participant-roster participant-roster-grid-card" aria-label="Gespeicherte Teilnehmer">
+            <aside ref={rosterRef} className="participant-roster participant-roster-grid-card" aria-label="Gespeicherte Teilnehmer">
                 <div className="participant-roster-head">
                   <h3>Teilnehmerliste</h3>
                   <span className="badge" aria-label={`${participantCount} Teilnehmer gespeichert`}>{participantCount}</span>
@@ -1806,9 +1827,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     <div className="participant-empty">
                       Noch keine Teilnehmer gespeichert. Neue Einträge erscheinen hier sofort.
                     </div>
-                  ) : participants.map((participant, index) => (
+                  ) : visibleRoster.map((participant, index) => (
                     <article className={`participant-roster-row ${editingParticipantId === participant.id ? 'editing' : ''}`} key={participant.id}>
-                      <span className="participant-list-number">{index + 1}</span>
+                      <span className="participant-list-number">{(visibleRosterPage - 1) * rosterPageSize + index + 1}</span>
                       <div className="participant-list-name" title={participantDisplayName(participant, discipline)}>
                          <strong>{participantDisplayName(participant, discipline)}</strong>
                          {!participantIsComplete(participant, discipline) && (
@@ -1837,6 +1858,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     </article>
                   ))}
                 </div>
+                {rosterPageCount > 1 && <nav className="creation-roster-pagination" aria-label="Teilnehmerseiten">
+                  <button type="button" className="btn small" disabled={visibleRosterPage === 1}
+                    onClick={() => setRosterPage(visibleRosterPage - 1)}>Zurück</button>
+                  <span aria-live="polite">Seite {visibleRosterPage} von {rosterPageCount} · {participants.length} Einträge</span>
+                  <button type="button" className="btn small" disabled={visibleRosterPage === rosterPageCount}
+                    onClick={() => setRosterPage(visibleRosterPage + 1)}>Weiter</button>
+                </nav>}
               </aside>
 
             {recentlyRemovedParticipant && <div className="creation-undo-remove" role="status">

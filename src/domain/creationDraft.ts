@@ -98,7 +98,8 @@ export function validDraft(value: unknown): value is CreationDraft {
     && Array.isArray(data.participants) && data.participants.length <= 10000
     && data.participants.every((entry) => entry && typeof entry.id === 'string'
       && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
-        .every((key) => typeof (entry as unknown as Record<string, unknown>)[key] === 'string'))
+        .every((key) => typeof (entry as unknown as Record<string, unknown>)[key] === 'string')
+      && (entry.teamName === undefined || typeof entry.teamName === 'string'))
     && (data.reviewRequiredPhaseIds === undefined || (Array.isArray(data.reviewRequiredPhaseIds) && data.reviewRequiredPhaseIds.every((id) => typeof id === 'string')))
     && Array.isArray(data.phaseDrafts) && data.phaseDrafts.length <= 80
     && data.phaseDrafts.every((entry) => entry && typeof entry.id === 'string'
@@ -118,6 +119,7 @@ export function validDraft(value: unknown): value is CreationDraft {
     && data.participantForm !== null && typeof data.participantForm === 'object'
     && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
       .every((key) => typeof (data.participantForm as unknown as Record<string, unknown>)[key] === 'string')
+    && (data.participantForm.teamName === undefined || typeof data.participantForm.teamName === 'string')
     && (data.editingParticipantId === null || typeof data.editingParticipantId === 'string')
     && typeof data.hasVisitedPhaseStep === 'boolean' && typeof data.customMinimumMatches === 'boolean'
     && Number.isInteger(Number(data.minimumMatches)) && Number(data.minimumMatches) >= 1

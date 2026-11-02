@@ -406,10 +406,9 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
     const playing = minutes.reduce((total, value, index) => total + (stages[index].type === 'BREAK' ? 0 : value), 0);
     return { timeline, duration: playing + plannedActiveBreakMinutes(timeline) };
   };
-  const old = scheduleFor(initialPrestartPhases(tournament));
   const recalculated = scheduleFor(phases);
   const awards = tournament.plannedSchedule.find((entry) => entry.id === 'award-ceremony');
-  const oldWasAutomatic = awards?.autoTime === true || awards?.at === old.timeline.estimatedEnd;
+  const oldWasAutomatic = awards?.autoTime === true;
   const ceremonyAt = awards && (oldWasAutomatic || awards.at < recalculated.timeline.estimatedEnd)
     ? recalculated.timeline.estimatedEnd : awards?.at;
   const otherEntries = tournament.plannedSchedule.filter((entry) =>

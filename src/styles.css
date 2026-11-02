@@ -7145,3 +7145,8 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   width: 70px; max-width: 85px; border-radius: 6px;
   border: 1px solid var(--border, #cbd5e1); padding: 5px;
 }
+
+/* Creation roster: viewport-sized pages, no nested scrollbar. */
+.creation-roster-pagination { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 0 0; font-size:.82rem; }
+.creation-roster-pagination span { text-align:center; }
+.participant-roster-grid-card .participant-roster-multi { overflow-y:visible; max-height:none; }
