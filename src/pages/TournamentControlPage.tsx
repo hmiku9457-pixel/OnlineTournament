@@ -46,7 +46,7 @@ import { TableStateLegend, TournamentHallView } from '@/components/TournamentHal
 import { ControlHelpButton, TournamentControlHelp } from '@/components/TournamentControlHelp';
 import type { ControlHelpTopic } from '@/domain/controlGuide';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
-import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
+import { addMockParticipant, updateMockParticipantName, getMockTournament, getPrestartScheduleIssues, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { generateUniquePlayerCode } from '@/services/mockPlayerCodes';
 import { toLocalDateTime } from '@/domain/tournamentSchedule';
 import { computeBreakResumeAt, getStageEntrants, getStageStartIssue, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage, completeStage, canFinishBreak, getBreakResumeAt, formatBreakCountdown, type BreakStartOptions } from '@/services/mockPhaseLifecycle';
@@ -677,6 +677,7 @@ export function TournamentControlPage() {
   // The roster changes the first phase's field automatically. Only a different
   // recommended phase configuration calls for a review.
   const firstPhaseRecommendationWarning = getFirstPhaseRecommendationWarning(tournament, activePrestartParticipants);
+  const prestartScheduleIssues = getPrestartScheduleIssues(tournament);
   const pendingPrestartRecommendationWarning = pendingWithdrawal && !tournament.hasStarted
     ? getFirstPhaseRecommendationWarning(tournament, activePrestartParticipants - 1)
     : null;
@@ -2054,6 +2055,8 @@ export function TournamentControlPage() {
                 <p className="muted">{pauseMode === 'clock' ? 'Datum und Uhrzeit werden gemeinsam geprüft. Verstrichene Termine werden nicht automatisch auf morgen verschoben.' : 'Die Zeit läuft ab dem tatsächlichen Start der Pause.'}</p>
               </div>
             )}
+            {prestartScheduleIssues.length > 0 && startModal.kind === 'tournament'
+              && <p className="break-prestart-warning" role="alert">Zeitplanung prüfen: {prestartScheduleIssues.join(' ')}</p>}
             {firstPhaseRecommendationWarning && startModal.kind === 'tournament' && <p className="break-prestart-warning" role="status">Hinweis zur ersten Phase: {firstPhaseRecommendationWarning} Bitte prüfe vor dem Start die Phaseneinstellungen. Ein erneutes Bestätigen der Phasenplanung ist für gültige Konstellationen nicht erforderlich.</p>}
             {pendingPauseIssue && <p className="field-error" role="alert">{pendingPauseIssue}</p>}
             {pendingStartIssue && <p className="field-error" role="alert">{pendingStartIssue}</p>}

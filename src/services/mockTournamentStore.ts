@@ -396,7 +396,11 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
       label: phase.label, note: phase.type === 'BREAK' ? phase.note : undefined,
       type: phase.type, estimatedMinutes: minutes[index],
       breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
-      breakUntil: phase.breakUntil, nextDayStart: phase.nextDayStart,
+      breakUntil: phase.breakUntil,
+      breakUntilDate: tournament.stages.find((saved) => saved.id === phase.id)?.settings.breakUntilDate
+        ? String(tournament.stages.find((saved) => saved.id === phase.id)!.settings.breakUntilDate)
+        : undefined,
+      nextDayStart: phase.nextDayStart,
       nextDayDate: phase.nextDayDate,
       roundCount: phase.type === 'SWISS' ? phase.swissRounds
         : phase.type === 'KNOCKOUT' ? Math.ceil(Math.log2(phase.entrantCount)) : undefined,
@@ -406,6 +410,9 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
       inlineBreakAfterRound: phase.inlineBreakAfterRound,
       inlineBreakKind: phase.inlineBreakKind,
       inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
+      inlineBreakUntilDate: tournament.stages.find((saved) => saved.id === phase.id)?.settings.inlineBreakUntilDate
+        ? String(tournament.stages.find((saved) => saved.id === phase.id)!.settings.inlineBreakUntilDate)
+        : undefined,
     })));
     const playing = minutes.reduce((total, value, index) => total + (stages[index].type === 'BREAK' ? 0 : value), 0);
     return { timeline, duration: playing + plannedActiveBreakMinutes(timeline) };
@@ -413,8 +420,7 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
   const recalculated = scheduleFor(phases);
   const awards = tournament.plannedSchedule.find((entry) => entry.id === 'award-ceremony');
   const oldWasAutomatic = awards?.autoTime === true;
-  const ceremonyAt = awards && (oldWasAutomatic || awards.at < recalculated.timeline.estimatedEnd)
-    ? recalculated.timeline.estimatedEnd : awards?.at;
+  const ceremonyAt = oldWasAutomatic ? recalculated.timeline.estimatedEnd : awards?.at;
   const otherEntries = tournament.plannedSchedule.filter((entry) =>
     entry.type === 'other' && entry.id !== 'award-ceremony');
   const plannedSchedule = [
@@ -422,6 +428,10 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
     ...otherEntries,
     ...(awards && ceremonyAt ? [{ ...awards, at: ceremonyAt }] : []),
   ];
+  if (awards && !oldWasAutomatic && ceremonyAt && ceremonyAt < recalculated.timeline.estimatedEnd) {
+    recalculated.timeline.warnings.push({ phaseIndex: -1,
+      message: `Die manuell gewählte Siegerehrung um ${ceremonyAt} liegt vor dem neu prognostizierten Turnierende ${recalculated.timeline.estimatedEnd}. Bitte die Uhrzeit ausdrücklich korrigieren.` });
+  }
   return { ...recalculated, plannedSchedule };
 }
 
@@ -448,10 +458,21 @@ export function refreshPrestartSchedule(tournamentId: string): void {
     .filter((name) => !isParticipantWithdrawn(tournament, name)).length;
   const phases = normalizePrestartPhases(initialPrestartPhases(tournament), activeCount);
   const plan = recalculatedPrestartPlan(tournament, phases);
-  if (!plan) return;
+  if (!plan || plan.timeline.warnings.length) return;
   const updated = { ...tournament, plannedSchedule: plan.plannedSchedule,
     estimatedDuration: durationLabel(plan.duration) };
   writeLocalTournaments(all.map((item) => item.id === tournamentId ? updated : item));
+}
+
+/** Warn the director when registrations/withdrawals invalidate a fixed date,
+ * without silently rewriting the planned deadline. */
+export function getPrestartScheduleIssues(tournament: DemoTournament): string[] {
+  if (tournament.hasStarted) return [];
+  const activeCount = getRuntimeParticipantNames(tournament)
+    .filter((name) => !isParticipantWithdrawn(tournament, name)).length;
+  if (activeCount < 2) return [];
+  const phases = normalizePrestartPhases(initialPrestartPhases(tournament), activeCount);
+  return recalculatedPrestartPlan(tournament, phases)?.timeline.warnings.map((warning) => warning.message) ?? [];
 }
 
 /** Reconfigure a local tournament only until its very first start.
@@ -557,6 +578,7 @@ export function updatePrestartTournamentPhases(
   tournamentId: string,
   drafts: PrestartPhaseDraft[],
   expectedFingerprint?: string,
+  manuallyConfirmedCeremonyAt?: string,
 ): { ok: boolean; error?: string; tournament?: DemoTournament; unchanged?: boolean } {
   const all = readLocalTournaments();
   const previous = all.find((item) => item.id === tournamentId);
@@ -567,13 +589,24 @@ export function updatePrestartTournamentPhases(
   if (expectedFingerprint !== undefined && expectedFingerprint !== prestartPlanningFingerprint(previous)) {
     return { ok: false, error: 'Die Turnierplanung, die Teilnehmer oder die Auslosung wurden in einem anderen Tab geändert. Bitte die aktuelle Planung neu öffnen und deine Änderungen überprüfen.' };
   }
-  if (samePrestartPlan(previous, drafts)) return { ok: true, tournament: previous, unchanged: true };
+  if (samePrestartPlan(previous, drafts) && manuallyConfirmedCeremonyAt === undefined)
+    return { ok: true, tournament: previous, unchanged: true };
 
   const active = getRuntimeParticipantNames(previous).filter((name) => !isParticipantWithdrawn(previous, name));
   const errors = validatePrestartPhases(drafts, active.length);
   if (errors.length) return { ok: false, error: errors[0] };
 
   const newPlan = recalculatedPrestartPlan(previous, drafts);
+  if (newPlan && manuallyConfirmedCeremonyAt !== undefined) {
+    const ceremony = newPlan.plannedSchedule.find((item) => item.id === 'award-ceremony');
+    if (!ceremony || ceremony.autoTime) return { ok: false, error: 'Keine manuelle Siegerehrung vorhanden.' };
+    if (!isValidLocalDateTime(manuallyConfirmedCeremonyAt)
+      || manuallyConfirmedCeremonyAt < newPlan.timeline.estimatedEnd) {
+      return { ok: false, error: 'Die neue Uhrzeit der Siegerehrung muss am oder nach dem Turnierende liegen.' };
+    }
+    ceremony.at = manuallyConfirmedCeremonyAt;
+    newPlan.timeline.warnings = newPlan.timeline.warnings.filter((warning) => warning.phaseIndex !== -1);
+  }
   if (newPlan?.timeline.warnings.length) return { ok: false, error: newPlan.timeline.warnings[0].message };
   if (newPlan) {
     const scheduleIssues = validatePlannedSchedule(newPlan.plannedSchedule);
@@ -633,8 +666,9 @@ export function updatePrestartTournamentPhases(
  * still require a global cross-tab guard. */
 export async function updatePrestartTournamentPhasesSafely(
   tournamentId: string, drafts: PrestartPhaseDraft[], expectedFingerprint: string,
+  manuallyConfirmedCeremonyAt?: string,
 ): Promise<ReturnType<typeof updatePrestartTournamentPhases>> {
-  const perform = () => updatePrestartTournamentPhases(tournamentId, drafts, expectedFingerprint);
+  const perform = () => updatePrestartTournamentPhases(tournamentId, drafts, expectedFingerprint, manuallyConfirmedCeremonyAt);
   if (typeof navigator !== 'undefined' && navigator.locks?.request) {
     return navigator.locks.request('online-tournament:prestart:shared-storage', { mode: 'exclusive' }, async () => {
       const result = perform();

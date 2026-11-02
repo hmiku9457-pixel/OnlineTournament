@@ -464,6 +464,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [submittingTournament, setSubmittingTournament] = useState(false);
   const [prestartSaveError, setPrestartSaveError] = useState('');
   const [prestartSaveBusy, setPrestartSaveBusy] = useState(false);
+  const prestartManualCeremony = prestart?.tournament.plannedSchedule?.find((item) =>
+    item.id === 'award-ceremony' && item.autoTime === false);
+  const [prestartCeremonyAt, setPrestartCeremonyAt] = useState(
+    restoredDraft?.awardsAtOverride ?? prestartManualCeremony?.at ?? '');
   const [step, setStep] = useState<WizardStep>((restoredDraft?.step ?? 1) as WizardStep);
   const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>((restoredDraft?.maxReachedStep ?? 1) as WizardStep);
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(restoredDraft?.hasVisitedPhaseStep ?? false);
@@ -663,9 +667,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     inlineBreakKind: phase.inlineBreakKind, inlineBreakMinutes: phase.inlineBreakMinutes,
     inlineBreakUntil: phase.inlineBreakUntil,
   }));
-  const currentPrestartSignature = JSON.stringify(prestartPhaseDrafts.map(prestartPhaseSignature));
+  const currentPrestartSignature = JSON.stringify([
+    prestartPhaseDrafts.map(prestartPhaseSignature),
+    prestartManualCeremony && prestartCeremonyAt !== prestartManualCeremony.at ? prestartCeremonyAt : null,
+  ]);
   const prestartDirty = Boolean(prestart && currentPrestartSignature
-    !== JSON.stringify(originalPrestartPhases.current.map(prestartPhaseSignature)));
+    !== JSON.stringify([originalPrestartPhases.current.map(prestartPhaseSignature), null]));
   useEffect(() => {
     if (!confirmPrestartSave) return;
     if (prestartConfirmationSignature.current !== currentPrestartSignature) {
@@ -718,7 +725,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     let result: Awaited<ReturnType<typeof updatePrestartTournamentPhasesSafely>>;
     try {
       result = await updatePrestartTournamentPhasesSafely(prestart.tournament.id, prestartPhaseDrafts,
-        originalPrestartFingerprint.current);
+        originalPrestartFingerprint.current,
+        prestartManualCeremony && prestartCeremonyAt !== prestartManualCeremony.at ? prestartCeremonyAt : undefined);
     } catch (error) {
       setPrestartSaveError(error instanceof Error ? error.message : 'Der Speichervorgang ist fehlgeschlagen.');
       setConfirmPrestartSave(false);
@@ -1458,7 +1466,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     inlineBreakKind: phase.inlineBreakKind,
     inlineBreakMinutes: phase.inlineBreakMinutes,
     inlineBreakUntil: phase.inlineBreakUntil,
-  })), [phaseDrafts, phaseEstimates, tables, timedSport, matchDurationMinutes, breakMinutes, sport]);
+    breakUntilDate: prestart ? String(prestart.tournament.stages.find((saved) => saved.id === phase.id)?.settings.breakUntilDate ?? '') : undefined,
+    inlineBreakUntilDate: prestart ? String(prestart.tournament.stages.find((saved) => saved.id === phase.id)?.settings.inlineBreakUntilDate ?? '') : undefined,
+  })), [phaseDrafts, phaseEstimates, tables, timedSport, matchDurationMinutes, breakMinutes, sport, prestart]);
   const plannedTimeline = useMemo(() => buildPlannedTimeline(scheduledStart, phaseScheduleProposals),
     [scheduledStart, phaseScheduleProposals]);
   // Only active competition and pauses during tournament days count toward
@@ -1478,6 +1488,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const scheduleIssues = [...validatePlannedSchedule(plannedSchedule), ...plannedTimelineConflicts(plannedTimeline), ...(ceremonyIssue ? [ceremonyIssue] : [])];
   const prestartIssues = prestart
     ? [...validatePrestartPhases(prestartPhaseDrafts, prestart.activeParticipants), ...validatePlannedSchedule(plannedTimeline.items), ...plannedTimelineConflicts(plannedTimeline),
+      ...(prestartManualCeremony && prestartCeremonyAt < plannedTimeline.estimatedEnd
+        ? ['Die manuelle Siegerehrung liegt vor dem neuen Turnierende. Bitte einen späteren Termin angeben.'] : []),
       ...(reviewRequiredPhaseIds.length ? ['Bitte alle automatisch veränderten Phasen als geprüft markieren.'] : [])]
     : [];
   const overnightDatesValid = phaseDrafts.every((phase, index) => {
@@ -2668,9 +2680,18 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         </div>}
         {(() => {
           const ceremony = prestart.tournament.plannedSchedule?.find((item) => item.id === 'award-ceremony');
-          return ceremony && !ceremony.autoTime && ceremony.at < plannedTimeline.estimatedEnd
-            ? <p className="callout" role="status">Die bisher festgelegte Siegerehrung um {formatPlannedDateTime(ceremony.at)}
-              wird aufgrund der neuen Phasendauer automatisch auf {formatPlannedDateTime(plannedTimeline.estimatedEnd)} verschoben.</p>
+          return ceremony && !ceremony.autoTime
+            ? <div className="callout">
+                <p>Manuell geplante Siegerehrung: {formatPlannedDateTime(ceremony.at)}. Sie wird nicht ohne Bestätigung verschoben.</p>
+                <div className="actions">
+                  <label>Datum<input type="date" value={prestartCeremonyAt.slice(0, 10)}
+                    onChange={(event) => setPrestartCeremonyAt(event.target.value + 'T' + (prestartCeremonyAt.slice(11, 16) || '12:00'))} /></label>
+                  <label>Uhrzeit<input type="time" value={prestartCeremonyAt.slice(11, 16)}
+                    onChange={(event) => setPrestartCeremonyAt(prestartCeremonyAt.slice(0, 10) + 'T' + event.target.value)} /></label>
+                  <button className="btn small" type="button"
+                    onClick={() => setPrestartCeremonyAt(plannedTimeline.estimatedEnd)}>Auf neues Turnierende setzen</button>
+                </div>
+              </div>
             : null;
         })()}
         <p className="muted">Beim Speichern werden die bisherigen Vorstart-Auslosungen neu erstellt. Teilnehmer, Codes und Rückzüge bleiben erhalten.</p>

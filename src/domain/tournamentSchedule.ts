@@ -148,6 +148,8 @@ export interface SchedulePhaseProposal {
   breakKind?: 'minutes' | 'until' | 'overnight';
   breakMinutes?: number;
   breakUntil?: string;
+  /** Immutable local day originally chosen for a fixed deadline. */
+  breakUntilDate?: string;
   nextDayStart?: string;
   /** Optional explicit return date; absent means the calendar day after the previous phase. */
   nextDayDate?: string;
@@ -158,6 +160,7 @@ export interface SchedulePhaseProposal {
   inlineBreakKind?: 'minutes' | 'until';
   inlineBreakMinutes?: number;
   inlineBreakUntil?: string;
+  inlineBreakUntilDate?: string;
 }
 
 export interface PlannedTimeline {
@@ -219,8 +222,11 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
         let resume = inlineStart;
         let validDuration = true;
         if (phase.inlineBreakKind === 'until') {
-          const target = clockAt(inlineStart, phase.inlineBreakUntil ?? '13:00');
-          if (target < inlineStart) {
+          const target = phase.inlineBreakUntilDate
+            ? parseLocalDateTime(`${phase.inlineBreakUntilDate}T${phase.inlineBreakUntil ?? '13:00'}`)
+              ?? new Date(NaN)
+            : clockAt(inlineStart, phase.inlineBreakUntil ?? '13:00');
+          if (Number.isNaN(target.getTime()) || target < inlineStart) {
             warnings.push({ phaseIndex: index, message: `„${phase.label}“: Die Zwischenpause nach Runde ${afterRound} beginnt voraussichtlich um ${formatPlannedDateTime(toLocalDateTime(inlineStart), false)}. „Pause bis ${phase.inlineBreakUntil ?? '13:00'} Uhr“ liegt davor. Bitte eine spätere Uhrzeit wählen.` });
             validDuration = false;
           } else resume = target;
@@ -243,10 +249,12 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
       pause.durationMinutes = Math.max(0, Math.round((cursor.getTime() - pauseStart.getTime()) / 60000));
       pause.durationApproximate = true;
     } else if (phase.breakKind === 'until') {
-      const target = clockAt(cursor, phase.breakUntil ?? '12:00');
+      const target = phase.breakUntilDate
+        ? parseLocalDateTime(`${phase.breakUntilDate}T${phase.breakUntil ?? '12:00'}`) ?? new Date(NaN)
+        : clockAt(cursor, phase.breakUntil ?? '12:00');
       const pause = items[items.length - 1];
       pause.durationApproximate = true;
-      if (target.getTime() < cursor.getTime()) {
+      if (Number.isNaN(target.getTime()) || target.getTime() < cursor.getTime()) {
         const planned = String(phase.breakUntil ?? '12:00');
         const earliest = formatPlannedDateTime(toLocalDateTime(cursor), false);
         warnings.push({
