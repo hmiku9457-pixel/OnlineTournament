@@ -293,6 +293,24 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
   };
 }
 
+/** Keep an editable numeric text draft until the field loses focus. */
+function BufferedNumberInput({ id, value, min, max, onCommit }: {
+  id?: string; value: number; min: number; max: number; onCommit: (value: number) => void;
+}) {
+  const [raw, setRaw] = useState(String(value));
+  useEffect(() => setRaw(String(value)), [value]);
+  function commit() {
+    const parsed = Number(raw);
+    const next = raw.trim() !== '' && Number.isFinite(parsed)
+      ? Math.max(min, Math.min(max, Math.trunc(parsed))) : value;
+    setRaw(String(next));
+    if (next !== value) onCommit(next);
+  }
+  return <input id={id} type="number" min={min} max={max} step="1"
+    value={raw} onChange={(event) => setRaw(event.target.value)}
+    onBlur={commit} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} />;
+}
+
 function NumberChoice({
   value,
   presets,
@@ -2111,7 +2129,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           <section className="phase-wizard-step">
             <h2>Phasen konfigurieren</h2>
             <p className="muted">Ordne deine Phasen an und öffne bei Bedarf die Einstellungen.</p>
-            {!canCreate && (
+            {!prestart && !canCreate && (
               <div className="wizard-schedule-errors" role="alert">
                 <strong>Bitte vor der Zusammenfassung korrigieren:</strong>
                 <ul>
@@ -2395,8 +2413,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                 </label>
                                 {phase.breakKind === 'minutes' ? (
                                   <label className="field">Dauer in Minuten
-                                    <input type="number" min="1" max="1440" step="1" value={phase.breakMinutes}
-                                      onChange={(event) => updatePhase(phase.id, { breakMinutes: Number(event.target.value) })} />
+                                    <BufferedNumberInput min={1} max={1440} value={phase.breakMinutes}
+                                      onCommit={(value) => updatePhase(phase.id, { breakMinutes: value })} />
                                   </label>
                                 ) : phase.breakKind === 'until' ? (
                                   <>
@@ -2483,14 +2501,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                             {index > 0 && !isTerminalStage(phase.type) && (
                               <div className="field">
                                 <label htmlFor={`entrants-${phase.id}`}>Weiterkommende Teilnehmer aus Phase {previousCompetitionPhaseNumber}</label>
-                                <input
-                                  id={`entrants-${phase.id}`}
-                                  type="number"
-                                  min="2"
-                                  max={maximumPhaseEntrants}
-                                  value={phase.entrantCount}
-                                  onChange={(event) => updatePhaseEntrants(index, Number(event.target.value))}
-                                />
+                                <BufferedNumberInput id={`entrants-${phase.id}`} min={2} max={maximumPhaseEntrants}
+                                  value={phase.entrantCount} onCommit={(value) => updatePhaseEntrants(index, value)} />
                               </div>
                             )}
 
@@ -2504,28 +2516,20 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                             {phase.type === 'GROUPS' && (
                               <div className="field">
                                 <label htmlFor={`groups-${phase.id}`}>Anzahl Gruppen</label>
-                                <input
-                                  id={`groups-${phase.id}`}
-                                  type="number"
-                                  min="2"
+                                <BufferedNumberInput id={`groups-${phase.id}`} min={2}
                                   max={Math.max(2, Math.floor(phase.entrantCount / 2))}
                                   value={Math.min(phase.groupCount, Math.max(2, Math.floor(phase.entrantCount / 2)))}
-                                  onChange={(event) => updatePhase(phase.id, { groupCount: Math.max(2, Math.min(Math.floor(phase.entrantCount / 2), Number(event.target.value))) })}
-                                />
+                                  onCommit={(value) => updatePhase(phase.id, { groupCount: value })} />
                               </div>
                             )}
 
                             {phase.type === 'SWISS' && (
                               <div className="field">
                                 <label htmlFor={`swiss-rounds-${phase.id}`}>Runden</label>
-                                <input
-                                  id={`swiss-rounds-${phase.id}`}
-                                  type="number"
-                                  min="2"
+                                <BufferedNumberInput id={`swiss-rounds-${phase.id}`} min={2}
                                   max={Math.max(2, phase.entrantCount - 1)}
                                   value={phase.swissRounds}
-                                  onChange={(event) => updatePhase(phase.id, { swissRounds: Math.max(2, Math.min(phase.entrantCount - 1, Number(event.target.value))) })}
-                                />
+                                  onCommit={(value) => updatePhase(phase.id, { swissRounds: value })} />
                                 {!isValidSwissRoundCount(phase.swissRounds, phase.entrantCount) &&
                                   <span className="field-error" role="alert">{phase.entrantCount < 3
                                     ? 'Für das Schweizer System sind mindestens 3 Teilnehmer erforderlich.'
@@ -2613,8 +2617,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                       </label>
                                       {phase.inlineBreakKind === 'minutes' ? (
                                         <label className="field">Dauer in Minuten
-                                          <input type="number" min={1} max={1440} value={phase.inlineBreakMinutes}
-                                            onChange={(event) => updatePhase(phase.id, { inlineBreakMinutes: Number(event.target.value) })} />
+                                          <BufferedNumberInput min={1} max={1440} value={phase.inlineBreakMinutes}
+                                            onCommit={(value) => updatePhase(phase.id, { inlineBreakMinutes: value })} />
                                         </label>
                                       ) : (
                                         <>
