@@ -2277,6 +2277,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                       const knockoutRounds = phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount) : [];
                       const inlineBreakRounds = phase.type === 'SWISS' ? phase.swissRounds
                         : phase.type === 'KNOCKOUT' ? knockoutRounds.length : 0;
+                      const dayRoundCount = playingRounds(phase);
                       const inlineBreakActive = inlineBreakRounds > 1 && phase.inlineBreakAfterRound > 0;
                       const inlineBreakExpanded = expandedInlineBreakIds.includes(phase.id);
                       const editingPhaseType = editingPhaseTypeId === phase.id;
@@ -2656,6 +2657,50 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                             </div>
                           )}
                           </div>}
+                          {isExpanded && tournamentMode === 'multi' && phase.type !== 'BREAK' && (
+                            <section className="playing-day-editor" aria-label={`Spieltagswechsel innerhalb Phase ${index + 1}`}>
+                              <div className="playing-day-editor-heading">
+                                <div><strong>Spieltage innerhalb der Phase</strong>
+                                  <p className="field-hint">Unterbrechung nach einer vollständigen Runde mit konkreter Fortsetzung am nächsten Spieltag.</p></div>
+                                <button type="button" className="btn small" disabled={dayRoundCount < 2 || phase.dayBreaks.length >= dayRoundCount - 1 || configuredPlayingDays(phaseDrafts) >= 14}
+                                  onClick={() => {
+                                    const available = Array.from({ length: dayRoundCount - 1 }, (_, i) => i + 1)
+                                      .find((round) => round !== phase.inlineBreakAfterRound && !phase.dayBreaks.some((item) => item.afterRound === round));
+                                    if (!available) return;
+                                    updatePhase(phase.id, { dayBreaks: [...phase.dayBreaks, {
+                                      afterRound: available, date: followingPlayingDate(scheduledDate, configuredPlayingDays(phaseDrafts)), time: '09:00',
+                                    }].sort((a,b) => a.afterRound - b.afterRound) });
+                                  }}>+ Spieltagsende nach Runde</button>
+                              </div>
+                              {phase.dayBreaks.map((boundary, position) => {
+                                const boundaryTime = plannedTimeline.items.find((item) => item.id === `day-break-${index + 1}-${boundary.afterRound}`)?.at;
+                                return <div className="playing-day-editor-row" key={position}>
+                                  <label className="field">Nach Runde
+                                    <select value={boundary.afterRound} onChange={(event) => updatePhase(phase.id, {
+                                      dayBreaks: phase.dayBreaks.map((item, i) => i === position
+                                        ? { ...item, afterRound: Number(event.target.value) } : item),
+                                    })}>
+                                      {Array.from({ length: dayRoundCount - 1 }, (_, i) => i + 1)
+                                        .filter((round) => round === boundary.afterRound || (round !== phase.inlineBreakAfterRound && !phase.dayBreaks.some((entry) => entry.afterRound === round)))
+                                        .map((round) => <option value={round} key={round}>Runde {round}</option>)}
+                                    </select>
+                                  </label>
+                                  <label className="field">Fortsetzungsdatum
+                                    <CalendarDatePicker label="Fortsetzungsdatum" value={boundary.date}
+                                      minDate={followingPlayingDate((boundaryTime ?? scheduledStart).slice(0,10), 1)}
+                                      onChange={(date) => updatePhase(phase.id, { dayBreaks: phase.dayBreaks.map((item,i) => i === position ? { ...item, date } : item) })}/>
+                                  </label>
+                                  <label className="field">Fortsetzungsuhrzeit
+                                    <ClockTimePicker label="Fortsetzungsuhrzeit" value={boundary.time}
+                                      onChange={(time) => updatePhase(phase.id, { dayBreaks: phase.dayBreaks.map((item,i) => i === position ? { ...item, time } : item) })}/>
+                                  </label>
+                                  <button type="button" className="btn small danger-outline" onClick={() => updatePhase(phase.id, {
+                                    dayBreaks: phase.dayBreaks.filter((_, i) => i !== position),
+                                  })}>Entfernen</button>
+                                </div>;
+                              })}
+                            </section>
+                          )}
                           {isExpanded && inlineBreakActive && (
                             <section
                               className={`phase-inline-break phase-inline-break-card ${inlineBreakExpanded ? 'is-expanded' : 'is-collapsed'}`}
@@ -2851,6 +2896,16 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           </section>
         )}
       </div>
+      {pendingTournamentMode && <div className="modal-backdrop" role="presentation">
+        <section className="modal" role="alertdialog" aria-modal="true" aria-label="Turniermodus wechseln?">
+          <h2>Auf eintägiges Turnier umstellen?</h2>
+          <p>Vorhandene Spieltagsenden bleiben erhalten. Du kannst sie danach gezielt entfernen; es werden keine Phasen ungefragt gelöscht.</p>
+          <div className="modal-actions">
+            <button type="button" className="btn" onClick={() => setPendingTournamentMode(null)}>Bisherigen Modus behalten</button>
+            <button type="button" className="btn danger" onClick={() => { setTournamentMode('single'); setPendingTournamentMode(null); }}>Auf eintägig umstellen</button>
+          </div>
+        </section>
+      </div>}
       {prestart && <section className="prestart-phase-save-panel" aria-label="Vorstart-Planung übernehmen">
         <PlannedScheduleEditor
           scheduledStart={scheduledStart} timeline={plannedTimeline}
