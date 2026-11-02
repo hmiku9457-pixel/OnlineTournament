@@ -90,3 +90,15 @@ export function validPlayingDayBreaks(breaks: readonly PlayingDayBreak[] | undef
     return true;
   });
 }
+
+/** Stage settings store JSON scalars, so day breaks are serialized as text. */
+export function parseSavedPlayingDayBreaks(value: unknown): PlayingDayBreak[] {
+  if (typeof value !== 'string') return [];
+  try {
+    const decoded: unknown = JSON.parse(value);
+    if (!Array.isArray(decoded) || decoded.length > 13) return [];
+    if (!decoded.every((item) => item && typeof item === 'object' && Number.isInteger(item.afterRound)
+      && typeof item.date === 'string' && typeof item.time === 'string')) return [];
+    return decoded as PlayingDayBreak[];
+  } catch { return []; }
+}
