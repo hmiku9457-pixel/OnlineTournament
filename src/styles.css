@@ -3727,6 +3727,45 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .wizard-workspace .participant-roster-multi .participant-list-actions .btn { padding: 5px 7px; font-size: .73rem; }
 .wizard-workspace .participant-roster-multi .participant-empty { grid-column: 1 / -1; }
 .wizard-workspace .participant-roster-multi .participant-roster-row:last-child { border: 1px solid #e4e7ec; }
+/* Roster cards have a stable, measurable height. Long names move horizontally
+   rather than wrapping and changing pagination capacity. */
+.wizard-workspace .participant-roster-multi .participant-roster-row {
+  height: 76px;
+  min-height: 76px;
+  max-height: 76px;
+  overflow: hidden;
+  grid-template-rows: 23px 23px;
+  align-content: center;
+}
+.wizard-workspace .participant-roster-multi .participant-list-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  align-self: center;
+}
+.participant-name-marquee-viewport { width: 100%; min-width: 0; overflow: hidden; white-space: nowrap; }
+.participant-name-marquee { display: flex; align-items: center; gap: 26px; width: max-content; max-width: none; white-space: nowrap; }
+.participant-name-marquee strong { display: block; flex: 0 0 auto; max-width: none; overflow: visible !important; text-overflow: clip !important; white-space: nowrap; }
+.participant-name-marquee.is-running { animation: participant-name-scroll 13s linear infinite; }
+.participant-roster-row:hover .participant-name-marquee.is-running,
+.participant-roster-row:focus-within .participant-name-marquee.is-running { animation-play-state: paused; }
+@keyframes participant-name-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .participant-name-marquee.is-running { animation: none; }
+}
+.tournament-mode-setting { display: grid; gap: 10px; margin: 12px 0 17px; padding: 12px; background: #f8fafc; border: 1px solid #e4e7ec; border-radius: 10px; }
+.tournament-mode-choice { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.tournament-mode-choice legend { font-weight: 800; font-size: .83rem; margin-bottom: 8px; }
+.tournament-mode-choice label { display: inline-flex; align-items: center; gap: 7px; font-size: .8rem; }
+.tournament-day-count { max-width: 380px; }
+.playing-day-editor { margin: 12px 0; padding: 12px; border: 1px solid #d4def0; border-radius: 10px; background: #f8fbff; display: grid; gap: 10px; }
+.playing-day-editor-heading { display: flex; justify-content: space-between; gap: 14px; align-items: center; flex-wrap: wrap; }
+.playing-day-editor-heading p { margin: 4px 0 0; }
+.playing-day-editor-row { display: grid; grid-template-columns: minmax(125px, .65fr) minmax(155px, 1fr) minmax(145px, 1fr) auto; gap: 8px; align-items: end; }
+.playing-day-editor-row .field { min-width: 0; }
+@media (max-width: 850px) { .playing-day-editor-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 470px) { .playing-day-editor-row { grid-template-columns: minmax(0, 1fr); } }
+
 
 /* Raster: kompakte, sofort sichtbare Plus-/Minus-Schalter. */
 .hall-editor-grid-controls {
