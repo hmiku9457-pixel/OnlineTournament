@@ -110,6 +110,36 @@ try {
     'settings sit above, rather than to the right of, recommendations');
   assert.ok(Math.abs(step3Layout.settingsWidth - step3Layout.recommendationsWidth) <= 2,
     'proposals use the same full available width as the settings');
+  // The quick-settings controls must be compact and readable, with a small
+  // chip-style selection row rather than large native checkboxes.
+  const quickSettings = await page.evaluate(() => {
+    const panel = document.querySelector('.format-settings-panel');
+    const primary = panel?.querySelector('.tournament-mode-setting');
+    const numberFields = panel?.querySelector('.format-setting-fields');
+    const systems = panel?.querySelector('.format-toggle-group');
+    const rows = [primary, numberFields, systems].map((element) => element?.getBoundingClientRect());
+    const chips = [...(panel?.querySelectorAll('.format-toggle') ?? [])];
+    return {
+      height: panel?.getBoundingClientRect().height ?? 0,
+      rows: rows.map((r) => r ? { top:r.top, bottom:r.bottom } : null),
+      systems: chips.length,
+      allActive: chips.every((x) => x.querySelector('input')?.checked),
+      chipHeight: chips[0]?.getBoundingClientRect().height ?? 0,
+      chipBackground: chips[0] ? getComputedStyle(chips[0]).backgroundColor : '',
+    };
+  });
+  assert.equal(quickSettings.systems, 4);
+  assert.ok(quickSettings.height < 320, `quick settings should remain compact: ${quickSettings.height}px`);
+  assert.equal(quickSettings.allActive, true);
+  assert.ok(quickSettings.chipHeight < 46);
+  assert.notEqual(quickSettings.chipBackground, 'rgb(255, 255, 255)', 'active systems are highlighted chips');
+  const systemsControl = page.locator('.format-toggle-group');
+  await systemsControl.getByLabel('Schweizer System').uncheck();
+  assert.equal(await systemsControl.getByLabel('Schweizer System').isChecked(), false);
+  await systemsControl.getByLabel('Schweizer System').check();
+  await page.locator('.format-help-details summary').click();
+  assert.equal(await page.locator('.format-help-details').getAttribute('open'), '');
+  await page.locator('.format-help-details summary').click();
   // Recommendation settings are directly editable and expose bounded
   // + / - actions. The duration is a soft preference, not a hard filter.
   assert.equal(await page.locator('#preferred-duration').innerText(), '03:30');
@@ -767,7 +797,7 @@ try {
     await multiPage.getByRole('button', { name: 'Spieler hinzufügen' }).click();
   }
   await next(multiPage);
-  await multiPage.getByRole('radio', { name: 'Mehrtägiges Turnier' }).check();
+  await multiPage.getByRole('radio', { name: 'Mehrtägig' }).check();
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
   assert.equal(await multiPage.locator('#preferred-duration').innerText(), '03:30',
     'multi-day mode does not change the total active-duration preference');
@@ -779,13 +809,30 @@ try {
   await multiPage.reload();
   await multiPage.locator('.phase-wizard-step').waitFor();
   await multiPage.locator('.wizard-step').nth(2).click();
-  assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägiges Turnier' }).isChecked(), true);
+  assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägig' }).isChecked(), true);
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
-  await multiPage.getByRole('radio', { name: 'Eintägiges Turnier' }).click();
+  const summaryBeforeModeSwitch = await multiPage.locator('.wizard-side-summary').innerText();
+  await multiPage.getByRole('radio', { name: 'Eintägig' }).click();
   const multiModeDialog = multiPage.getByRole('alertdialog', { name: 'Turniermodus wechseln?' });
   await multiModeDialog.waitFor();
-  await multiModeDialog.getByRole('button', { name: 'Bisherigen Modus behalten' }).click();
-  assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägiges Turnier' }).isChecked(), true);
+  const dialogGeometry = await multiPage.evaluate(() => {
+    const backdrop = document.querySelector('.sport-change-backdrop:has([aria-label="Turniermodus wechseln?"])');
+    const dialog = backdrop?.querySelector('.sport-change-dialog');
+    const rect = dialog?.getBoundingClientRect();
+    return { position: backdrop ? getComputedStyle(backdrop).position : '',
+      zIndex: backdrop ? Number(getComputedStyle(backdrop).zIndex) : 0,
+      dialogCentered: Boolean(rect && Math.abs((rect.left + rect.width / 2) - window.innerWidth / 2) < 3) };
+  });
+  assert.equal(dialogGeometry.position, 'fixed', 'the confirmation must be a real viewport overlay');
+  assert.ok(dialogGeometry.zIndex >= 1000);
+  assert.ok(dialogGeometry.dialogCentered);
+  assert.equal(await multiPage.locator('.wizard-side-summary').innerText(), summaryBeforeModeSwitch,
+    'opening the confirmation must not overwrite the tournament summary');
+  await multiModeDialog.getByRole('button', { name: 'Mehrtägig behalten' }).click();
+  assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägig' }).isChecked(), true);
+  await multiPage.getByRole('radio', { name: 'Eintägig' }).click();
+  await multiModeDialog.getByRole('button', { name: 'Auf eintägig umstellen' }).click();
+  assert.equal(await multiPage.getByRole('radio', { name: 'Eintägig' }).isChecked(), true);
   await multiContext.close();
 
   // Doubles keep the original taller card, with one player per line.
