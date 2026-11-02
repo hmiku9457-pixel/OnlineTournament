@@ -1614,7 +1614,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     breakUntilDate: phase.breakUntilDate || undefined,
     nextDayStart: phase.nextDayStart,
     nextDayDate: phase.nextDayDate,
-    roundCount: phase.type === 'SWISS' ? phase.swissRounds : phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount).length : undefined,
+    roundCount: playingRounds(phase) || undefined,
     roundDurationsMinutes: phase.type === 'KNOCKOUT'
       ? estimateKnockoutRoundMinutes(phase.entrantCount, tables, phase.bestOf, phase.knockoutBestOf,
         timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : { minutesPerSet: planningMinutesPerSet(sport) })
