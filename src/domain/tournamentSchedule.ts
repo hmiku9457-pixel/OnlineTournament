@@ -180,6 +180,7 @@ export interface SchedulePhaseProposal {
   inlineBreakMinutes?: number;
   inlineBreakUntil?: string;
   inlineBreakUntilDate?: string;
+  dayBreaks?: import('./playingDays').PlayingDayBreak[];
 }
 
 export interface PlannedTimeline {
@@ -225,7 +226,60 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
       const totalDuration = Math.max(0, phase.estimatedMinutes);
       const roundCount = Math.max(0, Math.trunc(phase.roundCount ?? 0));
       const afterRound = Number(phase.inlineBreakAfterRound) || 0;
-      if (roundCount > 1 && afterRound >= 1 && afterRound < roundCount) {
+      if (phase.dayBreaks?.length) {
+        // Rounds are indivisible. Equal cumulative rounding preserves the exact
+        // phase estimate; knockout rounds use their individual Best-of durations.
+        const rounds = Math.max(1, roundCount);
+        const fractions = phase.roundDurationsMinutes?.length === rounds
+          ? phase.roundDurationsMinutes
+          : Array.from({ length: rounds }, (_, round) =>
+            Math.round(totalDuration * (round + 1) / rounds) - Math.round(totalDuration * round / rounds));
+        const boundaries = [...phase.dayBreaks].sort((a, b) => a.afterRound - b.afterRound);
+        for (let round = 1; round <= rounds; round++) {
+          cursor = new Date(cursor.getTime() + (fractions[round - 1] ?? 0) * 60000);
+          if (afterRound === round && phase.inlineBreakAfterRound && phase.inlineBreakKind) {
+            const item: PlannedScheduleItem = {
+              id: `inline-break-${index + 1}`, at: toLocalDateTime(cursor),
+              title: `Pause nach Runde ${round} · ${phase.label}`, type: 'break',
+              durationApproximate: phase.inlineBreakKind === 'until',
+            };
+            items.push(item);
+            const requested = phase.inlineBreakUntilDate
+              ? parseLocalDateTime(`${phase.inlineBreakUntilDate}T${phase.inlineBreakUntil ?? '13:00'}`)
+              : clockAt(cursor, phase.inlineBreakUntil ?? '13:00');
+            const resume = phase.inlineBreakKind === 'until'
+              ? requested : new Date(cursor.getTime() + Math.max(1, phase.inlineBreakMinutes ?? 15) * 60000);
+            if (!resume || resume < cursor) warnings.push({ phaseIndex: index,
+              message: `„${phase.label}“: Zwischenpause nach Runde ${round} hat ein ungültiges oder zu frühes Pausenziel.` });
+            else {
+              item.durationMinutes = Math.round((resume.getTime() - cursor.getTime()) / 60000);
+              cursor = resume;
+            }
+            items.push({ id: `inline-resume-${index + 1}`, at: toLocalDateTime(cursor),
+              title: `Fortsetzung Runde ${round + 1} · ${phase.label}`, type: 'competition' });
+          }
+          const boundary = boundaries.find((value) => value.afterRound === round);
+          if (!boundary) continue;
+          const finish = cursor;
+          const resume = parseLocalDateTime(`${boundary.date}T${boundary.time}`);
+          const valid = Boolean(resume && boundary.date > toLocalDateTime(finish).slice(0, 10)
+            && resume.getTime() > finish.getTime());
+          const dayBreak: PlannedScheduleItem = {
+            id: `day-break-${index + 1}-${round}`, at: toLocalDateTime(finish),
+            title: `Spieltagsende nach Runde ${round} · ${phase.label}`,
+            type: 'break', breakKind: 'overnight', durationApproximate: true,
+          };
+          items.push(dayBreak);
+          if (!valid) warnings.push({ phaseIndex: index,
+            message: `„${phase.label}“: Das Fortsetzungsdatum nach Runde ${round} muss nach dem tatsächlichen Tagesende liegen. Gewählt: ${boundary.date} ${boundary.time} Uhr.` });
+          else {
+            dayBreak.durationMinutes = Math.round((resume!.getTime() - finish.getTime()) / 60000);
+            cursor = resume!;
+          }
+          items.push({ id: `day-resume-${index + 1}-${round}`, at: toLocalDateTime(cursor),
+            title: `Fortsetzung ab Runde ${round + 1} · ${phase.label}`, type: 'competition' });
+        }
+      } else if (roundCount > 1 && afterRound >= 1 && afterRound < roundCount) {
         const roundMinutes = phase.roundDurationsMinutes;
         const validBreakdown = roundMinutes?.length === roundCount
           && roundMinutes.every((value) => Number.isFinite(value) && value >= 0);
@@ -297,6 +351,29 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
     }
   });
   return { items, estimatedEnd: toLocalDateTime(cursor), warnings };
+}
+
+/** Verify that play never spills over midnight without an explicit day break.
+ * Ordinary overnight pause entries are separators and are excluded here. */
+export function playingDayOverflowWarnings(timeline: PlannedTimeline): string[] {
+  const issues: string[] = [];
+  let start: string | null = null;
+  for (let index = 0; index < timeline.items.length; index++) {
+    const item = timeline.items[index];
+    if (item.type === 'competition') {
+      if (start === null) start = item.at;
+      continue;
+    }
+    if (start && item.at.slice(0, 10) !== start.slice(0, 10)) {
+      issues.push(`Spielbetrieb vom ${start.slice(0, 10)} reicht ohne Spieltagswechsel bis zum ${item.at.slice(0, 10)}. Bitte einen Spieltagswechsel nach einer abgeschlossenen Runde einplanen.`);
+    }
+    if (item.breakKind === 'overnight') start = null;
+    else start = item.at;
+  }
+  if (start && timeline.estimatedEnd && start.slice(0, 10) !== timeline.estimatedEnd.slice(0, 10)) {
+    issues.push('Die letzte Wettkampfphase läuft über Mitternacht hinaus. Bitte einen weiteren Spieltag planen.');
+  }
+  return [...new Set(issues)];
 }
 
 /**
