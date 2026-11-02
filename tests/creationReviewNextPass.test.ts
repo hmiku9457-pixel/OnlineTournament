@@ -54,7 +54,9 @@ describe('internally tagged match identities', () => {
     expect(slots.filter((name) => name === 'TBD')).toHaveLength(1);
     expect(startFirstStage(tournament)).toBe(true);
     const ready = getMockStageMatches(tournament, stage);
-    expect(ready.some((match) => match.sideA === 'Freilos' || match.sideB === 'Freilos')).toBe(true);
+    const bracket = getMockStageBaseMatches(tournament, stage);
+    expect(bracket.flatMap((match) => [match.sideA, match.sideB])).toContain('Freilos');
+    expect(bracket.flatMap((match) => [match.sideA, match.sideB])).toContain('TBD');
     expect(ready.every((match) => match.sideA !== BYE_SLOT && match.sideB !== BYE_SLOT)).toBe(true);
   });
 
