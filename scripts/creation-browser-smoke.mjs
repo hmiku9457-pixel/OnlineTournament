@@ -323,24 +323,32 @@ try {
       `full-height desktop roster should not cause a document scrollbar at ${width}x${height}: ${layout.documentOverflow}px`);
   }
 
-  // Real row heights must drive pagination, including unusually tall names.
+  // Long names scroll inside fixed-height cards. Pagination must remain stable
+  // and navigate backwards to precisely the previous page start.
   await page2.setViewportSize({ width: 1280, height: 720 });
-  const beforeTall = await page2.locator('.participant-roster-row').count();
-  const firstBeforeTall = await page2.locator('.participant-list-number').first().innerText();
-  await page2.addStyleTag({ content: '.participant-roster-row:nth-child(2) { min-height: 220px !important; }' });
-  await page2.waitForFunction((initial) =>
-    (document.querySelectorAll('.participant-roster-row').length < initial), beforeTall);
-  assert.ok(await page2.locator('.participant-roster-row').count() < beforeTall,
-    'pagination reacts to the actual height of a tall rendered card');
-  assert.equal(await page2.locator('.participant-list-number').first().innerText(), firstBeforeTall,
-    'reflow does not shift the absolute start of the currently visible roster');
+  await page2.locator('#participant-first').fill('Alexander'.repeat(18));
+  await page2.locator('#participant-last').fill('Lang');
+  await page2.getByRole('button', { name: 'Spieler hinzufügen' }).click();
+  await page2.waitForFunction(() => document.querySelector('.participant-roster-head .badge')?.textContent?.trim() === '20');
+  const heights = await page2.locator('.participant-roster-row').evaluateAll((rows) =>
+    rows.map((row) => row.getBoundingClientRect().height));
+  assert.equal(new Set(heights.map(Math.round)).size, 1, 'every visible roster card has the same height');
   const nextRoster = page2.getByRole('navigation', { name:'Teilnehmerseiten' }).getByRole('button', { name:'Weiter' });
-  if (await nextRoster.isEnabled()) {
-    const lastCurrent = Number(await page2.locator('.participant-list-number').last().innerText());
-    await nextRoster.click();
-    assert.equal(Number(await page2.locator('.participant-list-number').first().innerText()), lastCurrent + 1,
-      'next page continues with the next unseen participant even if card heights change');
-  }
+  const backRoster = page2.getByRole('navigation', { name:'Teilnehmerseiten' }).getByRole('button', { name:'Zurück' });
+  const originalFirst = await page2.locator('.participant-list-number').first().innerText();
+  const originalLast = Number(await page2.locator('.participant-list-number').last().innerText());
+  await nextRoster.click();
+  assert.equal(Number(await page2.locator('.participant-list-number').first().innerText()), originalLast + 1);
+  await backRoster.click();
+  assert.equal(await page2.locator('.participant-list-number').first().innerText(), originalFirst,
+    'back navigation returns to the actual previous first item');
+  while (await nextRoster.isEnabled()) await nextRoster.click();
+  await page2.locator('.participant-name-marquee.is-running').waitFor();
+  const longCard = page2.locator('.participant-roster-row').filter({ hasText: 'AlexanderAlexander' }).first();
+  assert.equal(await longCard.evaluate((card) => getComputedStyle(card).height), '76px');
+  assert.equal(await longCard.locator('.participant-name-marquee strong').first().evaluate((el) =>
+    getComputedStyle(el).whiteSpace), 'nowrap');
+  await backRoster.click();
   // A sport change that reinterprets players as teams requires roster review.
   await page2.locator('.wizard-step').first().click();
   await page2.locator('#sport').selectOption('football');
