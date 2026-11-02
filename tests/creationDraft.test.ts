@@ -60,6 +60,24 @@ describe('tournament creation draft recovery', () => {
     expect(loadCreationDraft(store)).toBeNull();
   });
 
+  it('keeps multi-day mode, number of playing days and every round-end deadline across recovery', () => {
+    const store = fakeStorage();
+    const original = makeDraft();
+    original.tournamentMode = 'multi';
+    original.plannedDays = 3;
+    original.phaseDrafts[0].dayBreaks = [
+      { afterRound: 1, date: '2030-11-22', time: '09:00' },
+      { afterRound: 2, date: '2030-11-24', time: '10:00' },
+    ];
+    expect(saveCreationDraft(original, store)).toBe(true);
+    const restored = loadCreationDraft(store);
+    expect(restored?.tournamentMode).toBe('multi');
+    expect(restored?.plannedDays).toBe(3);
+    expect(restored?.phaseDrafts[0].dayBreaks).toEqual(original.phaseDrafts[0].dayBreaks);
+    expect(validDraft({ ...original, plannedDays: 15 })).toBe(false);
+    expect(validDraft({ ...original, tournamentMode: 'invalid' })).toBe(false);
+  });
+
   it('round-trips the prestart recovery key using the same versioned format as the wizard', () => {
     const store = fakeStorage();
     const key = 'online-tournament:prestart-recovery:tournament-1';
