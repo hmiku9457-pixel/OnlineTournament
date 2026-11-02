@@ -538,6 +538,7 @@ function samePrestartPlan(tournament: DemoTournament, drafts: PrestartPhaseDraft
     inlineBreakMinutes: phase.inlineBreakAfterRound && phase.inlineBreakKind === 'minutes' ? phase.inlineBreakMinutes : null,
     inlineBreakUntil: phase.inlineBreakAfterRound && phase.inlineBreakKind === 'until' ? phase.inlineBreakUntil : null,
     inlineBreakUntilDate: phase.inlineBreakAfterRound && phase.inlineBreakKind === 'until' ? phase.inlineBreakUntilDate : null,
+    dayBreaks: phase.dayBreaks ?? [],
   });
   return before.every((phase, index) => canonical(phase) === canonical(drafts[index]));
 }
