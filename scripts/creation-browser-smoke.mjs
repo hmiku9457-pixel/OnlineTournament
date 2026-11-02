@@ -306,6 +306,7 @@ try {
       const cards = [...list.querySelectorAll('.participant-roster-row')];
       return {
         tracks, count: cards.length, width: box.width,
+        documentOverflow: Math.max(0, document.documentElement.scrollHeight - window.innerHeight),
         rightmost: Math.max(0, ...cards.map((card) => card.getBoundingClientRect().right - box.left)),
         innerScroll: getComputedStyle(list).overflowY === 'auto' || getComputedStyle(list).overflowY === 'scroll',
         controlsReachable: Boolean(controls && controls.getBoundingClientRect().width > 0),
@@ -318,16 +319,28 @@ try {
     assert.ok(layout.controlsReachable || layout.count === 19,
       'pagination is accessible unless the entire roster fits on one page');
     if (layout.controlsReachable) await page2.getByRole('navigation', { name: 'Teilnehmerseiten' }).scrollIntoViewIfNeeded();
+    if (height >= 1080) assert.ok(layout.documentOverflow <= 2,
+      `full-height desktop roster should not cause a document scrollbar at ${width}x${height}: ${layout.documentOverflow}px`);
   }
 
   // Real row heights must drive pagination, including unusually tall names.
   await page2.setViewportSize({ width: 1280, height: 720 });
   const beforeTall = await page2.locator('.participant-roster-row').count();
+  const firstBeforeTall = await page2.locator('.participant-list-number').first().innerText();
   await page2.addStyleTag({ content: '.participant-roster-row:nth-child(2) { min-height: 220px !important; }' });
   await page2.waitForFunction((initial) =>
     (document.querySelectorAll('.participant-roster-row').length < initial), beforeTall);
   assert.ok(await page2.locator('.participant-roster-row').count() < beforeTall,
     'pagination reacts to the actual height of a tall rendered card');
+  assert.equal(await page2.locator('.participant-list-number').first().innerText(), firstBeforeTall,
+    'reflow does not shift the absolute start of the currently visible roster');
+  const nextRoster = page2.getByRole('navigation', { name:'Teilnehmerseiten' }).getByRole('button', { name:'Weiter' });
+  if (await nextRoster.isEnabled()) {
+    const lastCurrent = Number(await page2.locator('.participant-list-number').last().innerText());
+    await nextRoster.click();
+    assert.equal(Number(await page2.locator('.participant-list-number').first().innerText()), lastCurrent + 1,
+      'next page continues with the next unseen participant even if card heights change');
+  }
   // A sport change that reinterprets players as teams requires roster review.
   await page2.locator('.wizard-step').first().click();
   await page2.locator('#sport').selectOption('football');

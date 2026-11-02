@@ -51,9 +51,10 @@ import { DiscardDraftDialog } from '@/components/DiscardDraftDialog';
 import { UnsavedParticipantDialog } from '@/components/UnsavedParticipantDialog';
 import { QualificationRuleDialog } from '@/components/QualificationRuleDialog';
 import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/domain/groupQualification';
-import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, validParticipantRoster } from '@/domain/participantNames';
+import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, validParticipantRoster, MAX_PARTICIPANT_NAME_LENGTH } from '@/domain/participantNames';
+import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
-import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, formatPlannedDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
@@ -182,6 +183,7 @@ function validateParticipant(
   if (discipline === 'TEAMS') {
     const teamName = participant.teamName?.trim() || displayPersonName(participant.firstName, participant.lastName);
     if (!teamName) return { firstName: 'Bitte einen Mannschaftsnamen eingeben.' };
+    if (teamName.length > MAX_PARTICIPANT_NAME_LENGTH) return { firstName: `Ein Name darf höchstens ${MAX_PARTICIPANT_NAME_LENGTH} Zeichen enthalten.` };
     if (!isAllowedParticipantName(teamName)) return { firstName: 'Buchstaben, Zahlen, Punkte, Klammern, Leerzeichen und Bindestriche sind erlaubt.' };
     const occupied = collectSavedPersonNames(participants, discipline, editingParticipantId);
     return occupied.has(participantNameKey(teamName))
@@ -195,7 +197,9 @@ function validateParticipant(
   }
 
   for (const field of ['firstName', 'lastName', ...(discipline === 'DOUBLES' ? ['partnerFirstName', 'partnerLastName'] : [])] as ParticipantField[]) {
-    if ((participant[field] ?? '').trim() && !isAllowedParticipantName(participant[field] ?? '')) {
+    if ((participant[field] ?? '').trim() && (participant[field] ?? '').trim().length > MAX_PARTICIPANT_NAME_LENGTH) {
+      errors[field] = `Ein Name darf höchstens ${MAX_PARTICIPANT_NAME_LENGTH} Zeichen enthalten.`;
+    } else if ((participant[field] ?? '').trim() && !isAllowedParticipantName(participant[field] ?? '')) {
       errors[field] = 'Buchstaben, Zahlen, Punkte, Klammern, Leerzeichen und Bindestriche sind erlaubt.';
     }
   }
@@ -595,7 +599,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   // Page size is derived from the available viewport, so the roster itself
   // never adds a vertical scrollbar to the creation page.
   const rosterRef = useRef<HTMLElement | null>(null);
-  const [rosterPage, setRosterPage] = useState(1);
+  // Absolute start offset remains stable when real card heights change the page size.
+  const [rosterFirstIndex, setRosterFirstIndex] = useState(0);
   const [rosterPageSize, setRosterPageSize] = useState(8);
   useEffect(() => {
     if (step !== 2 || prestart) return;
@@ -614,7 +619,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         ? Math.max(...cards.map((card) => card.getBoundingClientRect().height))
         : list?.querySelector<HTMLElement>('.participant-empty')?.getBoundingClientRect().height ?? 56;
       const gap = list ? parseFloat(getComputedStyle(list).rowGap) || 8 : 8;
-      const available = Math.max(height, window.innerHeight - Math.max(0, rect?.top ?? 0) - 155);
+      const listBounds = list?.getBoundingClientRect();
+      const workspaceBounds = rosterRef.current?.closest<HTMLElement>('.wizard-workspace')?.getBoundingClientRect();
+      // Reserve actual content beneath the roster rather than a fixed 155 px.
+      const below = listBounds && workspaceBounds ? Math.max(0, workspaceBounds.bottom - listBounds.bottom) : 155;
+      const available = Math.max(height, window.innerHeight - Math.max(0, listBounds?.top ?? rect?.top ?? 0) - below - 12);
       const rows = Math.max(1, Math.floor((available + gap) / (height + gap)));
       setRosterPageSize(Math.max(1, Math.min(48, rows * columns)));
     };
@@ -628,9 +637,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     }
     return () => { window.removeEventListener('resize', updatePageSize); observer?.disconnect(); };
   }, [step, prestart]);
-  const rosterPageCount = Math.max(1, Math.ceil(participants.length / rosterPageSize));
-  const visibleRosterPage = Math.min(rosterPage, rosterPageCount);
-  const visibleRoster = participants.slice((visibleRosterPage - 1) * rosterPageSize, visibleRosterPage * rosterPageSize);
+  useEffect(() => {
+    setRosterFirstIndex((start) => start >= participants.length
+      ? Math.max(0, Math.floor(Math.max(0, participants.length - 1) / rosterPageSize) * rosterPageSize) : start);
+  }, [participants.length, rosterPageSize]);
+  const visibleRosterStart = Math.min(rosterFirstIndex, Math.max(0, participants.length - 1));
+  const visibleRoster = participants.slice(visibleRosterStart, visibleRosterStart + rosterPageSize);
+  const rosterNeedsPagination = visibleRosterStart > 0 || participants.length > rosterPageSize;
   const [recentlyRemovedParticipant, setRecentlyRemovedParticipant] = useState<{ participant: ParticipantDraft; index: number } | null>(null);
   const [groupRecommendationNotice, setGroupRecommendationNotice] = useState<string | null>(null);
   const previousRosterCount = useRef<number>(restoredDraft?.participants.length ?? 0);
@@ -917,6 +930,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const gameSettingsValid = Number.isInteger(minimumMatches) && minimumMatches >= 1 && minimumMatches <= 100 && validMatchDuration && validTurnover;
   const invalidLocalClock = Boolean(parseCalendarDate(scheduledDate) && parseClockTime(scheduledTime)
     && !isValidLocalDateTime(scheduledStart));
+  const ambiguousLocalClock = isAmbiguousLocalDateTime(scheduledStart);
   const startTimeIsAllowed = isStartAtOrAfterNow(scheduledStart, new Date(currentLocalMinute));
   const basicsValid = Boolean(name.trim()) && name.trim().length <= 120 && Boolean(sport) && selectedDisciplineValid && startTimeIsAllowed && Number.isSafeInteger(tables) && tables >= 1 && tables <= 9999 && gameSettingsValid;
   const venueLayoutValid = !venueLayoutEnabled || validateVenueLayout(venueLayout, tables).length === 0;
@@ -962,7 +976,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         participant.id === editingParticipantId ? { ...participant, ...participantForm } : participant
       )));
     } else {
-      setRosterPage(Math.max(1, Math.ceil((participants.length + 1) / rosterPageSize)));
+      setRosterFirstIndex(Math.floor(participants.length / rosterPageSize) * rosterPageSize);
       setParticipants((current) => [...current, newParticipant(participantForm)]);
     }
     resetParticipantEditor();
@@ -1271,7 +1285,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     if (type === 'BREAK' && (index === 0 || index === current.length - 1 || current[index - 1]?.type === 'BREAK' || current[index + 1]?.type === 'BREAK')) return;
 
     const next = current.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
-    const phase = next[index];
+    const phase = clearInlinePauseOnTypeChange(next[index]);
+    next[index] = phase;
     const bestOf = phaseBestOfForSport(sport, type);
     phase.type = type;
     phase.label = stageLabel(type);
@@ -1541,6 +1556,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   })), [phaseDrafts, phaseEstimates, tables, timedSport, matchDurationMinutes, breakMinutes, sport]);
   const plannedTimeline = useMemo(() => buildPlannedTimeline(scheduledStart, phaseScheduleProposals),
     [scheduledStart, phaseScheduleProposals]);
+  useEffect(() => {
+    setPhaseDrafts((current) => anchorFixedPauseDates(current, plannedTimeline));
+  }, [plannedTimeline]);
   // Only active competition and pauses during tournament days count toward
   // estimated duration. Overnight gaps still shift the preview calendar.
   const estimatedPlayingMinutes = phaseEstimates.reduce((total, estimate, index) =>
@@ -1686,7 +1704,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                   label="Geplanter Turnierbeginn" minTime={scheduledDate === currentLocalMinute.slice(0, 10) ? currentLocalMinute.slice(11, 16) : undefined}
                   nowTime={currentLocalMinute.slice(11, 16)} nowActive={useCurrentTime} onNow={selectCurrentTime} />
                 <span className="field-hint wizard-start-hint">Frühere Uhrzeiten sind am heutigen Tag gesperrt. „Jetzt“ übernimmt die aktuelle Uhrzeit und aktualisiert sie fortlaufend. Den tatsächlichen Spielstart löst später die Turnierleitung aus.</span>
-                {invalidLocalClock && <span className="field-error" role="alert">Diese Uhrzeit existiert an diesem Datum aufgrund der Zeitumstellung nicht. Bitte eine andere Uhrzeit auswählen.</span>}
+                {invalidLocalClock && <span className="field-error" role="alert">{ambiguousLocalClock
+                  ? 'Diese Uhrzeit kommt bei der Winterzeitumstellung zweimal vor. Da der Entwurf noch keine eindeutige Zeitzonenkennzeichnung speichert, bitte eine Uhrzeit außerhalb der doppelten Stunde wählen.'
+                  : 'Diese Uhrzeit existiert an diesem Datum aufgrund der Zeitumstellung nicht. Bitte eine andere Uhrzeit auswählen.'}</span>}
               </div>
               <div className="field">
                 <label htmlFor="sport">Sportart <span className="wizard-required-mark" aria-hidden="true">*</span></label>
@@ -1861,6 +1881,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                         value={discipline === 'TEAMS' ? (participantForm.teamName || displayPersonName(participantForm.firstName, participantForm.lastName)) : participantForm.firstName}
                         onChange={(event) => updateParticipantForm(discipline === 'TEAMS' ? 'teamName' : 'firstName', event.target.value)}
                         aria-invalid={Boolean(participantErrors.firstName || participantErrors.teamName)}
+                        maxLength={MAX_PARTICIPANT_NAME_LENGTH}
                         autoFocus
                       />
                     </div>
@@ -1870,6 +1891,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                         id="participant-last"
                         className={participantErrors.lastName ? 'input-error' : ''}
                         value={participantForm.lastName}
+                        maxLength={MAX_PARTICIPANT_NAME_LENGTH}
                         onChange={(event) => updateParticipantForm('lastName', event.target.value)}
                         aria-invalid={Boolean(participantErrors.lastName)}
                       />
@@ -1882,6 +1904,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                             id="participant-partner-first"
                             className={participantErrors.partnerFirstName ? 'input-error' : ''}
                             value={participantForm.partnerFirstName}
+                            maxLength={MAX_PARTICIPANT_NAME_LENGTH}
                             onChange={(event) => updateParticipantForm('partnerFirstName', event.target.value)}
                             aria-invalid={Boolean(participantErrors.partnerFirstName)}
                           />
@@ -1892,6 +1915,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                             id="participant-partner-last"
                             className={participantErrors.partnerLastName ? 'input-error' : ''}
                             value={participantForm.partnerLastName}
+                            maxLength={MAX_PARTICIPANT_NAME_LENGTH}
                             onChange={(event) => updateParticipantForm('partnerLastName', event.target.value)}
                             aria-invalid={Boolean(participantErrors.partnerLastName)}
                           />
@@ -1906,7 +1930,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     </button>
                   </div>
                 </div>
-                <p className="field-hint">Namen: Buchstaben, Zahlen, Punkte, Bindestriche und Klammern – z. B. Max Müller (TSV) oder 1. FC Köln.</p>
+                <p className="field-hint">Namen: Buchstaben, Zahlen, Punkte, Bindestriche und Klammern – z. B. Max Müller (TSV) oder 1. FC Köln. Maximal {MAX_PARTICIPANT_NAME_LENGTH} Zeichen je Feld.</p>
                 <div className="participant-validation" aria-live="polite">
                   {participantErrorMessages.map((message) => (
                     <span className="field-error" key={message}>{message}</span>
@@ -1928,7 +1952,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     </div>
                   ) : visibleRoster.map((participant, index) => (
                     <article className={`participant-roster-row ${editingParticipantId === participant.id ? 'editing' : ''}`} key={participant.id}>
-                      <span className="participant-list-number">{(visibleRosterPage - 1) * rosterPageSize + index + 1}</span>
+                      <span className="participant-list-number">{visibleRosterStart + index + 1}</span>
                       <div className="participant-list-name" title={participantDisplayName(participant, discipline)}>
                          <strong>{participantDisplayName(participant, discipline)}</strong>
                          {!participantIsComplete(participant, discipline) && (
@@ -1957,12 +1981,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     </article>
                   ))}
                 </div>
-                {rosterPageCount > 1 && <nav className="creation-roster-pagination" aria-label="Teilnehmerseiten">
-                  <button type="button" className="btn small" disabled={visibleRosterPage === 1}
-                    onClick={() => setRosterPage(visibleRosterPage - 1)}>Zurück</button>
-                  <span aria-live="polite">Seite {visibleRosterPage} von {rosterPageCount} · {participants.length} Einträge</span>
-                  <button type="button" className="btn small" disabled={visibleRosterPage === rosterPageCount}
-                    onClick={() => setRosterPage(visibleRosterPage + 1)}>Weiter</button>
+                {rosterNeedsPagination && <nav className="creation-roster-pagination" aria-label="Teilnehmerseiten">
+                  <button type="button" className="btn small" disabled={visibleRosterStart === 0}
+                    onClick={() => setRosterFirstIndex(Math.max(0, visibleRosterStart - rosterPageSize))}>Zurück</button>
+                  <span aria-live="polite">Einträge {visibleRosterStart + 1}–{Math.min(participants.length, visibleRosterStart + rosterPageSize)} von {participants.length}</span>
+                  <button type="button" className="btn small" disabled={visibleRosterStart + rosterPageSize >= participants.length}
+                    onClick={() => setRosterFirstIndex(visibleRosterStart + rosterPageSize)}>Weiter</button>
                 </nav>}
               </aside>
 
@@ -2732,7 +2756,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               <dl className="creation-review-facts">
                 <div><dt>Geplanter Beginn</dt><dd>{isValidLocalDateTime(scheduledStart) ? formatPlannedDateTime(scheduledStart) : 'Noch offen'}</dd></div>
                 <div><dt>Teilnehmer</dt><dd>{participantCount} {discipline === 'TEAMS' ? 'Mannschaften' : discipline === 'DOUBLES' ? 'Doppel' : 'Spieler'}</dd></div>
-                <div><dt>Spielflächen</dt><dd>{tables} {venue.plural}</dd></div>
+                <div><dt>Spielflächen</dt><dd>{tables} {venue.plural} · {venueLayoutEnabled ? 'Individueller Plan' : 'Automatische Nummerierung'}</dd></div>
+                {timedSport && <div><dt>Wechselpuffer</dt><dd>{breakMinutes} Min. pro Spielfläche</dd></div>}
                 <div><dt>Mindestspiele</dt><dd>{minimumMatches} pro Teilnehmer</dd></div>
                 <div><dt>Turnierphasen</dt><dd>{phaseDrafts.filter((phase) => phase.type !== 'BREAK').length} Wettkampfphasen · {phaseDrafts.filter((phase) => phase.type === 'BREAK').length} {phaseDrafts.filter((phase) => phase.type === 'BREAK').length === 1 ? 'Pause' : 'Pausen'}</dd></div>
                 <div><dt>Geplante Spiele</dt><dd>{phaseEstimates.reduce((total, estimate) => total + estimate.estimatedMatches, 0)}</dd></div>
@@ -2747,7 +2772,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             <PlannedScheduleEditor
               scheduledStart={scheduledStart}
               timeline={plannedTimeline}
-              phaseSummaries={phaseDrafts.map((_, index) => formatPhaseOverview(phaseDrafts, index, discipline))}
+              phaseSummaries={phaseDrafts.map((_, index) => formatPhaseOverview(phaseDrafts, index, discipline, !timedSport))}
               awardsEnabled={awardsEnabled}
               awardsAt={awardsAt}
               onToggleAwards={(enabled) => { setAwardsEnabled(enabled); setAwardsAtOverride(null); }}
@@ -2768,7 +2793,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       {prestart && <section className="prestart-phase-save-panel" aria-label="Vorstart-Planung übernehmen">
         <PlannedScheduleEditor
           scheduledStart={scheduledStart} timeline={plannedTimeline}
-          phaseSummaries={phaseDrafts.map((_, index) => formatPhaseOverview(phaseDrafts, index, discipline))}
+          phaseSummaries={phaseDrafts.map((_, index) => formatPhaseOverview(phaseDrafts, index, discipline, !timedSport))}
           awardsEnabled={false} awardsAt={plannedTimeline.estimatedEnd}
           showCeremony={false} onToggleAwards={() => {}} onAwardsAtChange={() => {}} />
         {prestartIssues.length > 0 && <div className="prestart-editor-errors" role="alert">
