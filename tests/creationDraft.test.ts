@@ -131,6 +131,14 @@ describe('tournament creation draft recovery', () => {
     expect(validDraft(staleEditor)).toBe(false);
   });
 
+  it('persists a required roster review after a change of competition type', () => {
+    const store = fakeStorage();
+    const draft = { ...makeDraft(), rosterReviewRequired: true };
+    expect(saveCreationDraft(draft, store)).toBe(true);
+    expect(loadCreationDraft(store)?.rosterReviewRequired).toBe(true);
+    expect(validDraft({ ...draft, rosterReviewRequired: 'false' })).toBe(false);
+  });
+
   it('starts new internal identifiers after the highest restored identifier', () => {
     expect(highestDraftSequence([{ id: 'participant-3' }, { id: 'participant-19' }, { id: 'other' }], 'participant')).toBe(19);
     expect(highestDraftSequence([{ id: 'phase-2' }, { id: 'phase-6' }], 'phase')).toBe(6);

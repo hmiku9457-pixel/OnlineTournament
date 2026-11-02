@@ -32,6 +32,35 @@ describe('optionaler vorläufiger Zeitplan', () => {
     { id: 'lunch', at: '2026-10-31T12:00', title: 'Mittagspause', type: 'break', note: 'Verpflegung im Foyer' },
     { id: 'final', at: '2026-10-31T16:30', title: 'Siegerehrung', type: 'other' },
   ];
+  it('shows full local dates in fixed pause and inline break conflicts', () => {
+    const late = buildPlannedTimeline('2026-11-21T13:00', [
+      { label: 'Vorrunde', type: 'SWISS', estimatedMinutes: 120, roundCount: 4,
+        roundDurationsMinutes: [30, 30, 30, 30], inlineBreakAfterRound: 2,
+        inlineBreakKind: 'until', inlineBreakUntil: '09:00', inlineBreakUntilDate: '2026-11-21' },
+      { label: 'Pause', type: 'BREAK', estimatedMinutes: 0,
+        breakKind: 'until', breakUntil: '12:00', breakUntilDate: '2026-11-20' },
+      { label: 'Finale', type: 'KNOCKOUT', estimatedMinutes: 30 },
+    ]);
+    expect(late.warnings).toHaveLength(2);
+    expect(late.warnings[0].message).toContain('2026-11-21');
+    expect(late.warnings[0].message).toContain('09:00');
+    expect(late.warnings[1].message).toContain('2026-11-20');
+    expect(late.warnings[1].message).toContain('2026-11-21');
+    expect(late.warnings[1].message).toContain('Das gewählte Datum liegt vor dem Pausentag.');
+  });
+
+  it('identifies the non-existent spring-forward hour in Berlin', () => {
+    const before = process.env.TZ;
+    process.env.TZ = 'Europe/Berlin';
+    try {
+      expect(isValidLocalDateTime('2027-03-28T02:30')).toBe(false);
+      expect(isValidLocalDateTime('2027-03-28T03:30')).toBe(true);
+    } finally {
+      if (before === undefined) delete process.env.TZ;
+      else process.env.TZ = before;
+    }
+  });
+
   it('blocks past tournament starts at minute precision, including invalid timestamps', () => {
     const now = new Date(2030, 10, 21, 12, 34, 59);
     expect(isStartAtOrAfterNow('2030-11-21T12:34', now)).toBe(true);
