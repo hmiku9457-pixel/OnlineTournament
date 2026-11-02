@@ -1,3 +1,4 @@
+import { participantId, participantName } from '@/domain/participantIdentity';
 import { localTournamentStorage } from '@/services/localTournamentStorage';
 import { groupLetter } from '@/domain/groupLabels';
 import { isParticipantWithdrawn, saveParticipantWithdrawal, removeParticipantWithdrawal, markWithdrawalRestoreEligibility, getWithdrawalRestoreEligibility, saveWithdrawalTiming, type WithdrawalTiming } from '@/services/mockWithdrawals';
@@ -97,7 +98,25 @@ interface SwissFixture { tournamentId: string; stageId: string; round: number; p
 
 function readSwissFixtures(): SwissFixture[] {
   if (typeof window === 'undefined') return [];
-  try { return JSON.parse(localTournamentStorage.getItem(SWISS_FIXTURE_KEY) ?? '[]') as SwissFixture[]; } catch { return []; }
+  try {
+    const persisted = JSON.parse(localTournamentStorage.getItem(SWISS_FIXTURE_KEY) ?? '[]') as SwissFixture[];
+    if (!Array.isArray(persisted)) return [];
+    const tournaments = new Map(getAllMockTournaments().map((item) => [item.id, item]));
+    return persisted.map((entry) => {
+      const tournament = tournaments.get(entry.tournamentId);
+      return tournament ? { ...entry, pairs: entry.pairs.map(([a, b]) =>
+        [participantName(tournament, a), participantName(tournament, b)]) } : entry;
+    });
+  } catch { return []; }
+}
+function writeSwissFixtures(fixtures: SwissFixture[]) {
+  const tournaments = new Map(getAllMockTournaments().map((item) => [item.id, item]));
+  const persisted = fixtures.map((entry) => {
+    const tournament = tournaments.get(entry.tournamentId);
+    return tournament ? { ...entry, pairs: entry.pairs.map(([a, b]) =>
+      [participantId(tournament, a), participantId(tournament, b)]) } : entry;
+  });
+  localTournamentStorage.setItem(SWISS_FIXTURE_KEY, JSON.stringify(persisted));
 }
 
 export function isMockParticipantWithdrawn(tournament: DemoTournament, name: string) {
@@ -169,8 +188,8 @@ function invalidateUnstartedLaterRounds(tournament: DemoTournament, stage: Tourn
   if (stage.type === 'SWISS' && typeof window !== 'undefined') {
     const fixtures = readSwissFixtures();
     if (fixtures.some((entry) => entry.tournamentId === tournament.id && entry.stageId === stage.id && entry.round > round)) {
-      localTournamentStorage.setItem(SWISS_FIXTURE_KEY, JSON.stringify(fixtures.filter((entry) =>
-        entry.tournamentId !== tournament.id || entry.stageId !== stage.id || entry.round <= round)));
+      writeSwissFixtures(fixtures.filter((entry) =>
+        entry.tournamentId !== tournament.id || entry.stageId !== stage.id || entry.round <= round));
     }
   }
 }
@@ -210,7 +229,13 @@ function readResults(): StoredMatchResult[] {
   if (typeof window === 'undefined') return [];
   try {
     const parsed = JSON.parse(localTournamentStorage.getItem(RESULT_KEY) ?? '[]') as StoredMatchResult[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    const tournaments = getAllMockTournaments();
+    return parsed.map((entry) => {
+      if (!entry.forcedWinner) return entry;
+      const tournament = tournaments.find((item) => item.stages.some((stage) => entry.matchId.startsWith(`${stage.id}-`)));
+      return tournament ? { ...entry, forcedWinner: participantName(tournament, entry.forcedWinner) } : entry;
+    });
   } catch {
     return [];
   }
@@ -218,7 +243,13 @@ function readResults(): StoredMatchResult[] {
 
 function writeResults(results: StoredMatchResult[]) {
   if (typeof window === 'undefined') return;
-  localTournamentStorage.setItem(RESULT_KEY, JSON.stringify(results));
+  const tournaments = getAllMockTournaments();
+  const persisted = results.map((entry) => {
+    if (!entry.forcedWinner) return entry;
+    const tournament = tournaments.find((item) => item.stages.some((stage) => entry.matchId.startsWith(`${stage.id}-`)));
+    return tournament ? { ...entry, forcedWinner: participantId(tournament, entry.forcedWinner) } : entry;
+  });
+  localTournamentStorage.setItem(RESULT_KEY, JSON.stringify(persisted));
   window.dispatchEvent(new CustomEvent('mock-runtime-change'));
 }
 
@@ -481,10 +512,10 @@ function swissMatches(tournament: DemoTournament, stage: TournamentStage, result
       ? swissRoundPairings(eligible, [], results, tournament.sport)
       : swissRoundPairings(eligible, matches, results, tournament.sport));
     if (!savedRound && isStageStarted(tournament, stage) && typeof window !== 'undefined') {
-      localTournamentStorage.setItem(SWISS_FIXTURE_KEY, JSON.stringify([
+      writeSwissFixtures([
         ...readSwissFixtures().filter((item) => !(item.tournamentId === tournament.id && item.stageId === stage.id && item.round === round)),
         { tournamentId: tournament.id, stageId: stage.id, round, pairs: pairings },
-      ]));
+      ]);
     }
 
     pairings.forEach(([sideA, sideB], index) => {

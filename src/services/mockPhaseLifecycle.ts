@@ -1,3 +1,5 @@
+import { participantId, participantName } from '@/domain/participantIdentity';
+import { getAllMockTournaments } from '@/services/mockTournamentStore';
 import { localTournamentStorage } from '@/services/localTournamentStorage';
 import { groupLetter } from '@/domain/groupLabels';
 import type { DemoTournament } from '@/data/demoTournaments';
@@ -28,7 +30,16 @@ function readAll(): PhaseLifecycleState[] {
   if (typeof window === 'undefined') return [];
   try {
     const parsed = JSON.parse(localTournamentStorage.getItem(PHASE_KEY) ?? '[]') as PhaseLifecycleState[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    const tournaments = new Map(getAllMockTournaments().map((item) => [item.id, item]));
+    return parsed.map((entry) => {
+      const tournament = tournaments.get(entry.tournamentId);
+      return !tournament || !entry.stageEntrants ? entry : {
+        ...entry,
+        stageEntrants: Object.fromEntries(Object.entries(entry.stageEntrants)
+          .map(([stageId, ids]) => [stageId, ids.map((id) => participantName(tournament, id))])),
+      };
+    });
   } catch {
     return [];
   }
@@ -36,7 +47,16 @@ function readAll(): PhaseLifecycleState[] {
 
 function writeAll(states: PhaseLifecycleState[]) {
   if (typeof window === 'undefined') return;
-  localTournamentStorage.setItem(PHASE_KEY, JSON.stringify(states));
+  const tournaments = new Map(getAllMockTournaments().map((item) => [item.id, item]));
+  const persisted = states.map((entry) => {
+    const tournament = tournaments.get(entry.tournamentId);
+    return !tournament || !entry.stageEntrants ? entry : {
+      ...entry,
+      stageEntrants: Object.fromEntries(Object.entries(entry.stageEntrants)
+        .map(([stageId, names]) => [stageId, names.map((name) => participantId(tournament, name))])),
+    };
+  });
+  localTournamentStorage.setItem(PHASE_KEY, JSON.stringify(persisted));
   window.dispatchEvent(new CustomEvent('mock-phase-change'));
 }
 
