@@ -269,6 +269,32 @@ try {
   assert.equal(await page2.locator('.participant-roster-row').count() <= 19, true,
     'a long participant list is paginated instead of expanding the document');
   await page2.getByRole('navigation', { name: 'Teilnehmerseiten' }).waitFor();
+  for (const [width, height] of [[1280, 720], [1440, 900], [1920, 1080]]) {
+    await page2.setViewportSize({ width, height });
+    await page2.waitForTimeout(80);
+    const layout = await page2.evaluate(() => {
+      const list = document.querySelector('.participant-roster-multi');
+      const roster = document.querySelector('.participant-roster-grid-card');
+      const controls = document.querySelector('.creation-roster-pagination');
+      if (!list || !roster || !controls) return null;
+      const box = list.getBoundingClientRect();
+      const tracks = getComputedStyle(list).gridTemplateColumns.split(/\s+/)
+        .filter((track) => parseFloat(track) > 0).length;
+      const cards = [...list.querySelectorAll('.participant-roster-row')];
+      return {
+        tracks, count: cards.length, width: box.width,
+        rightmost: Math.max(0, ...cards.map((card) => card.getBoundingClientRect().right - box.left)),
+        innerScroll: getComputedStyle(list).overflowY === 'auto' || getComputedStyle(list).overflowY === 'scroll',
+        controlsReachable: controls.getBoundingClientRect().width > 0,
+      };
+    });
+    assert.ok(layout, 'participant grid and pagination remain visible');
+    assert.ok(layout.tracks >= 1 && layout.count >= 1, `measured grid tracks and cards at ${width}x${height}`);
+    assert.ok(layout.rightmost <= layout.width + 2, `cards do not overflow grid at ${width}x${height}`);
+    assert.equal(layout.innerScroll, false, `no nested participant scrolling at ${width}x${height}`);
+    assert.equal(layout.controlsReachable, true);
+    await page2.getByRole('navigation', { name: 'Teilnehmerseiten' }).scrollIntoViewIfNeeded();
+  }
   await context2.close();
 
   // Date/time restrictions and live "Jetzt" mode with a deterministic
