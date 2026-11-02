@@ -47,7 +47,8 @@ import type { ControlHelpTopic } from '@/domain/controlGuide';
 import { canEditDraw, getBracketSlots, getPinnedBracketSlots, randomizeBracketSlots, randomizeSwissOrder, applySeededBracketSlots, setBracketSlot, toggleBracketPin } from '@/services/mockDrawStore';
 import { addMockParticipant, updateMockParticipantName, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { generateUniquePlayerCode } from '@/services/mockPlayerCodes';
-import { getStageEntrants, getStageStartIssue, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage, completeStage, canFinishBreak, getBreakResumeAt, formatBreakCountdown, type BreakStartOptions } from '@/services/mockPhaseLifecycle';
+import { toLocalDateTime } from '@/domain/tournamentSchedule';
+import { computeBreakResumeAt, getStageEntrants, getStageStartIssue, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage, completeStage, canFinishBreak, getBreakResumeAt, formatBreakCountdown, type BreakStartOptions } from '@/services/mockPhaseLifecycle';
 import { TournamentPauseBanner } from '@/components/TournamentPauseBanner';
 import { getInlineBreakStatus, startInlineBreak, finishInlineBreak, canFinishInlineBreak } from '@/services/mockInlineBreak';
 import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
@@ -626,6 +627,8 @@ export function TournamentControlPage() {
   const [pauseMode, setPauseMode] = useState<'minutes' | 'clock'>('minutes');
   const [pauseMinutes, setPauseMinutes] = useState(15);
   const [pauseTime, setPauseTime] = useState('12:00');
+  const [pauseDate, setPauseDate] = useState(() => toLocalDateTime(new Date()).slice(0, 10));
+  const [inlineBreakDecisionOpen, setInlineBreakDecisionOpen] = useState(false);
   const [pauseClockTick, setPauseClockTick] = useState(0);
   const [confirmEarlyBreak, setConfirmEarlyBreak] = useState(false);
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
@@ -749,10 +752,19 @@ export function TournamentControlPage() {
   const nextStartableStage = useMemo(() => getNextStartableStage(phaseSource.tournament), [phaseSource]);
   const pendingStartStage = startModal?.kind === 'tournament' ? tournament.stages[0] : nextStartableStage;
   const pendingStartIssue = pendingStartStage ? getStageStartIssue(tournament, pendingStartStage) : 'Keine startbare Phase vorhanden.';
+  const chosenPauseOptions: BreakStartOptions = pauseMode === 'clock'
+    ? { kind: 'clock', date: pauseDate, time: pauseTime }
+    : { kind: 'minutes', minutes: pauseMinutes };
+  const pauseDecisionError = (pauseMode === 'minutes' && (!Number.isInteger(pauseMinutes) || pauseMinutes < 1 || pauseMinutes > 1440))
+    ? 'Bitte eine Dauer zwischen 1 und 1440 Minuten angeben.'
+    : pauseMode === 'clock' && !computeBreakResumeAt(new Date(), chosenPauseOptions)
+      ? 'Der gewählte Pausentermin ist bereits vorbei oder ungültig. Bitte ein neues Datum und eine zukünftige Uhrzeit wählen oder eine Dauer in Minuten festlegen.'
+      : null;
   const pendingPauseIssue = pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind !== 'overnight'
-    ? pauseMode === 'minutes' ? (!Number.isInteger(pauseMinutes) || pauseMinutes < 1 || pauseMinutes > 1440 ? 'Bitte eine Dauer zwischen 1 und 1440 Minuten angeben.' : null)
-      : !/^([01]\d|2[0-3]):[0-5]\d$/.test(pauseTime) ? 'Bitte eine gültige Uhrzeit (HH:MM) angeben.' : null
-    : null;
+    ? pauseDecisionError : null;
+  const expiredInlineBreak = inlineBreakReady?.config.kind === 'until'
+    && !computeBreakResumeAt(new Date(), { kind: 'clock',
+      date: inlineBreakReady.config.untilDate, time: inlineBreakReady.config.until });
   const editableStage = useMemo(() => phaseSource.tournament.stages.find((stage) => isStageEditable(phaseSource.tournament, stage)), [phaseSource]);
   const selectedRoundRobinStage = tournament.stages.find((stage) => selectedStageId === `${stage.id}::rr`);
   const selectedRoundRobinDecision = selectedRoundRobinStage ? getSwissCutoffHistory(tournament, selectedRoundRobinStage) : null;
@@ -920,8 +932,7 @@ export function TournamentControlPage() {
 
   function performStartNextPhase() {
     const options: BreakStartOptions | undefined = nextStartableStage?.type === 'BREAK' && nextStartableStage.settings.breakKind !== 'overnight'
-      ? pauseMode === 'clock' ? { kind: 'clock', time: pauseTime } : { kind: 'minutes', minutes: pauseMinutes }
-      : undefined;
+      ? chosenPauseOptions : undefined;
     if (!nextStartableStage || !startStage(tournament, nextStartableStage, options)) {
       setAssignmentMessage(nextStartableStage ? getStageStartIssue(tournament, nextStartableStage) ?? 'Diese Phase kann derzeit nicht starten.' : 'Es ist keine startbare Phase vorhanden.');
       return;
@@ -941,12 +952,21 @@ export function TournamentControlPage() {
     if (firstStage) setStartModal({ kind: 'tournament', stageName: firstStage.name });
   }
 
-  function beginCurrentInlineBreak() {
+  function beginCurrentInlineBreak(override?: BreakStartOptions) {
+    if (!override && expiredInlineBreak && inlineBreakReady) {
+      setPauseMode('minutes');
+      setPauseMinutes(inlineBreakReady.config.minutes);
+      setPauseDate(toLocalDateTime(new Date()).slice(0, 10));
+      setPauseTime(inlineBreakReady.config.until);
+      setInlineBreakDecisionOpen(true);
+      return;
+    }
     if (!activeStage || !inlineBreakReady
-      || !startInlineBreak(tournament, activeStage, getMockStageMatches(tournament, activeStage))) {
+      || !startInlineBreak(tournament, activeStage, getMockStageMatches(tournament, activeStage), override)) {
       setAssignmentMessage('Die Zwischenpause kann noch nicht beginnen. Bitte die vorherige Runde abschließen und freigeben.');
       return;
     }
+    setInlineBreakDecisionOpen(false);
     recordMockAudit({ tournamentId: tournament.id, actor: 'Turnierleitung (lokal)',
       action: 'BREAK_STARTED', description: `Zwischenpause nach Runde ${inlineBreakReady.config.afterRound} in „${activeStage.name}“ gestartet` });
     setStatus('PAUSED');
@@ -985,6 +1005,9 @@ export function TournamentControlPage() {
       const future = new Date(Date.now() + minutes * 60000);
       setPauseTime(clockTarget ? String(nextStartableStage.settings.breakUntil ?? '12:00')
         : `${String(future.getHours()).padStart(2, '0')}:${String(future.getMinutes()).padStart(2, '0')}`);
+      setPauseDate(clockTarget
+        ? String(nextStartableStage.settings.breakUntilDate ?? '') || toLocalDateTime(new Date()).slice(0, 10)
+        : toLocalDateTime(future).slice(0, 10));
     }
     setStartModal({ kind: 'phase', stageName: nextStartableStage.name });
   }
@@ -1221,7 +1244,7 @@ export function TournamentControlPage() {
         <div className="control-review-alert inline-break-required no-print" role="status">
           <strong>Zwischenpause nach Runde {inlineBreakReady.config.afterRound} von „{activeStage.name}“</strong>
           <span>Die Runde ist freigegeben. Die nächste Runde bleibt gesperrt, bis du diese Zwischenpause gestartet und beendet hast.</span>
-          <button className="btn primary" type="button" onClick={beginCurrentInlineBreak}>Zwischenpause starten</button>
+          <button className="btn primary" type="button" onClick={() => beginCurrentInlineBreak()}>Zwischenpause starten</button>
         </div>
       )}
       {inlineBreakRunning && activeStage && !['ABORTED', 'FINISHED'].includes(tournament.status) && (
@@ -1981,6 +2004,28 @@ export function TournamentControlPage() {
           </section>
         </div>
       )}
+      {inlineBreakDecisionOpen && inlineBreakReady && (
+        <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setInlineBreakDecisionOpen(false)}>
+          <section className="prototype-modal start-phase-modal" role="dialog" aria-modal="true" aria-label="Zwischenpause neu festlegen"
+            onMouseDown={(event) => event.stopPropagation()}>
+            <h2>Zwischenpause neu festlegen</h2>
+            <p role="alert" className="break-prestart-warning">Die ursprünglich geplante Fortsetzung am {inlineBreakReady.config.untilDate ?? 'Turniertag'} um {inlineBreakReady.config.until} Uhr ist bereits verstrichen. Eine Verschiebung auf morgen erfolgt nicht automatisch.</p>
+            <div className="actions" role="group" aria-label="Neue Pausenplanung">
+              <button className={pauseMode === 'minutes' ? 'btn small primary' : 'btn small'} type="button" onClick={() => setPauseMode('minutes')}>Dauer in Minuten</button>
+              <button className={pauseMode === 'clock' ? 'btn small primary' : 'btn small'} type="button" onClick={() => setPauseMode('clock')}>Pause bis Datum und Uhrzeit</button>
+            </div>
+            {pauseMode === 'minutes'
+              ? <label>Dauer (1–1440 Minuten)<input type="number" min={1} max={1440} value={pauseMinutes} onChange={(event) => setPauseMinutes(Number(event.target.value))}/></label>
+              : <div className="actions"><label>Datum<input type="date" value={pauseDate} onChange={(event) => setPauseDate(event.target.value)}/></label>
+                  <label>Uhrzeit<input type="time" value={pauseTime} onChange={(event) => setPauseTime(event.target.value)}/></label></div>}
+            {pauseDecisionError && <p role="alert" className="field-error">{pauseDecisionError}</p>}
+            <div className="actions">
+              <button type="button" className="btn primary" disabled={Boolean(pauseDecisionError)} onClick={() => beginCurrentInlineBreak(chosenPauseOptions)}>Zwischenpause starten</button>
+              <button type="button" className="btn" onClick={() => setInlineBreakDecisionOpen(false)}>Abbrechen</button>
+            </div>
+          </section>
+        </div>
+      )}
       {startModal && (
         <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setStartModal(null)}>
           <section className="prototype-modal start-phase-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
@@ -1991,15 +2036,15 @@ export function TournamentControlPage() {
             {pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind !== 'overnight' && (
               <div className="break-start-settings">
                 <strong>Wann soll die Pause enden?</strong>
-                {pendingStartStage.settings.breakKind === 'until' && <p className="muted">Vorgabe aus der Turnierplanung: Pause bis {String(pendingStartStage.settings.breakUntil ?? '12:00')} Uhr.</p>}
+                {pendingStartStage.settings.breakKind === 'until' && <p className="muted">Vorgabe aus der Turnierplanung: Pause bis {String(pendingStartStage.settings.breakUntilDate ?? 'geplanter Turniertag')} um {String(pendingStartStage.settings.breakUntil ?? '12:00')} Uhr.</p>}
                 <div className="actions" role="group" aria-label="Pausenplanung">
                   <button className={pauseMode === 'minutes' ? 'btn small primary' : 'btn small'} type="button" aria-pressed={pauseMode === 'minutes'} onClick={() => setPauseMode('minutes')}>Dauer in Minuten</button>
                   <button className={pauseMode === 'clock' ? 'btn small primary' : 'btn small'} type="button" aria-pressed={pauseMode === 'clock'} onClick={() => setPauseMode('clock')}>Uhrzeit wählen</button>
                 </div>
                 {pauseMode === 'minutes'
                   ? <label>Dauer (1–1440 Minuten)<input type="number" min={1} max={1440} step={1} value={pauseMinutes} onChange={(event) => setPauseMinutes(Number(event.target.value))}/></label>
-                  : <label>Geplante Fortsetzung um<input type="time" value={pauseTime} onChange={(event) => setPauseTime(event.target.value)}/></label>}
-                <p className="muted">{pauseMode === 'clock' ? 'Die nächste zukünftige Uhrzeit zählt; liegt sie heute bereits zurück, ist morgen gemeint.' : 'Die Zeit läuft ab dem tatsächlichen Start der Pause.'}</p>
+                  : <div className="actions"><label>Datum<input type="date" value={pauseDate} onChange={(event) => setPauseDate(event.target.value)}/></label><label>Fortsetzung um<input type="time" value={pauseTime} onChange={(event) => setPauseTime(event.target.value)}/></label></div>}
+                <p className="muted">{pauseMode === 'clock' ? 'Datum und Uhrzeit werden gemeinsam geprüft. Verstrichene Termine werden nicht automatisch auf morgen verschoben.' : 'Die Zeit läuft ab dem tatsächlichen Start der Pause.'}</p>
               </div>
             )}
             {pendingStartStage?.type === 'BREAK' && pendingStartStage.settings.breakKind === 'overnight' && <p className="muted">Der nächste Spieltag beginnt planmäßig {pendingStartStage.settings.nextDayDate ? `am ${pendingStartStage.settings.nextDayDate}` : 'am Folgetag'} um {pendingStartStage.settings.nextDayStart} Uhr.</p>}
