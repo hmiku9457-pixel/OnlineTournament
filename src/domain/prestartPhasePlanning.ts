@@ -1,4 +1,4 @@
-import { parseSavedPlayingDayBreaks } from './playingDays';
+import { parseSavedPlayingDayBreaks, playingRounds, validPlayingDayBreaks } from './playingDays';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { StageType } from '@/domain/types';
 import {
@@ -186,6 +186,8 @@ export function validatePrestartPhases(phases: PrestartPhaseDraft[], activeCount
         errors.push(`${label}: Zwischenpause muss zwischen 1 und 1440 Minuten dauern.`);
       }
     }
+    if (!validPlayingDayBreaks(phase.dayBreaks, playingRounds(phase))) errors.push(`${label}: Ungültige Spieltagswechsel innerhalb der Phase.`);
+    if (phase.dayBreaks?.some((item) => item.afterRound === phase.inlineBreakAfterRound)) errors.push(`${label}: Spieltagswechsel und Zwischenpause dürfen nicht nach derselben Runde liegen.`);
     if (phase.type === 'SWISS') {
       if (!isValidSwissRoundCount(phase.swissRounds, phase.entrantCount)) {
         errors.push(phase.entrantCount < 3
