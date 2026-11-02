@@ -382,6 +382,45 @@ export function playingDayOverflowWarnings(timeline: PlannedTimeline): string[] 
  * toward the planned tournament duration or its break total.
  * Includes both standalone breaks and breaks between rounds.
  */
+
+export interface PlayingDayMetrics {
+  date: string;
+  firstActivity: string;
+  lastActivity: string;
+  playingMinutes: number;
+  pauseMinutes: number;
+  activeMinutes: number;
+}
+
+/** Daily active-time accounting: a day-end is a hard separator, not a giant
+ * break spanning the night. Phase/round segments retain their original dates. */
+export function summarizePlayingDays(timeline: PlannedTimeline): PlayingDayMetrics[] {
+  if (!timeline.estimatedEnd || timeline.items.length === 0) return [];
+  const entries = [...timeline.items, {
+    id: 'day-accounting-end', type: 'other' as const, title: 'Ende', at: timeline.estimatedEnd,
+  }];
+  const days = new Map<string, PlayingDayMetrics>();
+  for (let index = 0; index < entries.length - 1; index++) {
+    const current = entries[index], next = entries[index + 1];
+    const start = parseLocalDateTime(current.at), end = parseLocalDateTime(next.at);
+    if (!start || !end || current.breakKind === 'overnight') continue;
+    const date = current.at.slice(0, 10);
+    if (next.at.slice(0, 10) !== date || end < start) continue;
+    const minutes = Math.round((end.getTime() - start.getTime()) / 60000);
+    const previous = days.get(date) ?? {
+      date, firstActivity: current.at, lastActivity: next.at,
+      playingMinutes: 0, pauseMinutes: 0, activeMinutes: 0,
+    };
+    previous.firstActivity = previous.firstActivity < current.at ? previous.firstActivity : current.at;
+    previous.lastActivity = previous.lastActivity > next.at ? previous.lastActivity : next.at;
+    if (current.type === 'break') previous.pauseMinutes += minutes;
+    else if (current.type === 'competition') previous.playingMinutes += minutes;
+    previous.activeMinutes += minutes;
+    days.set(date, previous);
+  }
+  return [...days.values()].sort((a,b) => a.date.localeCompare(b.date));
+}
+
 export function plannedActiveBreakMinutes(timeline: PlannedTimeline): number {
   return timeline.items.reduce((total, item) => {
     if (item.type !== 'break' || item.breakKind === 'overnight'
