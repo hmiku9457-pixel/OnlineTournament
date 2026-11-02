@@ -14,6 +14,7 @@ import { validateTournamentCreation } from '@/domain/validateTournamentCreation'
 import { disciplineLabel, getSportLabel, planningMinutesPerSet } from '@/domain/sports';
 import { sportScoring } from '@/domain/sportScoring';
 import { estimatePhaseMetrics, estimateKnockoutRoundMinutes } from '@/domain/tournamentCreation';
+import { playingRounds } from '@/domain/playingDays';
 
 import { type DemoTournament } from '@/data/demoTournaments';
 import type { Discipline, StageType, TournamentStage, TournamentStatus } from '@/domain/types';
@@ -59,6 +60,8 @@ export interface CreateMockTournamentInput {
   venueLayout?: VenueLayout;
   matchDurationMinutes?: number;
   venueTurnoverMinutes?: number;
+  tournamentMode?: 'single' | 'multi';
+  plannedDays?: number;
   /** Allowed only after the user confirms replacing an unstarted tournament. */
   overwriteTournamentId?: string;
 }
@@ -360,6 +363,8 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
     matchDurationMinutes: input.matchDurationMinutes ?? 15,
     venueTurnoverMinutes: input.venueTurnoverMinutes ?? 0,
     minimumMatches: input.minimumMatches,
+    tournamentMode: input.tournamentMode ?? 'single',
+    plannedDays: input.tournamentMode === 'multi' ? input.plannedDays ?? 2 : 1,
     scheduledStart: input.scheduledStart,
     plannedSchedule: input.plannedSchedule?.map((entry) => ({ ...entry })) ?? [],
   };
@@ -404,8 +409,7 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
       breakUntil: phase.breakUntil, breakUntilDate: phase.breakUntilDate || undefined,
       nextDayStart: phase.nextDayStart,
       nextDayDate: phase.nextDayDate,
-      roundCount: phase.type === 'SWISS' ? phase.swissRounds
-        : phase.type === 'KNOCKOUT' ? Math.ceil(Math.log2(phase.entrantCount)) : undefined,
+      roundCount: playingRounds(phase) || undefined,
       roundDurationsMinutes: phase.type === 'KNOCKOUT'
         ? estimateKnockoutRoundMinutes(phase.entrantCount, tournament.tables, phase.bestOf, phase.knockoutBestOf, timing)
         : undefined,
@@ -413,6 +417,7 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
       inlineBreakKind: phase.inlineBreakKind,
       inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
       inlineBreakUntilDate: phase.inlineBreakUntilDate || undefined,
+      dayBreaks: phase.dayBreaks,
     })));
     const playing = minutes.reduce((total, value, index) => total + (stages[index].type === 'BREAK' ? 0 : value), 0);
     return { timeline, duration: playing + plannedActiveBreakMinutes(timeline) };
@@ -663,6 +668,7 @@ export function updatePrestartTournamentPhases(
     note: phase.note, inlineBreakAfterRound: phase.inlineBreakAfterRound, inlineBreakKind: phase.inlineBreakKind,
     inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
     inlineBreakUntilDate: phase.inlineBreakUntilDate || newPlan?.timeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at.slice(0, 10),
+    dayBreaks: phase.dayBreaks,
   }));
   const stages = phases.map((phase, index) => {
     const nextPlaying = phases.slice(index + 1).find((item) => item.type !== 'BREAK');
