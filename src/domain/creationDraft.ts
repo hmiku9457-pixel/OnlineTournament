@@ -113,11 +113,11 @@ export function validDraft(value: unknown): value is CreationDraft {
       && ['minutes', 'until', 'overnight'].includes(entry.breakKind)
       && Number.isInteger(entry.breakMinutes)
       && typeof entry.nextDayStart === 'string' && typeof entry.nextDayDate === 'string'
-      && typeof entry.breakUntil === 'string' && typeof entry.note === 'string'
+      && typeof entry.breakUntil === 'string' && (entry.breakUntilDate === undefined || typeof entry.breakUntilDate === 'string') && typeof entry.note === 'string'
       && Number.isInteger(entry.inlineBreakAfterRound) && entry.inlineBreakAfterRound >= 0
       && ['minutes', 'until'].includes(entry.inlineBreakKind)
       && Number.isInteger(entry.inlineBreakMinutes)
-      && typeof entry.inlineBreakUntil === 'string')
+      && typeof entry.inlineBreakUntil === 'string' && (entry.inlineBreakUntilDate === undefined || typeof entry.inlineBreakUntilDate === 'string'))
     && data.participantForm !== null && typeof data.participantForm === 'object'
     && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
       .every((key) => typeof (data.participantForm as unknown as Record<string, unknown>)[key] === 'string')

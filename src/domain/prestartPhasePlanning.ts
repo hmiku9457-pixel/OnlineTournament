@@ -26,11 +26,13 @@ export interface PrestartPhaseDraft {
   nextDayStart: string;
   nextDayDate?: string;
   breakUntil: string;
+  breakUntilDate: string;
   note: string;
   inlineBreakAfterRound: number;
   inlineBreakKind: 'minutes' | 'until';
   inlineBreakMinutes: number;
   inlineBreakUntil: string;
+  inlineBreakUntilDate: string;
 }
 
 const competitive = (phase: PrestartPhaseDraft) => phase.type !== 'BREAK';
@@ -52,11 +54,13 @@ export function initialPrestartPhases(tournament: DemoTournament): PrestartPhase
     nextDayStart: String(stage.settings.nextDayStart ?? '09:00'),
     nextDayDate: String(stage.settings.nextDayDate ?? ''),
     breakUntil: String(stage.settings.breakUntil ?? '12:00'),
+    breakUntilDate: String(stage.settings.breakUntilDate ?? ''),
     note: String(stage.settings.note ?? ''),
     inlineBreakAfterRound: Number(stage.settings.inlineBreakAfterRound) || 0,
     inlineBreakKind: stage.settings.inlineBreakKind === 'minutes' ? 'minutes' : 'until',
     inlineBreakMinutes: Number(stage.settings.inlineBreakMinutes) || 15,
     inlineBreakUntil: String(stage.settings.inlineBreakUntil ?? '13:00'),
+    inlineBreakUntilDate: String(stage.settings.inlineBreakUntilDate ?? ''),
   }));
 }
 
@@ -148,6 +152,7 @@ export function validatePrestartPhases(phases: PrestartPhaseDraft[], activeCount
         if (phase.nextDayDate && !isValidLocalDateTime(phase.nextDayDate + 'T12:00')) errors.push(`${label}: Ungültiges Fortsetzungsdatum.`);
       } else if (phase.breakKind === 'until') {
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(phase.breakUntil)) errors.push(`${label}: Für „Pause bis“ ist eine gültige Uhrzeit (HH:MM) erforderlich.`);
+        if (phase.breakUntilDate && !isValidLocalDateTime(phase.breakUntilDate + 'T12:00')) errors.push(`${label}: Ungültiges Pausenzieldatum.`);
       } else if (phase.breakKind === 'minutes') {
         if (!Number.isInteger(phase.breakMinutes) || phase.breakMinutes < 1 || phase.breakMinutes > 1440) errors.push(`${label}: Pausendauer muss zwischen 1 und 1440 Minuten liegen.`);
       } else {
@@ -173,6 +178,7 @@ export function validatePrestartPhases(phases: PrestartPhaseDraft[], activeCount
       if (phase.inlineBreakKind === 'until' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(phase.inlineBreakUntil)) {
         errors.push(`${label}: Gültige Uhrzeit für die Zwischenpause erforderlich.`);
       }
+      if (phase.inlineBreakKind === 'until' && phase.inlineBreakUntilDate && !isValidLocalDateTime(phase.inlineBreakUntilDate + 'T12:00')) errors.push(`${label}: Ungültiges Zwischenpausendatum.`);
       if (phase.inlineBreakKind === 'minutes' && (!Number.isInteger(phase.inlineBreakMinutes) || phase.inlineBreakMinutes < 1 || phase.inlineBreakMinutes > 1440)) {
         errors.push(`${label}: Zwischenpause muss zwischen 1 und 1440 Minuten dauern.`);
       }
@@ -217,8 +223,8 @@ export function createPrestartPhase(type: StageType, participants: number, next?
     groupCount: recommendGroupCount(entrants, next?.entrantCount),
     swissRounds: recommendedSwissRounds(entrants),
     knockoutBestOf: Array.from({ length: knockoutRoundLabels(entrants).length }, () => bestOf),
-    breakKind: 'minutes', breakMinutes: 15, nextDayStart: '09:00', nextDayDate: '', breakUntil: '12:00', note: '',
-    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00',
+    breakKind: 'minutes', breakMinutes: 15, nextDayStart: '09:00', nextDayDate: '', breakUntil: '12:00', breakUntilDate: '', note: '',
+    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '',
   };
 }
 
