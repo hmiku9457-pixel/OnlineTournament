@@ -773,7 +773,7 @@ export function TournamentControlPage() {
       ? 'Der gewählte Pausentermin ist bereits vorbei oder ungültig. Bitte ein neues Datum und eine zukünftige Uhrzeit wählen oder eine Dauer in Minuten festlegen.'
       : null;
   const pendingPauseIssue = pendingStartStage?.type === 'BREAK' ? pauseDecisionError : null;
-  const expiredInlineBreak = inlineBreakReady?.config.kind === 'until'
+  const expiredInlineBreak = (inlineBreakReady?.config.kind === 'until' || inlineBreakReady?.config.kind === 'overnight')
     && !computeBreakResumeAt(new Date(), { kind: 'clock',
       date: inlineBreakReady.config.untilDate, time: inlineBreakReady.config.until });
   const editableStage = useMemo(() => phaseSource.tournament.stages.find((stage) => isStageEditable(phaseSource.tournament, stage)), [phaseSource]);
@@ -1259,15 +1259,15 @@ export function TournamentControlPage() {
 
       {inlineBreakReady && activeStage && !['ABORTED', 'FINISHED'].includes(tournament.status) && (
         <div className="control-review-alert inline-break-required no-print" role="status">
-          <strong>Zwischenpause nach Runde {inlineBreakReady.config.afterRound} von „{activeStage.name}“</strong>
-          <span>Die Runde ist freigegeben. Die nächste Runde bleibt gesperrt, bis du diese Zwischenpause gestartet und beendet hast.</span>
-          <button className="btn primary" type="button" onClick={() => beginCurrentInlineBreak()}>Zwischenpause starten</button>
+          <strong>{inlineBreakReady.config.kind === 'overnight' ? 'Spieltagsende' : 'Zwischenpause'} nach Runde {inlineBreakReady.config.afterRound} von „{activeStage.name}“</strong>
+          <span>Die Runde ist freigegeben. Die nächste Runde bleibt gesperrt, bis du diese Unterbrechung gestartet und beendet hast.</span>
+          <button className="btn primary" type="button" onClick={() => beginCurrentInlineBreak()}>{inlineBreakReady.config.kind === 'overnight' ? 'Spieltagsende starten' : 'Zwischenpause starten'}</button>
         </div>
       )}
       {inlineBreakRunning && activeStage && !['ABORTED', 'FINISHED'].includes(tournament.status) && (
         <TournamentPauseBanner
-          stageName={`Zwischenpause nach Runde ${inlineBreakRunning.config.afterRound} · ${activeStage.name}`}
-          overnight={false}
+          stageName={`${inlineBreakRunning.config.kind === 'overnight' ? 'Spieltagsende' : 'Zwischenpause'} nach Runde ${inlineBreakRunning.config.afterRound} · ${activeStage.name}`}
+          overnight={inlineBreakRunning.config.kind === 'overnight'}
           resumeAt={inlineBreakRunning.resumeAt}
           ready={inlineBreakCanFinish}
           now={Date.now()}
