@@ -41,7 +41,7 @@ import { formatPhaseOverview } from '@/domain/creationOverview';
 import { changedPhaseEntrantIds, needsRosterPhaseReview } from '@/domain/phaseReview';
 import { CREATION_DRAFT_KEY, loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence, type CreationDraft, type SavedCreationDraft } from '@/domain/creationDraft';
 import { saveNamedCreationDraftAtomic, removeSavedCreationDraftAtomic } from '@/domain/savedCreationDraftStore';
-import { ClockTimePicker } from '@/components/ClockTimePicker';
+import { ClockTimePicker, parseClockTime } from '@/components/ClockTimePicker';
 import { RecommendationDurationPicker, DEFAULT_RECOMMENDATION_DURATION, MIN_RECOMMENDATION_DURATION, MAX_RECOMMENDATION_DURATION, formatRecommendationDuration } from '@/components/RecommendationDurationPicker';
 import { RecommendationNumberStepper } from '@/components/RecommendationNumberStepper';
 import { SportChangeDialog } from '@/components/SportChangeDialog';
@@ -314,9 +314,17 @@ function NumberChoice({
   onCustomValue: (value: number) => void;
   ariaLabel: string;
 }) {
-  function clampCustomValue(rawValue: number): number {
-    const minimumApplied = Math.max(customMinimum, Number.isFinite(rawValue) ? Math.trunc(rawValue) || customMinimum : customMinimum);
-    return customMaximum === undefined ? minimumApplied : Math.min(customMaximum, minimumApplied);
+  const [rawValue, setRawValue] = useState(String(value));
+  useEffect(() => { setRawValue(String(value)); }, [value, custom]);
+  // Do not clamp on each keystroke: clearing the field and typing a
+  // multi-digit number must remain possible.
+  function commitCustomValue() {
+    const parsed = Number(rawValue);
+    const proposed = rawValue.trim() !== '' && Number.isFinite(parsed) ? Math.trunc(parsed) : value;
+    const normalized = Math.max(customMinimum, customMaximum === undefined
+      ? proposed : Math.min(customMaximum, proposed));
+    setRawValue(String(normalized));
+    if (normalized !== value) onCustomValue(normalized);
   }
 
   return (
@@ -349,8 +357,10 @@ function NumberChoice({
             type="number"
             min={customMinimum}
             max={customMaximum}
-            value={value}
-            onChange={(event) => onCustomValue(clampCustomValue(Number(event.target.value)))}
+            value={rawValue}
+            onChange={(event) => setRawValue(event.target.value)}
+            onBlur={commitCustomValue}
+            onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
             aria-label={`${ariaLabel} benutzerdefiniert`}
             autoFocus
           />
@@ -531,6 +541,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [testParticipantsDialogOpen, setTestParticipantsDialogOpen] = useState(false);
   const [discardDraftDialogOpen, setDiscardDraftDialogOpen] = useState(false);
   const [pendingStepNavigation, setPendingStepNavigation] = useState<{ target: WizardStep; focusDate: boolean; advance: boolean } | null>(null);
+  const [pendingParticipantAction, setPendingParticipantAction] = useState<{ kind: 'edit'; id: string } | { kind: 'test-players' } | null>(null);
+  const [pendingRecommendationId, setPendingRecommendationId] = useState<string | null>(null);
   const [qualificationRulePhaseId, setQualificationRulePhaseId] = useState<string | null>(null);
   const [focusStartSettings, setFocusStartSettings] = useState(false);
   const discardDraftButtonRef = useRef<HTMLButtonElement>(null);
@@ -561,6 +573,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       : createVenueLayout(tables));
   }, [tables, venueLayoutCustomized]);
   const [participants, setParticipants] = useState<ParticipantDraft[]>(restoredDraft?.participants ?? []);
+  const [rosterReviewRequired, setRosterReviewRequired] = useState(restoredDraft?.rosterReviewRequired ?? false);
   // Page size is derived from the available viewport, so the roster itself
   // never adds a vertical scrollbar to the creation page.
   const rosterRef = useRef<HTMLElement | null>(null);
@@ -576,8 +589,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       // Use the actually rendered CSS grid rather than guessing 1/2/3 columns
       // from fixed pixel thresholds (which disregard padding and grid gaps).
       const columns = list ? Math.max(1, getComputedStyle(list).gridTemplateColumns.split(/\s+/).filter((track) => parseFloat(track) > 0).length) : 1;
-      const card = list?.querySelector<HTMLElement>('.participant-roster-row');
-      const height = card?.getBoundingClientRect().height ?? 92;
+      // Measure ALL actually rendered cards. A long doubles/team name can
+      // make cards taller than the first entry and must limit page capacity.
+      const cards = list ? Array.from(list.querySelectorAll<HTMLElement>('.participant-roster-row')) : [];
+      const height = cards.length
+        ? Math.max(...cards.map((card) => card.getBoundingClientRect().height))
+        : list?.querySelector<HTMLElement>('.participant-empty')?.getBoundingClientRect().height ?? 56;
       const gap = list ? parseFloat(getComputedStyle(list).rowGap) || 8 : 8;
       const available = Math.max(height, window.innerHeight - Math.max(0, rect?.top ?? 0) - 155);
       const rows = Math.max(1, Math.floor((available + gap) / (height + gap)));
@@ -641,7 +658,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
     sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
     customTables, venueLayoutEnabled, venueLayout, venueLayoutCustomized, participants, participantForm,
-    editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
+    editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
     knockoutQualifierCount, preferredDurationMinutes, awardsEnabled,
     awardsAtOverride: prestartManualCeremony ? prestartCeremonyAt : awardsAtOverride,
@@ -649,7 +666,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
     sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
     customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
-    editingParticipantId, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
+    editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
     knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
     prestartCeremonyAt, prestartManualCeremony?.at,
@@ -798,7 +815,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const incompleteSavedParticipants = participants.length - participantCount;
   const savedParticipantNamesValid = useMemo(
     () => validParticipantRoster(participants, discipline), [participants, discipline]);
-  const participantsValid = participantCount >= 2 && incompleteSavedParticipants === 0 && savedParticipantNamesValid;
+  const participantsValid = participantCount >= 2 && incompleteSavedParticipants === 0 && savedParticipantNamesValid && !rosterReviewRequired;
   const participantErrorMessages = uniqueErrorMessages(participantErrors);
 
   const defaultMaxGroups = Math.max(2, Math.ceil(participantCount / (participantCount >= 20 ? 5 : 4)));
@@ -880,6 +897,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             : phase.breakKind === 'overnight' && /^([01]\d|2[0-3]):[0-5]\d$/.test(phase.nextDayStart)));
     });
   const gameSettingsValid = Number.isInteger(minimumMatches) && minimumMatches >= 1 && minimumMatches <= 100 && validMatchDuration && validTurnover;
+  const invalidLocalClock = Boolean(parseCalendarDate(scheduledDate) && parseClockTime(scheduledTime)
+    && !isValidLocalDateTime(scheduledStart));
   const startTimeIsAllowed = isStartAtOrAfterNow(scheduledStart, new Date(currentLocalMinute));
   const basicsValid = Boolean(name.trim()) && name.trim().length <= 120 && Boolean(sport) && selectedDisciplineValid && startTimeIsAllowed && Number.isSafeInteger(tables) && tables >= 1 && tables <= 9999 && gameSettingsValid;
   const venueLayoutValid = !venueLayoutEnabled || validateVenueLayout(venueLayout, tables).length === 0;
@@ -932,6 +951,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   }
 
   function editParticipant(participant: ParticipantDraft) {
+    if (participantEditorDirty) {
+      setPendingParticipantAction({ kind: 'edit', id: participant.id });
+      return;
+    }
+    openParticipantEditor(participant);
+  }
+
+  function openParticipantEditor(participant: ParticipantDraft) {
     setParticipantForm({
       firstName: participant.firstName,
       lastName: participant.lastName,
@@ -1007,14 +1034,21 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setSelectedRecommendationId(null);
   }
 
-  function selectRecommendation(recommendation: FormatRecommendation) {
-    // Second clicks must never erase a fully configured tournament.
-    if (selectedRecommendationId === recommendation.id && recommendationPlanMatches) return;
+  function applyRecommendation(recommendation: FormatRecommendation) {
     setSelectedRecommendationId(recommendation.id);
     setPhaseDrafts(recommendation.phases.map((phase) => phaseDraftFromTemplate(phase, participantCount, sport)));
     setReviewRequiredPhaseIds([]);
     setExpandedPhaseId(null);
     setPhaseInsertIndex(null);
+  }
+
+  function selectRecommendation(recommendation: FormatRecommendation) {
+    if (selectedRecommendationId === recommendation.id && recommendationPlanMatches) return;
+    if (phaseDrafts.length > 0) {
+      setPendingRecommendationId(recommendation.id);
+      return;
+    }
+    applyRecommendation(recommendation);
   }
 
   function normalizePhaseEntrants(phases: PhaseDraft[]): PhaseDraft[] {
@@ -1307,6 +1341,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   function confirmDisciplineChange() {
     if (!pendingDiscipline) return;
+    if (participants.length > 0) setRosterReviewRequired(true);
     setDiscipline(pendingDiscipline);
     resetParticipantEditor();
     setPendingDiscipline(null);
@@ -1317,6 +1352,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const nextDiscipline = allowed.some((option) => option.value === discipline)
       ? discipline : allowed[0]?.value ?? 'SINGLES';
     if (nextDiscipline !== discipline) {
+      if (participants.length > 0) setRosterReviewRequired(true);
       setDiscipline(nextDiscipline);
       resetParticipantEditor();
       // Keep first name, surname, and both partner fields intact.
@@ -1632,6 +1668,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                   label="Geplanter Turnierbeginn" minTime={scheduledDate === currentLocalMinute.slice(0, 10) ? currentLocalMinute.slice(11, 16) : undefined}
                   nowTime={currentLocalMinute.slice(11, 16)} nowActive={useCurrentTime} onNow={selectCurrentTime} />
                 <span className="field-hint wizard-start-hint">Frühere Uhrzeiten sind am heutigen Tag gesperrt. „Jetzt“ übernimmt die aktuelle Uhrzeit und aktualisiert sie fortlaufend. Den tatsächlichen Spielstart löst später die Turnierleitung aus.</span>
+                {invalidLocalClock && <span className="field-error" role="alert">Diese Uhrzeit existiert an diesem Datum aufgrund der Zeitumstellung nicht. Bitte eine andere Uhrzeit auswählen.</span>}
               </div>
               <div className="field">
                 <label htmlFor="sport">Sportart <span className="wizard-required-mark" aria-hidden="true">*</span></label>
@@ -1768,6 +1805,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               </div>
             </div>
 
+            {rosterReviewRequired && (
+              <div className="callout" role="alert">
+                <strong>Teilnehmer nach Wechsel der Wettbewerbsart prüfen</strong>
+                <p>Die bisherigen Einträge werden jetzt als {discipline === 'TEAMS' ? 'Mannschaften' : discipline === 'DOUBLES' ? 'Doppel' : 'Einzelspieler'} interpretiert. Prüfe Namen und Zuordnungen, bevor du fortfährst.</p>
+                <button className="btn small" type="button" disabled={!savedParticipantNamesValid || incompleteSavedParticipants > 0}
+                  onClick={() => setRosterReviewRequired(false)}>Teilnehmerliste geprüft</button>
+              </div>
+            )}
             <div className="participant-entry-layout">
               <div className="participant-editor">
                 <div className="participant-editor-head">
@@ -2066,6 +2111,22 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           <section className="phase-wizard-step">
             <h2>Phasen konfigurieren</h2>
             <p className="muted">Ordne deine Phasen an und öffne bei Bedarf die Einstellungen.</p>
+            {!canCreate && (
+              <div className="wizard-schedule-errors" role="alert">
+                <strong>Bitte vor der Zusammenfassung korrigieren:</strong>
+                <ul>
+                  {[...new Set([...centralCreationIssues, ...scheduleIssues,
+                    ...(!phaseConfigurationValid ? ['Prüfe Phasentypen, Phasennamen, Runden und Pauseneinstellungen.'] : []),
+                    ...(!phaseEntrantsValid ? ['Die Anzahl der Teilnehmer oder Qualifikationsplätze ist in mindestens einer Phase ungültig.'] : []),
+                    ...(!overnightDatesValid ? ['Mindestens ein Fortsetzungsdatum muss nach dem Ende der vorherigen Phase liegen.'] : []),
+                    ...(reviewRequiredPhaseIds.length ? ['Bestätige die Prüfung aller automatisch angepassten Phasen.'] : []),
+                    ...(!venueLayoutValid ? ['Der Spielflächenplan muss in den Grunddaten korrigiert werden.'] : []),
+                    ...(!basicsValid ? ['Bitte die Grunddaten in Schritt 1 prüfen.'] : []),
+                    ...(!participantsValid ? ['Bitte die Teilnehmerliste in Schritt 2 prüfen.'] : [])])]
+                    .map((issue) => <li key={issue}>{issue}</li>)}
+                </ul>
+              </div>
+            )}
             {groupRecommendationNotice && <div className="callout" role="status">{groupRecommendationNotice} Die bisherige Einstellung bleibt erhalten; über „Empfehlung übernehmen“ kannst du sie ändern.</div>}
             {reviewRequiredPhaseIds.length > 0 && <div className="callout" role="alert">
               Einige Qualifikationswerte oder Rundeneinstellungen wurden nach einer Änderung der Teilnehmerzahl verkleinert. Bitte die markierten Phasen kontrollieren und einzeln als geprüft bestätigen.
@@ -2945,16 +3006,40 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           />
         );
       })()}
-      {pendingStepNavigation && (
+      {(pendingStepNavigation || pendingParticipantAction) && (
         <UnsavedParticipantDialog
-          onStay={() => setPendingStepNavigation(null)}
+          onStay={() => { setPendingStepNavigation(null); setPendingParticipantAction(null); }}
           onDiscard={() => {
             const requested = pendingStepNavigation;
+            const action = pendingParticipantAction;
             setPendingStepNavigation(null);
+            setPendingParticipantAction(null);
             resetParticipantEditor();
-            applyStepNavigation(requested.target, requested.focusDate, requested.advance);
+            if (requested) applyStepNavigation(requested.target, requested.focusDate, requested.advance);
+            else if (action?.kind === 'edit') {
+              const participant = participants.find((entry) => entry.id === action.id);
+              if (participant) openParticipantEditor(participant);
+            } else if (action?.kind === 'test-players') generateTestParticipants();
           }}
         />
+      )}
+      {pendingRecommendationId && (
+        <div className="sport-change-backdrop" role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingRecommendationId(null); }}>
+          <section className="sport-change-dialog" role="alertdialog" aria-modal="true" aria-label="Phasenplanung ersetzen?"
+            onKeyDown={(event) => { if (event.key === 'Escape') setPendingRecommendationId(null); }}>
+            <h2>Bestehende Phasenplanung ersetzen?</h2>
+            <p>Die ausgewählte Empfehlung ersetzt alle derzeit konfigurierten Phasen. Individuelle Best-of-Werte, Qualifikationsplätze und Pausen gehen verloren.</p>
+            <div className="sport-change-dialog-actions">
+              <button type="button" className="btn" autoFocus onClick={() => setPendingRecommendationId(null)}>Bisherige Planung behalten</button>
+              <button type="button" className="btn danger" onClick={() => {
+                const recommendation = recommendations.find((item) => item.id === pendingRecommendationId);
+                setPendingRecommendationId(null);
+                if (recommendation) applyRecommendation(recommendation);
+              }}>Phasen durch Empfehlung ersetzen</button>
+            </div>
+          </section>
+        </div>
       )}
       {discardDraftDialogOpen && (
         <DiscardDraftDialog
@@ -2975,8 +3060,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             testParticipantsButtonRef.current?.focus();
           }}
           onConfirm={() => {
-            generateTestParticipants();
             setTestParticipantsDialogOpen(false);
+            if (participantEditorDirty) setPendingParticipantAction({ kind: 'test-players' });
+            else generateTestParticipants();
           }}
         />
       )}
