@@ -227,7 +227,9 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
               ?? new Date(NaN)
             : clockAt(inlineStart, phase.inlineBreakUntil ?? '13:00');
           if (Number.isNaN(target.getTime()) || target < inlineStart) {
-            warnings.push({ phaseIndex: index, message: `„${phase.label}“: Die Zwischenpause nach Runde ${afterRound} beginnt voraussichtlich am ${formatPlannedDateTime(toLocalDateTime(inlineStart))}. Das feste Pausenziel ${formatPlannedDateTime(toLocalDateTime(target)) === 'Ungültiges Datum' ? `${phase.inlineBreakUntilDate ?? 'aktueller Tag'} ${phase.inlineBreakUntil ?? '13:00'} Uhr` : formatPlannedDateTime(toLocalDateTime(target))} liegt davor. Bitte Datum und Uhrzeit korrigieren.` });
+            const requestedDate = phase.inlineBreakUntilDate || toLocalDateTime(inlineStart).slice(0, 10);
+            const targetLabel = `${requestedDate} ${phase.inlineBreakUntil ?? '13:00'} Uhr`;
+            warnings.push({ phaseIndex: index, message: `„${phase.label}“: Die Zwischenpause nach Runde ${afterRound} beginnt voraussichtlich am ${formatPlannedDateTime(toLocalDateTime(inlineStart))}. Das feste Pausenziel am ${targetLabel} liegt davor. Bitte Datum und Uhrzeit korrigieren.` });
             validDuration = false;
           } else resume = target;
         } else resume = new Date(inlineStart.getTime() + Math.max(1, phase.inlineBreakMinutes ?? 15) * 60000);
