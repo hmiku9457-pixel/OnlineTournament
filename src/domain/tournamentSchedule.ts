@@ -396,8 +396,8 @@ export interface PlayingDayMetrics {
  * break spanning the night. Phase/round segments retain their original dates. */
 export function summarizePlayingDays(timeline: PlannedTimeline): PlayingDayMetrics[] {
   if (!timeline.estimatedEnd || timeline.items.length === 0) return [];
-  const entries = [...timeline.items, {
-    id: 'day-accounting-end', type: 'other' as const, title: 'Ende', at: timeline.estimatedEnd,
+  const entries: PlannedScheduleItem[] = [...timeline.items, {
+    id: 'day-accounting-end', type: 'other', title: 'Ende', at: timeline.estimatedEnd,
   }];
   const days = new Map<string, PlayingDayMetrics>();
   for (let index = 0; index < entries.length - 1; index++) {
