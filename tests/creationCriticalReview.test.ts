@@ -76,7 +76,7 @@ describe('critical creation review – final save, phases and time', () => {
     expect(validateTournamentCreation({ ...valid, phases: [{ ...valid.phases[0], swissRounds: 4 }] }).join(' ')).toMatch(/Schweizer/);
     expect(validateTournamentCreation({ ...valid, phases: [{ ...valid.phases[0], entrantCount: 3 }] }).join(' ')).toMatch(/Teilnehmerzahl/);
     expect(validateTournamentCreation({ ...valid, participantNames: [...names.slice(0, 3), 'ada  lovelace'] }).join(' ')).toMatch(/doppelt/);
-    expect(validateTournamentCreation({ ...valid, venueLayout: { ...valid.venueLayout!, cells: ['table:1', ''] } }).join(' ')).toMatch(/fehlen/);
+    expect(validateTournamentCreation({ ...valid, venueLayout: { ...valid.venueLayout!, cells: ['table:1', '', '', ''] } }).join(' ')).toMatch(/fehlen/);
   });
 
   it('requires review for automatically changed entrants after phase reordering', () => {
