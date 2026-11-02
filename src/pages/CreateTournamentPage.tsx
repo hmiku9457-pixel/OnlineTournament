@@ -300,6 +300,28 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
 }
 
 /** Keep an editable numeric text draft until the field loses focus. */
+/** Fixed-height marquee for overlong names; short names remain stationary. */
+function ScrollingParticipantName({ name }: { name: string }) {
+  const viewport = useRef<HTMLDivElement>(null);
+  const text = useRef<HTMLElement>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const measure = () => setOverflows(Boolean(viewport.current && text.current
+      && text.current.scrollWidth > viewport.current.clientWidth + 1));
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    if (viewport.current) observer?.observe(viewport.current);
+    return () => observer?.disconnect();
+  }, [name]);
+  return <div ref={viewport} className="participant-name-marquee-viewport" title={name}>
+    <div className={overflows ? 'participant-name-marquee is-running' : 'participant-name-marquee'}
+      style={overflows ? { animationDuration: `${Math.max(9, Math.ceil(name.length / 4))}s` } : undefined}>
+      <strong ref={text}>{name}</strong>
+      {overflows && <strong aria-hidden="true">{name}</strong>}
+    </div>
+  </div>;
+}
+
 function BufferedNumberInput({ id, value, min, max, onCommit }: {
   id?: string; value: number; min: number; max: number; onCommit: (value: number) => void;
 }) {
@@ -604,6 +626,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const rosterRef = useRef<HTMLElement | null>(null);
   // Absolute start offset remains stable when real card heights change the page size.
   const [rosterFirstIndex, setRosterFirstIndex] = useState(0);
+  const [rosterBackStack, setRosterBackStack] = useState<number[]>([]);
   const [rosterPageSize, setRosterPageSize] = useState(8);
   useEffect(() => {
     if (step !== 2 || prestart) return;
@@ -645,6 +668,15 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       ? Math.max(0, Math.floor(Math.max(0, participants.length - 1) / rosterPageSize) * rosterPageSize) : start);
   }, [participants.length, rosterPageSize]);
   const visibleRosterStart = Math.min(rosterFirstIndex, Math.max(0, participants.length - 1));
+  function rosterNextPage() {
+    setRosterBackStack((history) => [...history, visibleRosterStart]);
+    setRosterFirstIndex(visibleRosterStart + rosterPageSize);
+  }
+  function rosterPreviousPage() {
+    const previous = rosterBackStack.at(-1) ?? 0;
+    setRosterBackStack((history) => history.slice(0, -1));
+    setRosterFirstIndex(previous);
+  }
   const visibleRoster = participants.slice(visibleRosterStart, visibleRosterStart + rosterPageSize);
   const rosterNeedsPagination = visibleRosterStart > 0 || participants.length > rosterPageSize;
   const [recentlyRemovedParticipant, setRecentlyRemovedParticipant] = useState<{ participant: ParticipantDraft; index: number } | null>(null);
@@ -983,6 +1015,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         participant.id === editingParticipantId ? { ...participant, ...participantForm } : participant
       )));
     } else {
+      setRosterBackStack([]);
       setRosterFirstIndex(Math.floor(participants.length / rosterPageSize) * rosterPageSize);
       setParticipants((current) => [...current, newParticipant(participantForm)]);
     }
@@ -1993,7 +2026,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     <article className={`participant-roster-row ${editingParticipantId === participant.id ? 'editing' : ''}`} key={participant.id}>
                       <span className="participant-list-number">{visibleRosterStart + index + 1}</span>
                       <div className="participant-list-name" title={participantDisplayName(participant, discipline)}>
-                         <strong>{participantDisplayName(participant, discipline)}</strong>
+                         <ScrollingParticipantName name={participantDisplayName(participant, discipline)} />
                          {!participantIsComplete(participant, discipline) && (
                            <span className="participant-incomplete" role="img" aria-label="Eintrag unvollständig" title="Eintrag muss ergänzt werden.">!</span>
                          )}
@@ -2022,10 +2055,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 </div>
                 {rosterNeedsPagination && <nav className="creation-roster-pagination" aria-label="Teilnehmerseiten">
                   <button type="button" className="btn small" disabled={visibleRosterStart === 0}
-                    onClick={() => setRosterFirstIndex(Math.max(0, visibleRosterStart - rosterPageSize))}>Zurück</button>
+                    onClick={rosterPreviousPage}>Zurück</button>
                   <span aria-live="polite">Einträge {visibleRosterStart + 1}–{Math.min(participants.length, visibleRosterStart + rosterPageSize)} von {participants.length}</span>
                   <button type="button" className="btn small" disabled={visibleRosterStart + rosterPageSize >= participants.length}
-                    onClick={() => setRosterFirstIndex(visibleRosterStart + rosterPageSize)}>Weiter</button>
+                    onClick={rosterNextPage}>Weiter</button>
                 </nav>}
               </aside>
 
