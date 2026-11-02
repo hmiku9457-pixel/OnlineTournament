@@ -663,7 +663,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       if (list) observer.observe(list);
     }
     return () => { window.removeEventListener('resize', updatePageSize); observer?.disconnect(); };
-  }, [step, prestart]);
+  }, [step, prestart, discipline]);
   useEffect(() => {
     setRosterFirstIndex((start) => start >= participants.length
       ? Math.max(0, Math.floor(Math.max(0, participants.length - 1) / rosterPageSize) * rosterPageSize) : start);
@@ -679,7 +679,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setRosterFirstIndex(previous);
   }
   const visibleRoster = participants.slice(visibleRosterStart, visibleRosterStart + rosterPageSize);
-  const rosterNeedsPagination = visibleRosterStart > 0 || participants.length > rosterPageSize;
+  // Keep controls mounted at a stable height even when all entries fit.
+  const showRosterNavigation = participants.length > 0;
   const [recentlyRemovedParticipant, setRecentlyRemovedParticipant] = useState<{ participant: ParticipantDraft; index: number } | null>(null);
   const [groupRecommendationNotice, setGroupRecommendationNotice] = useState<string | null>(null);
   const previousRosterCount = useRef<number>(restoredDraft?.participants.length ?? 0);
@@ -1918,7 +1919,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             </div>
 
             {rosterReviewRequired && (
-              <div className="callout" role="alert">
+              <div className="callout participant-review-warning" role="alert">
                 <strong>Teilnehmer nach Wechsel der Wettbewerbsart prüfen</strong>
                 <p>Die bisherigen Einträge werden jetzt als {discipline === 'TEAMS' ? 'Mannschaften' : discipline === 'DOUBLES' ? 'Doppel' : 'Einzelspieler'} interpretiert. Prüfe Namen und Zuordnungen, bevor du fortfährst.</p>
                 <button className="btn small" type="button" disabled={!savedParticipantNamesValid || incompleteSavedParticipants > 0}
@@ -2019,16 +2020,37 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                   <span className="badge" aria-label={`${participantCount} Teilnehmer gespeichert`}>{participantCount}</span>
                 </div>
 
+                {showRosterNavigation && <nav className="creation-roster-pagination" aria-label="Teilnehmerseiten">
+                  <button type="button" className="btn small" disabled={visibleRosterStart === 0}
+                    onClick={rosterPreviousPage}>Zurück</button>
+                  <span aria-live="polite">Einträge {visibleRosterStart + 1}–{Math.min(participants.length, visibleRosterStart + rosterPageSize)} von {participants.length}</span>
+                  <button type="button" className="btn small" disabled={visibleRosterStart + rosterPageSize >= participants.length}
+                    onClick={rosterNextPage}>Weiter</button>
+                </nav>}
+
                 <div className="participant-roster-list participant-roster-multi">
                   {participants.length === 0 ? (
                     <div className="participant-empty">
                       Noch keine Teilnehmer gespeichert. Neue Einträge erscheinen hier sofort.
                     </div>
                   ) : visibleRoster.map((participant, index) => (
-                    <article className={`participant-roster-row ${editingParticipantId === participant.id ? 'editing' : ''}`} key={participant.id}>
+                    <article className={`participant-roster-row ${discipline === 'DOUBLES' ? 'is-double' : 'is-compact'} ${editingParticipantId === participant.id ? 'editing' : ''}`} key={participant.id}>
                       <span className="participant-list-number">{visibleRosterStart + index + 1}</span>
                       <div className="participant-list-name" title={participantDisplayName(participant, discipline)}>
-                         <ScrollingParticipantName name={participantDisplayName(participant, discipline)} />
+                         {discipline === 'DOUBLES' ? (
+                           <div className="participant-double-players">
+                             <div className="participant-double-player">
+                               <span className="participant-player-number" aria-hidden="true">1</span>
+                               <ScrollingParticipantName name={displayPersonName(participant.firstName, participant.lastName)} />
+                             </div>
+                             <div className="participant-double-player">
+                               <span className="participant-player-number" aria-hidden="true">2</span>
+                               <ScrollingParticipantName name={displayPersonName(participant.partnerFirstName, participant.partnerLastName)} />
+                             </div>
+                           </div>
+                         ) : (
+                           <ScrollingParticipantName name={participantDisplayName(participant, discipline)} />
+                         )}
                          {!participantIsComplete(participant, discipline) && (
                            <span className="participant-incomplete" role="img" aria-label="Eintrag unvollständig" title="Eintrag muss ergänzt werden.">!</span>
                          )}
@@ -2055,13 +2077,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     </article>
                   ))}
                 </div>
-                {rosterNeedsPagination && <nav className="creation-roster-pagination" aria-label="Teilnehmerseiten">
-                  <button type="button" className="btn small" disabled={visibleRosterStart === 0}
-                    onClick={rosterPreviousPage}>Zurück</button>
-                  <span aria-live="polite">Einträge {visibleRosterStart + 1}–{Math.min(participants.length, visibleRosterStart + rosterPageSize)} von {participants.length}</span>
-                  <button type="button" className="btn small" disabled={visibleRosterStart + rosterPageSize >= participants.length}
-                    onClick={rosterNextPage}>Weiter</button>
-                </nav>}
               </aside>
 
             {recentlyRemovedParticipant && <div className="creation-undo-remove" role="status">
@@ -2096,80 +2111,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             </div>
 
             <div className="format-step-layout">
-              <div className="recommendation-list">
-                {recommendations.length === 0 && (
-                  <div className="callout">Mit den aktuellen Vorgaben gibt es keinen sinnvollen automatischen Vorschlag innerhalb des Zeitmodells. Du kannst trotzdem weitergehen und die Phasen manuell anlegen.</div>
-                )}
-                {recommendations.map((item, index) => (
-                  <button
-                    className={`card recommendation recommendation-select ${selectedRecommendationId === item.id && recommendationPlanMatches ? 'selected' : ''} ${index === 0 ? 'best' : ''}`}
-                    key={item.id}
-                    type="button"
-                    onClick={() => selectRecommendation(item)}
-                  >
-                    <div className="recommendation-heading">
-                      <h3 className="recommendation-phase-heading">
-                        {item.phases.map((phase, phaseIndex) => {
-                          const entrants = phase.entrantCount ?? participantCount;
-                          const previousEntrants = phaseIndex > 0
-                            ? item.phases[phaseIndex - 1].entrantCount ?? participantCount
-                            : null;
-                          const phaseName = phase.type === 'GROUPS'
-                            ? `${phase.groupCount ?? 2} Gruppen`
-                            : phase.type === 'SWISS'
-                              ? `${phase.swissRounds ?? 1} Runden Schweizer System`
-                              : phase.label;
-                          return (
-                            <span className="recommendation-phase-segment" key={phase.key}>
-                              {phaseIndex > 0 && <span className="recommendation-phase-arrow" aria-hidden="true">→</span>}
-                              <span className="recommendation-phase-name">{phaseName}</span>
-                              <span className="recommendation-phase-count"
-                                title={previousEntrants === null
-                                  ? `${entrants} Teilnehmer starten in dieser Phase.`
-                                  : `${entrants} von ${previousEntrants} Teilnehmern kommen in diese Phase weiter.`}>
-                                {previousEntrants === null ? entrants : `${entrants}/${previousEntrants}`}
-                              </span>
-                            </span>
-                          );
-                        })}
-                      </h3>
-                      <div className="recommendation-labels">
-                        <span className="badge">{index === 0 ? 'Empfohlen' : 'Alternative'}</span>
-                        {selectedRecommendationId === item.id && <span className="badge selected-badge">{recommendationPlanMatches ? 'Ausgewählt' : 'Plan weicht ab · erneut übernehmen'}</span>}
-                      </div>
-                    </div>
-                    <p>{item.description}</p>
-                    <div className="recommendation-metrics">
-                      <span className="recommendation-metric-tag">{item.estimatedMatches} Spiele</span>
-                      <span className="recommendation-metric-tag">ca. {formatDuration(item.estimatedDurationMinutes)}</span>
-                      {tournamentMode === 'multi' && <span className="recommendation-metric-tag">
-                        {suggestDaySplit(item.phases.map((phase) => ({
-                          ...phase, entrantCount: phase.entrantCount ?? participantCount,
-                        })), plannedDays).possible
-                          ? `${plannedDays} Rundentagesabschnitte möglich · Uhrzeiten in Schritt 4 prüfen`
-                          : 'Zu wenige teilbare Runden für diese Anzahl Spieltage'}
-                      </span>}
-                      <span className={`recommendation-metric-tag ${item.minimumMatchShortfall ? 'wizard-metric-warning' : ''}`}>
-                        mindestens {item.minimumGuaranteedMatches} gespielte Begegnungen
-                      </span>
-                    </div>
-                    {index === 0 && !item.minimumMatchShortfall && (
-                      <p className="recommendation-reason">
-                        {item.estimatedDurationMinutes <= preferredDurationMinutes
-                          ? `Warum empfohlen: Erfüllt dein Mindestspielziel und liegt innerhalb deiner geplanten Turnierdauer von ${formatRecommendationDuration(preferredDurationMinutes)}.`
-                          : `Warum empfohlen: Erfüllt dein Mindestspielziel; die geschätzte Dauer übersteigt deine Zielzeit von ${formatRecommendationDuration(preferredDurationMinutes)}.`}
-                      </p>
-                    )}
-                  </button>
-                ))}
-              </div>
-
               <aside className="format-settings-panel">
                 <div className="format-settings-head">
                   <h3>Vorgaben für Vorschläge</h3>
                   <p className="muted">Passe die Vorschläge an deine Veranstaltung an. Deine manuelle Phasenplanung bleibt unabhängig von diesen Vorgaben.</p>
                 </div>
 
+                <div className="format-settings-content">
                 <div className="tournament-mode-setting">
                   <fieldset className="tournament-mode-choice">
                     <legend>Turnierzeitraum</legend>
@@ -2243,8 +2191,78 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     </label>
                   ))}
                 </fieldset>
+                </div>
                 <p className="format-settings-footnote">Dauerschätzungen berücksichtigen parallele Spiele, jedoch keine zusätzlichen Verzögerungen bei der Rundenauswertung.</p>
               </aside>
+              <div className="recommendation-list">
+                <h3 className="recommendation-section-title">Vorschläge</h3>
+                {recommendations.length === 0 && (
+                  <div className="callout">Mit den aktuellen Vorgaben gibt es keinen sinnvollen automatischen Vorschlag innerhalb des Zeitmodells. Du kannst trotzdem weitergehen und die Phasen manuell anlegen.</div>
+                )}
+                {recommendations.map((item, index) => (
+                  <button
+                    className={`card recommendation recommendation-select ${selectedRecommendationId === item.id && recommendationPlanMatches ? 'selected' : ''} ${index === 0 ? 'best' : ''}`}
+                    key={item.id}
+                    type="button"
+                    onClick={() => selectRecommendation(item)}
+                  >
+                    <div className="recommendation-heading">
+                      <h3 className="recommendation-phase-heading">
+                        {item.phases.map((phase, phaseIndex) => {
+                          const entrants = phase.entrantCount ?? participantCount;
+                          const previousEntrants = phaseIndex > 0
+                            ? item.phases[phaseIndex - 1].entrantCount ?? participantCount
+                            : null;
+                          const phaseName = phase.type === 'GROUPS'
+                            ? `${phase.groupCount ?? 2} Gruppen`
+                            : phase.type === 'SWISS'
+                              ? `${phase.swissRounds ?? 1} Runden Schweizer System`
+                              : phase.label;
+                          return (
+                            <span className="recommendation-phase-segment" key={phase.key}>
+                              {phaseIndex > 0 && <span className="recommendation-phase-arrow" aria-hidden="true">→</span>}
+                              <span className="recommendation-phase-name">{phaseName}</span>
+                              <span className="recommendation-phase-count"
+                                title={previousEntrants === null
+                                  ? `${entrants} Teilnehmer starten in dieser Phase.`
+                                  : `${entrants} von ${previousEntrants} Teilnehmern kommen in diese Phase weiter.`}>
+                                {previousEntrants === null ? entrants : `${entrants}/${previousEntrants}`}
+                              </span>
+                            </span>
+                          );
+                        })}
+                      </h3>
+                      <div className="recommendation-labels">
+                        <span className="badge">{index === 0 ? 'Empfohlen' : 'Alternative'}</span>
+                        {selectedRecommendationId === item.id && <span className="badge selected-badge">{recommendationPlanMatches ? 'Ausgewählt' : 'Plan weicht ab · erneut übernehmen'}</span>}
+                      </div>
+                    </div>
+                    <p>{item.description}</p>
+                    <div className="recommendation-metrics">
+                      <span className="recommendation-metric-tag">{item.estimatedMatches} Spiele</span>
+                      <span className="recommendation-metric-tag">ca. {formatDuration(item.estimatedDurationMinutes)}</span>
+                      {tournamentMode === 'multi' && <span className="recommendation-metric-tag">
+                        {suggestDaySplit(item.phases.map((phase) => ({
+                          ...phase, entrantCount: phase.entrantCount ?? participantCount,
+                        })), plannedDays).possible
+                          ? `${plannedDays} Rundentagesabschnitte möglich · Uhrzeiten in Schritt 4 prüfen`
+                          : 'Zu wenige teilbare Runden für diese Anzahl Spieltage'}
+                      </span>}
+                      <span className={`recommendation-metric-tag ${item.minimumMatchShortfall ? 'wizard-metric-warning' : ''}`}>
+                        mindestens {item.minimumGuaranteedMatches} gespielte Begegnungen
+                      </span>
+                    </div>
+                    {index === 0 && !item.minimumMatchShortfall && (
+                      <p className="recommendation-reason">
+                        {item.estimatedDurationMinutes <= preferredDurationMinutes
+                          ? `Warum empfohlen: Erfüllt dein Mindestspielziel und liegt innerhalb deiner geplanten Turnierdauer von ${formatRecommendationDuration(preferredDurationMinutes)}.`
+                          : `Warum empfohlen: Erfüllt dein Mindestspielziel; die geschätzte Dauer übersteigt deine Zielzeit von ${formatRecommendationDuration(preferredDurationMinutes)}.`}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
+
             </div>
           </section>
         )}
