@@ -88,11 +88,13 @@ type PhaseDraft = {
   nextDayStart: string;
   nextDayDate: string;
   breakUntil: string;
+  breakUntilDate: string;
   note: string;
   inlineBreakAfterRound: number;
   inlineBreakKind: 'minutes' | 'until';
   inlineBreakMinutes: number;
   inlineBreakUntil: string;
+  inlineBreakUntilDate: string;
 };
 
 const stepLabels = ['Grunddaten', 'Teilnehmer', 'Turnierform', 'Phasen', 'Zusammenfassung'];
@@ -285,8 +287,9 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
     nextDayStart: '09:00',
     nextDayDate: '',
     breakUntil: '12:00',
+    breakUntilDate: '',
     note: '',
-    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00',
+    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '',
   };
 }
 
@@ -360,9 +363,9 @@ function NumberChoice({
 function prestartPhaseSignature(phase: PrestartPhaseDraft): unknown[] {
   return [phase.id, phase.type, phase.label, phase.entrantCount, phase.bestOf,
     phase.groupCount, phase.swissRounds, phase.knockoutBestOf, phase.breakKind,
-    phase.breakMinutes, phase.nextDayStart, phase.nextDayDate ?? '', phase.breakUntil,
+    phase.breakMinutes, phase.nextDayStart, phase.nextDayDate ?? '', phase.breakUntil, phase.breakUntilDate,
     phase.note, phase.inlineBreakAfterRound, phase.inlineBreakKind,
-    phase.inlineBreakMinutes, phase.inlineBreakUntil];
+    phase.inlineBreakMinutes, phase.inlineBreakUntil, phase.inlineBreakUntilDate];
 }
 
 export interface PrestartPhaseMode {
@@ -665,9 +668,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     bestOf: phase.bestOf, groupCount: phase.groupCount, swissRounds: phase.swissRounds,
     knockoutBestOf: phase.knockoutBestOf, breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
     nextDayDate: phase.nextDayDate, nextDayStart: phase.nextDayStart, breakUntil: phase.breakUntil,
-    note: phase.note, inlineBreakAfterRound: phase.inlineBreakAfterRound,
+    breakUntilDate: phase.breakUntilDate, note: phase.note, inlineBreakAfterRound: phase.inlineBreakAfterRound,
     inlineBreakKind: phase.inlineBreakKind, inlineBreakMinutes: phase.inlineBreakMinutes,
-    inlineBreakUntil: phase.inlineBreakUntil,
+    inlineBreakUntil: phase.inlineBreakUntil, inlineBreakUntilDate: phase.inlineBreakUntilDate,
   }));
   const currentPrestartSignature = JSON.stringify([
     prestartPhaseDrafts.map(prestartPhaseSignature),
@@ -1397,13 +1400,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         nextDayStart: phase.nextDayStart,
         nextDayDate: phase.nextDayDate,
         breakUntil: phase.breakUntil,
-        breakUntilDate: finalTimeline.items.find((item) => item.id === `phase-${index + 1}`)?.at.slice(0, 10),
+        breakUntilDate: phase.breakUntilDate || finalTimeline.items.find((item) => item.id === `phase-${index + 1}`)?.at.slice(0, 10),
         note: phase.note,
         inlineBreakAfterRound: phase.inlineBreakAfterRound,
         inlineBreakKind: phase.inlineBreakKind,
         inlineBreakMinutes: phase.inlineBreakMinutes,
         inlineBreakUntil: phase.inlineBreakUntil,
-        inlineBreakUntilDate: finalTimeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at.slice(0, 10),
+        inlineBreakUntilDate: phase.inlineBreakUntilDate || finalTimeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at.slice(0, 10),
       })),
       estimatedDurationMinutes: estimatedPlayingMinutes + plannedActiveBreakMinutes(finalTimeline),
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
@@ -1457,6 +1460,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     breakKind: phase.breakKind,
     breakMinutes: phase.breakMinutes,
     breakUntil: phase.breakUntil,
+    breakUntilDate: phase.breakUntilDate || undefined,
     nextDayStart: phase.nextDayStart,
     nextDayDate: phase.nextDayDate,
     roundCount: phase.type === 'SWISS' ? phase.swissRounds : phase.type === 'KNOCKOUT' ? knockoutRoundLabels(phase.entrantCount).length : undefined,
@@ -1468,9 +1472,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     inlineBreakKind: phase.inlineBreakKind,
     inlineBreakMinutes: phase.inlineBreakMinutes,
     inlineBreakUntil: phase.inlineBreakUntil,
-    breakUntilDate: prestart ? String(prestart.tournament.stages.find((saved) => saved.id === phase.id)?.settings.breakUntilDate ?? '') : undefined,
-    inlineBreakUntilDate: prestart ? String(prestart.tournament.stages.find((saved) => saved.id === phase.id)?.settings.inlineBreakUntilDate ?? '') : undefined,
-  })), [phaseDrafts, phaseEstimates, tables, timedSport, matchDurationMinutes, breakMinutes, sport, prestart]);
+    inlineBreakUntilDate: phase.inlineBreakUntilDate || undefined,
+  })), [phaseDrafts, phaseEstimates, tables, timedSport, matchDurationMinutes, breakMinutes, sport]);
   const plannedTimeline = useMemo(() => buildPlannedTimeline(scheduledStart, phaseScheduleProposals),
     [scheduledStart, phaseScheduleProposals]);
   // Only active competition and pauses during tournament days count toward
@@ -2324,10 +2327,18 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                       onChange={(event) => updatePhase(phase.id, { breakMinutes: Number(event.target.value) })} />
                                   </label>
                                 ) : phase.breakKind === 'until' ? (
-                                  <label className="field">Pause bis (Uhrzeit)
-                                    <ClockTimePicker id={`phase-until-${phase.id}`} label="Pause bis" value={phase.breakUntil}
-                                      onChange={(time) => updatePhase(phase.id, { breakUntil: time })} />
-                                  </label>
+                                  <>
+                                    <label className="field">Pause bis (Datum)
+                                      <CalendarDatePicker id={`phase-until-date-${phase.id}`} label="Pausenzieldatum"
+                                        value={phase.breakUntilDate || (plannedPhaseStart ?? scheduledStart).slice(0, 10)}
+                                        minDate={scheduledStart.slice(0, 10)}
+                                        onChange={(date) => updatePhase(phase.id, { breakUntilDate: date })} />
+                                    </label>
+                                    <label className="field">Pause bis (Uhrzeit)
+                                      <ClockTimePicker id={`phase-until-${phase.id}`} label="Pause bis" value={phase.breakUntil}
+                                        onChange={(time) => updatePhase(phase.id, { breakUntil: time })} />
+                                    </label>
+                                  </>
                                 ) : (
                                   <>
                                     <div className="field">
@@ -2534,10 +2545,18 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                             onChange={(event) => updatePhase(phase.id, { inlineBreakMinutes: Number(event.target.value) })} />
                                         </label>
                                       ) : (
-                                        <label className="field">Pause bis (Uhrzeit)
-                                          <ClockTimePicker id={`inline-break-time-${phase.id}`} label="Zwischenpause bis"
-                                            value={phase.inlineBreakUntil} onChange={(time) => updatePhase(phase.id, { inlineBreakUntil: time })} />
-                                        </label>
+                                        <>
+                                          <label className="field">Pause bis (Datum)
+                                            <CalendarDatePicker id={`inline-break-date-${phase.id}`} label="Zwischenpausendatum"
+                                              value={phase.inlineBreakUntilDate || (plannedInlinePause ?? scheduledStart).slice(0, 10)}
+                                              minDate={scheduledStart.slice(0, 10)}
+                                              onChange={(date) => updatePhase(phase.id, { inlineBreakUntilDate: date })} />
+                                          </label>
+                                          <label className="field">Pause bis (Uhrzeit)
+                                            <ClockTimePicker id={`inline-break-time-${phase.id}`} label="Zwischenpause bis"
+                                              value={phase.inlineBreakUntil} onChange={(time) => updatePhase(phase.id, { inlineBreakUntil: time })} />
+                                          </label>
+                                        </>
                                       )}
                                       <p className="field-hint break-phase-time-hint">
                                         {phase.inlineBreakKind === 'until'
