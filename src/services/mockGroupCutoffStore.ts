@@ -32,7 +32,25 @@ function canonicalSignature(tournament: DemoTournament | undefined, signature: s
       }
       return value;
     };
-    return JSON.stringify(walk(JSON.parse(signature) as unknown));
+    const canonical = walk(JSON.parse(signature) as unknown) as {
+      tie?: { players?: string[] };
+      groups?: unknown[][];
+    };
+    // Sporting ties are displayed alphabetically. A name correction can
+    // reorder equal-ranked rows/participants without changing any result.
+    // Their identity fingerprint must therefore use a stable ID order.
+    if (canonical.tie?.players) canonical.tie.players.sort();
+    if (Array.isArray(canonical.groups)) {
+      canonical.groups = canonical.groups.map((group) => [
+        group[0],
+        ...group.slice(1).sort((a, b) => {
+          const left = Array.isArray(a) ? String(a[0]) : String(a);
+          const right = Array.isArray(b) ? String(b[0]) : String(b);
+          return left.localeCompare(right);
+        }),
+      ]);
+    }
+    return JSON.stringify(canonical);
   } catch { return signature; }
 }
 
