@@ -828,9 +828,9 @@ try {
   await multiPage.locator('.wizard-step').nth(2).click();
   // Replacement confirmation must keep both actions on the same line.
   await multiPage.locator('.recommendation-list .recommendation').nth(1).click();
-  const replaceDialog = multiPage.getByRole('alertdialog', { name: 'Phasenplanung ersetzen?' });
-  await replaceDialog.waitFor();
-  const replacementActionPositions = await replaceDialog.locator('.sport-change-dialog-actions .btn')
+  const daySplitReplaceDialog = multiPage.getByRole('alertdialog', { name: 'Phasenplanung ersetzen?' });
+  await daySplitReplaceDialog.waitFor();
+  const replacementActionPositions = await daySplitReplaceDialog.locator('.sport-change-dialog-actions .btn')
     .evaluateAll(buttons => buttons.map(button => {
       const r = button.getBoundingClientRect();
       return {left: r.left, top: r.top, right: r.right, bottom: r.bottom};
@@ -840,7 +840,7 @@ try {
     'both replacement actions must be side by side');
   assert.ok(replacementActionPositions[0].right <= replacementActionPositions[1].left,
     'the cancel button is left of the destructive replacement action');
-  await replaceDialog.getByRole('button', { name: 'Bisherige Planung behalten' }).click();
+  await daySplitReplaceDialog.getByRole('button', { name: 'Bisherige Planung behalten' }).click();
   assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägig' }).isChecked(), true);
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
   const summaryBeforeModeSwitch = await multiPage.locator('.wizard-side-summary').innerText();
