@@ -7654,3 +7654,38 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Creation wizard: align "Spieltage" with the other compact numeric controls. */
+.wizard-workspace .format-step .tournament-mode-setting > .tournament-day-count {
+  flex: 0 0 164px;
+  width: 164px;
+  max-width: 100%;
+}
+.wizard-workspace .format-step .tournament-day-count .recommendation-number-stepper {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
+  gap: 4px;
+}
+.wizard-workspace .format-step .tournament-day-count .recommendation-number-stepper > input,
+.wizard-workspace .format-step .tournament-day-count .recommendation-number-stepper-button {
+  min-height: 35px;
+}
+
+/* Confirmation buttons are aligned in one row, even when labels need two lines. */
+.sport-change-dialog.phase-replacement-dialog {
+  width: min(580px, 100%);
+}
+.phase-replacement-dialog .sport-change-dialog-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+.phase-replacement-dialog .sport-change-dialog-actions > .btn {
+  min-width: 0;
+  min-height: 44px;
+  white-space: normal;
+  line-height: 1.35;
+  text-align: center;
+}
