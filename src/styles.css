@@ -7428,9 +7428,13 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 }
 .wizard-workspace .format-step .tournament-mode-option input {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   opacity: 0;
+  cursor: pointer;
 }
 .wizard-workspace .format-step .tournament-mode-option span {
   display: flex;
@@ -7536,11 +7540,13 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 }
 .wizard-workspace .format-step .format-toggle-group .format-toggle input {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
   margin: 0;
   opacity: 0;
-  pointer-events: none;
+  cursor: pointer;
 }
 .wizard-workspace .format-step .format-toggle-group .format-toggle::before {
   content: '+';
