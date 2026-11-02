@@ -1160,35 +1160,33 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   function changePhaseType(index: number, type: StageType) {
     setSelectedRecommendationId(null);
     const current = phaseDrafts;
-    {
-      if (!current[index]) return current;
-      if (current[index].type === type) return current;
-      if (type === 'SWISS' && current[index].entrantCount < 3) return current;
-      if (type === 'GROUPS' && current[index].entrantCount < 4) return current;
-      if (isTerminalStage(type) && index !== current.length - 1) return current;
-      if (type === 'BREAK' && (index === 0 || index === current.length - 1 || current[index - 1]?.type === 'BREAK' || current[index + 1]?.type === 'BREAK')) return current;
+    if (!current[index]) return;
+    if (current[index].type === type) return;
+    if (type === 'SWISS' && current[index].entrantCount < 3) return;
+    if (type === 'GROUPS' && current[index].entrantCount < 4) return;
+    if (isTerminalStage(type) && index !== current.length - 1) return;
+    if (type === 'BREAK' && (index === 0 || index === current.length - 1 || current[index - 1]?.type === 'BREAK' || current[index + 1]?.type === 'BREAK')) return;
 
-      const next = current.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
-      const phase = next[index];
-      const bestOf = phaseBestOfForSport(sport, type);
-      phase.type = type;
-      phase.label = stageLabel(type);
-      phase.bestOf = bestOf;
-      if (type === 'GROUPS') {
-        phase.groupCount = recommendGroupCount(phase.entrantCount, next.slice(index + 1).find((candidate) => candidate.type !== 'BREAK')?.entrantCount);
-      }
-      if (type === 'SWISS') {
-        phase.swissRounds = recommendedSwissRounds(phase.entrantCount, minimumMatches);
-      }
-      phase.customEntrants = isTerminalStage(type)
-        ? phase.customEntrants || !knockoutEntrantPresets(index === 0 ? participantCount : next[index - 1].entrantCount).includes(phase.entrantCount)
-        : false;
-      phase.knockoutBestOf = type === 'KNOCKOUT'
-        ? resizeKnockoutBestOf(phase.knockoutBestOf, knockoutRoundLabels(phase.entrantCount).length, bestOf)
-        : [];
-
-      setPhaseDrafts(normalizeAndTrackPhaseChanges(current, next));
+    const next = current.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
+    const phase = next[index];
+    const bestOf = phaseBestOfForSport(sport, type);
+    phase.type = type;
+    phase.label = stageLabel(type);
+    phase.bestOf = bestOf;
+    if (type === 'GROUPS') {
+      phase.groupCount = recommendGroupCount(phase.entrantCount, next.slice(index + 1).find((candidate) => candidate.type !== 'BREAK')?.entrantCount);
     }
+    if (type === 'SWISS') {
+      phase.swissRounds = recommendedSwissRounds(phase.entrantCount, minimumMatches);
+    }
+    phase.customEntrants = isTerminalStage(type)
+      ? phase.customEntrants || !knockoutEntrantPresets(index === 0 ? participantCount : next[index - 1].entrantCount).includes(phase.entrantCount)
+      : false;
+    phase.knockoutBestOf = type === 'KNOCKOUT'
+      ? resizeKnockoutBestOf(phase.knockoutBestOf, knockoutRoundLabels(phase.entrantCount).length, bestOf)
+      : [];
+
+    setPhaseDrafts(normalizeAndTrackPhaseChanges(current, next));
     setEditingPhaseTypeId(null);
   }
 
