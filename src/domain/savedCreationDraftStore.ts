@@ -4,14 +4,69 @@ import { validDraft, type CreationDraft, type SavedCreationDraft } from '@/domai
  * Development-era localStorage draft lists are intentionally not imported. */
 const DATABASE = 'online-tournament:named-creation-drafts:v2';
 const STORE = 'drafts';
+const INVALID = 'damaged-drafts';
+
+export interface IsolatedCreationDraft {
+  id: string;
+  original: unknown;
+  detectedAt: string;
+  reason: string;
+}
+function isSavedDraft(value: unknown): value is SavedCreationDraft {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Partial<SavedCreationDraft>;
+  return typeof record.id === 'string' && record.id.length > 0
+    && typeof record.savedAt === 'string' && !Number.isNaN(Date.parse(record.savedAt))
+    && Number.isSafeInteger(record.revision) && (record.revision ?? 0) >= 1
+    && validDraft(record.draft);
+}
+
+/** Remove only current malformed entries after re-reading them in a write
+ * transaction, so a simultaneous repair is never overwritten. */
+async function isolateInvalidDrafts(items: unknown[]): Promise<void> {
+  if (!items.length) return;
+  await withDatabase((db) => runTransaction<void>(db, 'readwrite', [STORE, INVALID], (tx, done) => {
+    const store = tx.objectStore(STORE);
+    const invalid = tx.objectStore(INVALID);
+    for (const item of items) {
+      const id = (item as { id?: unknown })?.id;
+      if (typeof id !== 'string') continue;
+      const request = store.get(id);
+      request.onsuccess = () => {
+        if (request.result && !isSavedDraft(request.result)) {
+          invalid.put({ id, original: request.result, detectedAt: new Date().toISOString(),
+            reason: 'Aktueller Entwurf enthält beschädigte oder unvollständige Angaben.' } satisfies IsolatedCreationDraft);
+          store.delete(id);
+        }
+      };
+    }
+    done(undefined);
+  }));
+  window.dispatchEvent(new Event('draft-integrity-change'));
+}
+
+export async function listIsolatedCreationDraftsAtomic(): Promise<IsolatedCreationDraft[]> {
+  return withDatabase((db) => runTransaction<IsolatedCreationDraft[]>(db, 'readonly', [INVALID], (tx, done) => {
+    const request = tx.objectStore(INVALID).getAll();
+    request.onsuccess = () => done(request.result as IsolatedCreationDraft[]);
+  }));
+}
+export async function discardIsolatedCreationDraftAtomic(id: string): Promise<void> {
+  await withDatabase((db) => runTransaction<void>(db, 'readwrite', [INVALID], (tx, done) => {
+    tx.objectStore(INVALID).delete(id);
+    done(undefined);
+  }));
+  window.dispatchEvent(new Event('draft-integrity-change'));
+}
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') { reject(new Error('IndexedDB ist in diesem Browser nicht verfügbar.')); return; }
-    const request = indexedDB.open(DATABASE, 1);
+    const request = indexedDB.open(DATABASE, 2);
     request.onupgradeneeded = () => {
       const database = request.result;
       if (!database.objectStoreNames.contains(STORE)) database.createObjectStore(STORE, { keyPath: 'id' });
+      if (!database.objectStoreNames.contains(INVALID)) database.createObjectStore(INVALID, { keyPath: 'id' });
     };
     request.onerror = () => reject(request.error ?? new Error('Die Entwurfsdatenbank konnte nicht geöffnet werden.'));
     request.onsuccess = () => resolve(request.result);
@@ -53,15 +108,21 @@ export async function listSavedCreationDraftsAtomic(): Promise<SavedCreationDraf
       const request = tx.objectStore(STORE).getAll();
       request.onsuccess = () => done(request.result as SavedCreationDraft[]);
     });
-    return drafts.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+    const valid = drafts.filter((draft) => isSavedDraft(draft));
+    await isolateInvalidDrafts(drafts.filter((draft) => !isSavedDraft(draft)));
+    return valid.sort((a, b) => b.savedAt.localeCompare(a.savedAt));
   });
 }
 
 export async function getSavedCreationDraftAtomic(id: string): Promise<SavedCreationDraft | null> {
-  return withDatabase((db) => runTransaction<SavedCreationDraft | null>(db, 'readonly', [STORE], (tx, done) => {
+  const entry = await withDatabase((db) => runTransaction<unknown>(db, 'readonly', [STORE], (tx, done) => {
     const request = tx.objectStore(STORE).get(id);
-    request.onsuccess = () => done((request.result as SavedCreationDraft | undefined) ?? null);
+    request.onsuccess = () => done(request.result ?? null);
   }));
+  if (entry === null) return null;
+  if (isSavedDraft(entry)) return entry;
+  await isolateInvalidDrafts([entry]);
+  return null;
 }
 
 function freshId(): string {
