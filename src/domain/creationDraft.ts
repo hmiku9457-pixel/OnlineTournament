@@ -28,11 +28,13 @@ export interface CreationDraftPhase {
   nextDayStart: string;
   nextDayDate: string;
   breakUntil: string;
+  breakUntilDate?: string;
   note: string;
   inlineBreakAfterRound: number;
   inlineBreakKind: 'minutes' | 'until';
   inlineBreakMinutes: number;
   inlineBreakUntil: string;
+  inlineBreakUntilDate?: string;
 }
 
 export interface CreationDraft {
