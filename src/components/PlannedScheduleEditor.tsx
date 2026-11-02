@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { PlannedTimeline, PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { ClockTimePicker } from '@/components/ClockTimePicker';
 import { CalendarDatePicker } from '@/components/CalendarDatePicker';
-import { formatPlannedBreakDuration, formatPlannedClockTime, groupPlannedScheduleDays, parseLocalDateTime } from '@/domain/tournamentSchedule';
+import { formatPlannedBreakDuration, formatPlannedClockTime, groupPlannedScheduleDays, summarizePlayingDays, parseLocalDateTime } from '@/domain/tournamentSchedule';
 
 interface Props {
   scheduledStart: string;
@@ -36,6 +36,10 @@ export function PlannedScheduleEditor({
       title: 'Siegerehrung', type: 'other' as const }] : []),
   ];
   const grouped = groupPlannedScheduleDays(entries, scheduledStart);
+  const dayMetrics = summarizePlayingDays(timeline);
+  const durationLabel = (minutes: number) => minutes >= 60
+    ? `${Math.floor(minutes / 60)} Std. ${minutes % 60 ? `${minutes % 60} Min.` : ''}`.trim()
+    : `${minutes} Min.`;
   const renderRow = (item: PlannedScheduleItem) => {
     const isStart = item.id === 'scheduled-start';
     const isFinish = item.id === 'estimated-finish';
@@ -144,6 +148,12 @@ export function PlannedScheduleEditor({
         {grouped.days.map((day) => (
           <li className="planned-schedule-day-group" key={day.date}>
             {grouped.multipleDays && <h4 className="planned-schedule-day-heading">{day.label}</h4>}
+            {grouped.multipleDays && dayMetrics.filter((metric) => metric.date === day.date).map((metric) => <div className="planned-schedule-day-metrics" key={metric.date}>
+              <span>Spielbetrieb: {formatPlannedClockTime(metric.firstActivity)} – {formatPlannedClockTime(metric.lastActivity)}</span>
+              <span>Wettkampf {durationLabel(metric.playingMinutes)}</span>
+              <span>Pausen {durationLabel(metric.pauseMinutes)}</span>
+              <strong>Aktiv {durationLabel(metric.activeMinutes)}</strong>
+            </div>)}
             <ol className="planned-schedule-day-entries">{day.items.map(renderRow)}</ol>
           </li>
         ))}
