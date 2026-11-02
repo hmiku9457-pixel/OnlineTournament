@@ -1,4 +1,4 @@
-import { BYE_SLOT } from '@/domain/matchSlots';
+import { BYE_SLOT, PENDING_SLOT, UNCLAIMED_WINNER } from '@/domain/matchSlots';
 import { groupLetter } from '@/domain/groupLabels';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { MatchSet, TournamentStage } from '@/domain/types';
@@ -162,7 +162,7 @@ export function buildMockBracket(tournament: DemoTournament, stage: TournamentSt
     if (stored?.thirdPlaceSkipped) {
       score = 'Beide Platz 3';
     } else if (stored?.forcedWinner) {
-      winner = stored.forcedWinner;
+      winner = stored.forcedWinner === UNCLAIMED_WINNER ? undefined : stored.forcedWinner;
       score = 'W.O.';
     } else if (stored?.sets.length) {
       score = resultScore(tournament.sport, stored.sets);
@@ -255,12 +255,12 @@ export function getPreviousStageFinishLabels(tournament: DemoTournament, stage: 
     if (final?.winner) labels[final.winner] = 'Sieger';
     if (final) {
       const finalist = final.sideA === final.winner ? final.sideB : final.sideA;
-      if (finalist && finalist !== 'TBD' && finalist !== 'Freilos') labels[finalist] = 'Finalist';
+      if (finalist && finalist !== PENDING_SLOT && finalist !== BYE_SLOT) labels[finalist] = 'Finalist';
     }
     const semifinal = rounds.find((round) => round.label === 'Halbfinale');
     semifinal?.matches.forEach((match) => {
       [match.sideA, match.sideB].forEach((name) => {
-        if (name !== 'TBD' && name !== 'Freilos' && !labels[name]) labels[name] = 'Halbfinale';
+        if (name !== PENDING_SLOT && name !== BYE_SLOT && !labels[name]) labels[name] = 'Halbfinale';
       });
     });
   }

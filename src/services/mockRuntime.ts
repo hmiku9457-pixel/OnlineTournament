@@ -248,7 +248,7 @@ function updateRuntime(matchId: string, update: Omit<StoredMatchRuntime, 'matchI
 
 function resultWinner(result: StoredMatchResult | undefined, sideA: string, sideB: string, sport: string) {
   if (!result || result.status !== 'FINISHED') return undefined;
-  if (result.forcedWinner) return result.forcedWinner;
+  if (result.forcedWinner) return result.forcedWinner === UNCLAIMED_WINNER ? undefined : result.forcedWinner;
   const side = resultWinnerSide(sport, result.sets, result.decisionSide);
   return side === 'A' ? sideA : side === 'B' ? sideB : undefined;
 }

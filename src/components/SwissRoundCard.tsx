@@ -1,3 +1,4 @@
+import { displayMatchSlot, isByeSlot } from '@/domain/matchSlots';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
 import { MatchStatusLegend } from '@/components/MatchStatusLegend';
 import { matchVisualClass, matchVisualState, matchVisualLabel } from '@/domain/matchVisualStatus';
@@ -77,7 +78,7 @@ export function SwissRoundCard({ fixtures, matches, standings = [], sport, edita
         {currentFixtures.length === 0 && <p className="muted">Für diese Runde sind noch keine Spiele angesetzt.</p>}
         {currentFixtures.map((fixture) => {
           const match = matchById.get(fixture.id);
-          const isBye = fixture.sideB === 'Freilos' || Boolean(fixture.autoWinner);
+          const isBye = isByeSlot(fixture.sideB) || Boolean(fixture.autoWinner);
           const isLive = !isBye && matchVisualState(match?.status) === 'live';
           const isFinished = isBye || matchVisualState(match?.status) === 'finished';
           const visualStatus = isBye ? 'FINISHED' : match?.status;
@@ -111,13 +112,13 @@ export function SwissRoundCard({ fixtures, matches, standings = [], sport, edita
                       onOpenResult={match && ['LIVE', 'READY', 'CONFIRMATION', 'FINISHED'].includes(match.status) && onEditResult ? () => onEditResult(fixture.id) : undefined}
                       onEdit={isFinished && onEditResult && canEditResult?.(fixture.id) ? () => onEditResult(fixture.id) : undefined}
                     />}
-                <span className="group-match-side swiss-round-player swiss-round-player-right" title={fixture.sideB}>
+                <span className="group-match-side swiss-round-player swiss-round-player-right" title={displayMatchSlot(fixture.sideB)}>
                   {recordByPlayer.has(fixture.sideB) && (
                     <span className="swiss-round-standing-tag" title="Aktuelle Bilanz" aria-label={`Aktuelle Bilanz ${recordByPlayer.get(fixture.sideB)}`}>
                       {recordByPlayer.get(fixture.sideB)}
                     </span>
                   )}
-                  <span className="swiss-round-player-name">{fixture.sideB}</span>
+                  <span className="swiss-round-player-name">{displayMatchSlot(fixture.sideB)}</span>
                 </span>
               </div>
             </div>

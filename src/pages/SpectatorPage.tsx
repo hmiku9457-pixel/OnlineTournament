@@ -1,3 +1,4 @@
+import { displayMatchSlot, isByeSlot } from '@/domain/matchSlots';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { TournamentBreakNotice } from '@/components/TournamentBreakNotice';
@@ -114,12 +115,12 @@ export function SpectatorPage() {
                   {[match.sideA, match.sideB].map((side, sideIndex) => (
                     <div className={`${match.winner === side ? 'winner ' : ''}${scoreStages.length ? 'bracket-stage-row' : ''}`.trim()} key={`${match.id}-${sideIndex}`}>
                       <span>
-                        {match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, side) ? `Rückzug (${side})` : side}
+                        {match.score === 'W.O.' && isMockParticipantWithdrawn(tournament, side) ? `Rückzug (${displayMatchSlot(side)})` : displayMatchSlot(side)}
                         {previousFinishLabels[side] && <small className="participant-origin">{previousFinishLabels[side]}</small>}
                       </span>
                       {scoreStages.length ? <BracketStageValues stages={scoreStages} sideIndex={sideIndex as 0 | 1} /> : <span className="bracket-score-cells">
                         {!scoreSport && (match.sets ?? []).map((set, index) => <span key={index}>{sideIndex === 0 ? set.sideAScore : set.sideBScore}</span>)}
-                        <strong>{match.score === 'W.O.' ? (match.winner === side ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : sideIndex === 1 && match.score === 'Freilos' ? 'BYE' : ''}</strong>
+                        <strong>{match.score === 'W.O.' ? (match.winner === side ? '✓' : '–') : match.score === 'Beide Platz 3' ? '3.' : match.score && match.score !== 'Freilos' ? match.score.split(':')[sideIndex] : isByeSlot(side) && match.score === 'Freilos' ? 'BYE' : ''}</strong>
                       </span>}
                     </div>
                   ))}

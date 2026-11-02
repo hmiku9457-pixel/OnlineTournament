@@ -443,7 +443,7 @@ function StageCompetitionView({
                               <span>
                                 <span className="bracket-name-inline">{match.score === 'W.O.' && getStageWithdrawalLabel(tournament, side, stage.id) ? `Rückzug (${displayMatchSlot(side)})` : displayMatchSlot(side)}{isEditableSlot && !isByeSlot(side) && (
                                   <button className={pinnedSlots.has(slotIndex) ? 'bracket-pin pinned' : 'bracket-pin'} type="button"
-                                    aria-label={`${side} ${pinnedSlots.has(slotIndex) ? 'lösen' : 'fixieren'}`}
+                                    aria-label={`${displayMatchSlot(side)} ${pinnedSlots.has(slotIndex) ? 'lösen' : 'fixieren'}`}
                                     title={pinnedSlots.has(slotIndex) ? 'Fixierung lösen' : 'Platz fixieren'}
                                     onClick={() => { if (toggleBracketPin(tournament, stage, slotIndex)) onDrawChanged?.(); }}>
                                     {pinnedSlots.has(slotIndex) ? '📌' : '📍'}
