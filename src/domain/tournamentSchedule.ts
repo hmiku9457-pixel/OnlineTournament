@@ -365,7 +365,7 @@ export function playingDayOverflowWarnings(timeline: PlannedTimeline): string[] 
       continue;
     }
     if (start && item.at.slice(0, 10) !== start.slice(0, 10)) {
-      issues.push(`Spielbetrieb vom ${start.slice(0, 10)} reicht ohne Spieltagswechsel bis zum ${item.at.slice(0, 10)}. Bitte einen Spieltagswechsel nach einer abgeschlossenen Runde einplanen.`);
+      issues.push(`Spielbetrieb vom ${start.slice(0, 10)} reicht über Mitternacht ohne Spieltagswechsel bis zum ${item.at.slice(0, 10)}. Bitte einen Spieltagswechsel nach einer abgeschlossenen Runde einplanen.`);
     }
     if (item.breakKind === 'overnight') start = null;
     else start = item.at;
