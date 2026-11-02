@@ -634,13 +634,19 @@ export function updatePrestartTournamentPhases(
   if (!sportingPhasesChanged && newPlan) {
     const updated: DemoTournament = { ...previous, plannedSchedule: newPlan.plannedSchedule,
       lastUpdate: 'gerade eben' };
+    let ceremonyTransaction: { ok: boolean; rollbackFailed: boolean };
     try {
-      writeLocalTournaments(all.map((item) => item.id === tournamentId ? updated : item));
-      recordMockAudit({ tournamentId, actor: 'Turnierleitung (lokal)', action: 'PRESTART_CEREMONY_CHANGED',
-        description: 'Zeitpunkt der Siegerehrung manuell angepasst; Auslosung und Phasen unverändert.' });
+      ceremonyTransaction = withPrestartRollback(tournamentId, () => {
+        writeLocalTournaments(all.map((item) => item.id === tournamentId ? updated : item));
+        recordMockAudit({ tournamentId, actor: 'Turnierleitung (lokal)', action: 'PRESTART_CEREMONY_CHANGED',
+          description: 'Zeitpunkt der Siegerehrung manuell angepasst; Auslosung und Phasen unverändert.' });
+      });
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : 'Siegerehrung konnte nicht gespeichert werden.' };
     }
+    if (!ceremonyTransaction.ok) return { ok: false, error: ceremonyTransaction.rollbackFailed
+      ? 'Speicherfehler: Wiederherstellung der Siegerehrung nicht vollständig. Bitte neu laden.'
+      : 'Speicherfehler: Die Siegerehrung wurde nicht verändert.' };
     window.dispatchEvent(new CustomEvent('mock-runtime-change'));
     return { ok: true, tournament: updated };
   }
