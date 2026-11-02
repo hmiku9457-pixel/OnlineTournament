@@ -2121,48 +2121,24 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 <div className="tournament-mode-setting">
                   <fieldset className="tournament-mode-choice">
                     <legend>Turnierzeitraum</legend>
-                    <label><input type="radio" name="tournament-mode" checked={tournamentMode === 'single'}
-                      onChange={() => {
-                        if (configuredPlayingDays(phaseDrafts) > 1) setPendingTournamentMode('single');
-                        else setTournamentMode('single');
-                      }}/> Eintägiges Turnier</label>
-                    <label><input type="radio" name="tournament-mode" checked={tournamentMode === 'multi'}
-                      onChange={() => setTournamentMode('multi')}/> Mehrtägiges Turnier</label>
+                    <label className="tournament-mode-option">
+                      <input type="radio" name="tournament-mode" checked={tournamentMode === 'single'}
+                        onChange={() => setPendingTournamentMode('single')}/>
+                      <span>Eintägig</span>
+                    </label>
+                    <label className="tournament-mode-option">
+                      <input type="radio" name="tournament-mode" checked={tournamentMode === 'multi'}
+                        onChange={() => setTournamentMode('multi')}/>
+                      <span>Mehrtägig</span>
+                    </label>
                   </fieldset>
                   {tournamentMode === 'multi' && <div className="field tournament-day-count">
-                    <label htmlFor="planned-playing-days">Geplante Anzahl an Spieltagen</label>
+                    <label htmlFor="planned-playing-days">Spieltage</label>
                     <RecommendationNumberStepper id="planned-playing-days" label="Geplante Anzahl an Spieltagen"
                       value={plannedDays} min={2} max={14} onChange={setPlannedDays}/>
-                    <span className="field-hint">Die konkreten Fortsetzungen werden in Schritt 4 geplant. Nächte zählen nicht zur aktiven Turnierdauer.</span>
                   </div>}
-                  <p className="field-hint">Die gewünschte aktive Turnierdauer bleibt eine Gesamtsumme von maximal 23 Std. 59 Min.</p>
-                </div>
-                <div className="format-setting-fields">
-                  <div className="field">
-                    <label htmlFor="max-groups">Maximale Gruppenanzahl</label>
-                    <RecommendationNumberStepper id="max-groups" label="Maximale Gruppenanzahl"
-                      value={effectiveMaxGroups} min={2} max={Math.max(2, Math.floor(participantCount / 2))}
-                      onChange={setMaxGroups} disabled={!enabledSystems.groups}/>
-                    <span className="field-hint">Höchstens so viele Gruppen in den Vorschlägen.</span>
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="max-swiss-rounds">Max. Schweizer Runden</label>
-                    <RecommendationNumberStepper id="max-swiss-rounds" label="Maximale Schweizer Runden"
-                      value={effectiveMaxSwissRounds} min={2} max={Math.max(2, participantCount - 1)}
-                      onChange={setMaxSwissRounds} disabled={!enabledSystems.swiss}/>
-                    <span className="field-hint">Maximal einmal gegen jeden anderen Teilnehmer, ohne Wiederholung.</span>
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="knockout-qualifiers">Teilnehmer einer empfohlenen K.-o.-Phase</label>
-                    <RecommendationNumberStepper id="knockout-qualifiers" label="Teilnehmer einer empfohlenen K.-o.-Phase"
-                      value={effectiveKnockoutQualifierCount} min={2} max={Math.max(2, participantCount)}
-                      onChange={setKnockoutQualifierCount} disabled={!enabledSystems.knockout}/>
-                    <span className="field-hint">Bis zu allen Teilnehmern; bei kombinierten Turnierformen muss zuvor mindestens einer ausscheiden.</span>
-                  </div>
                   <div className="field recommendation-duration-field">
-                    <label htmlFor="preferred-duration">Geplante Turnierdauer</label>
+                    <label htmlFor="preferred-duration" title="Die gesamte aktive Turnierdauer als Zielwert. Mit ± in 15-Minuten-Schritten ändern.">Geplante Turnierdauer</label>
                     <div className="recommendation-duration-stepper" role="group" aria-label="Geplante Turnierdauer anpassen">
                       <button type="button" className="recommendation-number-stepper-button"
                         aria-label="Geplante Turnierdauer um 15 Minuten verringern"
@@ -2174,7 +2150,28 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                         disabled={preferredDurationMinutes >= MAX_RECOMMENDATION_DURATION}
                         onClick={() => adjustPreferredDuration(15)}>+</button>
                     </div>
-                    <span className="field-hint">Mit −/+ in 15-Minuten-Schritten ändern oder die Stunden und Minuten über das Uhrsymbol einstellen. Längere Formen ergänzen bei Bedarf auf fünf Vorschläge.</span>
+                  </div>
+                </div>
+                <div className="format-setting-fields">
+                  <div className="field">
+                    <label htmlFor="max-groups" title="Begrenzt ausschließlich die Anzahl der Gruppen in Empfehlungen.">Max. Gruppen</label>
+                    <RecommendationNumberStepper id="max-groups" label="Maximale Gruppenanzahl"
+                      value={effectiveMaxGroups} min={2} max={Math.max(2, Math.floor(participantCount / 2))}
+                      onChange={setMaxGroups} disabled={!enabledSystems.groups}/>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="max-swiss-rounds" title="Maximal Teilnehmerzahl minus 1, ohne Gegnerwiederholung.">Max. Schweizer Runden</label>
+                    <RecommendationNumberStepper id="max-swiss-rounds" label="Maximale Schweizer Runden"
+                      value={effectiveMaxSwissRounds} min={2} max={Math.max(2, participantCount - 1)}
+                      onChange={setMaxSwissRounds} disabled={!enabledSystems.swiss}/>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="knockout-qualifiers" title="Maximale Teilnehmerzahl einer empfohlenen K.-o.-Phase.">K.-o.-Teilnehmer</label>
+                    <RecommendationNumberStepper id="knockout-qualifiers" label="Teilnehmer einer empfohlenen K.-o.-Phase"
+                      value={effectiveKnockoutQualifierCount} min={2} max={Math.max(2, participantCount)}
+                      onChange={setKnockoutQualifierCount} disabled={!enabledSystems.knockout}/>
                   </div>
                 </div>
 
@@ -2187,12 +2184,20 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                         checked={enabledSystems[system.id]}
                         onChange={() => toggleSystem(system.id)}
                       />
-                      <span>{system.label}</span>
+                      <span className="format-toggle-label">{system.label}</span>
                     </label>
                   ))}
                 </fieldset>
                 </div>
-                <p className="format-settings-footnote">Dauerschätzungen berücksichtigen parallele Spiele, jedoch keine zusätzlichen Verzögerungen bei der Rundenauswertung.</p>
+                <div className="format-settings-bottom">
+                  <details className="format-help-details">
+                    <summary>Einstellungen erklärt</summary>
+                    <p>Die Obergrenzen gelten nur für die Empfehlungen. Schweizer Runden haben das Limit Teilnehmerzahl minus 1; bei kombinierten Turnierformen muss vor der K.-o.-Phase mindestens eine Person ausscheiden.</p>
+                    <p>Die Dauer ist die gesamte aktive Planungszeit, maximal 23 Std. 59 Min. Nächte zählen nicht dazu. Mit ± lässt sie sich um 15 Minuten ändern; weitere Turnierformen können die gewünschte Dauer überschreiten.</p>
+                    <p>Die Schätzungen berücksichtigen parallele Spiele, aber keine zusätzlichen Verzögerungen bei der Auswertung. Die konkreten Spieltage konfigurierst du in Schritt 4.</p>
+                  </details>
+                  <p className="format-settings-footnote">Nur Empfehlungen betroffen · Schätzungen ohne Auswertungsverzögerungen</p>
+                </div>
               </aside>
               <div className="recommendation-list">
                 <h3 className="recommendation-section-title">Vorschläge</h3>
@@ -2956,16 +2961,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           </section>
         )}
       </div>
-      {pendingTournamentMode && <div className="modal-backdrop" role="presentation">
-        <section className="modal" role="alertdialog" aria-modal="true" aria-label="Turniermodus wechseln?">
-          <h2>Auf eintägiges Turnier umstellen?</h2>
-          <p>Vorhandene Spieltagsenden bleiben erhalten. Du kannst sie danach gezielt entfernen; es werden keine Phasen ungefragt gelöscht.</p>
-          <div className="modal-actions">
-            <button type="button" className="btn" onClick={() => setPendingTournamentMode(null)}>Bisherigen Modus behalten</button>
-            <button type="button" className="btn danger" onClick={() => { setTournamentMode('single'); setPendingTournamentMode(null); }}>Auf eintägig umstellen</button>
-          </div>
-        </section>
-      </div>}
+
       {prestart && <section className="prestart-phase-save-panel" aria-label="Vorstart-Planung übernehmen">
         <PlannedScheduleEditor
           scheduledStart={scheduledStart} timeline={plannedTimeline}
@@ -3227,6 +3223,27 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             } else if (action?.kind === 'test-players') generateTestParticipants();
           }}
         />
+      )}
+      {pendingTournamentMode && (
+        <div className="sport-change-backdrop" role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingTournamentMode(null); }}>
+          <section className="sport-change-dialog" role="alertdialog" aria-modal="true"
+            aria-label="Turniermodus wechseln?"
+            onKeyDown={(event) => { if (event.key === 'Escape') setPendingTournamentMode(null); }}>
+            <h2>Auf eintägiges Turnier umstellen?</h2>
+            <p>Die Veranstaltung wird wieder für einen Spieltag geplant. Die gewünschte aktive Turnierdauer und alle anderen Einstellungen bleiben erhalten.</p>
+            {configuredPlayingDays(phaseDrafts) > 1 && (
+              <p className="modal-mode-warning">Im Phasenplan sind bereits Spieltagsenden eingerichtet. Sie werden nicht automatisch gelöscht und müssen vor der Erstellung angepasst werden.</p>
+            )}
+            <div className="sport-change-dialog-actions">
+              <button type="button" className="btn" autoFocus onClick={() => setPendingTournamentMode(null)}>Mehrtägig behalten</button>
+              <button type="button" className="btn primary" onClick={() => {
+                setTournamentMode('single');
+                setPendingTournamentMode(null);
+              }}>Auf eintägig umstellen</button>
+            </div>
+          </section>
+        </div>
       )}
       {pendingRecommendationId && (
         <div className="sport-change-backdrop" role="presentation"
