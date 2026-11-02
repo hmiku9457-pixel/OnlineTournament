@@ -4,7 +4,7 @@ import { buildPlannedTimeline } from '@/domain/tournamentSchedule';
 
 const phase = (patch: Partial<DateAnchoredPausePhase>): DateAnchoredPausePhase => ({
   type: 'SWISS', breakKind: 'minutes', breakUntilDate: '', inlineBreakAfterRound: 0,
-  inlineBreakKind: 'minutes', inlineBreakUntilDate: '', ...patch,
+  inlineBreakKind: 'minutes', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '', ...patch,
 });
 
 describe('fixed pause dates are persisted rather than relative to a future forecast', () => {

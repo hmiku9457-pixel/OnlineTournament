@@ -5,7 +5,9 @@ export interface DateAnchoredPausePhase {
   breakKind: string;
   breakUntilDate: string;
   inlineBreakAfterRound: number;
-  inlineBreakKind: string;
+  inlineBreakKind: 'minutes' | 'until';
+  inlineBreakMinutes: number;
+  inlineBreakUntil: string;
   inlineBreakUntilDate: string;
 }
 
