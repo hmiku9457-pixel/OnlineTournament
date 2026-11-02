@@ -3,6 +3,7 @@ import { addMockParticipant, createMockTournament, getMockTournament, updateMock
 import { getBracketSlots, getGroupAssignments, randomizeBracketSlots, setParticipantGroup } from '@/services/mockDrawStore';
 import { getMockStageBaseMatches } from '@/services/mockRuntime';
 import { startFirstStage } from '@/services/mockPhaseLifecycle';
+import { inspectSnapshot } from '@/services/localTournamentStorage';
 
 const storage = new Map<string, string>();
 beforeEach(() => {
@@ -56,6 +57,27 @@ describe('persistent participant identities independent of names', () => {
   it('rejects whitespace-equivalent duplicate team names during registration', () => {
     const t = make('GROUPS');
     expect(addMockParticipant(t.id, 'Team  A', '').ok).toBe(false);
+  });
+
+  it('quarantines invalid current participant identities and malformed KO slot storage', () => {
+    const t = make('KNOCKOUT');
+    expect(randomizeBracketSlots(t, t.stages[0])).toBe(true);
+    const snapshot = () => [...storage.entries()].map(([key, value]) => ({ key, value }));
+    expect(inspectSnapshot(snapshot()).corrupt).toHaveLength(0);
+
+    const tournamentKey = `online-tournament:local-prototype-tournaments:v1:record:${t.id}`;
+    const original = storage.get(tournamentKey)!;
+    const broken = JSON.parse(original);
+    broken.tournament.participantIds['Freilos'] = broken.tournament.participantIds['TBD'];
+    storage.set(tournamentKey, JSON.stringify(broken));
+    expect(inspectSnapshot(snapshot()).corrupt.some((item) => item.key === tournamentKey)).toBe(true);
+
+    storage.set(tournamentKey, original);
+    const drawKey = 'online-tournament:mock-draw-config:v1';
+    const malformedDraw = JSON.parse(storage.get(drawKey)!);
+    malformedDraw[0].bracketSlots[0] = 'Freilos';
+    storage.set(drawKey, JSON.stringify(malformedDraw));
+    expect(inspectSnapshot(snapshot()).corrupt.some((item) => item.key === drawKey)).toBe(true);
   });
 
   it('keeps the same ID when a named team is renamed', () => {
