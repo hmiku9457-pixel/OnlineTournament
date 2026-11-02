@@ -259,11 +259,12 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
       if (Number.isNaN(target.getTime()) || target.getTime() < cursor.getTime()) {
         const planned = String(phase.breakUntil ?? '12:00');
         const earliest = formatPlannedDateTime(toLocalDateTime(cursor));
-        const targetLabel = phase.breakUntilDate ? `${phase.breakUntilDate} ${planned} Uhr`
-          : `${toLocalDateTime(cursor).slice(0, 10)} ${planned} Uhr`;
+        const plannedDate = phase.breakUntilDate || toLocalDateTime(cursor).slice(0, 10);
+        const targetLabel = `${plannedDate} ${planned} Uhr`;
+        const wrongDay = plannedDate < toLocalDateTime(cursor).slice(0, 10);
         warnings.push({
           phaseIndex: index,
-          message: `„${phase.label}“: Das feste Pausenziel am ${targetLabel} liegt vor dem voraussichtlichen Pausenbeginn am ${earliest}. Bitte Datum und Uhrzeit prüfen. Für die Vorschau beginnt die nächste Phase frühestens nach dem vorherigen Spielende.`,
+          message: `„${phase.label}“: Pause bis ${planned} Uhr liegt vor dem voraussichtlichen Pausenbeginn um ${formatPlannedDateTime(toLocalDateTime(cursor), false)}. Gewähltes Ziel: ${targetLabel}; voraussichtlicher Pausenbeginn: ${earliest}. ${wrongDay ? 'Das gewählte Datum liegt vor dem Pausentag.' : 'Die Uhrzeit liegt am selben Tag zu früh.'} Bitte Datum und Uhrzeit korrigieren. Für die Vorschau wird die nächste Phase frühestens nach dem vorherigen Spielende angesetzt.`,
         });
       } else {
         pause.durationMinutes = Math.max(0, Math.round((target.getTime() - cursor.getTime()) / 60000));
