@@ -473,7 +473,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         selectedRecommendationId: null, enabledSystems: initialEnabledSystems,
         maxGroups: null, maxSwissRounds: null, knockoutQualifierCount: null,
         preferredDurationMinutes: DEFAULT_RECOMMENDATION_DURATION,
-        tournamentMode: t.tournamentMode ?? 'single', plannedDays: t.plannedDays ?? 2,
+        tournamentMode: t.tournamentMode ?? 'single', plannedDays: Math.max(2, t.plannedDays ?? 2),
         awardsEnabled: false, awardsAtOverride: null,
       };
       return initial;
