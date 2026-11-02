@@ -27,6 +27,55 @@ export function createVenueLayout(tableCount: number): VenueLayout {
   };
 }
 
+/** Validate the exact current layout; duplicated, missing or nonexisting tables
+ * must never be accepted in a newly created tournament. */
+export function validateVenueLayout(layout: VenueLayout | undefined, tableCount: number): string[] {
+  if (!layout) return [];
+  if (!Number.isSafeInteger(tableCount) || tableCount < 1 || tableCount > 9999) return ['Ungültige Spielflächenanzahl.'];
+  if (!Number.isInteger(layout.columns) || !Number.isInteger(layout.rows)
+    || layout.columns < 1 || layout.rows < 1
+    || layout.columns > MAX_VENUE_GRID_DIMENSION || layout.rows > MAX_VENUE_GRID_DIMENSION
+    || layout.columns * layout.rows > MAX_VENUE_GRID_CELLS
+    || !Array.isArray(layout.cells) || layout.cells.length !== layout.columns * layout.rows) {
+    return ['Der Hallenplan überschreitet die Rastergrenzen oder ist unvollständig.'];
+  }
+  if (!['none', 'top', 'right', 'bottom', 'left'].includes(layout.deskDock)) return ['Ungültige Position der Turnierleitung.'];
+  const found = new Set<number>();
+  let desks = 0;
+  for (const cell of layout.cells) {
+    if (cell === 'desk') { desks++; continue; }
+    if (cell === '' || cell === 'space') continue;
+    if (!/^table:[1-9]\d*$/.test(cell)) return ['Der Hallenplan enthält ein ungültiges Feld.'];
+    const number = Number(cell.slice(6));
+    if (!Number.isInteger(number) || number > tableCount || found.has(number))
+      return ['Der Hallenplan enthält eine doppelte oder ungültige Spielfläche.'];
+    found.add(number);
+  }
+  if (found.size !== tableCount) return ['Im Hallenplan fehlen Spielflächen.'];
+  if (desks > 1 || (desks && layout.deskDock !== 'none')) return ['Die Turnierleitung darf nur einmal platziert werden.'];
+  return [];
+}
+
+/** Grow a custom hall without violating rendering limits. Prefer retaining
+ * its existing dimensions and cell positions over resetting the layout. */
+export function resizeVenueLayoutForTableCount(layout: VenueLayout, tableCount: number): VenueLayout {
+  const required = tableCount + (layout.deskDock === 'none' && layout.cells.includes('desk') ? 1 : 0);
+  if (required > MAX_VENUE_GRID_CELLS) return createVenueLayout(tableCount);
+  if (layout.columns <= MAX_VENUE_GRID_DIMENSION && layout.rows <= MAX_VENUE_GRID_DIMENSION
+    && layout.columns * layout.rows <= MAX_VENUE_GRID_CELLS && layout.columns * layout.rows >= required) {
+    return resizeVenueLayout(layout, layout.columns, layout.rows, tableCount);
+  }
+  let candidate: { columns: number; rows: number; cost: number } | null = null;
+  for (let columns = Math.max(1, layout.columns); columns <= MAX_VENUE_GRID_DIMENSION; columns++) {
+    const rows = Math.max(layout.rows, Math.ceil(required / columns));
+    if (rows > MAX_VENUE_GRID_DIMENSION || columns * rows > MAX_VENUE_GRID_CELLS) continue;
+    const cost = (columns - layout.columns) + (rows - layout.rows) + (columns * rows - required) / 1000;
+    if (!candidate || cost < candidate.cost) candidate = { columns, rows, cost };
+  }
+  return candidate ? resizeVenueLayout(layout, candidate.columns, candidate.rows, tableCount)
+    : createVenueLayout(tableCount);
+}
+
 export function layoutTableNumbers(layout: VenueLayout): number[] {
   return layout.cells.filter((cell) => cell.startsWith('table:')).map((cell) => Number(cell.slice(6)));
 }

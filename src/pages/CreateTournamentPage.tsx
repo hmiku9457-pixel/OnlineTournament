@@ -1,5 +1,5 @@
 import { VenueLayoutEditor } from '@/components/VenueLayout';
-import { createVenueLayout, resizeVenueLayout } from '@/domain/venueLayout';
+import { createVenueLayout, resizeVenueLayoutForTableCount, validateVenueLayout } from '@/domain/venueLayout';
 import { getVenueTerminology } from '@/domain/venueTerminology';
 import { disciplineLabel, disciplineOptionsForSport, planningMinutesPerSet, sportOptions } from '@/domain/sports';
 import { sportScoring } from '@/domain/sportScoring';
@@ -50,7 +50,7 @@ import { DiscardDraftDialog } from '@/components/DiscardDraftDialog';
 import { UnsavedParticipantDialog } from '@/components/UnsavedParticipantDialog';
 import { QualificationRuleDialog } from '@/components/QualificationRuleDialog';
 import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/domain/groupQualification';
-import { isAllowedParticipantName, sanitizeParticipantName } from '@/domain/participantNames';
+import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, validParticipantRoster } from '@/domain/participantNames';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
@@ -127,7 +127,7 @@ function participantIsComplete(participant: ParticipantFields, discipline: Disci
 }
 
 function normalizePersonName(firstName: string, lastName: string): string {
-  return `${firstName.trim()} ${lastName.trim()}`.replace(/\s+/g, ' ').toLocaleLowerCase('de-DE');
+  return participantNameKey(displayPersonName(firstName, lastName));
 }
 
 function displayPersonName(firstName: string, lastName: string): string {
@@ -152,7 +152,7 @@ function collectSavedPersonNames(
     if (participant.id === excludedParticipantId) continue;
     if (discipline === 'TEAMS') {
       const name = participant.teamName?.trim() || displayPersonName(participant.firstName, participant.lastName);
-      if (name) names.add(name.toLocaleLowerCase('de-DE'));
+      if (name) names.add(participantNameKey(name));
       continue;
     }
     if (participant.firstName.trim() && participant.lastName.trim()) {
@@ -181,7 +181,7 @@ function validateParticipant(
     if (!teamName) return { firstName: 'Bitte einen Mannschaftsnamen eingeben.' };
     if (!isAllowedParticipantName(teamName)) return { firstName: 'Buchstaben, Zahlen, Punkte, Klammern, Leerzeichen und Bindestriche sind erlaubt.' };
     const occupied = collectSavedPersonNames(participants, discipline, editingParticipantId);
-    return occupied.has(teamName.toLocaleLowerCase('de-DE'))
+    return occupied.has(participantNameKey(teamName))
       ? { firstName: 'Diese Mannschaft ist bereits eingetragen.' } : errors;
   }
   if (!participant.firstName.trim()) errors.firstName = 'Vorname fehlt.';
@@ -549,7 +549,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       && JSON.stringify(restoredDraft.venueLayout) !== JSON.stringify(createVenueLayout(restoredDraft.tables))));
   useEffect(() => {
     setVenueLayout((current) => venueLayoutCustomized
-      ? resizeVenueLayout(current, current.columns, Math.max(current.rows, Math.ceil(tables / current.columns)), tables)
+      ? resizeVenueLayoutForTableCount(current, tables)
       : createVenueLayout(tables));
   }, [tables, venueLayoutCustomized]);
   const [participants, setParticipants] = useState<ParticipantDraft[]>(restoredDraft?.participants ?? []);
@@ -745,8 +745,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   const participantCount = participants.filter((participant) => participantIsComplete(participant, discipline)).length;
   const incompleteSavedParticipants = participants.length - participantCount;
-  const savedParticipantNamesValid = participants.every((entry) =>
-    Object.keys(validateParticipant(entry, discipline, participants, entry.id)).length === 0);
+  const savedParticipantNamesValid = useMemo(
+    () => validParticipantRoster(participants, discipline), [participants, discipline]);
   const participantsValid = participantCount >= 2 && incompleteSavedParticipants === 0 && savedParticipantNamesValid;
   const participantErrorMessages = uniqueErrorMessages(participantErrors);
 
@@ -831,6 +831,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const gameSettingsValid = Number.isInteger(minimumMatches) && minimumMatches >= 1 && minimumMatches <= 100 && validMatchDuration && validTurnover;
   const startTimeIsAllowed = isStartAtOrAfterNow(scheduledStart, new Date(currentLocalMinute));
   const basicsValid = Boolean(name.trim()) && name.trim().length <= 120 && Boolean(sport) && selectedDisciplineValid && startTimeIsAllowed && Number.isSafeInteger(tables) && tables >= 1 && tables <= 9999 && gameSettingsValid;
+  const venueLayoutValid = !venueLayoutEnabled || validateVenueLayout(venueLayout, tables).length === 0;
   const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
     const maximum = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
     return phase.entrantCount >= 2 && phase.entrantCount <= maximum
@@ -1438,7 +1439,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     return !phase.nextDayDate || (Boolean(parseCalendarDate(phase.nextDayDate)) && Boolean(plannedStart)
       && phase.nextDayDate > plannedStart!.slice(0, 10));
   });
-  const canCreate = reviewRequiredPhaseIds.length === 0 && basicsValid && participantsValid && gameSettingsValid
+  const canCreate = reviewRequiredPhaseIds.length === 0 && basicsValid && participantsValid && venueLayoutValid && gameSettingsValid
     && phaseConfigurationValid && phaseEntrantsValid && overnightDatesValid && hasVisitedPhaseStep
     && scheduleIssues.length === 0;
   const firstCompetition = phaseDrafts.find((phase) => phase.type !== 'BREAK');
@@ -1629,6 +1630,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                       {venueLayoutEditorOpen ? 'Plan einklappen' : 'Plan bearbeiten'}
                     </button>
                   </div>
+                  {venueLayoutEnabled && !venueLayoutValid && <p role="alert" className="field-error">{validateVenueLayout(venueLayout, tables).join(' ')}</p>}
                   {venueLayoutEditorOpen && <VenueLayoutEditor layout={venueLayout} tableCount={tables} sport={sport} onChange={(next) => { setVenueLayout(next); setVenueLayoutCustomized(JSON.stringify(next) !== JSON.stringify(createVenueLayout(tables))); }} />}
                 </>
               )}
