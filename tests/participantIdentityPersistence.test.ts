@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createMockTournament, getMockTournament, updateMockParticipantName } from '@/services/mockTournamentStore';
+import { addMockParticipant, createMockTournament, getMockTournament, updateMockParticipantName } from '@/services/mockTournamentStore';
 import { getBracketSlots, getGroupAssignments, randomizeBracketSlots, setParticipantGroup } from '@/services/mockDrawStore';
 import { getMockStageBaseMatches } from '@/services/mockRuntime';
 import { startFirstStage } from '@/services/mockPhaseLifecycle';
@@ -36,6 +36,28 @@ function rename(t: ReturnType<typeof make>) {
 }
 
 describe('persistent participant identities independent of names', () => {
+  it('allows changing a double code without rewriting either person', () => {
+    const t = createMockTournament({
+      name: 'Doppel', sport: 'table_tennis', discipline: 'DOUBLES',
+      tables: 2, minimumMatches: 1,
+      participantNames: ['Ada Lovelace / Grace Hopper', 'Marie Curie / Lise Meitner'],
+      phases: [{ type: 'ROUND_ROBIN', label: 'Doppel', entrantCount: 2,
+        groupCount: 1, swissRounds: 1, bestOf: 1, knockoutBestOf: [] }],
+      estimatedDurationMinutes: 15,
+    });
+    const original = t.participantIds!['Ada Lovelace / Grace Hopper'];
+    expect(updateMockParticipantName(t.id, 'Ada Lovelace / Grace Hopper',
+      'Ada', 'Lovelace', '9876', 'Grace', 'Hopper')).toBe(true);
+    const after = getMockTournament(t.id);
+    expect(after.participantCodes!['Ada Lovelace / Grace Hopper']).toBe('9876');
+    expect(after.participantIds!['Ada Lovelace / Grace Hopper']).toBe(original);
+  });
+
+  it('rejects whitespace-equivalent duplicate team names during registration', () => {
+    const t = make('GROUPS');
+    expect(addMockParticipant(t.id, 'Team  A', '').ok).toBe(false);
+  });
+
   it('keeps the same ID when a named team is renamed', () => {
     const t = make('KNOCKOUT');
     const id = t.participantIds!['Freilos'];

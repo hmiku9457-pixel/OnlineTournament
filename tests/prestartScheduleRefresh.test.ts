@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildPlannedTimeline } from '@/domain/tournamentSchedule';
 import { initialPrestartPhases } from '@/domain/prestartPhasePlanning';
-import { addMockParticipant, createMockTournament, getMockTournament, refreshPrestartSchedule, updatePrestartTournamentPhases, prestartPlanningFingerprint } from '@/services/mockTournamentStore';
+import { addMockParticipant, createMockTournament, getMockTournament, refreshPrestartSchedule, updatePrestartTournamentPhases, prestartPlanningFingerprint, getPrestartScheduleProjection } from '@/services/mockTournamentStore';
 import { saveParticipantWithdrawal } from '@/services/mockWithdrawals';
 import { getGroupAssignments, setParticipantGroup } from '@/services/mockDrawStore';
 import { startFirstStage } from '@/services/mockPhaseLifecycle';
@@ -184,6 +184,57 @@ describe('prestart schedule consistency after roster and phase edits', () => {
     const shifted = updatePrestartTournamentPhases(t.id, phases, undefined, '2026-11-21T16:00');
     expect(shifted.ok).toBe(true);
     expect(getMockTournament(t.id).plannedSchedule?.find((item) => item.id === 'award-ceremony')?.at).toBe('2026-11-21T16:00');
+  });
+
+  it('changes just a manual ceremony without touching the confirmed draw or stage identities', () => {
+    const t = sample(false, true);
+    const assignments = getGroupAssignments(t, t.stages[0]);
+    const player = Object.keys(assignments)[0];
+    expect(setParticipantGroup(t, t.stages[0], player, 1 - assignments[player])).toBe(true);
+    const originalDraw = storage.get('online-tournament:mock-draw-config:v1');
+    const originalStageIds = getMockTournament(t.id).stages.map((stage) => stage.id);
+    const originalPhaseRecords = storage.get('online-tournament:mock-phase-lifecycle:v1');
+    const phases = initialPrestartPhases(t);
+    const fingerprint = prestartPlanningFingerprint(t);
+    expect(updatePrestartTournamentPhases(t.id, phases, fingerprint, '2026-11-21T13:00').ok).toBe(true);
+    const updated = getMockTournament(t.id);
+    expect(updated.plannedSchedule?.find((entry) => entry.id === 'award-ceremony')?.at).toBe('2026-11-21T13:00');
+    expect(updated.stages.map((stage) => stage.id)).toEqual(originalStageIds);
+    expect(storage.get('online-tournament:mock-draw-config:v1')).toBe(originalDraw);
+    expect(storage.get('online-tournament:mock-phase-lifecycle:v1')).toBe(originalPhaseRecords);
+    expect(prestartPlanningFingerprint(updated)).not.toBe(fingerprint);
+  });
+
+  it('uses a selected fixed pause date across prestart edits and rejects expired targets', () => {
+    const t = sample(true);
+    const phases = initialPrestartPhases(t);
+    phases[1].breakKind = 'until';
+    phases[1].breakUntilDate = '2026-11-22';
+    phases[1].breakUntil = '12:00';
+    expect(updatePrestartTournamentPhases(t.id, phases).ok).toBe(true);
+    const saved = getMockTournament(t.id);
+    expect(saved.stages[1].settings.breakUntilDate).toBe('2026-11-22');
+    const reread = initialPrestartPhases(saved);
+    expect(reread[1].breakUntilDate).toBe('2026-11-22');
+    reread[1].breakUntilDate = '2026-11-20';
+    expect(updatePrestartTournamentPhases(t.id, reread).ok).toBe(false);
+    expect(getMockTournament(t.id).stages[1].settings.breakUntilDate).toBe('2026-11-22');
+  });
+
+  it('keeps a last confirmed timeline while exposing a forecast blocked by fixed dates', () => {
+    const t = sample(true);
+    const phases = initialPrestartPhases(t);
+    phases[1].breakKind = 'until';
+    phases[1].breakUntilDate = '2026-11-21';
+    phases[1].breakUntil = '09:20';
+    expect(updatePrestartTournamentPhases(t.id, phases).ok).toBe(true);
+    const before = JSON.stringify(getMockTournament(t.id).plannedSchedule);
+    expect(addMockParticipant(t.id, 'Neuer', 'Teilnehmer').ok).toBe(true);
+    const after = getMockTournament(t.id);
+    expect(JSON.stringify(after.plannedSchedule)).toBe(before);
+    const projection = getPrestartScheduleProjection(after);
+    expect(projection?.issues.some((message) => message.includes('Pause bis'))).toBe(true);
+    expect(projection?.estimatedEnd).toBeTruthy();
   });
 
   it('rejects impossible break-until settings before saving a modified phase plan', () => {

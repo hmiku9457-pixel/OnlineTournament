@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
+import { createMockTournament, getMockTournament, updateMockParticipantName, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { startFirstStage, getStageEntrants } from '@/services/mockPhaseLifecycle';
 import { approveMockProgress, completeMockMatch, getMockStageMatches,
   getPendingGroupCutoff, getPendingMockApproval, resolveGroupCutoff } from '@/services/mockRuntime';
@@ -62,6 +62,21 @@ describe('mandatory group qualification decision at an exact sporting tie', () =
     expect(getStageEntrants(t, t.stages[1])).toHaveLength(3);
     expect(getMockAudit(t.id).some((entry) => entry.action === 'GROUP_TIE_RESOLVED'
       && entry.description.includes(chosen))).toBe(true);
+  });
+
+  it('retains a confirmed group tie when the winning player is renamed', () => {
+    const t = groupTournament();
+    const pending = getPendingGroupCutoff(t)!;
+    const selected = pending.tie.players[0];
+    expect(resolveGroupCutoff(t, [selected], 'LOT', 'Losziehung mit Zeugen')).toBeNull();
+    const saved = JSON.parse(values.get('online-tournament:group-cutoff-decisions:v1')!)[0];
+    expect(saved.winners).toContain(t.participantIds![selected]);
+    expect(saved.signature).not.toContain(selected);
+    const currentCode = t.participantCodes![selected];
+    const renamed = updateMockParticipantName(t.id, selected, 'Neuer', 'Nachname', currentCode);
+    expect(renamed).toBe(true);
+    const updated = getMockTournament(t.id);
+    expect(getPendingGroupCutoff(updated)).toBeNull();
   });
 
   it('restores an unresolved tie when a saved decision has a stale result signature', () => {
