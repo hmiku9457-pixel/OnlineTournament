@@ -45,7 +45,7 @@ describe('optionaler vorläufiger Zeitplan', () => {
     expect(late.warnings[0].message).toContain('2026-11-21');
     expect(late.warnings[0].message).toContain('09:00');
     expect(late.warnings[1].message).toContain('2026-11-20');
-    expect(late.warnings[1].message).toContain('2026-11-21');
+    expect(late.warnings[1].message).toContain('21.11.2026');
     expect(late.warnings[1].message).toContain('Das gewählte Datum liegt vor dem Pausentag.');
   });
 
