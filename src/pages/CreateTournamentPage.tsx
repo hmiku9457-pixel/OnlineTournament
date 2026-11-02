@@ -53,8 +53,9 @@ import { QualificationRuleDialog } from '@/components/QualificationRuleDialog';
 import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/domain/groupQualification';
 import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, validParticipantRoster, MAX_PARTICIPANT_NAME_LENGTH } from '@/domain/participantNames';
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
+import { configuredPlayingDays, followingPlayingDate, playingRounds, suggestDaySplit, type PlayingDayBreak } from '@/domain/playingDays';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
-import { buildPlannedTimeline, formatPlannedDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, formatPlannedDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, playingDayOverflowWarnings, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
@@ -96,6 +97,7 @@ type PhaseDraft = {
   inlineBreakMinutes: number;
   inlineBreakUntil: string;
   inlineBreakUntilDate: string;
+  dayBreaks: PlayingDayBreak[];
 };
 
 const stepLabels = ['Grunddaten', 'Teilnehmer', 'Turnierform', 'Phasen', 'Zusammenfassung'];
@@ -293,7 +295,7 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
     breakUntil: '12:00',
     breakUntilDate: '',
     note: '',
-    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '',
+    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '', dayBreaks: [],
   };
 }
 
@@ -397,7 +399,7 @@ function prestartPhaseSignature(phase: PrestartPhaseDraft): unknown[] {
     phase.groupCount, phase.swissRounds, phase.knockoutBestOf, phase.breakKind,
     phase.breakMinutes, phase.nextDayStart, phase.nextDayDate ?? '', phase.breakUntil, phase.breakUntilDate,
     phase.note, phase.inlineBreakAfterRound, phase.inlineBreakKind,
-    phase.inlineBreakMinutes, phase.inlineBreakUntil, phase.inlineBreakUntilDate];
+    phase.inlineBreakMinutes, phase.inlineBreakUntil, phase.inlineBreakUntilDate, phase.dayBreaks];
 }
 
 export interface PrestartPhaseMode {
@@ -448,7 +450,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         })),
         selectedRecommendationId: null, enabledSystems: initialEnabledSystems,
         maxGroups: null, maxSwissRounds: null, knockoutQualifierCount: null,
-        preferredDurationMinutes: DEFAULT_RECOMMENDATION_DURATION, awardsEnabled: false, awardsAtOverride: null,
+        preferredDurationMinutes: DEFAULT_RECOMMENDATION_DURATION, tournamentMode: 'single', plannedDays: 2,
+        awardsEnabled: false, awardsAtOverride: null,
       };
       return initial;
     }
@@ -665,7 +668,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [customMinimumMatches, setCustomMinimumMatches] = useState(restoredDraft?.customMinimumMatches ?? false);
   const [selectedRecommendationId, setSelectedRecommendationId] = useState<string | null>(restoredDraft?.selectedRecommendationId ?? null);
   const [phaseDrafts, setPhaseDrafts] = useState<PhaseDraft[]>(restoredDraft?.phaseDrafts.map((phase) => ({
-    ...phase, breakUntilDate: phase.breakUntilDate ?? '', inlineBreakUntilDate: phase.inlineBreakUntilDate ?? '',
+    ...phase, breakUntilDate: phase.breakUntilDate ?? '', inlineBreakUntilDate: phase.inlineBreakUntilDate ?? '', dayBreaks: phase.dayBreaks ?? [],
   })) ?? []);
   const [reviewRequiredPhaseIds, setReviewRequiredPhaseIds] = useState<string[]>(restoredDraft?.reviewRequiredPhaseIds ?? []);
   const [editingPhaseTypeId, setEditingPhaseTypeId] = useState<string | null>(null);
@@ -679,6 +682,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [maxSwissRounds, setMaxSwissRounds] = useState<number | null>(restoredDraft?.maxSwissRounds ?? null);
   const [knockoutQualifierCount, setKnockoutQualifierCount] = useState<number | null>(restoredDraft?.knockoutQualifierCount ?? null);
   const [preferredDurationMinutes, setPreferredDurationMinutes] = useState(restoredDraft?.preferredDurationMinutes ?? DEFAULT_RECOMMENDATION_DURATION);
+  const [tournamentMode, setTournamentMode] = useState<'single' | 'multi'>(restoredDraft?.tournamentMode ?? (restoredDraft?.phaseDrafts.some((phase) => (phase.dayBreaks?.length ?? 0) > 0 || (phase.type === 'BREAK' && phase.breakKind === 'overnight')) ? 'multi' : 'single'));
+  const [plannedDays, setPlannedDays] = useState(restoredDraft?.plannedDays ?? 2);
+  const [pendingTournamentMode, setPendingTournamentMode] = useState<'single' | null>(null);
   function adjustPreferredDuration(delta: number) {
     setPreferredDurationMinutes((value) => Math.min(MAX_RECOMMENDATION_DURATION,
       Math.max(MIN_RECOMMENDATION_DURATION, value + delta)));
@@ -691,7 +697,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     customTables, venueLayoutEnabled, venueLayout, venueLayoutCustomized, participants, participantForm,
     editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
-    knockoutQualifierCount, preferredDurationMinutes, awardsEnabled,
+    knockoutQualifierCount, preferredDurationMinutes, tournamentMode, plannedDays, awardsEnabled,
     awardsAtOverride: prestartManualCeremony ? prestartCeremonyAt : awardsAtOverride,
   }), [
     step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
@@ -699,7 +705,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
     editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
-    knockoutQualifierCount, preferredDurationMinutes, awardsEnabled, awardsAtOverride,
+    knockoutQualifierCount, preferredDurationMinutes, tournamentMode, plannedDays, awardsEnabled, awardsAtOverride,
     prestartCeremonyAt, prestartManualCeremony?.at,
   ]);
   useEffect(() => {
@@ -730,6 +736,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     breakUntilDate: phase.breakUntilDate, note: phase.note, inlineBreakAfterRound: phase.inlineBreakAfterRound,
     inlineBreakKind: phase.inlineBreakKind, inlineBreakMinutes: phase.inlineBreakMinutes,
     inlineBreakUntil: phase.inlineBreakUntil, inlineBreakUntilDate: phase.inlineBreakUntilDate,
+    dayBreaks: phase.dayBreaks,
   }));
   const currentPrestartSignature = JSON.stringify([
     prestartPhaseDrafts.map(prestartPhaseSignature),
@@ -1285,7 +1292,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     if (type === 'BREAK' && (index === 0 || index === current.length - 1 || current[index - 1]?.type === 'BREAK' || current[index + 1]?.type === 'BREAK')) return;
 
     const next = current.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
-    const phase = clearInlinePauseOnTypeChange(next[index]);
+    const phase = { ...clearInlinePauseOnTypeChange(next[index]), dayBreaks: [] };
     next[index] = phase;
     const bestOf = phaseBestOfForSport(sport, type);
     phase.type = type;
@@ -1316,6 +1323,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const nextEntrants = Math.max(2, Math.min(maximum, entrantCount));
     next[index].entrantCount = nextEntrants;
     next[index].customEntrants = customEntrants;
+    next[index].dayBreaks = next[index].dayBreaks.filter((item) => item.afterRound < playingRounds(next[index]));
     if (next[index].type === 'KNOCKOUT') {
       next[index].knockoutBestOf = resizeKnockoutBestOf(next[index].knockoutBestOf,
         knockoutRoundLabels(nextEntrants).length, next[index].bestOf);
@@ -1487,6 +1495,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         inlineBreakMinutes: phase.inlineBreakMinutes,
         inlineBreakUntil: phase.inlineBreakUntil,
         inlineBreakUntilDate: phase.inlineBreakUntilDate || finalTimeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at.slice(0, 10),
+        dayBreaks: phase.dayBreaks,
       })),
       estimatedDurationMinutes: estimatedPlayingMinutes + plannedActiveBreakMinutes(finalTimeline),
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
@@ -1553,6 +1562,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     inlineBreakMinutes: phase.inlineBreakMinutes,
     inlineBreakUntil: phase.inlineBreakUntil,
     inlineBreakUntilDate: phase.inlineBreakUntilDate || undefined,
+    dayBreaks: phase.dayBreaks,
   })), [phaseDrafts, phaseEstimates, tables, timedSport, matchDurationMinutes, breakMinutes, sport]);
   const plannedTimeline = useMemo(() => buildPlannedTimeline(scheduledStart, phaseScheduleProposals),
     [scheduledStart, phaseScheduleProposals]);
@@ -1573,7 +1583,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const ceremonyIssue = awardsEnabled && (!isValidLocalDateTime(awardsAt)
     || (plannedTimeline.estimatedEnd && awardsAt < plannedTimeline.estimatedEnd))
     ? 'Die Siegerehrung muss am oder nach dem voraussichtlichen Turnierende liegen.' : null;
-  const scheduleIssues = [...validatePlannedSchedule(plannedSchedule), ...plannedTimelineConflicts(plannedTimeline), ...(ceremonyIssue ? [ceremonyIssue] : [])];
+  const scheduleIssues = [...validatePlannedSchedule(plannedSchedule), ...plannedTimelineConflicts(plannedTimeline), ...playingDayOverflowWarnings(plannedTimeline), ...(ceremonyIssue ? [ceremonyIssue] : [])];
   const prestartIssues = prestart
     ? [...validatePrestartPhases(prestartPhaseDrafts, prestart.activeParticipants), ...validatePlannedSchedule(plannedTimeline.items), ...plannedTimelineConflicts(plannedTimeline),
       ...(prestartManualCeremony && prestartCeremonyAt < plannedTimeline.estimatedEnd
@@ -1590,7 +1600,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     name, sport, discipline, tables, minimumMatches,
     participantNames: participants.map((participant) => participantDisplayName(participant, discipline)),
     phases: phaseDrafts, plannedSchedule, scheduledStart, venueLayout: venueLayoutEnabled ? venueLayout : undefined,
-    matchDurationMinutes, venueTurnoverMinutes: breakMinutes,
+    matchDurationMinutes, venueTurnoverMinutes: breakMinutes, tournamentMode, plannedDays,
   }) : [];
   const canCreate = centralCreationIssues.length === 0 && reviewRequiredPhaseIds.length === 0 && basicsValid && participantsValid && venueLayoutValid && gameSettingsValid
     && phaseConfigurationValid && phaseEntrantsValid && overnightDatesValid && hasVisitedPhaseStep
