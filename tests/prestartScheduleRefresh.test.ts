@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function sample(withBreak = false) {
+function sample(withBreak = false, manualCeremony = false) {
   const stages = [
     { type: 'GROUPS' as const, label: 'Gruppen', entrantCount: 8, groupCount: 2, swissRounds: 1, bestOf: 1, knockoutBestOf: [] },
     ...(withBreak ? [{
@@ -47,17 +47,15 @@ function sample(withBreak = false) {
     scheduledStart: '2026-11-21T09:00',
     plannedSchedule: [
       ...timeline.items,
-      { id: 'award-ceremony', at: timeline.estimatedEnd, type: 'other', title: 'Siegerehrung', autoTime: true },
+      { id: 'award-ceremony', at: timeline.estimatedEnd, type: 'other', title: 'Siegerehrung', autoTime: !manualCeremony },
     ],
   });
 }
 
 describe('prestart schedule consistency after roster and phase edits', () => {
   it('retains an explicitly manual ceremony even when it matched the previous end', () => {
-    const tournament = sample();
-    const ceremony = tournament.plannedSchedule!.find((item) => item.id === 'award-ceremony')!;
-    ceremony.autoTime = false;
-    const originalTime = ceremony.at;
+    const tournament = sample(false, true);
+    const originalTime = tournament.plannedSchedule!.find((item) => item.id === 'award-ceremony')!.at;
     const phases = initialPrestartPhases(tournament);
     phases[0].groupCount = 4;
     expect(updatePrestartTournamentPhases(tournament.id, phases).ok).toBe(true);
