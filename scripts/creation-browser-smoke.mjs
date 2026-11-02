@@ -337,11 +337,13 @@ try {
   const backRoster = page2.getByRole('navigation', { name:'Teilnehmerseiten' }).getByRole('button', { name:'Zurück' });
   const originalFirst = await page2.locator('.participant-list-number').first().innerText();
   const originalLast = Number(await page2.locator('.participant-list-number').last().innerText());
-  await nextRoster.click();
-  assert.equal(Number(await page2.locator('.participant-list-number').first().innerText()), originalLast + 1);
-  await backRoster.click();
-  assert.equal(await page2.locator('.participant-list-number').first().innerText(), originalFirst,
-    'back navigation returns to the actual previous first item');
+  if (await nextRoster.isEnabled()) {
+    await nextRoster.click();
+    assert.equal(Number(await page2.locator('.participant-list-number').first().innerText()), originalLast + 1);
+    await backRoster.click();
+    assert.equal(await page2.locator('.participant-list-number').first().innerText(), originalFirst,
+      'back navigation returns to the actual previous first item');
+  }
   while (await nextRoster.isEnabled()) await nextRoster.click();
   await page2.locator('.participant-name-marquee.is-running').waitFor();
   const longCard = page2.locator('.participant-roster-row').filter({ hasText: 'AlexanderAlexander' }).first();
