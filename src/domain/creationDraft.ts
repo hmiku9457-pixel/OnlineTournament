@@ -159,7 +159,7 @@ export function validDraft(value: unknown): value is CreationDraft {
     && (data.plannedDays === undefined || (Number.isInteger(data.plannedDays) && data.plannedDays >= 2 && data.plannedDays <= 14))
     && typeof data.preferredDurationMinutes === 'number'
     && Number.isInteger(data.preferredDurationMinutes) && data.preferredDurationMinutes >= 15
-    && data.preferredDurationMinutes <= 14 * 24 * 60 - 1
+    && data.preferredDurationMinutes <= (data.tournamentMode === 'multi' ? 14 * 24 * 60 - 1 : 1439)
     && (data.selectedRecommendationId === null || typeof data.selectedRecommendationId === 'string')
     && typeof data.awardsEnabled === 'boolean'
     && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string')
