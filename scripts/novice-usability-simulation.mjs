@@ -27,6 +27,8 @@ async function snapshot(page) {
       phaseCount: state?.phaseDrafts?.length ?? 0,
       savedParticipants: state?.participants?.length ?? 0,
       configuredDays: state?.plannedDays ?? null,
+      phaseDayBreaks: (state?.phaseDrafts ?? []).filter(x=>x.dayBreaks?.length)
+        .map(x=>({type:x.type,dayBreaks:x.dayBreaks,swissRounds:x.swissRounds})),
       selectedRecommendation: state?.selectedRecommendationId ?? null,
       createEnabled: (() => { const x=document.querySelector('.wizard-create-button'); return x ? !x.disabled : null; })(),
       nextEnabled: (() => { const x=document.querySelector('.wizard-continue-button'); return x ? !x.disabled : null; })(),
@@ -154,6 +156,8 @@ async function runTournament(config) {
       result.observations.review = {
         ...(await snapshot(page)),
         overview:trimmed(await page.locator('.creation-review-overview').innerText(),520),
+        dayHeadings:(await page.locator('.planned-schedule-day-heading').allInnerTexts()).map(x=>trimmed(x,180)),
+        scheduleRows:(await page.locator('.planned-schedule-phase-row').allInnerTexts()).map(x=>trimmed(x,125)).slice(0,15),
       };
       result.status=await page.locator('.wizard-create-button').isEnabled() ? 'READY_TO_CREATE' : 'REVIEW_BLOCKED';
     }
