@@ -2620,7 +2620,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                   type="button"
                                   aria-pressed={inlineBreakActive}
                                   aria-label={inlineBreakActive ? 'Zwischenpause deaktivieren' : 'Zwischenpause aktivieren'}
-                                  title={inlineBreakActive ? 'Zwischenpause deaktivieren' : 'Zwischenpause aktivieren'}
+                                  title={inlineBreakActive ? 'Zwischenpause deaktivieren'
+                                    : phase.dayBreaks.length >= inlineBreakRounds - 1 ? 'Alle Rundengrenzen haben bereits ein Spieltagsende.'
+                                      : 'Zwischenpause aktivieren'}
+                                  disabled={!inlineBreakActive && (phase.dayBreaks.length >= inlineBreakRounds - 1
+                                    || countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES)}
                                   onClick={() => togglePhaseInlineBreak(phase, inlineBreakRounds)}
                                 >
                                   Zwischenpause
@@ -2887,9 +2891,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                     const available = Array.from({ length: dayRoundCount - 1 }, (_, i) => i + 1)
                                       .find((round) => round !== phase.inlineBreakAfterRound && !phase.dayBreaks.some((item) => item.afterRound === round));
                                     if (!available) return;
-                                    updatePhase(phase.id, { dayBreaks: [...phase.dayBreaks, {
-                                      afterRound: available, date: followingPlayingDate(scheduledDate, configuredPlayingDays(phaseDrafts)), time: '09:00',
-                                    }].sort((a,b) => a.afterRound - b.afterRound) });
+                                    const insertion = proposePlayingDayInsertion(phase.dayBreaks, available,
+                                      (plannedPhaseStart ?? scheduledStart).slice(0, 10));
+                                    if (insertion.shifted.length) {
+                                      setPendingDayInsertion({ phaseId: phase.id, nextBreaks: insertion.dayBreaks, shifted: insertion.shifted });
+                                    } else updatePhase(phase.id, { dayBreaks: insertion.dayBreaks });
                                   }}>+ Spieltagsende nach Runde</button>
                               </div>
                               {phase.dayBreaks.map((boundary, position) => {
@@ -2916,7 +2922,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                   </label>
                                   <button type="button" className="btn small danger-outline" onClick={() => updatePhase(phase.id, {
                                     dayBreaks: phase.dayBreaks.filter((_, i) => i !== position),
-                                  })}>Entfernen</button>
+                                  }, true)}>Entfernen</button>
                                 </div>;
                               })}
                             </section>
@@ -2958,8 +2964,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                       <label className="field">Unterbrechung nach
                                         <select value={Math.min(phase.inlineBreakAfterRound, inlineBreakRounds - 1)}
                                           onChange={(event) => updatePhase(phase.id, { inlineBreakAfterRound: Number(event.target.value) })}>
-                                          {Array.from({ length: inlineBreakRounds - 1 }, (_, round) =>
-                                            <option key={round + 1} value={round + 1}>Runde {round + 1}</option>)}
+                                          {Array.from({ length: inlineBreakRounds - 1 }, (_, round) => round + 1)
+                                            .filter((round) => round === phase.inlineBreakAfterRound
+                                              || !phase.dayBreaks.some((item) => item.afterRound === round))
+                                            .map((round) => <option key={round} value={round}>Runde {round}</option>)}
                                         </select>
                                       </label>
                                       {phase.inlineBreakKind === 'minutes' ? (
