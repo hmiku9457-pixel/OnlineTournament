@@ -7943,6 +7943,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .wizard-workspace .format-step .recommendation-target-choice,
 .wizard-workspace .format-step .tournament-mode-setting > .field {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 18px 40px 24px;
   row-gap: 6px;
   align-items: center;
