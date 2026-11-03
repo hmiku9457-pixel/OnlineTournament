@@ -1062,7 +1062,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     && !isValidLocalDateTime(scheduledStart));
   const ambiguousLocalClock = isAmbiguousLocalDateTime(scheduledStart);
   const startTimeIsAllowed = isStartAtOrAfterNow(scheduledStart, new Date(currentLocalMinute));
-  const basicsValid = Boolean(name.trim()) && name.trim().length <= 120 && Boolean(sport) && selectedDisciplineValid && startTimeIsAllowed && Number.isSafeInteger(tables) && tables >= 1 && tables <= 9999 && gameSettingsValid;
+  const basicsValid = Boolean(name.trim()) && name.trim().length <= 120 && Boolean(sport)
+    && selectedDisciplineValid && startTimeIsAllowed && !timeValuesReviewRequired
+    && Number.isSafeInteger(tables) && tables >= 1 && tables <= 9999 && gameSettingsValid;
   const venueLayoutValid = !venueLayoutEnabled || validateVenueLayout(venueLayout, tables).length === 0;
   const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
     const maximum = index === 0 ? participantCount : phaseDrafts[index - 1].entrantCount;
@@ -1528,11 +1530,19 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setExpandedPhaseId(phase.id);
   }
 
-  function removePhase(id: string) {
-    const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, phaseDrafts.filter((phase) => phase.id !== id));
+  function removePhase(id: string, adjacentPauseId?: string) {
+    const candidate = phaseDrafts.filter((phase) => phase.id !== id && phase.id !== adjacentPauseId);
+    if (!hasValidBreakStageOrder(candidate.map((phase) => phase.type))
+      || !hasValidTerminalStageOrder(candidate.map((phase) => phase.type))) {
+      if (!adjacentPauseId) setPendingPhaseRemoval(id);
+      return;
+    }
+    const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, candidate, id);
     if (!normalized) return;
+    setPendingPhaseRemoval(null);
     setSelectedRecommendationId(null);
-    setReviewRequiredPhaseIds((ids) => ids.filter((candidate) => candidate !== id));
+    const retainedIds = new Set(normalized.map((phase) => phase.id));
+    setReviewRequiredPhaseIds((ids) => ids.filter((candidateId) => retainedIds.has(candidateId)));
     if (editingPhaseTypeId === id) setEditingPhaseTypeId(null);
     if (expandedPhaseId === id) setExpandedPhaseId(null);
     setPhaseDrafts(normalized);
@@ -1643,6 +1653,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const current = phaseDrafts;
     if (!current[index]) return;
     if (current[index].type === type) return;
+    if (current[index].type === 'BREAK' && type !== 'BREAK' && !confirmed) {
+      setPendingPhaseTypeLoss({ index, type });
+      return;
+    }
     if (type === 'SWISS' && current[index].entrantCount < 3) return;
     if (type === 'GROUPS' && current[index].entrantCount < 4) return;
     if (isTerminalStage(type) && index !== current.length - 1) return;
@@ -1758,6 +1772,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       resetParticipantEditor();
       // Keep first name, surname, and both partner fields intact.
     }
+    if (sport && sport !== nextSport && sportScoring(sport).mode === 'score'
+      && sportScoring(nextSport).mode === 'score' && timedMatchMinutes.trim()) {
+      setTimeValuesReviewRequired(true);
+    } else setTimeValuesReviewRequired(false);
     setSport(nextSport);
     setPhaseDrafts((current) => current.map((phase) => ({
       ...phase,
@@ -2194,15 +2212,22 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               </div>
               <div className="field match-timing-fields">
                 <label htmlFor="match-duration">{timedSport ? <>Spieldauer (Minuten) <span className="wizard-required-mark" aria-hidden="true">*</span></> : 'Satzdauer (Minuten)'}</label>
-                <input id="match-duration" type="number" min="1" step="1" required={timedSport} value={timedSport ? timedMatchMinutes : planningMinutesPerSet(sport)} disabled={!timedSport} placeholder={timedSport ? 'Pflichtfeld – z. B. 12' : undefined} onChange={(event) => setTimedMatchMinutes(event.target.value)} />
+                <input id="match-duration" type="number" min="1" step="1" required={timedSport} value={timedSport ? timedMatchMinutes : planningMinutesPerSet(sport)} disabled={!timedSport} placeholder={timedSport ? 'Pflichtfeld – z. B. 12' : undefined} onChange={(event) => { setTimedMatchMinutes(event.target.value); setTimeValuesReviewRequired(false); }} />
                 {!timedSport && <span className="field-hint">Automatischer Planungswert: {planningMinutesPerSet(sport)} Minuten pro Satz. Dieser Wert wird für die Dauerprognose verwendet.</span>}
                 {timedSport && <>
                   <span className="field-hint">Geplante Dauer eines Spiels in vollen Minuten. Sie wird für die Zeitprognose verwendet.</span>
                   <label htmlFor="venue-turnover">Zeitpuffer zwischen Spielen (Minuten) <span className="wizard-optional-tag">Optional</span></label>
-                  <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => setVenueTurnoverMinutes(event.target.value)} />
+                  <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => { setVenueTurnoverMinutes(event.target.value); setTimeValuesReviewRequired(false); }} />
                   <span className="field-hint">Zusätzliche Zeit zwischen zwei Spielen auf derselben Spielfläche. Ein leeres Feld entspricht 0 Minuten.</span>
                   {(Number(timedMatchMinutes) > 240 || Number(venueTurnoverMinutes) > 60) && validMatchDuration && validTurnover && <span className="field-hint" role="status">Ungewöhnlich lange Spieldauer oder Wechselpause – bitte kontrolliere die Zeitangabe.</span>}
                   {(!validMatchDuration || !validTurnover) && <span className="field-error">Die Spieldauer muss zwischen 1 und 1440 Minuten liegen; der Zeitpuffer zwischen 0 und 240 Minuten.</span>}
+                  {timeValuesReviewRequired && (
+                    <div className="callout" role="alert">
+                      <strong>Zeitwerte der vorherigen Sportart übernommen</strong>
+                      <p>Bitte kontrolliere die Spieldauer von {timedMatchMinutes || '–'} Minuten und den Wechselpuffer von {venueTurnoverMinutes || '0'} Minuten. Die Werte werden für {sportOptions.find((option) => option.id === sport)?.label || sport} weiterverwendet.</p>
+                      <button type="button" className="btn small" onClick={() => setTimeValuesReviewRequired(false)}>Spieldauer und Wechselpuffer geprüft</button>
+                    </div>
+                  )}
                 </>}
               </div>
             </div>
