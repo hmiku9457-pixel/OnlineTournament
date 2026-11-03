@@ -7706,3 +7706,16 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   border-color: #dce4f0;
   background: #f8fafc;
 }
+
+/* Confirmation lists must remain readable without stretching the wizard. */
+.wizard-confirm-details {
+  max-height: 190px;
+  overflow-y: auto;
+  padding-left: 1.5rem;
+  margin: .5rem 0 1rem;
+  overflow-wrap: anywhere;
+}
+.wizard-confirm-details li + li { margin-top: .35rem; }
+.single-day-choice-dialog { width: min(660px, calc(100vw - 32px)); max-width: 660px; }
+.single-day-choice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.single-day-choice-actions > button { flex: 1 1 auto; }
