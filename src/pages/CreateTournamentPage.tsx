@@ -2077,7 +2077,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const centralCreationIssues = !prestart && phaseDrafts.length ? validateTournamentCreation({
     name, sport, discipline, tables, minimumMatches,
     participantNames: participants.map((participant) => participantDisplayName(participant, discipline)),
-    phases: phaseDrafts, plannedSchedule, scheduledStart, venueLayout: venueLayoutEnabled ? venueLayout : undefined,
+    phases: phaseDrafts, plannedSchedule, scheduledStart, estimatedEnd: plannedTimeline.estimatedEnd,
+    venueLayout: venueLayoutEnabled ? venueLayout : undefined,
     matchDurationMinutes, venueTurnoverMinutes: breakMinutes, tournamentMode, plannedDays,
   }) : [];
   const canCreate = centralCreationIssues.length === 0 && reviewRequiredPhaseIds.length === 0 && basicsValid && participantsValid && venueLayoutValid && gameSettingsValid
