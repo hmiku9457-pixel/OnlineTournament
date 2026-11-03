@@ -1462,12 +1462,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     if (type === 'GROUPS' && current[index].entrantCount < 4) return;
     if (isTerminalStage(type) && index !== current.length - 1) return;
     if (type === 'BREAK' && (index === 0 || index === current.length - 1 || current[index - 1]?.type === 'BREAK' || current[index + 1]?.type === 'BREAK')) return;
-    if (!confirmed && (current[index].dayBreaks.length > 0 || current[index].inlineBreakAfterRound > 0)) {
-      setPendingRoundAdjustment({ kind: 'type', index, type,
-        removedDays: current[index].dayBreaks.length, removedInline: current[index].inlineBreakAfterRound > 0 });
-      return;
-    }
-    setSelectedRecommendationId(null);
     const next = current.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
     const phase = { ...clearInlinePauseOnTypeChange(next[index]), dayBreaks: [] };
     next[index] = phase;
@@ -1488,29 +1482,28 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       ? resizeKnockoutBestOf(phase.knockoutBestOf, knockoutRoundLabels(phase.entrantCount).length, bestOf)
       : [];
 
-    setPhaseDrafts(normalizeAndTrackPhaseChanges(current, next));
+    const normalized = normalizeAndTrackPhaseChanges(current, next, undefined, confirmed);
+    if (!normalized) return;
+    setSelectedRecommendationId(null);
+    setPhaseDrafts(normalized);
     setEditingPhaseTypeId(null);
   }
 
-  function updatePhaseEntrants(index: number, entrantCount: number, customEntrants = false, confirmed = false) {
-    setSelectedRecommendationId(null);
+  function updatePhaseEntrants(index: number, entrantCount: number, customEntrants = false) {
     const next = phaseDrafts.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
     if (!next[index] || index === 0) return;
     const maximum = next[index - 1].entrantCount;
     const nextEntrants = Math.max(2, Math.min(maximum, entrantCount));
     next[index].entrantCount = nextEntrants;
     next[index].customEntrants = customEntrants;
-    const impact = reconcileRoundDependentBreaks(next[index]).impact;
-    if (!confirmed && (impact.removedDayBreaks > 0 || impact.removedInlineBreak)) {
-      setPendingRoundAdjustment({ kind: 'entrants', index, entrants: nextEntrants, custom: customEntrants,
-        removedDays: impact.removedDayBreaks, removedInline: impact.removedInlineBreak });
-      return;
-    }
     if (next[index].type === 'KNOCKOUT') {
       next[index].knockoutBestOf = resizeKnockoutBestOf(next[index].knockoutBestOf,
         knockoutRoundLabels(nextEntrants).length, next[index].bestOf);
     }
-    setPhaseDrafts(normalizeAndTrackPhaseChanges(phaseDrafts, next, next[index].id));
+    const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, next, next[index].id);
+    if (!normalized) return;
+    setSelectedRecommendationId(null);
+    setPhaseDrafts(normalized);
   }
 
   function updateKnockoutRoundBestOf(phase: PhaseDraft, roundIndex: number, bestOf: number) {
