@@ -57,7 +57,7 @@ import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, 
 import { availableDayBreakRounds, convertToSingleDay, singleDayFixedPauseConflicts, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, earliestRoundContinuationDate, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
 import { configuredPlayingDays, followingPlayingDate, playingRounds, type PlayingDayBreak } from '@/domain/playingDays';
-import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays } from '@/domain/creationPlanRecommendations';
+import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays, recommendationEndTimePenalty } from '@/domain/creationPlanRecommendations';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, playingDayOverflowWarnings, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
@@ -793,6 +793,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const [maxSwissRounds, setMaxSwissRounds] = useState<number | null>(restoredDraft?.maxSwissRounds ?? null);
   const [knockoutQualifierCount, setKnockoutQualifierCount] = useState<number | null>(restoredDraft?.knockoutQualifierCount ?? null);
   const [preferredDurationMinutes, setPreferredDurationMinutes] = useState(restoredDraft?.preferredDurationMinutes ?? DEFAULT_RECOMMENDATION_DURATION);
+  const [preferredTimeMode, setPreferredTimeMode] = useState<'duration' | 'end-time'>(restoredDraft?.preferredTimeMode ?? 'duration');
+  const [preferredEndTime, setPreferredEndTime] = useState(restoredDraft?.preferredEndTime ?? '17:00');
   const [tournamentMode, setTournamentMode] = useState<'single' | 'multi'>(restoredDraft?.tournamentMode ?? (restoredDraft?.phaseDrafts.some((phase) => (phase.dayBreaks?.length ?? 0) > 0 || (phase.type === 'BREAK' && phase.breakKind === 'overnight')) ? 'multi' : 'single'));
   const [plannedDays, setPlannedDays] = useState(restoredDraft?.plannedDays ?? 2);
   useEffect(() => {
@@ -910,7 +912,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     customTables, venueLayoutEnabled, venueLayout, venueLayoutCustomized, participants, participantForm,
     editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
-    knockoutQualifierCount, preferredDurationMinutes, tournamentMode, plannedDays, awardsEnabled,
+    knockoutQualifierCount, preferredDurationMinutes, preferredTimeMode, preferredEndTime, tournamentMode, plannedDays, awardsEnabled,
     pendingDependentChange: pendingPhaseChange, timeValuesReviewRequired,
     awardsAtOverride: prestartManualCeremony ? prestartCeremonyAt : awardsAtOverride,
   }), [
@@ -919,7 +921,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
     editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
-    knockoutQualifierCount, preferredDurationMinutes, tournamentMode, plannedDays, awardsEnabled, awardsAtOverride,
+    knockoutQualifierCount, preferredDurationMinutes, preferredTimeMode, preferredEndTime, tournamentMode, plannedDays, awardsEnabled, awardsAtOverride,
     pendingPhaseChange, timeValuesReviewRequired, prestartCeremonyAt, prestartManualCeremony?.at,
   ]);
   const latestDraftSnapshot = useRef(draftSnapshot);
@@ -1105,6 +1107,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const effectiveMaxSwissRounds = Math.min(Math.max(2, participantCount - 1), Math.max(2, maxSwissRounds ?? defaultMaxSwissRounds));
   const effectiveKnockoutQualifierCount = Math.min(Math.max(2, participantCount), Math.max(2, knockoutQualifierCount ?? defaultKnockoutQualifierCount));
 
+  const preferredEndDate = tournamentMode === 'multi'
+    ? followingPlayingDate(scheduledDate, plannedDays - 1) : scheduledDate;
+  const preferredEndDateTime = `${preferredEndDate}T${preferredEndTime}`;
+  const preferredEndInstant = parseLocalDateTime(preferredEndDateTime);
+  const scheduledStartInstant = parseLocalDateTime(scheduledStart);
+  const preferredEndTimeValid = Boolean(preferredEndInstant && scheduledStartInstant
+    && preferredEndInstant.getTime() - scheduledStartInstant.getTime() >= MIN_RECOMMENDATION_DURATION * 60_000);
   const allRecommendations = useMemo(
     () => recommendTournamentFormats(
       { playerCount: participantCount, tableCount: tables, minimumMatches, sport, matchDurationMinutes, venueTurnoverMinutes: breakMinutes },
@@ -1113,7 +1122,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
         maxGroups: effectiveMaxGroups,
         maxSwissRounds: effectiveMaxSwissRounds,
         knockoutQualifierCount: effectiveKnockoutQualifierCount,
-        preferredDurationMinutes: tournamentMode === 'multi' ? preferredDurationMinutes : Math.min(preferredDurationMinutes, MAX_SINGLE_DAY_DURATION),
+        preferredDurationMinutes: preferredTimeMode === 'duration'
+          ? (tournamentMode === 'multi' ? preferredDurationMinutes : Math.min(preferredDurationMinutes, MAX_SINGLE_DAY_DURATION))
+          : undefined,
         requireDecisiveWinner: true,
         maxResults: 0,
       },
@@ -1130,12 +1141,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       effectiveMaxGroups,
       effectiveMaxSwissRounds,
       effectiveKnockoutQualifierCount,
-      preferredDurationMinutes,
+      preferredDurationMinutes, preferredTimeMode,
     ],
   );
 
-  const assessedRecommendations = useMemo(() => allRecommendations.map((item) => ({
-    item, assessment: assessRecommendationTime(item, {
+  const assessedRecommendations = useMemo(() => {
+    const entries = allRecommendations.map((item) => ({
+      item, assessment: assessRecommendationTime(item, {
       start: scheduledStart, days: tournamentMode === 'single' ? 1 : plannedDays,
       participants: participantCount, tableCount: tables,
       timing: timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes }
@@ -1143,9 +1155,15 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       bestOfFor: (type) => phaseBestOfForSport(sport, type),
       awardsEnabled, awardsAtOverride,
     }),
-  })), [allRecommendations, tournamentMode, scheduledStart, plannedDays,
+    }));
+    if (preferredTimeMode !== 'end-time' || !preferredEndTimeValid) return entries;
+    return entries.sort((a, b) =>
+      (a.item.minimumMatchShortfall ?? 0) - (b.item.minimumMatchShortfall ?? 0)
+      || recommendationEndTimePenalty(a.assessment.estimatedEnd, preferredEndDateTime)
+        - recommendationEndTimePenalty(b.assessment.estimatedEnd, preferredEndDateTime));
+  }, [allRecommendations, tournamentMode, scheduledStart, plannedDays,
     participantCount, tables, timedSport, matchDurationMinutes, breakMinutes, sport,
-    awardsEnabled, awardsAtOverride]);
+    awardsEnabled, awardsAtOverride, preferredTimeMode, preferredEndDateTime, preferredEndTimeValid]);
   // Do not discard the sixth viable suggestion before checking the first five.
   const visibleRecommendationChoices = useMemo(() => [
     ...assessedRecommendations.filter(({ assessment }) => assessment.feasible),
