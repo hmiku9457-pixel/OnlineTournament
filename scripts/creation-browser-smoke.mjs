@@ -142,18 +142,18 @@ try {
   await page.locator('.format-help-details summary').click();
   // Recommendation settings are directly editable and expose bounded
   // + / - actions. The duration is a soft preference, not a hard filter.
-  assert.equal(await page.locator('#preferred-duration').innerText(), '03:30');
+  assert.equal(await page.locator('#preferred-duration').innerText(), '3 Std. 30 Min.');
   await page.getByRole('button', { name: 'Geplante Turnierdauer um 15 Minuten erhöhen' }).click();
-  assert.equal(await page.locator('#preferred-duration').innerText(), '03:45');
+  assert.equal(await page.locator('#preferred-duration').innerText(), '3 Std. 45 Min.');
   await page.getByRole('button', { name: 'Geplante Turnierdauer um 15 Minuten verringern' }).click();
-  assert.equal(await page.locator('#preferred-duration').innerText(), '03:30');
+  assert.equal(await page.locator('#preferred-duration').innerText(), '3 Std. 30 Min.');
   await page.locator('#preferred-duration').click();
   const durationDialog = page.getByRole('dialog', { name: 'Geplante Turnierdauer' });
   await durationDialog.waitFor();
   await durationDialog.getByLabel('Stunden (0–23)').fill('2');
   await durationDialog.getByLabel('Minuten (0–59)').fill('10');
-  await durationDialog.getByRole('button', { name: 'Übernehmen' }).click();
-  assert.equal(await page.locator('#preferred-duration').innerText(), '02:10');
+  await durationDialog.getByRole('button', { name: 'Dauer übernehmen' }).click();
+  assert.equal(await page.locator('#preferred-duration').innerText(), '2 Std. 10 Min.');
   const swissBefore = Number(await page.locator('#max-swiss-rounds').inputValue());
   const swissLimit = Number(await page.locator('#max-swiss-rounds').getAttribute('max'));
   if (swissBefore < swissLimit) {
@@ -169,7 +169,7 @@ try {
   assert.equal(swissLimit, 3, 'four participants allow at most three distinct Swiss opponents');
   await page.reload();
   await page.waitForSelector('.format-step');
-  assert.equal(await page.locator('#preferred-duration').innerText(), '02:10',
+  assert.equal(await page.locator('#preferred-duration').innerText(), '2 Std. 10 Min.',
     'chosen duration must persist in the saved creation draft');
   assert.match(await page.locator('.format-settings-head').innerText(),
     /Passe die Vorschläge an deine Veranstaltung an/,
@@ -187,6 +187,9 @@ try {
   await page.locator('.format-toggle-group input').nth(2).uncheck();
   await next(page);
   await page.waitForSelector('.phase-wizard-step');
+  assert.match(await page.locator('.phase-wizard-step .callout').first().innerText(),
+    /Du stellst dein Turnier jetzt selbst zusammen/,
+    'without a recommendation the wizard explains the manual workflow');
   assert.equal(await page.getByRole('button', { name: '+ Schweizer System' }).count(), 1,
     'disabled recommendation system is still available for manual phases');
   await page.getByRole('button', { name: '+ Jeder gegen jeden' }).click();
@@ -514,16 +517,47 @@ try {
   await next(recPage);
   const options = recPage.locator('.recommendation-list .recommendation');
   assert.ok(await options.count() >= 2);
+  const titles = await options.locator('.recommendation-phase-heading').allInnerTexts();
+  assert.ok(titles.every((title) => title.includes('K.-o.-Phase')),
+    'every proposed format ends with a decisive knockout stage');
   await options.first().click();
+  assert.equal(await options.first().getAttribute('aria-pressed'), 'true');
   await options.nth(1).click();
-  const replaceDialog = recPage.getByRole('alertdialog', { name: 'Phasenplanung ersetzen?' });
-  await replaceDialog.waitFor();
-  await replaceDialog.getByRole('button', { name: 'Bisherige Planung behalten' }).click();
-  assert.equal(await replaceDialog.count(), 0);
+  assert.equal(await options.first().getAttribute('aria-pressed'), 'false');
+  assert.equal(await options.nth(1).getAttribute('aria-pressed'), 'true');
+  assert.equal(await recPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' }).count(), 0,
+    'browsing recommendations never opens a confirmation');
   await options.nth(1).click();
-  await recPage.getByRole('alertdialog', { name: 'Phasenplanung ersetzen?' })
-    .getByRole('button', { name: 'Phasen durch Empfehlung ersetzen' }).click();
+  assert.equal(await options.nth(1).getAttribute('aria-pressed'), 'false',
+    'clicking a selected recommendation deselects it');
+  await options.first().click();
   await next(recPage);
+  const replaceDialog = recPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' });
+  await replaceDialog.waitFor();
+  assert.match(await replaceDialog.innerText(), /Empfehlung als Phasenplan übernehmen/,
+    'even the first transition to step 4 requires explicit confirmation');
+  await replaceDialog.getByRole('button', { name: 'Zurück zur Auswahl' }).click();
+  assert.equal(await replaceDialog.count(), 0);
+  assert.equal(await recPage.locator('.format-step').count(), 1);
+  assert.equal(await recPage.locator('.phase-config').count(), 0);
+  await next(recPage);
+  await replaceDialog.getByRole('button', { name: 'Empfehlung übernehmen und weiter' }).click();
+  await recPage.locator('.phase-wizard-step').waitFor();
+  const originalPhaseLabels = await recPage.locator('.phase-config').allInnerTexts();
+  assert.ok(originalPhaseLabels.length >= 1);
+  await recPage.locator('.wizard-step').nth(2).click();
+  const alternatives = recPage.locator('.recommendation-list .recommendation');
+  await alternatives.nth(1).click();
+  assert.equal(await replaceDialog.count(), 0);
+  await next(recPage);
+  await replaceDialog.waitFor();
+  assert.match(await replaceDialog.innerText(), /Bestehende Phasenplanung ersetzen/,
+    'only the transition to step 4 checks an existing configured plan');
+  await replaceDialog.getByRole('button', { name: 'Zurück zur Auswahl' }).click();
+  assert.equal(await recPage.locator('.format-step').count(), 1);
+  await next(recPage);
+  await replaceDialog.getByRole('button', { name: 'Phasen ersetzen und weiter' }).click();
+  await recPage.locator('.phase-wizard-step').waitFor();
   assert.ok(await recPage.locator('.phase-config').count() >= 1);
   await recContext.close();
 
@@ -820,10 +854,13 @@ try {
     'playing-day +/- buttons must stay at the reduced 28px width');
   assert.ok(dayControlGeometry.groupWidth > dayControlGeometry.dayWidth + 15,
     'the playing-day counter must be visibly narrower than the other numeric steppers');
-  assert.equal(await multiPage.locator('#preferred-duration').innerText(), '03:30',
+  assert.equal(await multiPage.locator('#preferred-duration').innerText(), '3 Std. 30 Min.',
     'multi-day mode does not change the total active-duration preference');
   await multiPage.locator('.recommendation-list .recommendation').first().click();
   await next(multiPage);
+  const initialMultiRecommendation = multiPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' });
+  await initialMultiRecommendation.waitFor();
+  await initialMultiRecommendation.getByRole('button', { name: 'Empfehlung übernehmen und weiter' }).click();
   await multiPage.locator('.phase-wizard-step').waitFor();
   const daysInPlan = await multiPage.evaluate(() => [...document.querySelectorAll('.phase-config')].length);
   assert.ok(daysInPlan >= 1, 'multi-day recommendation produces editable phases');
@@ -832,7 +869,9 @@ try {
   await multiPage.locator('.wizard-step').nth(2).click();
   // Replacement confirmation must keep both actions on the same line.
   await multiPage.locator('.recommendation-list .recommendation').nth(1).click();
-  const daySplitReplaceDialog = multiPage.getByRole('alertdialog', { name: 'Phasenplanung ersetzen?' });
+  assert.equal(await multiPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' }).count(), 0);
+  await next(multiPage);
+  const daySplitReplaceDialog = multiPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' });
   await daySplitReplaceDialog.waitFor();
   const replacementActionPositions = await daySplitReplaceDialog.locator('.sport-change-dialog-actions .btn')
     .evaluateAll(buttons => buttons.map(button => {
@@ -844,7 +883,7 @@ try {
     'both replacement actions must be side by side');
   assert.ok(replacementActionPositions[0].right <= replacementActionPositions[1].left,
     'the cancel button is left of the destructive replacement action');
-  await daySplitReplaceDialog.getByRole('button', { name: 'Bisherige Planung behalten' }).click();
+  await daySplitReplaceDialog.getByRole('button', { name: 'Zurück zur Auswahl' }).click();
   assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägig' }).isChecked(), true);
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
   const summaryBeforeModeSwitch = await multiPage.locator('.wizard-side-summary').innerText();
