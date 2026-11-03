@@ -43,7 +43,7 @@ import { changedPhaseEntrantIds, needsRosterPhaseReview } from '@/domain/phaseRe
 import { CREATION_DRAFT_KEY, loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence, type CreationDraft, type SavedCreationDraft } from '@/domain/creationDraft';
 import { saveNamedCreationDraftAtomic, removeSavedCreationDraftAtomic } from '@/domain/savedCreationDraftStore';
 import { ClockTimePicker, parseClockTime } from '@/components/ClockTimePicker';
-import { RecommendationDurationPicker, DEFAULT_RECOMMENDATION_DURATION, MIN_RECOMMENDATION_DURATION, MAX_RECOMMENDATION_DURATION, formatRecommendationDuration } from '@/components/RecommendationDurationPicker';
+import { RecommendationDurationPicker, DEFAULT_RECOMMENDATION_DURATION, MIN_RECOMMENDATION_DURATION, MAX_RECOMMENDATION_DURATION, MAX_SINGLE_DAY_DURATION, formatRecommendationDuration } from '@/components/RecommendationDurationPicker';
 import { RecommendationNumberStepper } from '@/components/RecommendationNumberStepper';
 import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { DisciplineChangeDialog } from '@/components/DisciplineChangeDialog';
@@ -53,7 +53,7 @@ import { UnsavedParticipantDialog } from '@/components/UnsavedParticipantDialog'
 import { QualificationRuleDialog } from '@/components/QualificationRuleDialog';
 import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/domain/groupQualification';
 import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, invalidParticipantRosterIndices, MAX_PARTICIPANT_NAME_LENGTH } from '@/domain/participantNames';
-import { availableDayBreakRounds, convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, earliestRoundContinuationDate, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
+import { availableDayBreakRounds, convertToSingleDay, singleDayFixedPauseConflicts, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, earliestRoundContinuationDate, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
 import { configuredPlayingDays, followingPlayingDate, playingRounds, type PlayingDayBreak } from '@/domain/playingDays';
 import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays } from '@/domain/creationPlanRecommendations';
@@ -487,7 +487,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       participantSequence = Math.max(participantSequence,
         highestDraftSequence(draft.participants, 'participant'),
         highestDraftSequence(draft.pendingDependentChange?.previousRoster ?? [], 'participant'));
-      phaseSequence = Math.max(phaseSequence, highestDraftSequence(draft.phaseDrafts, 'phase'));
+      phaseSequence = Math.max(phaseSequence, highestDraftSequence(draft.phaseDrafts, 'phase'),
+        highestDraftSequence(draft.pendingDependentChange?.next ?? [], 'phase'));
     }
     return draft;
   });
@@ -606,6 +607,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [timeValuesReviewRequired, setTimeValuesReviewRequired] =
     useState(restoredDraft?.timeValuesReviewRequired ?? false);
   const [pendingPhaseRemoval, setPendingPhaseRemoval] = useState<string | null>(null);
+  const [pendingConfirmPhaseRemoval, setPendingConfirmPhaseRemoval] = useState<string | null>(null);
   const [pendingPhaseTypeLoss, setPendingPhaseTypeLoss] = useState<{ index: number; type: StageType } | null>(null);
   const [pendingDeleteParticipantId, setPendingDeleteParticipantId] = useState<string | null>(null);
   const [pendingUndoConflict, setPendingUndoConflict] = useState(false);
@@ -689,8 +691,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     return () => { window.removeEventListener('resize', updatePageSize); observer?.disconnect(); };
   }, [step, prestart, discipline]);
   useEffect(() => {
-    setRosterFirstIndex((start) => start >= participants.length
-      ? Math.max(0, Math.floor(Math.max(0, participants.length - 1) / rosterPageSize) * rosterPageSize) : start);
+    const finalPage = Math.max(0, Math.floor(Math.max(0, participants.length - 1) / rosterPageSize) * rosterPageSize);
+    setRosterFirstIndex((start) => Math.min(start, finalPage));
+    setRosterBackStack((history) => history.filter((start) => start < finalPage));
   }, [participants.length, rosterPageSize]);
   useEffect(() => {
     // Old page offsets are meaningless once real card measurements change the
@@ -729,6 +732,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [undoRemoveError, setUndoRemoveError] = useState('');
   // Keep the preceding roster until dependent phase edits have been accepted.
   const rosterBeforeLastChange = useRef<ParticipantDraft[]>(restoredDraft?.participants ?? []);
+  const disciplineBeforeLastChange = useRef<Discipline>(restoredDraft?.discipline ?? 'SINGLES');
+  const sportBeforeLastChange = useRef<string>(restoredDraft?.sport ?? '');
+  const rosterReviewBeforeLastChange = useRef(restoredDraft?.rosterReviewRequired ?? false);
   const [participantForm, setParticipantForm] = useState<ParticipantFields>(restoredDraft?.participantForm ?? emptyParticipantFields());
   // Registration may change in another director tab while this editor stays
   // mounted. Reconcile the field size without discarding its unsaved plan.
@@ -756,6 +762,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     manuallyEditedId?: string;
     source: 'manual' | 'roster';
     previousRoster?: ParticipantDraft[];
+    previousDiscipline?: Discipline;
+    previousSport?: string;
+    previousRosterReviewRequired?: boolean;
   } | null>(() => restoredDraft?.pendingDependentChange
     ? { ...restoredDraft.pendingDependentChange, next: restoredDraft.pendingDependentChange.next.map((phase) => ({
       ...phase, dayBreaks: phase.dayBreaks ?? [], breakUntilDate: phase.breakUntilDate ?? '',
@@ -783,7 +792,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [plannedDays, setPlannedDays] = useState(restoredDraft?.plannedDays ?? 2);
   const [pendingTournamentMode, setPendingTournamentMode] = useState<'single' | null>(null);
   useEffect(() => { setPhaseLimitError(''); },
-    [phaseDrafts, participants, plannedDays, tournamentMode, awardsEnabled]);
+    [phaseDrafts, participants, plannedDays, tournamentMode, awardsEnabled, step, scheduledDate, scheduledTime]);
   const [pendingAutomaticSplit, setPendingAutomaticSplit] = useState(false);
   // Legacy inline confirmation dialogs share one keyboard/focus contract.
   // Inert the wizard behind them so Tab cannot escape into the form.
@@ -1002,10 +1011,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   }
 
   const editingSavedParticipant = participants.find((participant) => participant.id === editingParticipantId);
-  const participantEditorDirty = Object.keys(emptyParticipantFields()).some((field) => {
-    const key = field as ParticipantField;
-    return participantForm[key] !== (editingSavedParticipant?.[key] ?? '');
-  });
+  const relevantParticipantFields: ParticipantField[] = discipline === 'TEAMS'
+    ? ['teamName'] : discipline === 'DOUBLES'
+      ? ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
+      : ['firstName', 'lastName'];
+  const participantEditorDirty = relevantParticipantFields.some((key) =>
+    participantForm[key] !== (editingSavedParticipant?.[key] ?? ''));
 
   const participantCount = participants.filter((participant) => participantIsComplete(participant, discipline)).length;
   const incompleteSavedParticipants = participants.length - participantCount;
@@ -1077,8 +1088,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const firstSelectableRecommendationIndex = recommendationAssessments.findIndex((assessment) => assessment.feasible);
 
   const selectedRecommendation = useMemo(
-    () => recommendations.find((recommendation) => recommendation.id === selectedRecommendationId) ?? null,
-    [recommendations, selectedRecommendationId],
+    () => allRecommendations.find((recommendation) => recommendation.id === selectedRecommendationId) ?? null,
+    [allRecommendations, selectedRecommendationId],
   );
 
   /** The editable phase plan is authoritative even when inputs change. */
@@ -1093,8 +1104,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         && (phase.type !== 'GROUPS' || phase.groupCount === (original.groupCount ?? 2))
         && (phase.type !== 'SWISS' || phase.swissRounds === (original.swissRounds ?? 1));
     }));
-  const currentRecommendationAssessment = recommendationAssessments[recommendations.findIndex(
-    (item) => item.id === selectedRecommendationId)];
+  const currentRecommendationAssessment = assessedRecommendations.find(
+    ({ item }) => item.id === selectedRecommendationId)?.assessment;
   const recommendationTimeMatches = Boolean(recommendationStructureMatches && currentRecommendationAssessment?.feasible
     && currentRecommendationAssessment.scheduleSignature === creationPlanScheduleSignature(phaseDrafts));
   const recommendationPlanMatches = Boolean(recommendationStructureMatches && recommendationTimeMatches);
@@ -1131,7 +1142,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const ambiguousLocalClock = isAmbiguousLocalDateTime(scheduledStart);
   const startTimeIsAllowed = isStartAtOrAfterNow(scheduledStart, new Date(currentLocalMinute));
   const basicsValid = Boolean(name.trim()) && name.trim().length <= 120 && Boolean(sport)
-    && selectedDisciplineValid && startTimeIsAllowed && !timeValuesReviewRequired
+    && selectedDisciplineValid && startTimeIsAllowed && (!timedSport || !timeValuesReviewRequired)
     && Number.isSafeInteger(tables) && tables >= 1 && tables <= 9999 && gameSettingsValid;
   const venueLayoutValid = !venueLayoutEnabled || validateVenueLayout(venueLayout, tables).length === 0;
   const phaseEntrantsValid = phaseDrafts.every((phase, index) => {
@@ -1480,8 +1491,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     if (groupIndex < 0 || participantCount < 4) return null;
     const phase = phaseDrafts[groupIndex];
     const following = phaseDrafts.slice(groupIndex + 1).find((item) => item.type !== 'BREAK');
+    if (selectedRecommendation?.phases.some((suggestion) => suggestion.type === 'GROUPS'
+      && suggestion.entrantCount === phase.entrantCount && suggestion.groupCount === phase.groupCount)) return null;
     return changedGroupRecommendationMessage(phase.entrantCount, phase.groupCount, following?.entrantCount);
-  }, [phaseDrafts, participantCount]);
+  }, [phaseDrafts, participantCount, selectedRecommendation]);
 
   function updateBulkCleanupUndoPostPhases(afterPhases: PhaseDraft[], afterReviews: string[]) {
     setBulkCleanupUndo((entry) => entry && JSON.stringify(entry.after) === JSON.stringify(participants)
@@ -1639,6 +1652,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setReviewRequiredPhaseIds((ids) => ids.filter((candidateId) => retainedIds.has(candidateId)));
     if (editingPhaseTypeId === id) setEditingPhaseTypeId(null);
     if (expandedPhaseId === id) setExpandedPhaseId(null);
+    setPhaseInsertIndex(null);
     setPhaseDrafts(normalized);
   }
 
@@ -1796,7 +1810,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const next = phaseDrafts.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
     if (!next[index] || index === 0) return;
     const maximum = next[index - 1].entrantCount;
-    const nextEntrants = Math.max(2, Math.min(maximum, entrantCount));
+    const minimum = next[index].type === 'GROUPS' ? 4 : next[index].type === 'SWISS' ? 3 : 2;
+    if (maximum < minimum) return;
+    const nextEntrants = Math.max(minimum, Math.min(maximum, entrantCount));
     next[index].entrantCount = nextEntrants;
     next[index].customEntrants = customEntrants;
     if (next[index].type === 'KNOCKOUT') {
