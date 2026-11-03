@@ -48,7 +48,7 @@ export function countCreationScheduleEntries(
 }
 
 /** A single-day plan has no overnight phase or round-level day boundaries. */
-export function convertToSingleDay<T extends RoundDependentPhase & { breakKind: string; breakMinutes: number }>(
+export function convertToSingleDay<T extends RoundDependentPhase & { breakKind: string; breakMinutes?: number }>(
   phases: readonly T[],
   overnightTreatment: 'remove' | 'convert' = 'remove',
 ): T[] {
