@@ -1114,6 +1114,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
         maxSwissRounds: effectiveMaxSwissRounds,
         knockoutQualifierCount: effectiveKnockoutQualifierCount,
         preferredDurationMinutes: tournamentMode === 'multi' ? preferredDurationMinutes : Math.min(preferredDurationMinutes, MAX_SINGLE_DAY_DURATION),
+        requireDecisiveWinner: true,
         maxResults: 0,
       },
     ),
@@ -1949,11 +1950,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     if (step === 3 && target === 4 && selectedRecommendation) {
       if (!currentRecommendationAssessment?.feasible) {
         setSelectedRecommendationId(null);
-      } else if (phaseDrafts.length > 0 && !recommendationPlanMatches) {
+      } else if (!recommendationPlanMatches) {
+        // Confirm once, on navigation – including the first time Step 4 is entered.
         setPendingRecommendationId(selectedRecommendation.id);
         return;
-      } else if (phaseDrafts.length === 0) {
-        applyRecommendation(selectedRecommendation);
       }
     }
     applyStepNavigation(target, focusDate, advance);
@@ -4179,12 +4179,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
           onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingRecommendationId(null); }}>
           <section className="sport-change-dialog phase-replacement-dialog" role="alertdialog" aria-modal="true" aria-label="Übernahme der Empfehlung bestätigen?"
             onKeyDown={(event) => { if (event.key === 'Escape') setPendingRecommendationId(null); }}>
-            <h2>Bestehende Phasenplanung ersetzen?</h2>
-            <p>Beim Wechsel zu Schritt 4 ersetzt die ausgewählte Empfehlung alle bereits konfigurierten Phasen. Individuelle Best-of-Werte, Qualifikationsplätze und Pausen gehen verloren.</p>
-            <p className="field-hint">Du kannst die Empfehlung auch abwählen und deinen vorhandenen Plan unverändert weiterbearbeiten.</p>
+            <h2>{phaseDrafts.length ? 'Bestehende Phasenplanung ersetzen?' : 'Empfehlung als Phasenplan übernehmen?'}</h2>
+            {phaseDrafts.length
+              ? <p>Beim Wechsel zu Schritt 4 ersetzt die ausgewählte Empfehlung alle bereits konfigurierten Phasen. Individuelle Best-of-Werte, Qualifikationsplätze und Pausen gehen verloren.</p>
+              : <p>Die ausgewählte Empfehlung wird jetzt als Grundlage für Schritt 4 übernommen. Dort kannst du jede Phase noch anpassen.</p>}
+            <p className="field-hint">Du kannst die Empfehlung auch abwählen und ohne Vorlage zu Schritt 4 wechseln.</p>
             <div className="sport-change-dialog-actions">
               <button type="button" className="btn" autoFocus onClick={() => setPendingRecommendationId(null)}>Zurück zur Auswahl</button>
-              <button type="button" className="btn danger" onClick={() => {
+              <button type="button" className={`btn ${phaseDrafts.length ? 'danger' : 'primary'}`} onClick={() => {
                 const recommendation = assessedRecommendations.find(({ item, assessment }) =>
                   item.id === pendingRecommendationId && assessment.feasible)?.item;
                 setPendingRecommendationId(null);
@@ -4192,7 +4194,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                   applyRecommendation(recommendation);
                   applyStepNavigation(4, false, true);
                 }
-              }}>Phasen ersetzen und weiter</button>
+              }}>{phaseDrafts.length ? 'Phasen ersetzen und weiter' : 'Empfehlung übernehmen und weiter'}</button>
             </div>
           </section>
         </div>
