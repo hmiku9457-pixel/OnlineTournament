@@ -230,8 +230,17 @@ export function recommendTournamentFormats(
   const swiss = calculateSwissPlan(playerCount, minimumMatches, settings.maxSwissRounds);
   const defaultQualifiers = playerCount >= 16 ? 8 : 4;
   // A combined format must cut the field before the K.-o. phase.
-  const qualifiers = clampInteger(settings.knockoutQualifierCount, defaultQualifiers, 2, Math.max(2, playerCount));
-  const groupSwissEntrants = playerCount >= 4 ? groupQualifiers(playerCount, group.groupCount) : playerCount;
+  const requestedQualifiers = clampInteger(settings.knockoutQualifierCount, defaultQualifiers, 2, Math.max(2, playerCount));
+  const maximumQualifiers = Math.min(playerCount - 1, requestedQualifiers);
+  // Respect an explicitly selected custom bracket size (for example six).
+  // Only reduce the field if the request would leave everyone advancing.
+  const qualifiers = requestedQualifiers < playerCount
+    ? requestedQualifiers
+    : [64, 32, 16, 8, 4, 2].find((size) => size <= maximumQualifiers) ?? 2;
+  // Unequal group qualification counts are permitted and resolved by the
+  // existing group-comparison/tiebreaker rules.
+  const groupSwissEntrants = playerCount >= 4
+    ? Math.max(3, Math.min(playerCount - 1, groupQualifiers(playerCount, group.groupCount))) : playerCount;
   const groupSwissRounds = calculateSwissPlan(groupSwissEntrants, minimumMatches, settings.maxSwissRounds);
   // Three-system suggestions need two genuine qualification cuts.
   const tripleKnockoutEntrants = Math.min(qualifiers, playerCount - 2);
@@ -401,14 +410,18 @@ export function recommendTournamentFormats(
     });
   }
 
+  // A one-match shortfall with a perfect duration should beat a format
+  // exceeding the target by 60 minutes, while a two-match shortfall should not.
+  // Minimum games remain a soft preference, never a feasibility constraint.
+  const preferenceCost = (item: FormatRecommendation) =>
+    (item.minimumMatchShortfall ?? 0) * 40
+      + Math.max(0, item.estimatedDurationMinutes - preferredDuration) * 0.75;
   const byPreference = (a: FormatRecommendation, b: FormatRecommendation) =>
-    b.score - a.score || a.estimatedDurationMinutes - b.estimatedDurationMinutes;
-  const withinWindow = recommendations.filter((item) => item.estimatedDurationMinutes <= preferredDuration).sort(byPreference);
-  const longer = recommendations.filter((item) => item.estimatedDurationMinutes > preferredDuration)
-    .sort((a, b) => a.estimatedDurationMinutes - b.estimatedDurationMinutes || byPreference(a, b));
-  const ranked = [...withinWindow, ...longer];
+    preferenceCost(a) - preferenceCost(b)
+      || b.score - a.score || a.estimatedDurationMinutes - b.estimatedDurationMinutes;
+  const ranked = recommendations.sort(byPreference);
   const maxResults = settings.maxResults ?? 5;
   return settings.maxRecommendedDurationMinutes === undefined
     ? maxResults === 0 ? ranked : ranked.slice(0, maxResults)
-    : recommendations.sort(byPreference);
+    : ranked;
 }

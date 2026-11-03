@@ -1,4 +1,4 @@
-import { estimateKnockoutRoundMinutes, estimatePhaseMetrics, knockoutRoundLabels, type TimedMatchSettings } from './tournamentCreation';
+import { estimateKnockoutRoundMinutes, estimateRoundRobinRoundMinutes, estimatePhaseMetrics, knockoutRoundLabels, type TimedMatchSettings } from './tournamentCreation';
 import { buildPlannedTimeline, plannedTimelineConflicts, playingDayOverflowWarnings, validatePlannedSchedule } from './tournamentSchedule';
 import { countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES } from './creationPlanTransitions';
 import { configuredPlayingDays, followingPlayingDate, playingRounds, validPlayingDayBreaks, type PlayingDayBreak } from './playingDays';
@@ -80,7 +80,9 @@ export function creationPlanTimeIssues(
     roundCount: playingRounds(phase) || undefined,
     roundDurationsMinutes: phase.type === 'KNOCKOUT'
       ? estimateKnockoutRoundMinutes(phase.entrantCount, tables, phase.bestOf, phase.knockoutBestOf, timing)
-      : undefined,
+      : phase.type === 'GROUPS' || phase.type === 'ROUND_ROBIN'
+        ? estimateRoundRobinRoundMinutes(phase.type, phase.entrantCount, phase.groupCount, tables, phase.bestOf, timing)
+        : undefined,
     inlineBreakAfterRound: phase.inlineBreakAfterRound,
     inlineBreakKind: phase.inlineBreakKind, inlineBreakMinutes: phase.inlineBreakMinutes,
     inlineBreakUntil: phase.inlineBreakUntil, inlineBreakUntilDate: phase.inlineBreakUntilDate || undefined,
@@ -196,15 +198,28 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
     return issues.length ? impossible(issues[0]) : result;
   }
   if (days < 2 || days > 14) return impossible('Die Anzahl der Spieltage muss zwischen 2 und 14 liegen.');
+  const knownTimes = phases.flatMap((phase) => [
+    ...(phase.type === 'BREAK' && phase.breakKind === 'overnight' ? [phase.nextDayStart] : []),
+    ...phase.dayBreaks.map((item) => item.time),
+  ]);
+  const starts = [scheduledStart.slice(11, 16),
+    ...Array.from({ length: days - 1 }, (_, i) => knownTimes[i] || '09:00')];
+  const budgetFor = (time: string) => {
+    const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
+    return match ? 1440 - Number(match[1]) * 60 - Number(match[2]) : 900;
+  };
+  const budgets = starts.map(budgetFor);
   const slots = competition.flatMap((phase, phaseIndex) => {
     const rounds = playingRounds(phase);
     const totalMinutes = estimatePhaseMetrics(phase, tableCount, timing).estimatedDurationMinutes;
-    const koDurations = phase.type === 'KNOCKOUT'
+    const roundDurations = phase.type === 'KNOCKOUT'
       ? estimateKnockoutRoundMinutes(phase.entrantCount, tableCount, phase.bestOf, phase.knockoutBestOf, timing)
-      : [];
+      : phase.type === 'GROUPS' || phase.type === 'ROUND_ROBIN'
+        ? estimateRoundRobinRoundMinutes(phase.type, phase.entrantCount, phase.groupCount, tableCount, phase.bestOf, timing)
+        : [];
     return Array.from({ length: rounds }, (_, round) => ({
       phaseIndex, afterRound: round + 1,
-      weight: Math.max(1, koDurations[round] ?? totalMinutes / rounds),
+      weight: Math.max(1, roundDurations[round] ?? totalMinutes / rounds),
     }));
   });
   if (slots.length < days) return impossible('Zu wenige vollständige Rundengrenzen für die gewünschten Spieltage.');
@@ -235,9 +250,7 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
         if (cumulative[mid] < target) left = mid + 1;
         else right = mid;
       }
-      const budget = day === 1
-        ? 24 * 60 - (Number(scheduledStart.slice(11, 13)) * 60 + Number(scheduledStart.slice(14, 16)))
-        : 24 * 60 - (Number((phases.find((p) => p.type === 'BREAK' && p.breakKind === 'overnight')?.nextDayStart || '09:00').slice(0, 2)) * 60);
+      const budget = budgets[day - 1];
       let budgetCut = lower;
       let budgetHi = upper;
       while (budgetCut < budgetHi) {
@@ -288,16 +301,6 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
   // Exact O(days × rounds) reachability fallback. Unlike a beam, this never
   // drops a legal cutoff only because it is far from the balanced target.
   // A final full-timeline validation still handles fixed pauses and dates.
-  const knownTimes = phases.flatMap((phase) => [
-    ...(phase.type === 'BREAK' && phase.breakKind === 'overnight' ? [phase.nextDayStart] : []),
-    ...phase.dayBreaks.map((item) => item.time),
-  ]);
-  const starts = [scheduledStart.slice(11, 16),
-    ...Array.from({ length: days - 1 }, (_, i) => knownTimes[i] || '09:00')];
-  const budgets = starts.map((time) => {
-    const match = /^(\\d{2}):(\\d{2})$/.exec(time);
-    return match ? 1440 - Number(match[1]) * 60 - Number(match[2]) : 900;
-  });
   const n = slots.length;
   let previousScores = new Float64Array(n + 1).fill(Infinity);
   previousScores[0] = 0;
@@ -329,7 +332,7 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
     .filter((position) => Number.isFinite(previousScores[position])
       && total - cumulative[position] <= budgets[days - 1])
     .sort((a, b) => previousScores[a] - previousScores[b]);
-  for (const finish of lastCut.slice(0, 10)) {
+  for (const finish of lastCut) {
     const cuts = [finish];
     let position = finish;
     for (let day = days - 2; day >= 0; day--) {
@@ -364,7 +367,9 @@ export function creationPlanScheduleSignature(phases: readonly DayDistributionPh
       inlineBreakMinutes: phase.inlineBreakAfterRound > 0 && phase.inlineBreakKind === 'minutes'
         ? phase.inlineBreakMinutes : undefined,
       inlineBreakUntil: phase.inlineBreakAfterRound > 0 && phase.inlineBreakKind === 'until'
-        ? phase.inlineBreakUntil : undefined }));
+        ? phase.inlineBreakUntil : undefined,
+      inlineBreakUntilDate: phase.inlineBreakAfterRound > 0 && phase.inlineBreakKind === 'until'
+        ? phase.inlineBreakUntilDate : undefined }));
 }
 
 export interface RecommendationTimeAssessment {

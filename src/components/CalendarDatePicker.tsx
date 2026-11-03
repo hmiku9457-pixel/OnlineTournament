@@ -55,6 +55,7 @@ export function CalendarDatePicker({
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(0);
   const [viewYear, setViewYear] = useState(2026);
+  const [yearInput, setYearInput] = useState('2026');
   const selected = parseCalendarDate(value);
   const minimum = minDate && parseCalendarDate(minDate) ? minDate : '';
   const today = toCalendarDate(new Date());
@@ -66,6 +67,7 @@ export function CalendarDatePicker({
     const initial = selected && (!minimum || value >= minimum) ? selected : parseCalendarDate(minimum) ?? new Date();
     setViewMonth(initial.getMonth());
     setViewYear(initial.getFullYear());
+    setYearInput(String(initial.getFullYear()));
     setOpen(true);
   }
   function close() {
@@ -74,9 +76,25 @@ export function CalendarDatePicker({
   }
   function navigateMonths(delta: number) {
     const date = new Date(viewYear, viewMonth + delta, 1);
-    if (minimum && `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` < minimum.slice(0, 7)) return;
+    if (date.getFullYear() > 9999 || date.getFullYear() < 1
+      || (minimum && `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` < minimum.slice(0, 7))) return;
     setViewYear(date.getFullYear());
+    setYearInput(String(date.getFullYear()));
     setViewMonth(date.getMonth());
+  }
+  function commitYear() {
+    const value = Number(yearInput);
+    const firstYear = minimum ? Number(minimum.slice(0, 4)) : 1;
+    if (!/^\d{1,4}$/.test(yearInput) || !Number.isInteger(value)
+      || value < firstYear || value > 9999) {
+      setYearInput(String(viewYear));
+      return;
+    }
+    setViewYear(value);
+    setYearInput(String(value));
+    if (minimum && value === firstYear && viewMonth < Number(minimum.slice(5, 7)) - 1) {
+      setViewMonth(Number(minimum.slice(5, 7)) - 1);
+    }
   }
   function choose(date: string) {
     if (minimum && date < minimum) return;
@@ -133,24 +151,32 @@ export function CalendarDatePicker({
                 <h2 id={titleId}>{label} auswählen</h2>
                 <p>Wähle einen Tag im Kalender.</p>
               </div>
-              <button type="button" className="calendar-picker-close" aria-label="Schließen" onClick={close}>×</button>
+              <button type="button" ref={firstFocusRef} className="calendar-picker-close" aria-label="Schließen" onClick={close}>×</button>
             </div>
             <div className="calendar-picker-month-nav">
-              <button type="button" ref={firstFocusRef} aria-label="Vorheriger Monat" disabled={previousMonthUnavailable} onClick={() => navigateMonths(-1)}>‹</button>
+              <button type="button" aria-label="Vorheriger Monat" disabled={previousMonthUnavailable} onClick={() => navigateMonths(-1)}>‹</button>
               <select aria-label="Monat" value={viewMonth} onChange={(event) => setViewMonth(Number(event.target.value))}>
                 {months.map((month, index) => <option key={month} value={index} disabled={Boolean(minimum && `${viewYear}-${String(index + 1).padStart(2, "0")}` < minimum.slice(0, 7))}>{month}</option>)}
               </select>
-              <input type="number" aria-label="Jahr" min={minimum ? Number(minimum.slice(0, 4)) : 1} max={9999} value={viewYear}
-                onChange={(event) => {
-                  const year = Number(event.target.value);
-                  if (Number.isInteger(year) && year >= (minimum ? Number(minimum.slice(0, 4)) : 1) && year <= 9999) {
-                    setViewYear(year);
-                    if (minimum && year === Number(minimum.slice(0, 4)) && viewMonth < Number(minimum.slice(5, 7)) - 1) {
-                      setViewMonth(Number(minimum.slice(5, 7)) - 1);
+              <input type="number" aria-label="Jahr" min={minimum ? Number(minimum.slice(0, 4)) : 1}
+                max={9999} value={yearInput} onChange={(event) => {
+                  const typed = event.target.value;
+                  setYearInput(typed);
+                  // Update the month selector when a complete valid year is typed.
+                  // Partial input remains editable until blur/Enter.
+                  if (/^\d{4}$/.test(typed)) {
+                    const value = Number(typed);
+                    const firstYear = minimum ? Number(minimum.slice(0, 4)) : 1;
+                    if (value >= firstYear && value <= 9999) {
+                      setViewYear(value);
+                      if (minimum && value === firstYear && viewMonth < Number(minimum.slice(5, 7)) - 1) {
+                        setViewMonth(Number(minimum.slice(5, 7)) - 1);
+                      }
                     }
                   }
-                }}/>
-              <button type="button" aria-label="Nächster Monat" onClick={() => navigateMonths(1)}>›</button>
+                }}
+                onBlur={commitYear} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}/>
+              <button type="button" aria-label="Nächster Monat" disabled={viewYear === 9999 && viewMonth === 11} onClick={() => navigateMonths(1)}>›</button>
             </div>
             <div className="calendar-picker-grid" role="group" aria-label={months[viewMonth] + ' ' + viewYear}>
               {weekdays.map((day) => <span className="calendar-picker-weekday" key={day}>{day}</span>)}

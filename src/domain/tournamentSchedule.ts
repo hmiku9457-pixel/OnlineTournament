@@ -138,7 +138,13 @@ export function groupPlannedScheduleDays(items: PlannedScheduleItem[], scheduled
  * estimated start. Otherwise the live scheduler may interpret them as
  * a next-day break while the planning preview silently omits them. */
 export function plannedTimelineConflicts(timeline: PlannedTimeline): string[] {
-  return timeline.warnings.map((warning) => warning.message);
+  const issues = timeline.warnings.map((warning) => warning.message);
+  if (timeline.estimatedEnd && !isValidLocalDateTime(timeline.estimatedEnd)) {
+    issues.push(isAmbiguousLocalDateTime(timeline.estimatedEnd)
+      ? 'Das geschätzte Turnierende fällt in eine doppelt vorkommende Uhrzeit der Winterzeitumstellung. Bitte Beginn oder Phasenplanung anpassen.'
+      : 'Das geschätzte Turnierende hat kein gültiges lokales Datum oder keine gültige Uhrzeit.');
+  }
+  return issues;
 }
 
 export function validatePlannedSchedule(items: PlannedScheduleItem[]): string[] {
@@ -314,7 +320,17 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
     } else if (phase.breakKind === 'overnight') {
       const pauseStart = cursor;
       const explicit = phase.nextDayDate ? parseLocalDateTime(phase.nextDayDate + 'T' + (phase.nextDayStart ?? '09:00')) : null;
-      const tomorrow = clockAt(cursor, phase.nextDayStart ?? '09:00', true);
+      const following = new Date(cursor);
+      following.setHours(12, 0, 0, 0);
+      following.setDate(following.getDate() + 1);
+      const requestedNextDay = toLocalDateTime(following).slice(0, 10) + 'T' + (phase.nextDayStart ?? '09:00');
+      const implicit = parseLocalDateTime(requestedNextDay);
+      if (!phase.nextDayDate && !implicit) {
+        warnings.push({ phaseIndex: index, message: isAmbiguousLocalDateTime(requestedNextDay)
+          ? `„${phase.label}“: Die Fortsetzungszeit ${requestedNextDay} ist wegen der Winterzeitumstellung mehrdeutig. Bitte eine eindeutige Uhrzeit auswählen.`
+          : `„${phase.label}“: Die Fortsetzungszeit ${requestedNextDay} existiert wegen der Sommerzeitumstellung nicht oder ist ungültig.` });
+      }
+      const tomorrow = implicit ?? clockAt(cursor, phase.nextDayStart ?? '09:00', true);
       if (phase.nextDayDate && (!explicit || phase.nextDayDate <= toLocalDateTime(cursor).slice(0, 10))) {
         warnings.push({ phaseIndex: index,
           message: '„' + phase.label + '“: Das Fortsetzungsdatum muss nach dem Ende der vorherigen Phase liegen. Bitte ein späteres Datum wählen.' });
