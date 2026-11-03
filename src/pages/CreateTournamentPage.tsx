@@ -59,7 +59,7 @@ import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fi
 import { configuredPlayingDays, followingPlayingDate, playingRounds, type PlayingDayBreak } from '@/domain/playingDays';
 import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays, recommendationEndTimePenalty } from '@/domain/creationPlanRecommendations';
 import { initialEarlierDaysMinutes, earliestLinkedEnd, linkedDuration, linkedEndTime,
-  maximumLinkedDuration, rebalanceEarlierDays } from '@/domain/linkedCreationTime';
+  rebalanceEarlierDays } from '@/domain/linkedCreationTime';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, parseLocalDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, playingDayOverflowWarnings, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
