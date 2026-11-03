@@ -42,6 +42,7 @@ import { formatPhaseOverview } from '@/domain/creationOverview';
 import { changedPhaseEntrantIds, needsRosterPhaseReview } from '@/domain/phaseReview';
 import { CREATION_DRAFT_KEY, loadCreationDraft, saveCreationDraft, clearCreationDraft, highestDraftSequence, type CreationDraft, type SavedCreationDraft } from '@/domain/creationDraft';
 import { saveNamedCreationDraftAtomic, removeSavedCreationDraftAtomic } from '@/domain/savedCreationDraftStore';
+import { creationRecoveryKey, saveCreationRecoveryAtomic, clearCreationRecoveryAtomic } from '@/domain/creationRecoveryStore';
 import { ClockTimePicker, parseClockTime } from '@/components/ClockTimePicker';
 import { RecommendationDurationPicker, DEFAULT_RECOMMENDATION_DURATION, MIN_RECOMMENDATION_DURATION, MAX_RECOMMENDATION_DURATION, MAX_SINGLE_DAY_DURATION, formatRecommendationDuration } from '@/components/RecommendationDurationPicker';
 import { RecommendationNumberStepper } from '@/components/RecommendationNumberStepper';
@@ -438,11 +439,14 @@ export interface PrestartPhaseMode {
 
 /** The same creation phase editor is used by the pre-start director.
  * Its surrounding wizard and summary card are hidden in pre-start mode. */
-export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart?: PrestartPhaseMode; initialNamedDraft?: SavedCreationDraft } = {}) {
+export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecoveryDraft }: {
+  prestart?: PrestartPhaseMode; initialNamedDraft?: SavedCreationDraft; initialRecoveryDraft?: CreationDraft | null;
+} = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const savedDraftId = new URLSearchParams(location.search).get('draft');
   const sessionDraftKey = `${CREATION_DRAFT_KEY}:${savedDraftId ?? 'new'}`;
+  const recoveryKey = !prestart ? creationRecoveryKey(savedDraftId) : '';
   const [restoredDraft] = useState(() => {
     if (prestart) {
       const t = prestart.tournament;
@@ -481,7 +485,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       };
       return initial;
     }
-    const draft = loadCreationDraft(typeof window !== 'undefined' ? window.sessionStorage : undefined, sessionDraftKey)
+    const draft = initialRecoveryDraft
+      ?? loadCreationDraft(typeof window !== 'undefined' ? window.sessionStorage : undefined, sessionDraftKey)
       ?? (savedDraftId ? initialNamedDraft?.draft ?? null : null);
     if (draft) {
       participantSequence = Math.max(participantSequence,
@@ -507,7 +512,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const savedDraftRevision = useRef<number | null>((() => {
     if (!savedDraftId) return null;
     const fallback = initialNamedDraft?.revision ?? 1;
-    const recovery = loadCreationDraft(window.sessionStorage, sessionDraftKey);
+    const recovery = initialRecoveryDraft ?? loadCreationDraft(window.sessionStorage, sessionDraftKey);
     if (!recovery) return fallback;
     const stored = Number(window.sessionStorage.getItem(`${sessionDraftKey}:base-revision`));
     return Number.isSafeInteger(stored) && stored >= 1 ? stored : fallback;
@@ -520,7 +525,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [draftConflictOpen, setDraftConflictOpen] = useState(false);
   const [recoveryChoiceOpen, setRecoveryChoiceOpen] = useState(() => {
     if (prestart || !savedDraftId || typeof window === 'undefined') return false;
-    const recovery = loadCreationDraft(window.sessionStorage, sessionDraftKey);
+    const recovery = initialRecoveryDraft ?? loadCreationDraft(window.sessionStorage, sessionDraftKey);
     const saved = initialNamedDraft?.draft;
     return Boolean(recovery && saved && JSON.stringify(recovery) !== JSON.stringify(saved));
   });
@@ -921,8 +926,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   useEffect(() => { latestDraftSnapshot.current = draftSnapshot; }, [draftSnapshot]);
   useEffect(() => {
     if (prestart) return; // Never save a director's prestart edits as a new tournament draft.
-    setDraftSaveFailed(!saveCreationDraft(draftSnapshot, window.sessionStorage, sessionDraftKey));
-  }, [draftSnapshot, sessionDraftKey, prestart]);
+    let active = true;
+    void saveCreationRecoveryAtomic(recoveryKey, draftSnapshot)
+      .then(() => { if (active) setDraftSaveFailed(false); })
+      .catch(() => { if (active) setDraftSaveFailed(true); });
+    return () => { active = false; };
+  }, [draftSnapshot, recoveryKey, prestart]);
 
   const originalPrestartPhases = useRef(prestart ? initialPrestartPhases(prestart.tournament) : []);
   // Recovery is based on the version that was originally edited, never on
@@ -1053,6 +1062,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       setNamedDraftMessage(copy ? 'Kopie als neuer Entwurf gespeichert.' : 'Entwurf gespeichert.');
       if (copy || entry.id !== savedDraftId) {
         clearCreationDraft(window.sessionStorage, sessionDraftKey);
+        await clearCreationRecoveryAtomic(recoveryKey).catch(() => undefined);
         navigate(`/tournaments/new?draft=${encodeURIComponent(entry.id)}`, { replace: !copy });
       }
     } catch (error) {
@@ -1999,6 +2009,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     try {
       if (savedDraftId) await removeSavedCreationDraftAtomic(savedDraftId, savedDraftRevision.current ?? undefined);
       clearCreationDraft(window.sessionStorage, sessionDraftKey);
+      await clearCreationRecoveryAtomic(recoveryKey).catch(() => undefined);
       if (savedDraftId) navigate('/tournaments/new', { replace: true });
       else window.location.reload();
     } catch (error) {
@@ -2078,6 +2089,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
     });
     clearCreationDraft(window.sessionStorage, sessionDraftKey);
+    await clearCreationRecoveryAtomic(recoveryKey).catch(() => undefined);
     if (savedDraftId) {
       try {
         await removeSavedCreationDraftAtomic(savedDraftId, savedDraftRevision.current ?? undefined);
