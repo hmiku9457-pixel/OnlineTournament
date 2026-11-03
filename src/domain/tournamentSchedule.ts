@@ -207,6 +207,17 @@ function clockAt(current: Date, time: string, followingDay = false): Date {
   return next;
 }
 
+/** Generated timeline headings must respect the storage limit without
+ * shortening the user's actual phase name. */
+export function generatedScheduleTitle(prefix: string, phaseLabel: string): string {
+  const maximum = 80;
+  const available = maximum - prefix.length - 3;
+  if (available <= 0) return prefix.slice(0, maximum);
+  return phaseLabel.length <= available
+    ? `${prefix} · ${phaseLabel}`
+    : `${prefix} · ${phaseLabel.slice(0, Math.max(1, available - 1)).trimEnd()}…`;
+}
+
 /** Calculate the whole non-binding timetable, starting with the first tournament
  * phase. A "Pause bis" that would end before the theoretical pause begins
  * produces a warning instead of introducing an unexplained next-day delay.
@@ -246,7 +257,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
           if (afterRound === round && phase.inlineBreakAfterRound && phase.inlineBreakKind) {
             const item: PlannedScheduleItem = {
               id: `inline-break-${index + 1}`, at: toLocalDateTime(cursor),
-              title: `Pause nach Runde ${round} · ${phase.label}`, type: 'break',
+              title: generatedScheduleTitle(`Pause nach Runde ${round}`, phase.label), type: 'break',
               durationApproximate: phase.inlineBreakKind === 'until',
             };
             items.push(item);
@@ -262,7 +273,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
               cursor = resume;
             }
             items.push({ id: `inline-resume-${index + 1}`, at: toLocalDateTime(cursor),
-              title: `Fortsetzung Runde ${round + 1} · ${phase.label}`, type: 'competition' });
+              title: generatedScheduleTitle(`Fortsetzung Runde ${round + 1}`, phase.label), type: 'competition' });
           }
           const boundary = boundaries.find((value) => value.afterRound === round);
           if (!boundary) continue;
@@ -272,7 +283,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
             && resume.getTime() > finish.getTime());
           const dayBreak: PlannedScheduleItem = {
             id: `day-break-${index + 1}-${round}`, at: toLocalDateTime(finish),
-            title: `Spieltagsende nach Runde ${round} · ${phase.label}`,
+            title: generatedScheduleTitle(`Spieltagsende nach Runde ${round}`, phase.label),
             type: 'break', breakKind: 'overnight', durationApproximate: true,
           };
           items.push(dayBreak);
@@ -283,7 +294,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
             cursor = resume!;
           }
           items.push({ id: `day-resume-${index + 1}-${round}`, at: toLocalDateTime(cursor),
-            title: `Fortsetzung ab Runde ${round + 1} · ${phase.label}`, type: 'competition' });
+            title: generatedScheduleTitle(`Fortsetzung ab Runde ${round + 1}`, phase.label), type: 'competition' });
         }
       } else if (roundCount > 1 && afterRound >= 1 && afterRound < roundCount) {
         const roundMinutes = phase.roundDurationsMinutes;
@@ -295,7 +306,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
         const after = Math.round(totalDuration) - before;
         const inlineStart = new Date(cursor.getTime() + before * 60000);
         const inlinePause: PlannedScheduleItem = { id: `inline-break-${index + 1}`, at: toLocalDateTime(inlineStart),
-          title: `Pause nach Runde ${afterRound} · ${phase.label}`, type: 'break',
+          title: generatedScheduleTitle(`Pause nach Runde ${afterRound}`, phase.label), type: 'break',
           durationApproximate: phase.inlineBreakKind === 'until' };
         items.push(inlinePause);
         let resume = inlineStart;
@@ -314,7 +325,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
         } else resume = new Date(inlineStart.getTime() + Math.max(1, phase.inlineBreakMinutes ?? 15) * 60000);
         if (validDuration) inlinePause.durationMinutes = Math.max(0, Math.round((resume.getTime() - inlineStart.getTime()) / 60000));
         items.push({ id: `inline-resume-${index + 1}`, at: toLocalDateTime(resume),
-          title: `Fortsetzung Runde ${afterRound + 1} · ${phase.label}`, type: 'competition' });
+          title: generatedScheduleTitle(`Fortsetzung Runde ${afterRound + 1}`, phase.label), type: 'competition' });
         cursor = new Date(resume.getTime() + after * 60000);
       } else cursor = new Date(cursor.getTime() + totalDuration * 60000);
     } else if (phase.breakKind === 'overnight') {
