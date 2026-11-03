@@ -52,9 +52,10 @@ import { UnsavedParticipantDialog } from '@/components/UnsavedParticipantDialog'
 import { QualificationRuleDialog } from '@/components/QualificationRuleDialog';
 import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/domain/groupQualification';
 import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, invalidParticipantRosterIndices, MAX_PARTICIPANT_NAME_LENGTH } from '@/domain/participantNames';
-import { convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, proposePlayingDayInsertion, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
+import { availableDayBreakRounds, convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
 import { configuredPlayingDays, followingPlayingDate, playingRounds, suggestDaySplit, type PlayingDayBreak } from '@/domain/playingDays';
+import { assessRecommendationTime, distributePlayingDays } from '@/domain/creationPlanRecommendations';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, playingDayOverflowWarnings, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
@@ -669,20 +670,26 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setRosterFirstIndex((start) => start >= participants.length
       ? Math.max(0, Math.floor(Math.max(0, participants.length - 1) / rosterPageSize) * rosterPageSize) : start);
   }, [participants.length, rosterPageSize]);
+  useEffect(() => {
+    // Old page offsets are meaningless once real card measurements change the
+    // number of visible entries. Keep the currently viewed entry on-screen.
+    setRosterFirstIndex((start) => Math.floor(start / rosterPageSize) * rosterPageSize);
+    setRosterBackStack([]);
+  }, [rosterPageSize]);
   const visibleRosterStart = Math.min(rosterFirstIndex, Math.max(0, participants.length - 1));
   function rosterNextPage() {
     setRosterBackStack((history) => [...history, visibleRosterStart]);
     setRosterFirstIndex(visibleRosterStart + rosterPageSize);
   }
   function rosterPreviousPage() {
-    const previous = rosterBackStack.at(-1) ?? 0;
+    const previous = rosterBackStack.at(-1) ?? Math.max(0, visibleRosterStart - rosterPageSize);
     setRosterBackStack((history) => history.slice(0, -1));
     setRosterFirstIndex(previous);
   }
   const visibleRoster = participants.slice(visibleRosterStart, visibleRosterStart + rosterPageSize);
   // Keep controls mounted at a stable height even when all entries fit.
   const showRosterNavigation = participants.length > 0;
-  const [recentlyRemovedParticipant, setRecentlyRemovedParticipant] = useState<{ participant: ParticipantDraft; index: number } | null>(null);
+  const [recentlyRemovedParticipant, setRecentlyRemovedParticipant] = useState<{ participant: ParticipantDraft; index: number; before: ParticipantDraft[]; after: ParticipantDraft[] } | null>(null);
   const [pendingBulkCleanup, setPendingBulkCleanup] = useState(false);
   const [bulkCleanupUndo, setBulkCleanupUndo] = useState<{ before: ParticipantDraft[]; after: ParticipantDraft[]; removed: number } | null>(null);
   const [undoRemoveError, setUndoRemoveError] = useState('');
@@ -1085,23 +1092,53 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   function removeParticipant(id: string) {
     const index = participants.findIndex((participant) => participant.id === id);
     if (index < 0) return;
-    setRecentlyRemovedParticipant({ participant: participants[index], index });
+    const after = participants.filter((participant) => participant.id !== id);
+    setRecentlyRemovedParticipant({ participant: participants[index], index, before: participants, after });
     setBulkCleanupUndo(null);
     setUndoRemoveError('');
-    setParticipants((current) => current.filter((participant) => participant.id !== id));
+    setParticipants(after);
     if (editingParticipantId === id) resetParticipantEditor();
   }
 
   function undoRemoveParticipant() {
     if (!recentlyRemovedParticipant) return;
-    const { participant, index } = recentlyRemovedParticipant;
-    const restored = [...participants.slice(0, index), participant, ...participants.slice(index)];
-    if (participants.some((item) => item.id === participant.id)
-      || invalidParticipantRosterIndices(restored, discipline).size > invalidRosterIndices.size) {
-      setUndoRemoveError('Wiederherstellung nicht möglich: Der Eintrag würde die Teilnehmerliste ungültig machen.');
+    const { participant, index, before, after } = recentlyRemovedParticipant;
+    if (participants.some((item) => item.id === participant.id)) {
+      setUndoRemoveError('Wiederherstellung nicht möglich: Die Teilnehmer-ID ist bereits vergeben.');
       setRecentlyRemovedParticipant(null);
       return;
     }
+    // Exact undo must restore even a formerly incomplete or invalid entry.
+    // If the roster has since changed, only NEW name collisions may prevent it.
+    if (JSON.stringify(participants) === JSON.stringify(after)) {
+      setParticipants(before);
+      setRecentlyRemovedParticipant(null);
+      setUndoRemoveError('');
+      return;
+    }
+    const identityKeys = (item: ParticipantDraft): string[] => {
+      const person = (first: string, last: string) =>
+        participantNameKey(displayPersonName(first, last));
+      if (discipline === 'TEAMS') return [participantNameKey(item.teamName?.trim()
+        || displayPersonName(item.firstName, item.lastName))].filter(Boolean);
+      return [person(item.firstName, item.lastName),
+        ...(discipline === 'DOUBLES' ? [person(item.partnerFirstName, item.partnerLastName)] : [])]
+        .filter(Boolean);
+    };
+    const removedKeys = new Set(identityKeys(participant));
+    const oldById = new Map(before.map((item) => [item.id, item]));
+    const newlyColliding = participants.some((item) => {
+      const matchingNow = identityKeys(item).some((key) => removedKeys.has(key));
+      if (!matchingNow) return false;
+      const old = oldById.get(item.id);
+      return !old || !identityKeys(old).some((key) => removedKeys.has(key));
+    });
+    if (newlyColliding) {
+      setUndoRemoveError('Wiederherstellung nicht möglich: Seit dem Löschen ist ein neuer Namenskonflikt entstanden.');
+      setRecentlyRemovedParticipant(null);
+      return;
+    }
+    const restored = [...participants.slice(0, index), participant, ...participants.slice(index)];
     setParticipants(restored);
     setRecentlyRemovedParticipant(null);
     setUndoRemoveError('');
@@ -1311,13 +1348,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   function approvePhaseChanges() {
     if (!pendingPhaseChange) return;
-    const { next, losses, manuallyEditedId } = pendingPhaseChange;
+    const { next, losses, manuallyEditedId, source } = pendingPhaseChange;
     const changedIds = changedPhaseEntrantIds(phaseDrafts, next, manuallyEditedId);
     const needsReview = phaseDrafts.flatMap((original) => {
       const index = next.findIndex((phase) => phase.id === original.id);
       return index >= 0 && needsRosterPhaseReview(original, next[index], index) ? [original.id] : [];
     });
-    const affected = [...changedIds, ...losses.map((loss) => loss.id), ...needsReview];
+    const affected = [...changedIds, ...losses.map((loss) => loss.id), ...needsReview]
+      .filter((id) => source === 'roster' || id !== manuallyEditedId);
     if (affected.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...affected])]);
     setPhaseDrafts(next);
     setSelectedRecommendationId(null);
@@ -1471,7 +1509,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const candidate = phaseDrafts.map((phase) => phase.id === id ? result.phase : phase);
     const losses = phaseBreakLosses(phaseDrafts, candidate);
     if (losses.length && !explicitRemoval) {
-      setPendingPhaseChange({ next: candidate, losses, source: 'manual' });
+      setPendingPhaseChange({ next: candidate, losses, manuallyEditedId: id, source: 'manual' });
       return;
     }
     if (countCreationScheduleEntries(candidate, awardsEnabled) > MAX_CREATION_SCHEDULE_ENTRIES) {
@@ -1528,7 +1566,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       ? resizeKnockoutBestOf(phase.knockoutBestOf, knockoutRoundLabels(phase.entrantCount).length, bestOf)
       : [];
 
-    const normalized = normalizeAndTrackPhaseChanges(current, next, undefined, confirmed);
+    const normalized = normalizeAndTrackPhaseChanges(current, next, current[index].id, confirmed);
     if (!normalized) return;
     setSelectedRecommendationId(null);
     setPhaseDrafts(normalized);
@@ -3522,6 +3560,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             onKeyDown={(event) => { if (event.key === 'Escape') setPendingBulkCleanup(false); }}>
             <h2>{invalidRosterIndices.size} fehlerhafte Einträge entfernen?</h2>
             <p>Diese Einträge werden aus der Teilnehmerliste entfernt. Der erste gültige Eintrag eines Duplikats bleibt bestehen.</p>
+            {participantEditorDirty && <p className="modal-mode-warning" role="alert">
+              Achtung: Die ungespeicherten Änderungen im Teilnehmereditor werden bei der Bereinigung verworfen. Speichere deine Korrektur vorher oder bestätige den Verlust ausdrücklich.
+            </p>}
             <ul className="wizard-confirm-details">
               {participants.filter((_, index) => invalidRosterIndices.has(index)).slice(0, 25).map((participant) =>
                 <li key={participant.id}>{participantDisplayName(participant, discipline) || 'Unvollständiger Eintrag'}</li>)}
@@ -3530,7 +3571,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             <p className="field-hint">Nach der Bereinigung kannst du die gesamte Aktion rückgängig machen.</p>
             <div className="sport-change-dialog-actions">
               <button className="btn" type="button" autoFocus onClick={() => setPendingBulkCleanup(false)}>Abbrechen</button>
-              <button className="btn danger" type="button" onClick={removeInvalidParticipants}>Fehlerhafte Einträge entfernen</button>
+              <button className="btn danger" type="button" onClick={removeInvalidParticipants}>
+                {participantEditorDirty ? 'Änderungen verwerfen und Einträge entfernen' : 'Fehlerhafte Einträge entfernen'}
+              </button>
             </div>
           </section>
         </div>
