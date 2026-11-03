@@ -13,9 +13,10 @@ export function formatClockTime(hour: number, minute: number): string | null {
 }
 
 /** Clock limits are only applied to a selected calendar day (normally today). */
-export function isClockTimeAllowed(value: string, minimum?: string): boolean {
+export function isClockTimeAllowed(value: string, minimum?: string, maximum?: string): boolean {
   if (!parseClockTime(value)) return false;
-  return !minimum || (Boolean(parseClockTime(minimum)) && value >= minimum);
+  return (!minimum || (Boolean(parseClockTime(minimum)) && value >= minimum))
+    && (!maximum || (Boolean(parseClockTime(maximum)) && value <= maximum));
 }
 
 /** Dial coordinate in percent, with zero at 12 o'clock and clockwise progression. */
@@ -29,12 +30,13 @@ interface ClockDialProps {
   hour: number;
   minute: number;
   minTime?: string;
+  maxTime?: string;
   onPickHour: (hour: number) => void;
   onPickMinute: (minute: number) => void;
 }
 
 /** 24-hour clock dial: outer ring 01–12, inner ring 00 and 13–23. */
-export function ClockTimeDial({ mode, hour, minute, minTime, onPickHour, onPickMinute }: ClockDialProps) {
+export function ClockTimeDial({ mode, hour, minute, minTime, maxTime, onPickHour, onPickMinute }: ClockDialProps) {
   const innerHour = hour === 0 || hour >= 13;
   const selected = mode === 'hours'
     ? clockDialPosition(hour % 12, innerHour ? 27 : 41)
@@ -53,7 +55,8 @@ export function ClockTimeDial({ mode, hour, minute, minTime, onPickHour, onPickM
           return (
             <button className={`clock-picker-mark${hour === value ? ' is-selected' : ''}`}
               type="button" key={value} aria-label={`${value} Uhr`} aria-pressed={hour === value}
-              disabled={Boolean(minTime && parseClockTime(minTime) && value < parseClockTime(minTime)!.hour)}
+              disabled={Boolean((minTime && parseClockTime(minTime) && value < parseClockTime(minTime)!.hour)
+                || (maxTime && parseClockTime(maxTime) && value > parseClockTime(maxTime)!.hour)}
               style={{ left: `${point.left}%`, top: `${point.top}%` }}
               onClick={() => onPickHour(value)}>{value === 0 ? '00' : String(value)}</button>
           );
@@ -64,7 +67,7 @@ export function ClockTimeDial({ mode, hour, minute, minTime, onPickHour, onPickM
           return (
             <button className={`clock-picker-mark${minute === value ? ' is-selected' : ''}`}
               type="button" key={value} aria-label={`${value} Minuten`} aria-pressed={minute === value}
-              disabled={Boolean(minTime && !isClockTimeAllowed(formatClockTime(hour, value)!, minTime))}
+              disabled={!isClockTimeAllowed(formatClockTime(hour, value)!, minTime, maxTime)}
               style={{ left: `${point.left}%`, top: `${point.top}%` }}
               onClick={() => onPickMinute(value)}>{String(value).padStart(2, '0')}</button>
           );
@@ -80,6 +83,8 @@ interface ClockTimePickerProps {
   label?: string;
   /** Earliest allowed clock time on the currently selected day. */
   minTime?: string;
+  /** Latest allowed clock time on the currently selected day. */
+  maxTime?: string;
   /** Enables a live local-clock selection rather than a fixed time. */
   onNow?: () => void;
   nowActive?: boolean;
@@ -87,7 +92,7 @@ interface ClockTimePickerProps {
 }
 
 export function ClockTimePicker({
-  id, value, onChange, label = 'Uhrzeit', minTime, onNow, nowActive = false, nowTime,
+  id, value, onChange, label = 'Uhrzeit', minTime, maxTime, onNow, nowActive = false, nowTime,
 }: ClockTimePickerProps) {
   const dialogTitle = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -101,10 +106,11 @@ export function ClockTimePicker({
   const hour = /^\d{1,2}$/.test(hourInput) && Number(hourInput) <= 23 ? Number(hourInput) : null;
   const minute = /^\d{1,2}$/.test(minuteInput) && Number(minuteInput) <= 59 ? Number(minuteInput) : null;
   const formatted = hour === null || minute === null ? null : formatClockTime(hour, minute);
-  const meetsMinimum = Boolean(formatted && isClockTimeAllowed(formatted, minTime));
+  const meetsMinimum = Boolean(formatted && isClockTimeAllowed(formatted, minTime, maxTime));
 
   function show() {
-    const parsed = parseClockTime(minTime && !isClockTimeAllowed(value, minTime) ? minTime : value) ?? { hour: 9, minute: 0 };
+    const initial = isClockTimeAllowed(value, minTime, maxTime) ? value : minTime ?? maxTime ?? value;
+    const parsed = parseClockTime(initial) ?? { hour: 9, minute: 0 };
     setHourInput(String(parsed.hour).padStart(2, '0'));
     setMinuteInput(String(parsed.minute).padStart(2, '0'));
     setMode('hours');
@@ -115,7 +121,7 @@ export function ClockTimePicker({
     triggerRef.current?.focus();
   }
   function confirm() {
-    if (!formatted || !isClockTimeAllowed(formatted, minTime)) return;
+    if (!formatted || !isClockTimeAllowed(formatted, minTime, maxTime)) return;
     onChange(formatted);
     close();
   }
@@ -173,7 +179,7 @@ export function ClockTimePicker({
                 {minute === null ? '--' : String(minute).padStart(2, '0')}
               </button>
             </div>
-            <ClockTimeDial mode={mode} hour={hour ?? 9} minute={minute ?? 0} minTime={minTime}
+            <ClockTimeDial mode={mode} hour={hour ?? 9} minute={minute ?? 0} minTime={minTime} maxTime={maxTime}
               onPickHour={(next) => { setHourInput(String(next).padStart(2, '0')); setMode('minutes'); }}
               onPickMinute={(next) => setMinuteInput(String(next).padStart(2, '0'))} />
             <p className="clock-picker-ring-hint">{mode === 'hours'
@@ -181,15 +187,18 @@ export function ClockTimePicker({
               : 'Minuten in 5er-Schritten wählen. Einzelne Minuten unten eingeben.'}</p>
             <div className="clock-picker-manual">
               <label>Stunde (0–23)
-                <input type="number" inputMode="numeric" min={parseClockTime(minTime ?? '')?.hour ?? 0} max="23" value={hourInput}
+                <input type="number" inputMode="numeric" min={parseClockTime(minTime ?? '')?.hour ?? 0} max={parseClockTime(maxTime ?? '')?.hour ?? 23} value={hourInput}
                   onChange={(event) => { setHourInput(event.target.value); setMode('hours'); }} />
               </label>
               <label>Minute (0–59)
-                <input type="number" inputMode="numeric" min={hour === parseClockTime(minTime ?? '')?.hour ? parseClockTime(minTime ?? '')!.minute : 0} max="59" value={minuteInput}
+                <input type="number" inputMode="numeric" min={hour === parseClockTime(minTime ?? '')?.hour ? parseClockTime(minTime ?? '')!.minute : 0}
+                  max={hour === parseClockTime(maxTime ?? '')?.hour ? parseClockTime(maxTime ?? '')!.minute : 59} value={minuteInput}
                   onChange={(event) => { setMinuteInput(event.target.value); setMode('minutes'); }} />
               </label>
             </div>
-            {minTime && !meetsMinimum && <p className="clock-picker-minimum-hint" role="status">Frühestens {minTime} Uhr auswählbar.</p>}
+            {(minTime || maxTime) && !meetsMinimum && <p className="clock-picker-minimum-hint" role="status">
+              {minTime && `Frühestens ${minTime} Uhr. `}{maxTime && `Spätestens ${maxTime} Uhr.`}
+            </p>}
             <div className="clock-picker-actions">
               {onNow && <button type="button" className="btn clock-picker-now" aria-pressed={nowActive}
                 onClick={() => { onNow(); close(); }}>Jetzt{nowTime ? ` · ${nowTime} Uhr` : ''}</button>}

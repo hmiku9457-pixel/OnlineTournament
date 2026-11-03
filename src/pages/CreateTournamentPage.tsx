@@ -1227,8 +1227,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     if (!preferredEndTimeValid) return entries;
     return entries.sort((a, b) =>
       (a.item.minimumMatchShortfall ?? 0) - (b.item.minimumMatchShortfall ?? 0)
-      || recommendationEndTimePenalty(a.assessment.estimatedEnd, preferredEndDateTime)
-        - recommendationEndTimePenalty(b.assessment.estimatedEnd, preferredEndDateTime));
+      || recommendationEndTimePenalty(a.assessment.estimatedEnd, preferredEndDateTime ?? '')
+        - recommendationEndTimePenalty(b.assessment.estimatedEnd, preferredEndDateTime ?? ''));
   }, [allRecommendations, tournamentMode, scheduledStart, plannedDays,
     participantCount, tables, timedSport, matchDurationMinutes, breakMinutes, sport,
     awardsEnabled, awardsAtOverride, preferredEndDateTime, preferredEndTimeValid]);
