@@ -2,6 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { recommendTournamentFormats } from '@/engine/recommendations';
 
 describe('format recommendations', () => {
+  it('offers only tournament paths ending in a decisive final when required', () => {
+    for (const playerCount of [2, 4, 8, 19, 24]) {
+      for (const sport of ['table_tennis', 'football']) {
+        const formats = recommendTournamentFormats(
+          { playerCount, tableCount: 6, minimumMatches: 3, sport },
+          { requireDecisiveWinner: true, maxResults: 0 },
+        );
+        expect(formats.length).toBeGreaterThan(0);
+        expect(formats.every((item) => item.phases.at(-1)?.type === 'KNOCKOUT')).toBe(true);
+        expect(formats.some((item) => item.phases.length === 1 && item.phases[0].type === 'GROUPS')).toBe(false);
+      }
+    }
+  });
+
   it('does not offer a group stage when fewer than four people participate', () => {
     for (const playerCount of [2, 3]) {
       const formats = recommendTournamentFormats(
