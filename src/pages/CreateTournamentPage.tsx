@@ -297,7 +297,7 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
     breakUntil: '12:00',
     breakUntilDate: '',
     note: '',
-    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '', dayBreaks: [],
+    inlineBreakAfterRound: 0, inlineBreakKind: 'minutes', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '', dayBreaks: [],
   };
 }
 
@@ -941,7 +941,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const effectiveMaxSwissRounds = Math.min(Math.max(2, participantCount - 1), Math.max(2, maxSwissRounds ?? defaultMaxSwissRounds));
   const effectiveKnockoutQualifierCount = Math.min(Math.max(2, participantCount), Math.max(2, knockoutQualifierCount ?? defaultKnockoutQualifierCount));
 
-  const recommendations = useMemo(
+  const allRecommendations = useMemo(
     () => recommendTournamentFormats(
       { playerCount: participantCount, tableCount: tables, minimumMatches, sport, matchDurationMinutes, venueTurnoverMinutes: breakMinutes },
       {
@@ -950,6 +950,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         maxSwissRounds: effectiveMaxSwissRounds,
         knockoutQualifierCount: effectiveKnockoutQualifierCount,
         preferredDurationMinutes,
+        maxResults: 0,
       },
     ),
     [
@@ -968,16 +969,25 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     ],
   );
 
-  const recommendationAssessments = useMemo(() => recommendations.map((item) =>
-    assessRecommendationTime(item, {
+  const assessedRecommendations = useMemo(() => allRecommendations.map((item) => ({
+    item, assessment: assessRecommendationTime(item, {
       start: scheduledStart, days: tournamentMode === 'single' ? 1 : plannedDays,
       participants: participantCount, tableCount: tables,
       timing: timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes }
         : { minutesPerSet: planningMinutesPerSet(sport) },
       bestOfFor: (type) => phaseBestOfForSport(sport, type),
-    })),
-  [recommendations, tournamentMode, scheduledStart, plannedDays, participantCount,
-    tables, timedSport, matchDurationMinutes, breakMinutes, sport]);
+    }),
+  })), [allRecommendations, tournamentMode, scheduledStart, plannedDays,
+    participantCount, tables, timedSport, matchDurationMinutes, breakMinutes, sport]);
+  // Do not discard the sixth viable suggestion before checking the first five.
+  const visibleRecommendationChoices = useMemo(() => [
+    ...assessedRecommendations.filter(({ assessment }) => assessment.feasible),
+    ...assessedRecommendations.filter(({ assessment }) => !assessment.feasible),
+  ].slice(0, 5), [assessedRecommendations]);
+  const recommendations = useMemo(() => visibleRecommendationChoices.map(({ item }) => item),
+    [visibleRecommendationChoices]);
+  const recommendationAssessments = useMemo(() => visibleRecommendationChoices.map(({ assessment }) => assessment),
+    [visibleRecommendationChoices]);
   const firstSelectableRecommendationIndex = recommendationAssessments.findIndex((assessment) => assessment.feasible);
 
   const selectedRecommendation = useMemo(
@@ -1078,6 +1088,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         participant.id === editingParticipantId ? { ...participant, ...participantForm } : participant
       )));
     } else {
+      if (participants.length >= 10000) {
+        setParticipantErrors({ firstName: 'Maximal 10.000 Teilnehmer möglich. Bitte zuerst einen Eintrag entfernen.' });
+        return;
+      }
       setRecentlyRemovedParticipant(null);
       setBulkCleanupUndo(null);
       setUndoRemoveError('');
@@ -2484,7 +2498,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 )}
                 {recommendations.length > 0 && firstSelectableRecommendationIndex === -1 && (
                   <div className="callout" role="status">
-                    Keine Empfehlung ist mit den gewünschten {plannedDays} Spieltagen und den geschätzten Spielzeiten plausibel. Prüfe Startzeit, Spielflächen, Spieldauer oder Spieltage. Alternativ kannst du mit „Weiter“ die Phasen manuell anlegen.
+                    {tournamentMode === 'single'
+                      ? 'Keine vorgeschlagene Turnierform lässt sich am gewählten Tag bis Mitternacht abschließen. Prüfe Startzeit, Spielflächen oder Spieldauer.'
+                      : `Keine Empfehlung ist für ${plannedDays} Spieltage und die geschätzten Spielzeiten plausibel. Prüfe Startzeit, Spielflächen oder die Spieltagszahl.`}
+                    Du kannst im nächsten Schritt die Phasen auch selbst zusammenstellen.
                   </div>
                 )}
                 {recommendations.map((item, index) => {
@@ -2544,7 +2561,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                             ? 'Nicht wählbar: Tagesetappe zeitlich nicht plausibel'
                             : `${plannedDays} Spieltage · geschätzte Tageszeiten geprüft`}
                       </span>}
-                      {tournamentMode === 'multi' && !recommendationFeasible && assessment.reason && (
+                      {!recommendationFeasible && assessment.reason && (
                         <span className="recommendation-metric-tag wizard-metric-warning">{assessment.reason}</span>
                       )}
                       <span className={`recommendation-metric-tag ${item.minimumMatchShortfall ? 'wizard-metric-warning' : ''}`}>
@@ -2757,7 +2774,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                     {phase.type === 'GROUPS' && <span className="phase-quick-tag">{phase.groupCount} Gruppen</span>}
                                     {phase.type === 'SWISS' && <span className="phase-quick-tag">{phase.swissRounds} Runden</span>}
                                     {phase.type === 'KNOCKOUT' && <span className="phase-quick-tag">{knockoutRoundLabels(phase.entrantCount).length} Runden</span>}
-                                    <span className="phase-quick-tag">{timedSport ? `${matchDurationMinutes} Min./Spiel` : `Best-of-${phase.bestOf}`}</span>
+                                    <span className="phase-quick-tag">{timedSport ? `${matchDurationMinutes} Min./Spiel`
+                                      : phase.type === 'KNOCKOUT' && new Set(phase.knockoutBestOf).size > 1
+                                        ? 'Best-of je Runde' : `Best-of-${phase.type === 'KNOCKOUT'
+                                          ? phase.knockoutBestOf[0] ?? phase.bestOf : phase.bestOf}`}</span>
                                     {phaseEstimates[index] && <span className="phase-quick-tag phase-quick-tag-time">ca. {formatCompactDuration(phaseEstimates[index].estimatedDurationMinutes)}</span>}
                                   </>
                                 )}
