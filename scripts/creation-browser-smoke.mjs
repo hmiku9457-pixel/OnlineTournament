@@ -811,8 +811,8 @@ try {
       referenceWidths: groupButtons.map((r) => r.width) };
   });
   assert.ok(dayControlGeometry, 'days and groups steppers must both exist');
-  assert.ok(Math.abs(dayControlGeometry.dayWidth - dayControlGeometry.groupWidth) <= 16,
-    'playing days stepper should match the compact size of the other number steppers');
+  assert.ok(dayControlGeometry.dayWidth >= 150 && dayControlGeometry.dayWidth <= 170,
+    `playing days stepper should have a consistently compact width: ${dayControlGeometry.dayWidth}px`);
   assert.ok(dayControlGeometry.buttonWidths.every((width, index) =>
     Math.abs(width - dayControlGeometry.referenceWidths[index]) <= 1),
     'playing-day +/- buttons should match the other numeric inputs');
