@@ -961,12 +961,34 @@ try {
   }
   await next(multiPage);
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '1');
+  const lowerFilterTop = async () => multiPage.locator('.format-setting-fields')
+    .evaluate(element => element.getBoundingClientRect().top);
+  const initialFilterTop = await lowerFilterTop();
+  assert.equal(await multiPage.locator('.recommendation-day-info').count(), 1,
+    'forecast details are available in a compact info tooltip beside the day label');
+  assert.match(await multiPage.locator('.recommendation-day-info').getAttribute('title') ?? '',
+    /24 Stunden/);
+  assert.equal(await multiPage.locator('.recommendation-linked-explanation').count(), 0,
+    'the day forecast must not add a separate content row underneath the planning fields');
   await multiPage.getByRole('button', { name: 'Geplante Anzahl an Spieltagen erhöhen' }).click();
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
+  assert.match(await multiPage.locator('.recommendation-day-info').getAttribute('title') ?? '',
+    /letzte Spieltag beginnt rechnerisch um 09:00 Uhr/);
+  assert.equal(await multiPage.locator('.recommendation-linked-explanation').count(), 0,
+    'a multi-day forecast belongs to the info tooltip rather than an extra layout row');
+  assert.ok(Math.abs((await lowerFilterTop()) - initialFilterTop) <= 2,
+    'changing from one to two days must not move the recommendation filters');
+  await multiPage.getByRole('radio', { name: 'Endzeit', exact: true }).check();
+  assert.ok(Math.abs((await lowerFilterTop()) - initialFilterTop) <= 2,
+    'changing the time target must not move the recommendation filters');
+  await multiPage.getByRole('radio', { name: 'Turnierdauer', exact: true }).check();
+  assert.ok(Math.abs((await lowerFilterTop()) - initialFilterTop) <= 2);
   await multiPage.getByRole('button', { name: 'Geplante Anzahl an Spieltagen verringern' }).click();
   assert.equal(await multiPage.getByRole('alertdialog', { name: 'Turniermodus wechseln?' }).count(), 0,
     'reducing to a single day before phase configuration never shows a confirmation dialog');
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '1');
+  assert.ok(Math.abs((await lowerFilterTop()) - initialFilterTop) <= 2,
+    'changing back to one day must not move the recommendation filters');
   await multiPage.getByRole('button', { name: 'Geplante Anzahl an Spieltagen erhöhen' }).click();
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
   // Four-day regression: changing the last-day clock must actually persist,
