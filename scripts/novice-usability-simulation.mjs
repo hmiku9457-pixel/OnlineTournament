@@ -30,6 +30,21 @@ async function snapshot(page) {
       selectedRecommendation: state?.selectedRecommendationId ?? null,
       createEnabled: (() => { const x=document.querySelector('.wizard-create-button'); return x ? !x.disabled : null; })(),
       nextEnabled: (() => { const x=document.querySelector('.wizard-continue-button'); return x ? !x.disabled : null; })(),
+      firstRecommendationPosition: (() => {
+        const element = document.querySelector('.recommendation-list .recommendation');
+        if (!element) return null;
+        const bounds=element.getBoundingClientRect();
+        return { top:Math.round(bounds.top),bottom:Math.round(bounds.bottom),
+          visibleWithoutScroll: bounds.top >= 0 && bounds.bottom <= innerHeight };
+      })(),
+      nextButtonPosition: (() => {
+        const element = document.querySelector('.wizard-continue-button');
+        if (!element) return null;
+        const bounds=element.getBoundingClientRect();
+        return { top:Math.round(bounds.top),bottom:Math.round(bounds.bottom),
+          visibleWithoutScroll: bounds.top >= 0 && bounds.bottom <= innerHeight };
+      })(),
+      firstRecommendationLabel: document.querySelector('.recommendation-list .recommendation')?.textContent?.trim().replace(/\\s+/g,' ').slice(0,110) ?? null,
     };
   });
 }
@@ -170,6 +185,8 @@ async function runNoviceStart() {
 try {
   await runNoviceStart();
   await runTournament({name:'Novize acht Tischtennisspieler',sport:'table_tennis',discipline:'SINGLES',count:8,tables:4,minimum:4,pick:'none',novice:true});
+  await runTournament({name:'Novize acht mit Klick auf Empfehlung',sport:'table_tennis',discipline:'SINGLES',count:8,tables:4,minimum:4,pick:'first'});
+  await runTournament({name:'Kleines Acht Spieler K O',sport:'table_tennis',discipline:'SINGLES',count:8,tables:4,minimum:1,pick:'ko'});
   await runTournament({name:'Vereinsmeisterschaft neunzehn',sport:'table_tennis',discipline:'SINGLES',count:19,tables:6,minimum:4,pick:'groups-ko'});
   await runTournament({name:'Schweizer Runde neun Spieler',sport:'table_tennis',discipline:'SINGLES',count:9,tables:4,minimum:3,pick:'swiss'});
   await runTournament({name:'Doppelturnier acht Paare',sport:'table_tennis',discipline:'DOUBLES',count:8,tables:4,minimum:3,pick:'groups-ko'});
