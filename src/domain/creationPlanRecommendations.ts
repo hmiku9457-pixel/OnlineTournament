@@ -306,7 +306,7 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
     const currentScores = new Float64Array(n + 1).fill(Infinity);
     const parent = new Int32Array(n + 1).fill(-1);
     const queue: number[] = [];
-    let start = 0, cursor = 0;
+    let start = 0;
     for (let position = day; position <= n - (days - day); position++) {
       const prior = position - 1;
       if (Number.isFinite(previousScores[prior])) {
