@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   earliestLinkedEnd, finalPlayingDayStart, initialEarlierDaysMinutes,
   linkedDuration, linkedEndTime, rebalanceEarlierDays, maximumLinkedDuration,
+  maximumLinkedActiveDuration,
 } from '@/domain/linkedCreationTime';
 
 describe('linked preferred duration and end time', () => {
@@ -27,6 +28,17 @@ describe('linked preferred duration and end time', () => {
     expect(linkedDuration('16:30', settings)).toBe(555);
     expect(linkedEndTime(linkedDuration('16:30', settings)!, settings)).toBe('16:30');
     expect(rebalanceEarlierDays(211, settings)).toBe(earlier);
+  });
+
+  it('reallocates exceptionally long durations across previous playing days', () => {
+    const settings = { scheduledStart: '2030-11-21T09:00', days: 2, earlierDaysMinutes: 105 };
+    expect(maximumLinkedActiveDuration(settings)).toBe(1798);
+    const earlier = rebalanceEarlierDays(1200, settings);
+    expect(earlier).toBe(301);
+    const adjusted = { ...settings, earlierDaysMinutes: earlier };
+    expect(linkedEndTime(1200, adjusted)).toBe('23:59');
+    expect(linkedDuration('23:59', adjusted)).toBe(1200);
+    expect(maximumLinkedActiveDuration({ ...settings, days: 3 })).toBe(2697);
   });
 
   it('respects Berlin DST when deriving the end clock from actual elapsed minutes', () => {
