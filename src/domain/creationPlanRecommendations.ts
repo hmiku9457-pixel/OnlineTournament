@@ -239,10 +239,27 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
   return impossible(firstIssue || 'Keine zeitlich durchführbare Aufteilung für die gewählten Spieltage gefunden.');
 }
 
+export function creationPlanScheduleSignature(phases: readonly DayDistributionPhase[]): string {
+  return JSON.stringify(phases.map((phase) => phase.type === 'BREAK'
+    ? { type: 'BREAK', breakKind: phase.breakKind,
+      breakMinutes: phase.breakKind === 'minutes' ? phase.breakMinutes : undefined,
+      breakUntil: phase.breakKind === 'until' ? phase.breakUntil : undefined,
+      breakUntilDate: phase.breakKind === 'until' ? phase.breakUntilDate : undefined,
+      nextDayStart: phase.breakKind === 'overnight' ? phase.nextDayStart : undefined,
+      nextDayDate: phase.breakKind === 'overnight' ? phase.nextDayDate : undefined }
+    : { type: phase.type, dayBreaks: phase.dayBreaks, inlineBreakAfterRound: phase.inlineBreakAfterRound,
+      inlineBreakKind: phase.inlineBreakAfterRound > 0 ? phase.inlineBreakKind : undefined,
+      inlineBreakMinutes: phase.inlineBreakAfterRound > 0 && phase.inlineBreakKind === 'minutes'
+        ? phase.inlineBreakMinutes : undefined,
+      inlineBreakUntil: phase.inlineBreakAfterRound > 0 && phase.inlineBreakKind === 'until'
+        ? phase.inlineBreakUntil : undefined }));
+}
+
 export interface RecommendationTimeAssessment {
   feasible: boolean;
   daySplitPossible: boolean;
   reason: string | null;
+  scheduleSignature?: string;
 }
 
 /** Simulate the exact planning model used by Step 4. Enough rounds are
@@ -283,5 +300,6 @@ export function assessRecommendationTime(
     feasible: distribution.possible,
     daySplitPossible: days === 1 || phases.reduce((count, phase) => count + playingRounds(phase), 0) >= days,
     reason: distribution.reason ?? null,
+    scheduleSignature: distribution.possible ? creationPlanScheduleSignature(distribution.phases) : undefined,
   };
 }
