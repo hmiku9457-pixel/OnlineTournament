@@ -7655,21 +7655,29 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   }
 }
 
-/* Creation wizard: align "Spieltage" with the other compact numeric controls. */
+/* Playing-day count is intentionally a short counter, not a full-width number field. */
 .wizard-workspace .format-step .tournament-mode-setting > .tournament-day-count {
-  flex: 0 0 164px;
-  width: 164px;
+  flex: 0 0 120px;
+  width: 120px;
   max-width: 100%;
 }
 .wizard-workspace .format-step .tournament-day-count .recommendation-number-stepper {
-  width: 100%;
+  width: 120px;
+  max-width: 100%;
   min-width: 0;
-  grid-template-columns: 32px minmax(0, 1fr) 32px;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
   gap: 4px;
 }
-.wizard-workspace .format-step .tournament-day-count .recommendation-number-stepper > input,
+.wizard-workspace .format-step .tournament-day-count .recommendation-number-stepper > input {
+  min-width: 0;
+  min-height: 34px;
+  padding: 3px;
+  font-size: .85rem;
+}
 .wizard-workspace .format-step .tournament-day-count .recommendation-number-stepper-button {
-  min-height: 35px;
+  min-height: 34px;
+  border-radius: 7px;
+  font-size: 1.05rem;
 }
 
 /* Confirmation buttons are aligned in one row, even when labels need two lines. */
