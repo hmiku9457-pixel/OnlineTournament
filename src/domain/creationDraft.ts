@@ -71,6 +71,10 @@ export interface CreationDraft {
   maxSwissRounds: number | null;
   knockoutQualifierCount: number | null;
   preferredDurationMinutes: number;
+  /** Preference for a desired absolute finish clock versus an active-time target. */
+  preferredTimeMode?: 'duration' | 'end-time';
+  /** HH:mm on the final playing day, using the tournament timezone. */
+  preferredEndTime?: string;
   tournamentMode?: 'single' | 'multi';
   plannedDays?: number;
   awardsEnabled: boolean;
@@ -160,6 +164,10 @@ export function validDraft(value: unknown): value is CreationDraft {
     && typeof data.preferredDurationMinutes === 'number'
     && Number.isInteger(data.preferredDurationMinutes) && data.preferredDurationMinutes >= 15
     && data.preferredDurationMinutes <= (data.tournamentMode === 'multi' ? 14 * 24 * 60 - 1 : 1439)
+    && (data.preferredTimeMode === undefined || ['duration', 'end-time'].includes(data.preferredTimeMode))
+    && (data.preferredEndTime === undefined
+      || (typeof data.preferredEndTime === 'string'
+        && /^([01]\\d|2[0-3]):[0-5]\\d$/.test(data.preferredEndTime)))
     && (data.selectedRecommendationId === null || typeof data.selectedRecommendationId === 'string')
     && typeof data.awardsEnabled === 'boolean'
     && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string')
