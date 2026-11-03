@@ -1161,6 +1161,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   }
 
   function applyRecommendation(recommendation: FormatRecommendation) {
+    setPhaseLimitError('');
     setSelectedRecommendationId(recommendation.id);
     setPhaseDrafts(recommendedPhaseDrafts(recommendation));
     setReviewRequiredPhaseIds([]);
@@ -1245,6 +1246,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   /** Explicitly acknowledge every participant count changed as a consequence
    * of inserting, removing or reordering phases (not just roster changes). */
   function normalizeAndTrackPhaseChanges(previous: PhaseDraft[], proposed: PhaseDraft[], manuallyEditedId?: string): PhaseDraft[] {
+    setPhaseLimitError('');
     const normalized = normalizePhaseEntrants(proposed);
     const changed = changedPhaseEntrantIds(previous, normalized, manuallyEditedId);
     if (changed.length) setReviewRequiredPhaseIds((current) => [...new Set([...current, ...changed])]);
