@@ -866,7 +866,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
           case 'remove-phase': setPendingPhaseRemoval(null); break;
           case 'confirm-remove-phase': setPendingConfirmPhaseRemoval(null); break;
           case 'phase-type': setPendingPhaseTypeLoss(null); break;
-          case 'single-day': setPendingTournamentMode(null); break;
           case 'dependent-phase': setPendingPhaseChange(null); break;
           case 'day-split': setPendingAutomaticSplit(false); break;
           case 'day-insert': setPendingDayInsertion(null); break;
