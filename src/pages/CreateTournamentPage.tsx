@@ -811,13 +811,24 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     pendingBulkCleanup && 'cleanup', pendingRecommendationId && 'recommendation',
     draftConflictOpen && 'draft-conflict', recoveryChoiceOpen && 'recovery',
   ].filter(Boolean).join(':');
+  // Remember the actual wizard control before a dialog's autoFocus runs.
+  const modalReturnFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const trackFocus = (event: FocusEvent) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest('.creation-page-container')
+        && !target.closest('[role="dialog"], [role="alertdialog"]')) modalReturnFocusRef.current = target;
+    };
+    document.addEventListener('focusin', trackFocus, true);
+    return () => document.removeEventListener('focusin', trackFocus, true);
+  }, []);
   useEffect(() => {
     if (!inlineModalKey) return;
     const dialogs = Array.from(document.querySelectorAll<HTMLElement>(
       '.sport-change-dialog[role="alertdialog"], .prototype-modal[role="alertdialog"]'));
     const dialog = dialogs.at(-1);
     if (!dialog) return;
-    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previouslyFocused = modalReturnFocusRef.current;
     const background = document.querySelector<HTMLElement>('.creation-page-container');
     background?.setAttribute('inert', '');
     const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(
@@ -825,6 +836,33 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       .filter((item) => item.getClientRects().length > 0);
     if (!dialog.contains(document.activeElement)) (focusable()[0] ?? dialog).focus();
     const contain = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        const active = inlineModalKey.split(':').at(-1);
+        // A dependent roster decision cannot be closed without resolving it.
+        if (active === 'dependent-phase' && pendingPhaseChange?.source === 'roster') return;
+        event.preventDefault();
+        event.stopPropagation();
+        switch (active) {
+          case 'prestart-save': setConfirmPrestartSave(false); break;
+          case 'prestart-discard': setConfirmPrestartDiscard(false); break;
+          case 'overwrite': setOverwriteTournamentId(null); break;
+          case 'delete-participant': setPendingDeleteParticipantId(null); break;
+          case 'undo': setPendingUndoConflict(false); break;
+          case 'bulk-undo': setPendingBulkUndoConflict(false); break;
+          case 'remove-phase': setPendingPhaseRemoval(null); break;
+          case 'confirm-remove-phase': setPendingConfirmPhaseRemoval(null); break;
+          case 'phase-type': setPendingPhaseTypeLoss(null); break;
+          case 'single-day': setPendingTournamentMode(null); break;
+          case 'dependent-phase': setPendingPhaseChange(null); break;
+          case 'day-split': setPendingAutomaticSplit(false); break;
+          case 'day-insert': setPendingDayInsertion(null); break;
+          case 'cleanup': setPendingBulkCleanup(false); break;
+          case 'recommendation': setPendingRecommendationId(null); break;
+          case 'draft-conflict': setDraftConflictOpen(false); break;
+          case 'recovery': setRecoveryChoiceOpen(false); break;
+        }
+        return;
+      }
       if (event.key !== 'Tab') return;
       const elements = focusable();
       if (!elements.length) { event.preventDefault(); return; }
@@ -842,7 +880,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       background?.removeAttribute('inert');
       if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
     };
-  }, [inlineModalKey]);
+  }, [inlineModalKey, pendingPhaseChange?.source]);
   function applySingleDayConversion(treatment: 'convert' | 'remove') {
     const adjusted = convertToSingleDay(phaseDrafts, treatment, scheduledDate);
     const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, adjusted, undefined, true);
@@ -879,6 +917,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     knockoutQualifierCount, preferredDurationMinutes, tournamentMode, plannedDays, awardsEnabled, awardsAtOverride,
     pendingPhaseChange, timeValuesReviewRequired, prestartCeremonyAt, prestartManualCeremony?.at,
   ]);
+  const latestDraftSnapshot = useRef(draftSnapshot);
+  useEffect(() => { latestDraftSnapshot.current = draftSnapshot; }, [draftSnapshot]);
   useEffect(() => {
     if (prestart) return; // Never save a director's prestart edits as a new tournament draft.
     setDraftSaveFailed(!saveCreationDraft(draftSnapshot, window.sessionStorage, sessionDraftKey));
@@ -990,17 +1030,26 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     if (savingNamedDraft) return;
     setSavingNamedDraft(true);
     try {
-      const data = copy
-        ? { ...draftSnapshot, name: draftSnapshot.name.trim() ? `${draftSnapshot.name.trim()} (Kopie)` : 'Turnierentwurf (Kopie)' }
-        : draftSnapshot;
-      const entry = await saveNamedCreationDraftAtomic(data, copy ? null : savedDraftId,
+      const copySuffix = ' (Kopie)';
+      const copyName = draftSnapshot.name.trim()
+        ? draftSnapshot.name.trim().slice(0, 120 - copySuffix.length).trimEnd() + copySuffix
+        : 'Turnierentwurf (Kopie)';
+      const data = copy ? { ...draftSnapshot, name: copyName } : draftSnapshot;
+      let entry = await saveNamedCreationDraftAtomic(data, copy ? null : savedDraftId,
         copy ? undefined : (savedDraftRevision.current ?? undefined));
+      // A clock rollover or an already queued edit may have changed the form
+      // while IndexedDB was saving. Persist the newest snapshot before leaving.
+      const latest = latestDraftSnapshot.current;
+      if (JSON.stringify(latest) !== JSON.stringify(draftSnapshot)) {
+        const newer = copy ? { ...latest, name: copyName } : latest;
+        entry = await saveNamedCreationDraftAtomic(newer, entry.id, entry.revision);
+      }
       if (!copy) {
         savedDraftRevision.current = entry.revision ?? 1;
         try { window.sessionStorage.setItem(`${sessionDraftKey}:base-revision`, String(savedDraftRevision.current)); }
         catch { /* Best-effort recovery metadata. */ }
       }
-      setSavedDraftFingerprint(JSON.stringify(data));
+      setSavedDraftFingerprint(JSON.stringify(latestDraftSnapshot.current));
       setNamedDraftMessage(copy ? 'Kopie als neuer Entwurf gespeichert.' : 'Entwurf gespeichert.');
       if (copy || entry.id !== savedDraftId) {
         clearCreationDraft(window.sessionStorage, sessionDraftKey);
