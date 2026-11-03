@@ -1264,7 +1264,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         pause.label = 'Spieltagsende';
         pause.breakKind = 'overnight';
         return pause;
-      }, { scheduledStart });
+      }, { scheduledStart, awardsEnabled, awardsAtOverride });
     return proposal.possible ? proposal.phases : created;
   }
 
