@@ -1162,7 +1162,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const next = participants.filter((entry) => !invalidIds.has(entry.id));
     setBulkCleanupUndo({ before: participants, after: next, removed: invalidIds.size });
     setParticipants(next);
-    if (editingParticipantId && invalidIds.has(editingParticipantId)) resetParticipantEditor();
+    if (participantEditorDirty || (editingParticipantId && invalidIds.has(editingParticipantId))) resetParticipantEditor();
     setRecentlyRemovedParticipant(null);
     setUndoRemoveError('');
     setPendingBulkCleanup(false);
