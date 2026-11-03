@@ -8521,3 +8521,226 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   font-weight: 720;
   line-height: 1.35;
 }
+
+/* Schritt 4 · Kompakte Pausenkarten (eigenständige + Zwischenpause)
+   Einheitliche dreigeteilte Hauptzeile: Bezug, Zeit, Unterbrechungsart. */
+.wizard-workspace .phase-wizard-step .break-phase-fields,
+.wizard-workspace .phase-wizard-step .phase-inline-break-card .phase-inline-break-settings .break-phase-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(235px, 270px);
+  align-items: start;
+  gap: 8px 13px;
+}
+.wizard-workspace .phase-wizard-step .break-phase-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 6px 12px;
+}
+.wizard-workspace .phase-wizard-step .break-phase-inputs > .field,
+.wizard-workspace .phase-wizard-step .break-phase-datetime-fields > .field {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  gap: 5px;
+}
+.wizard-workspace .phase-wizard-step .break-phase-datetime-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-items: start;
+  min-width: 0;
+}
+.wizard-workspace .phase-wizard-step .break-phase-datetime-fields label {
+  min-width: 0;
+  white-space: nowrap;
+  font-size: .75rem;
+  font-weight: 720;
+  line-height: 1.35;
+}
+.wizard-workspace .phase-wizard-step .break-phase-inputs .break-overnight-name {
+  grid-column: auto;
+}
+/* Keep all controls at the same visual height while reclaiming vertical space. */
+.wizard-workspace .phase-wizard-step .break-phase-fields > .break-phase-inputs > .field > input:not([type="radio"]),
+.wizard-workspace .phase-wizard-step .break-phase-fields > .break-phase-inputs > .field > select,
+.wizard-workspace .phase-wizard-step .break-phase-fields > .break-phase-inputs .calendar-picker-trigger,
+.wizard-workspace .phase-wizard-step .break-phase-fields > .break-phase-inputs .clock-picker-trigger,
+.wizard-workspace .phase-wizard-step .phase-inline-break-card .break-phase-inputs select,
+.wizard-workspace .phase-wizard-step .phase-inline-break-card .break-phase-inputs input:not([type="radio"]),
+.wizard-workspace .phase-wizard-step .break-phase-inputs .phase-pause-minutes .recommendation-number-stepper {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  min-height: 42px;
+  max-height: 42px;
+}
+.wizard-workspace .phase-wizard-step .break-phase-inputs .phase-pause-minutes .recommendation-number-stepper > input,
+.wizard-workspace .phase-wizard-step .break-phase-inputs .phase-pause-minutes .recommendation-number-stepper-button {
+  height: 40px;
+  min-height: 40px;
+  max-height: 40px;
+}
+.wizard-workspace .phase-wizard-step .break-phase-inputs > .field > label,
+.wizard-workspace .phase-wizard-step .break-phase-inputs > label.field,
+.wizard-workspace .phase-wizard-step .break-phase-choice-segmented legend {
+  font-size: .8rem;
+  font-weight: 720;
+  line-height: 1.35;
+}
+/* A compact radio group keeps native keyboard navigation and screen-reader
+   semantics but presents the choices as one segmented switch. */
+.wizard-workspace .phase-wizard-step .break-phase-choice-segmented {
+  display: block;
+  align-self: start;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-segmented legend {
+  width: 100%;
+  margin: 0 0 5px;
+  padding: 0;
+  color: #344054;
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  padding: 3px;
+  border: 1px solid #d7e0ed;
+  border-radius: 9px;
+  background: #edf2f8;
+}
+.wizard-workspace .phase-wizard-step .phase-inline-break-card .break-phase-choice-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-options > label {
+  position: relative;
+  display: block;
+  min-width: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-options > label > input[type="radio"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-options > label > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 34px;
+  padding: 3px 2px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #475467;
+  font-size: .69rem;
+  font-weight: 650;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-options > label:has(input:checked) > span {
+  border-color: #c7d9ef;
+  background: #fff;
+  color: #175cd3;
+  box-shadow: 0 1px 3px rgb(16 24 40 / 9%);
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-options > label:has(input:disabled) {
+  cursor: not-allowed;
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-options > label:has(input:disabled) > span {
+  color: #98a2b3;
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-options > label:has(input:focus-visible) > span {
+  outline: 2px solid #175cd3;
+  outline-offset: -2px;
+}
+.wizard-workspace .phase-wizard-step .break-phase-time-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: .7rem;
+  line-height: 1.4;
+}
+.wizard-workspace .phase-wizard-step .break-phase-fields > .break-phase-notes {
+  grid-column: 1 / -1;
+  gap: 5px;
+  padding-top: 3px;
+}
+.wizard-workspace .phase-wizard-step .break-phase-note-heading {
+  justify-content: flex-start;
+  align-items: center;
+  min-height: 17px;
+  gap: 0;
+}
+.wizard-workspace .phase-wizard-step .break-phase-note-heading > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: .8rem;
+  font-weight: 720;
+}
+.wizard-workspace .phase-wizard-step .pause-note-info {
+  display: inline-grid;
+  flex: 0 0 14px;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #b6c8df;
+  border-radius: 50%;
+  background: #f1f6fd;
+  color: #45678e;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: help;
+}
+.wizard-workspace .phase-wizard-step .pause-note-info:focus-visible {
+  outline: 2px solid #175cd3;
+  outline-offset: 2px;
+}
+.wizard-workspace .phase-wizard-step .break-phase-notes textarea {
+  box-sizing: border-box;
+  min-height: 42px;
+  height: 42px;
+  width: 100%;
+  padding: 9px 11px;
+  line-height: 1.4;
+  resize: vertical;
+}
+.wizard-workspace .phase-wizard-step .phase-inline-break-card .phase-inline-break-header {
+  padding: 8px 11px;
+}
+.wizard-workspace .phase-wizard-step .phase-inline-break-card .phase-inline-break-settings {
+  padding: 9px 0 10px;
+  margin: 0 11px;
+}
+@media (max-width: 880px) {
+  .wizard-workspace .phase-wizard-step .break-phase-fields,
+  .wizard-workspace .phase-wizard-step .phase-inline-break-card .phase-inline-break-settings .break-phase-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 510px) {
+  .wizard-workspace .phase-wizard-step .break-phase-inputs,
+  .wizard-workspace .phase-wizard-step .break-phase-datetime-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .wizard-workspace .phase-wizard-step .break-phase-time-hint { grid-column: 1; }
+}
