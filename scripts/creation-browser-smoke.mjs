@@ -224,6 +224,41 @@ try {
   assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '31');
   await durationDialog.getByRole('button', { name: '+1 Std.' }).click();
   assert.equal(await durationDialog.getByLabel(/^Stunden \(0–\d+\)$/).inputValue(), '03');
+  assert.equal(await durationDialog.getByRole('group', { name: 'Turnierdauer verkürzen' }).getByRole('button').count(), 4);
+  assert.equal(await durationDialog.getByRole('group', { name: 'Turnierdauer verlängern' }).getByRole('button').count(), 4);
+  await durationDialog.getByRole('button', { name: '−1 Min.' }).click();
+  assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '30');
+  await durationDialog.getByRole('button', { name: '−5 Min.' }).click();
+  assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '25');
+  await durationDialog.getByRole('button', { name: '−15 Min.' }).click();
+  assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '10');
+  await durationDialog.getByRole('button', { name: '−1 Std.' }).click();
+  assert.equal(await durationDialog.getByLabel(/^Stunden \(0–\d+\)$/).inputValue(), '02');
+  assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '10');
+  assert.match(await durationDialog.locator('.recommendation-duration-preview').innerText(),
+    /2 Std\. 10 Min\./, 'the preview follows both positive and negative corrections');
+  await durationDialog.getByLabel(/^Stunden \(0–\d+\)$/).fill('0');
+  await durationDialog.getByLabel('Minuten (0–59)').fill('15');
+  assert.equal(await durationDialog.getByRole('button', { name: '−1 Min.' }).isDisabled(), true,
+    'the 15-minute minimum disables subtraction');
+  assert.equal(await durationDialog.getByRole('button', { name: '−1 Std.' }).isDisabled(), true);
+  await durationDialog.getByRole('button', { name: '+1 Min.' }).click();
+  assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '16');
+  await durationDialog.getByRole('button', { name: '−1 Min.' }).click();
+  assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '15');
+  await durationDialog.getByLabel('Minuten (0–59)').fill('0');
+  assert.equal(await durationDialog.getByRole('button', { name: 'Dauer übernehmen' }).isDisabled(), true,
+    'an invalid manual entry must not be accepted');
+  await durationDialog.getByRole('button', { name: '+1 Min.' }).click();
+  assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '15',
+    'quick adjustments clamp back to the valid minimum');
+  await durationDialog.getByLabel(/^Stunden \(0–\d+\)$/).fill('24');
+  await durationDialog.getByLabel('Minuten (0–59)').fill('0');
+  assert.equal(await durationDialog.getByRole('button', { name: '+1 Min.' }).isDisabled(), true,
+    'the 24-hour maximum disables additions');
+  await durationDialog.getByRole('button', { name: '−1 Min.' }).click();
+  assert.equal(await durationDialog.getByLabel(/^Stunden \(0–\d+\)$/).inputValue(), '23');
+  assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '59');
   await durationDialog.getByLabel(/^Stunden \(0–\d+\)$/).fill('2');
   await durationDialog.getByLabel('Minuten (0–59)').fill('10');
   await durationDialog.getByRole('button', { name: 'Dauer übernehmen' }).click();
