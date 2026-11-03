@@ -712,7 +712,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [removalHistory, setRemovalHistory] = useState<RemovalUndo[]>([]);
   const recentlyRemovedParticipant = removalHistory.at(-1) ?? null;
   const [pendingBulkCleanup, setPendingBulkCleanup] = useState(false);
-  const [bulkCleanupUndo, setBulkCleanupUndo] = useState<{ before: ParticipantDraft[]; after: ParticipantDraft[]; removed: number } | null>(null);
+  const [pendingBulkUndoConflict, setPendingBulkUndoConflict] = useState(false);
+  const [bulkCleanupUndo, setBulkCleanupUndo] = useState<{
+    before: ParticipantDraft[]; after: ParticipantDraft[]; removed: number;
+    beforePhases: PhaseDraft[]; afterPhases: PhaseDraft[];
+    beforeReviews: string[]; afterReviews: string[];
+  } | null>(null);
   const [undoRemoveError, setUndoRemoveError] = useState('');
   // Keep the preceding roster until dependent phase edits have been accepted.
   const rosterBeforeLastChange = useRef<ParticipantDraft[]>(restoredDraft?.participants ?? []);
@@ -1197,7 +1202,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     if (!invalidRosterIndices.size) { setPendingBulkCleanup(false); return; }
     const invalidIds = new Set(participants.filter((_, index) => invalidRosterIndices.has(index)).map((entry) => entry.id));
     const next = participants.filter((entry) => !invalidIds.has(entry.id));
-    setBulkCleanupUndo({ before: participants, after: next, removed: invalidIds.size });
+    setBulkCleanupUndo({ before: participants, after: next, removed: invalidIds.size,
+      beforePhases: phaseDrafts, afterPhases: phaseDrafts,
+      beforeReviews: reviewRequiredPhaseIds, afterReviews: reviewRequiredPhaseIds });
     setParticipants(next);
     if (participantEditorDirty || (editingParticipantId && invalidIds.has(editingParticipantId))) resetParticipantEditor();
     setRemovalHistory([]);
@@ -1207,16 +1214,25 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setRosterFirstIndex(0);
   }
 
-  function undoBulkCleanup() {
+  function undoBulkCleanup(overrideConflict = false) {
     if (!bulkCleanupUndo) return;
-    if (JSON.stringify(participants) !== JSON.stringify(bulkCleanupUndo.after)) {
-      setUndoRemoveError('Die Teilnehmerliste wurde seit der Bereinigung verändert. Die entfernten Einträge können nicht mehr automatisch wiederhergestellt werden.');
-      setBulkCleanupUndo(null);
+    const rosterMatches = JSON.stringify(participants) === JSON.stringify(bulkCleanupUndo.after);
+    const planMatches = JSON.stringify(phaseDrafts) === JSON.stringify(bulkCleanupUndo.afterPhases)
+      && JSON.stringify(reviewRequiredPhaseIds) === JSON.stringify(bulkCleanupUndo.afterReviews);
+    if ((!rosterMatches || !planMatches) && !overrideConflict) {
+      setPendingBulkUndoConflict(true);
       return;
     }
+    // Bulk cleanup and its dependent phase adjustments form one undo transaction.
+    participantSequence = Math.max(participantSequence, highestDraftSequence(bulkCleanupUndo.before, 'participant'));
     setParticipants(bulkCleanupUndo.before);
+    setPhaseDrafts(bulkCleanupUndo.beforePhases);
+    setReviewRequiredPhaseIds(bulkCleanupUndo.beforeReviews);
+    setPendingPhaseChange(null);
     setBulkCleanupUndo(null);
+    setPendingBulkUndoConflict(false);
     setUndoRemoveError('');
+    setSelectedRecommendationId(null);
   }
 
   function generateTestParticipants() {
@@ -1389,7 +1405,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     if (needsReview.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...needsReview])]);
     if (JSON.stringify(normalized) !== JSON.stringify(phaseDrafts)) setPhaseDrafts(normalized);
     if (JSON.stringify(normalized) !== JSON.stringify(phaseDrafts) || needsReview.length) {
-      updateRemovalUndoPostPhases(normalized, [...new Set([...reviewRequiredPhaseIds, ...needsReview])]);
+      const nextReviews = [...new Set([...reviewRequiredPhaseIds, ...needsReview])];
+      updateRemovalUndoPostPhases(normalized, nextReviews);
+      updateBulkCleanupUndoPostPhases(normalized, nextReviews);
     }
   // Die Teilnehmerzahl ist die Quelle für das Startfeld aller Phasen.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1408,6 +1426,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const following = phaseDrafts.slice(groupIndex + 1).find((item) => item.type !== 'BREAK');
     return changedGroupRecommendationMessage(phase.entrantCount, phase.groupCount, following?.entrantCount);
   }, [phaseDrafts, participantCount]);
+
+  function updateBulkCleanupUndoPostPhases(afterPhases: PhaseDraft[], afterReviews: string[]) {
+    setBulkCleanupUndo((entry) => entry && JSON.stringify(entry.after) === JSON.stringify(participants)
+      ? { ...entry, afterPhases, afterReviews } : entry);
+  }
 
   function updateRemovalUndoPostPhases(afterPhases: PhaseDraft[], afterReviews: string[]) {
     setRemovalHistory((history) => {
@@ -1446,7 +1469,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       .filter((id) => source === 'roster' || id !== manuallyEditedId);
     const retained = new Set(next.map((phase) => phase.id));
     setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...affected])].filter((id) => retained.has(id)));
-    updateRemovalUndoPostPhases(next, [...new Set([...reviewRequiredPhaseIds, ...affected])].filter((id) => retained.has(id)));
+    const nextReviews = [...new Set([...reviewRequiredPhaseIds, ...affected])].filter((id) => retained.has(id));
+    updateRemovalUndoPostPhases(next, nextReviews);
+    updateBulkCleanupUndoPostPhases(next, nextReviews);
     setPhaseDrafts(next);
     setSelectedRecommendationId(null);
     setPhaseLimitError('');
@@ -1462,6 +1487,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       return;
     }
     setPendingPhaseChange(null);
+    participantSequence = Math.max(participantSequence, highestDraftSequence(previous, 'participant'));
     setParticipants(previous);
     setRemovalHistory([]);
     setBulkCleanupUndo(null);
@@ -1495,7 +1521,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       ...changedPhaseEntrantIds(phaseDrafts, retained),
     ];
     if (affected.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...affected])]);
-    updateRemovalUndoPostPhases(retained, [...new Set([...reviewRequiredPhaseIds, ...affected])]);
+    const nextReviews = [...new Set([...reviewRequiredPhaseIds, ...affected])];
+    updateRemovalUndoPostPhases(retained, nextReviews);
+    updateBulkCleanupUndoPostPhases(retained, nextReviews);
     setPhaseDrafts(retained);
     setSelectedRecommendationId(null);
     setPendingPhaseChange(null);
@@ -3710,6 +3738,19 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 setPendingDeleteParticipantId(null);
                 removeParticipant(id, true);
               }}>Ungespeicherte Änderungen verwerfen und löschen</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {pendingBulkUndoConflict && (
+        <div className="sport-change-backdrop" role="presentation">
+          <section className="sport-change-dialog" role="alertdialog" aria-modal="true"
+            aria-label="Gesamte Teilnehmerbereinigung mit Phasen zurücksetzen?">
+            <h2>Turnierplanung seit der Bereinigung geändert</h2>
+            <p>Die vollständige Wiederherstellung setzt die Teilnehmerliste, alle Phasen und ihre Prüfmarkierungen zurück. Neuere Änderungen gehen dabei verloren.</p>
+            <div className="sport-change-dialog-actions">
+              <button className="btn" type="button" autoFocus onClick={() => setPendingBulkUndoConflict(false)}>Aktuellen Stand behalten</button>
+              <button className="btn danger" type="button" onClick={() => undoBulkCleanup(true)}>Teilnehmer und Phasen wiederherstellen</button>
             </div>
           </section>
         </div>
