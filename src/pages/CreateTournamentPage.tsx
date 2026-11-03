@@ -2577,6 +2577,22 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                   </div>
                 )}
 
+                {tournamentMode === 'multi' && phaseDrafts.some((phase) => phase.type !== 'BREAK') && (
+                  <div className="callout phase-auto-day-plan">
+                    <div>
+                      <strong>{plannedDayMismatch
+                        ? `Spieltage verteilen: ${configuredPlayingDays(phaseDrafts)} von ${plannedDays} eingerichtet`
+                        : `${plannedDays} Spieltage eingerichtet`}</strong>
+                      <p className="field-hint">Die Verteilung behält Teilnehmer, Gruppen, Runden und Best-of-Einstellungen bei. Bestehende Unterbrechungen werden vor einer Änderung erläutert.</p>
+                    </div>
+                    <button type="button" className="btn small"
+                      disabled={!suggestDaySplit(phaseDrafts.filter((phase) => phase.type !== 'BREAK'), plannedDays).possible}
+                      title={!suggestDaySplit(phaseDrafts.filter((phase) => phase.type !== 'BREAK'), plannedDays).possible
+                        ? 'Für diese Anzahl Spieltage fehlen vollständige Rundengrenzen.' : undefined}
+                      onClick={() => setPendingAutomaticSplit(true)}>Spieltage automatisch verteilen</button>
+                  </div>
+                )}
+
                 <div className="phase-add-panel phase-add-compact">
                   <div>
                     <strong>{phaseDrafts.length ? 'Phasenreihenfolge' : 'Erste Phase hinzufügen'}</strong>
@@ -3597,6 +3613,25 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               <button className="btn primary" type="button" onClick={approvePhaseChanges}>
                 Änderung und Pausenanpassung übernehmen
               </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {pendingAutomaticSplit && (
+        <div className="sport-change-backdrop" role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingAutomaticSplit(false); }}>
+          <section className="sport-change-dialog phase-replacement-dialog" role="alertdialog" aria-modal="true"
+            aria-label="Spieltage automatisch verteilen?"
+            onKeyDown={(event) => { if (event.key === 'Escape') setPendingAutomaticSplit(false); }}>
+            <h2>Spieltage automatisch verteilen?</h2>
+            <p>Die bestehenden Wettkampfphasen und ihre Einstellungen bleiben erhalten. Die Rundengrenzen werden neu auf {plannedDays} Spieltage verteilt und alle bisherigen Spieltagswechsel ersetzt.</p>
+            {countConfiguredDayTransitions(phaseDrafts) > 0 && (
+              <p className="modal-mode-warning">{countConfiguredDayTransitions(phaseDrafts)} vorhandene Spieltagswechsel werden neu angeordnet. Bereits geplante Fortsetzungsdaten können sich ändern.</p>
+            )}
+            <p>Gewöhnliche Pausen behalten Namen und Hinweise. Liegt eine solche Pause an einem neuen Spieltagswechsel, wird sie als Spieltagsende genutzt. Nicht mehr benötigte Spieltagsende-Phasen werden zu normalen 15-Minuten-Pausen – sie werden nicht gelöscht.</p>
+            <div className="sport-change-dialog-actions">
+              <button className="btn" type="button" autoFocus onClick={() => setPendingAutomaticSplit(false)}>Bisherige Verteilung behalten</button>
+              <button className="btn primary" type="button" onClick={applyAutomaticPlayingDays}>Neue Spieltage übernehmen</button>
             </div>
           </section>
         </div>
