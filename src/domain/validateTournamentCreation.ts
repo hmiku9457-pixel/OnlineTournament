@@ -5,7 +5,8 @@ import { hasValidBreakStageOrder, hasValidTerminalStageOrder, isValidSwissRoundC
 import { isValidLocalDateTime, isAmbiguousLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { validateVenueLayout, type VenueLayout } from '@/domain/venueLayout';
 import type { Discipline, StageType } from '@/domain/types';
-import { configuredPlayingDays, playingRounds, validPlayingDayBreaks, type PlayingDayBreak } from '@/domain/playingDays';
+import { configuredPlayingDays, playingRounds, validPlayingDayBreaks, validPlayingRoundPauses,
+  type PlayingDayBreak, type PlayingRoundPause } from '@/domain/playingDays';
 
 /** Shared creation rules: the wizard and the final write must agree. */
 export interface CreationValidationPhase {
@@ -27,6 +28,7 @@ export interface CreationValidationPhase {
   inlineBreakMinutes?: number;
   inlineBreakUntil?: string;
   dayBreaks?: PlayingDayBreak[];
+  extraInlineBreaks?: PlayingRoundPause[];
 }
 export interface CreationValidationInput {
   name: string;
@@ -104,6 +106,10 @@ export function validateTournamentCreation(input: CreationValidationInput): stri
     }
     if (!validPlayingDayBreaks(phase.dayBreaks, playingRounds(phase))) errors.push(`${prefix}: Spieltagswechsel dürfen nur nach einer abgeschlossenen Runde liegen und benötigen ein gültiges Datum und eine Uhrzeit.`);
     if (phase.dayBreaks?.some((item) => item.afterRound === phase.inlineBreakAfterRound)) errors.push(`${prefix}: Zwischenpause und Spieltagswechsel dürfen nicht nach derselben Runde liegen.`);
+    if (!validPlayingRoundPauses(phase.extraInlineBreaks, playingRounds(phase),
+      [...(phase.dayBreaks ?? []).map((item) => item.afterRound),
+        ...(phase.inlineBreakAfterRound ? [phase.inlineBreakAfterRound] : [])]))
+      errors.push(`${prefix}: Zwischenpausen müssen an unterschiedlichen freien Rundengrenzen liegen und gültige Zeitwerte besitzen.`);
     if (!Number.isSafeInteger(phase.entrantCount) || phase.entrantCount < 2 || phase.entrantCount > available
       || (firstPlaying && phase.entrantCount !== available)) errors.push(`${prefix}: Ungültige Teilnehmerzahl.`);
     firstPlaying = false;

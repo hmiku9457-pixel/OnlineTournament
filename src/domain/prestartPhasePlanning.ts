@@ -1,4 +1,4 @@
-import { parseSavedPlayingDayBreaks, parseSavedRoundPauses, playingRounds, validPlayingDayBreaks } from './playingDays';
+import { parseSavedPlayingDayBreaks, parseSavedRoundPauses, playingRounds, validPlayingDayBreaks, validPlayingRoundPauses } from './playingDays';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { StageType } from '@/domain/types';
 import {
@@ -189,6 +189,10 @@ export function validatePrestartPhases(phases: PrestartPhaseDraft[], activeCount
       }
     }
     if (!validPlayingDayBreaks(phase.dayBreaks, playingRounds(phase))) errors.push(`${label}: Ungültige Spieltagswechsel innerhalb der Phase.`);
+    if (!validPlayingRoundPauses(phase.extraInlineBreaks, playingRounds(phase), [
+      ...(phase.dayBreaks ?? []).map((item) => item.afterRound),
+      ...(phase.inlineBreakAfterRound ? [phase.inlineBreakAfterRound] : []),
+    ])) errors.push(`${label}: Ungültige Zwischenpausen innerhalb der Phase.`);
     if (phase.dayBreaks?.some((item) => item.afterRound === phase.inlineBreakAfterRound)) errors.push(`${label}: Spieltagswechsel und Zwischenpause dürfen nicht nach derselben Runde liegen.`);
     if (phase.type === 'SWISS') {
       if (!isValidSwissRoundCount(phase.swissRounds, phase.entrantCount)) {

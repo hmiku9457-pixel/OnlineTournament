@@ -3,7 +3,7 @@ import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
 import { computeBreakResumeAt, isStageStarted, isSwissRoundApproved, type BreakStartOptions } from '@/services/mockPhaseLifecycle';
-import { parseSavedPlayingDayBreaks, playingRounds } from '@/domain/playingDays';
+import { parseSavedPlayingDayBreaks, parseSavedRoundPauses, playingRounds } from '@/domain/playingDays';
 
 const STORAGE_KEY = 'online-tournament:mock-inline-breaks:v2';
 
@@ -67,6 +67,13 @@ export function getInlineBreakConfigs(stage: TournamentStage): InlineBreakConfig
         untilDate: String(stage.settings.inlineBreakUntilDate ?? '') || undefined,
       });
     }
+  }
+  for (const pause of parseSavedRoundPauses(stage.settings.extraInlineBreaks)) {
+    if (pause.afterRound >= rounds || configs.some((config) => config.afterRound === pause.afterRound)) continue;
+    configs.push({
+      afterRound: pause.afterRound, kind: pause.kind, minutes: pause.minutes,
+      until: pause.until, untilDate: pause.untilDate || undefined,
+    });
   }
   for (const boundary of parseSavedPlayingDayBreaks(stage.settings.dayBreaks)) {
     if (boundary.afterRound < 1 || boundary.afterRound >= rounds

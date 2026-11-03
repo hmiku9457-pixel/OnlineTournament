@@ -1,4 +1,4 @@
-import { followingPlayingDate, playingRounds, type PlayingDayBreak } from './playingDays';
+import { followingPlayingDate, playingRounds, type PlayingDayBreak, type PlayingRoundPause } from './playingDays';
 import type { StageType } from './types';
 import { buildPlannedTimeline, type SchedulePhaseProposal } from './tournamentSchedule';
 
@@ -11,6 +11,7 @@ export interface RoundDependentPhase {
   swissRounds: number;
   dayBreaks: PlayingDayBreak[];
   inlineBreakAfterRound: number;
+  extraInlineBreaks?: PlayingRoundPause[];
 }
 
 export interface RoundAdjustmentImpact {
@@ -30,8 +31,15 @@ export function reconcileRoundDependentBreaks<T extends RoundDependentPhase>(pha
   const removedInlineBreak = phase.inlineBreakAfterRound > 0
     && (phase.inlineBreakAfterRound >= rounds || (phase.type !== 'SWISS' && phase.type !== 'KNOCKOUT'));
   const inlineBreakAfterRound = removedInlineBreak ? 0 : phase.inlineBreakAfterRound;
+  const reserved = new Set([...dayBreaks.map((item) => item.afterRound),
+    ...(inlineBreakAfterRound ? [inlineBreakAfterRound] : [])]);
+  const extraInlineBreaks = (phase.extraInlineBreaks ?? []).filter((pause) => {
+    if (pause.afterRound < 1 || pause.afterRound >= rounds || reserved.has(pause.afterRound)) return false;
+    reserved.add(pause.afterRound);
+    return true;
+  });
   return {
-    phase: { ...phase, dayBreaks, inlineBreakAfterRound },
+    phase: { ...phase, dayBreaks, inlineBreakAfterRound, extraInlineBreaks },
     impact: { removedDayBreaks: phase.dayBreaks.length - dayBreaks.length, removedInlineBreak },
   };
 }
@@ -44,7 +52,8 @@ export function countCreationScheduleEntries(
     if (phase.type === 'BREAK') return count + 1;
     const inline = (phase.type === 'SWISS' || phase.type === 'KNOCKOUT')
       && phase.inlineBreakAfterRound > 0 && phase.inlineBreakAfterRound < playingRounds(phase);
-    return count + 1 + phase.dayBreaks.length * 2 + (inline ? 2 : 0);
+    return count + 1 + phase.dayBreaks.length * 2 + (inline ? 2 : 0)
+      + (phase.extraInlineBreaks?.length ?? 0) * 2;
   }, 0);
 }
 
@@ -63,6 +72,10 @@ export function singleDayFixedPauseConflicts<T extends RoundDependentPhase & {
       && phase.inlineBreakKind === 'until'
       && phase.inlineBreakUntilDate && phase.inlineBreakUntilDate > startDate) {
       conflicts.push(`Phase ${index + 1}: Zwischenpause bis ${phase.inlineBreakUntilDate}`);
+    }
+    for (const pause of phase.extraInlineBreaks ?? []) {
+      if (pause.kind === 'until' && pause.untilDate > startDate)
+        conflicts.push(`Phase ${index + 1}: Zwischenpause bis ${pause.untilDate}`);
     }
     return conflicts;
   });
@@ -93,6 +106,11 @@ export function convertToSingleDay<T extends RoundDependentPhase & {
       return {
         ...phase,
         dayBreaks: [],
+        extraInlineBreaks: phase.extraInlineBreaks?.map((pause) =>
+          pause.kind === 'until' && startDate && pause.untilDate > startDate
+            ? overnightTreatment === 'remove' ? null
+              : { ...pause, kind: 'minutes' as const, minutes: 15, untilDate: '' }
+            : pause).filter((pause): pause is PlayingRoundPause => pause !== null),
         ...((convertsOvernight || convertsFixedBreak) && overnightTreatment === 'convert'
           ? { breakKind: 'minutes', breakMinutes: 15, breakUntilDate: '' } : {}),
         ...(convertsInline
@@ -124,8 +142,10 @@ export function phaseBreakLosses<T extends RoundDependentPhase & { id: string; l
     const removedCount = Math.max(0, phase.dayBreaks.length - (updated?.dayBreaks.length ?? 0));
     const removedRounds = phase.dayBreaks.filter((boundary) => !retained.has(boundary.afterRound))
       .slice(0, removedCount).map((boundary) => boundary.afterRound);
-    const removedInlineBreak = phase.inlineBreakAfterRound > 0
-      && (!updated || updated.inlineBreakAfterRound === 0);
+    const removedInlineBreak = (phase.inlineBreakAfterRound > 0
+      && (!updated || updated.inlineBreakAfterRound === 0))
+      || (phase.extraInlineBreaks ?? []).some((pause) => !(updated?.extraInlineBreaks ?? [])
+        .some((candidate) => candidate.afterRound === pause.afterRound));
     const originalKo = phase.type === 'KNOCKOUT' ? phase.knockoutBestOf ?? [] : [];
     const newKoLength = updated?.type === 'KNOCKOUT' ? updated.knockoutBestOf?.length ?? 0 : 0;
     const removedKnockoutBestOf = originalKo.slice(0, Math.max(0, originalKo.length - newKoLength));
@@ -219,10 +239,12 @@ export function proposePlayingDayMove(
 /** Pauses after the same round cannot coexist. */
 export function availableDayBreakRounds(
   totalRounds: number, dayBreaks: readonly PlayingDayBreak[], inlineBreakAfterRound: number,
+  extraInlineBreaks: readonly PlayingRoundPause[] = [],
 ): number[] {
   return Array.from({ length: Math.max(0, totalRounds - 1) }, (_, i) => i + 1)
     .filter((round) => round !== inlineBreakAfterRound
-      && !dayBreaks.some((item) => item.afterRound === round));
+      && !dayBreaks.some((item) => item.afterRound === round)
+      && !extraInlineBreaks.some((item) => item.afterRound === round));
 }
 
 export function countConfiguredDayTransitions<T extends { type: string; breakKind: string; dayBreaks: readonly PlayingDayBreak[] }>(
