@@ -159,7 +159,22 @@ export function CalendarDatePicker({
                 {months.map((month, index) => <option key={month} value={index} disabled={Boolean(minimum && `${viewYear}-${String(index + 1).padStart(2, "0")}` < minimum.slice(0, 7))}>{month}</option>)}
               </select>
               <input type="number" aria-label="Jahr" min={minimum ? Number(minimum.slice(0, 4)) : 1}
-                max={9999} value={yearInput} onChange={(event) => setYearInput(event.target.value)}
+                max={9999} value={yearInput} onChange={(event) => {
+                  const typed = event.target.value;
+                  setYearInput(typed);
+                  // Update the month selector when a complete valid year is typed.
+                  // Partial input remains editable until blur/Enter.
+                  if (/^\d{4}$/.test(typed)) {
+                    const value = Number(typed);
+                    const firstYear = minimum ? Number(minimum.slice(0, 4)) : 1;
+                    if (value >= firstYear && value <= 9999) {
+                      setViewYear(value);
+                      if (minimum && value === firstYear && viewMonth < Number(minimum.slice(5, 7)) - 1) {
+                        setViewMonth(Number(minimum.slice(5, 7)) - 1);
+                      }
+                    }
+                  }
+                }}
                 onBlur={commitYear} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}/>
               <button type="button" aria-label="Nächster Monat" disabled={viewYear === 9999 && viewMonth === 11} onClick={() => navigateMonths(1)}>›</button>
             </div>
