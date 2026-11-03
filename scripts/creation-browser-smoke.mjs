@@ -1337,10 +1337,11 @@ try {
   assert.deepEqual(pauseLabelStyles[0], pauseLabelStyles[1],
     'Name der Pause and Dauer in Minuten have identical font size and weight');
   const pauseChoices = pauseCard.locator('.break-phase-choice-segmented');
-  assert.equal(await pauseChoices.locator('label').count(), 3);
+  assert.equal(await pauseChoices.locator('.break-phase-choice-options > label').count(), 2,
+    'fixed-time and end-of-day pauses share the same main selection');
   assert.equal(await pauseChoices.getByRole('radio', { name: 'Pause in Minuten' }).isChecked(), true);
-  assert.equal(await pauseChoices.getByRole('radio', { name: 'Spieltagsende' }).isDisabled(), true,
-    'a single-day tournament cannot select an overnight break');
+  assert.equal(await pauseChoices.getByRole('checkbox', { name: 'Als Spieltagsende planen' }).count(), 0,
+    'a single-day tournament cannot choose a new playing day');
   const compactPause = await pauseCard.locator('.break-phase-fields').evaluate(root => {
     const name = root.querySelector('.phase-pause-name').getBoundingClientRect();
     const duration = root.querySelector('.phase-pause-minutes').getBoundingClientRect();
@@ -1355,6 +1356,7 @@ try {
   await pauseChoices.getByRole('radio', { name: 'Pause bis' }).check();
   assert.equal(await pauseCard.locator('.break-phase-datetime-fields').count(), 1,
     'standalone fixed-end pause keeps date and clock together');
+  assert.equal(await pauseChoices.getByRole('radio', { name: 'Pause bis' }).isChecked(), true);
   await pauseChoices.getByRole('radio', { name: 'Pause in Minuten' }).check();
   assert.equal(await pauseCard.locator('.phase-pause-minutes').count(), 1);
   const pauseMinutes = pauseCard.getByRole('spinbutton', { name: 'Pausendauer in Minuten' });
@@ -1375,6 +1377,58 @@ try {
     const draft = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft;
     return draft.phaseDrafts.find(p => p.id === 'phase-9102')?.breakMinutes === 30;
   });
+  // In a multi-day tournament the same fixed-time option can optionally
+  // mark the boundary between playing days, without a third main button.
+  await multiPage.evaluate(() => {
+    const key = 'online-tournament:creation-draft:v1:new';
+    const payload = JSON.parse(sessionStorage.getItem(key));
+    payload.draft.tournamentMode = 'multi';
+    payload.draft.plannedDays = 2;
+    sessionStorage.setItem(key, JSON.stringify(payload));
+  });
+  await multiPage.reload();
+  await multiPage.locator('.phase-wizard-step').waitFor();
+  const multiDayPause = multiPage.locator('.phase-config').filter({ hasText: 'Mittagspause' });
+  await multiDayPause.locator('.phase-config-head').click();
+  const multiDayTypes = multiDayPause.locator('.break-phase-choice-segmented');
+  assert.equal(await multiDayTypes.locator('.break-phase-choice-options > label').count(), 2);
+  await multiDayTypes.getByRole('radio', { name: 'Pause bis' }).check();
+  const nextDayOption = multiDayTypes.getByRole('checkbox', { name: 'Als Spieltagsende planen' });
+  assert.equal(await nextDayOption.isChecked(), false);
+  await nextDayOption.check();
+  assert.equal(await nextDayOption.isChecked(), true);
+  assert.equal(await multiDayPause.getByText('Fortsetzungsdatum', { exact: true }).count(), 1,
+    'the selected new-day mode offers a continuation date and time');
+  await multiPage.waitForFunction(() => {
+    const draft = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft;
+    return draft.phaseDrafts.find(p => p.id === 'phase-9102')?.breakKind === 'overnight';
+  });
+  await multiPage.reload();
+  await multiPage.locator('.phase-wizard-step').waitFor();
+  const resumedPause = multiPage.locator('.phase-config').filter({ hasText: 'Mittagspause' });
+  await resumedPause.locator('.phase-config-head').click();
+  const resumedTypes = resumedPause.locator('.break-phase-choice-segmented');
+  assert.equal(await resumedTypes.getByRole('radio', { name: 'Pause bis' }).isChecked(), true,
+    'an overnight pause is represented by the shared fixed-time main button');
+  assert.equal(await resumedTypes.getByRole('checkbox', { name: 'Als Spieltagsende planen' }).isChecked(), true,
+    'the new playing-day option survives draft recovery');
+  await resumedTypes.getByRole('checkbox', { name: 'Als Spieltagsende planen' }).uncheck();
+  assert.equal(await resumedTypes.getByRole('radio', { name: 'Pause bis' }).isChecked(), true,
+    'unchecking the next-day option keeps the pause in fixed-time mode');
+  await multiPage.waitForFunction(() => {
+    const draft = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft;
+    return draft.phaseDrafts.find(p => p.id === 'phase-9102')?.breakKind === 'until';
+  });
+  await resumedTypes.getByRole('radio', { name: 'Pause in Minuten' }).check();
+  await multiPage.evaluate(() => {
+    const key = 'online-tournament:creation-draft:v1:new';
+    const payload = JSON.parse(sessionStorage.getItem(key));
+    payload.draft.tournamentMode = 'single';
+    payload.draft.plannedDays = 1;
+    sessionStorage.setItem(key, JSON.stringify(payload));
+  });
+  await multiPage.reload();
+  await multiPage.locator('.phase-wizard-step').waitFor();
   const middlePhase = multiPage.locator('.phase-config').filter({ hasText: 'Zwischenrunde' });
   await middlePhase.getByRole('button', { name: 'Entfernen', exact: true }).click();
   const firstConfirm = multiPage.getByRole('alertdialog', { name: 'Phase entfernen bestätigen' });
