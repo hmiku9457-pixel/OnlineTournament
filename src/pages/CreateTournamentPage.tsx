@@ -2852,7 +2852,15 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                 <div className="tournament-mode-setting">
                   <div className="recommendation-period-column">
                     <div className="field tournament-day-count">
-                      <label htmlFor="planned-playing-days">Spieltage</label>
+                      <label htmlFor="planned-playing-days">Spieltage
+                        <span className="recommendation-day-info" tabIndex={0} role="note"
+                          title={tournamentMode === 'multi'
+                            ? `Für die Prognose werden ${formatRecommendationDuration(preferredEarlierDaysMinutes)} für die ersten ${plannedDays - 1} Spieltage berücksichtigt. Der letzte Spieltag beginnt rechnerisch um 09:00 Uhr. Die tatsächliche Aufteilung legst du in Schritt 4 fest.`
+                            : 'Ein Turnier mit einem Spieltag darf maximal 24 Stunden dauern und kann erst am Folgetag enden.'}
+                          aria-label={tournamentMode === 'multi'
+                            ? `Planungshinweis: Für die ersten ${plannedDays - 1} Spieltage sind ${formatRecommendationDuration(preferredEarlierDaysMinutes)} berücksichtigt; der letzte beginnt rechnerisch um 09:00 Uhr.`
+                            : 'Planungshinweis: Ein Spieltag darf bis zu 24 Stunden dauern, auch über Mitternacht.'}>i</span>
+                      </label>
                       <RecommendationNumberStepper id="planned-playing-days" label="Geplante Anzahl an Spieltagen"
                         value={tournamentMode === 'single' ? 1 : plannedDays} min={1} max={14}
                         onChange={changePlannedPlayingDays}/>
@@ -2940,10 +2948,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     {preferredEndError && <span className="field-error" role="alert">{preferredEndError}</span>}
                   </div>
 
-                  {tournamentMode === 'multi' && <p className="field-hint recommendation-linked-explanation">
-                    Aktive Spielzeit vor dem letzten Tag: {formatRecommendationDuration(preferredEarlierDaysMinutes)}.
-                    Der letzte startet rechnerisch um 09:00 Uhr.
-                  </p>}
                   {!preferredEndTimeValid && <p className="field-error recommendation-linked-explanation" role="status">
                     Die festgelegte Endzeit ist für den aktuellen Start nicht mehr erreichbar.
                     Bitte eine spätere Endzeit oder die Turnierdauer wählen.
@@ -2990,9 +2994,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                   <details className="format-help-details">
                     <summary>Einstellungen erklärt</summary>
                     <div className="format-help-grid">
-                      <p><strong>Zeit:</strong> Der ausgewählte Wert bleibt fest, der andere wird berechnet. Ein Spieltag darf maximal 24 Stunden dauern – auch über Mitternacht.</p>
-                      <p><strong>Spieltage:</strong> Bei mehreren Spieltagen gilt die Endzeit für den letzten Tag; Nächte zählen nicht zur Spielzeit. Die konkrete Aufteilung erfolgt in Schritt 4.</p>
-                      <p><strong>Empfehlungen:</strong> Die Obergrenzen wirken nur auf Vorschläge. Schweizer Runden sind auf Teilnehmerzahl minus 1 begrenzt. Dauer und Endzeit sind Richtwerte; Auswertungsverzögerungen werden nicht mitgeschätzt.</p>
+                      <p><strong>Zeitvorgabe:</strong> Du legst entweder die Turnierdauer oder die Endzeit fest. Der andere Wert wird aus dem geplanten Start berechnet. Bei „Jetzt“ bleibt die gewählte Vorgabe konstant.</p>
+                      <p><strong>Spieltage:</strong> Ein Spieltag darf bis zu 24 Stunden dauern – auch über Mitternacht. Bei mehreren Spieltagen gilt die Endzeit für den letzten Tag. Nächte zählen nicht zur aktiven Spielzeit; die Aufteilung erfolgt in Schritt 4.</p>
+                      <p><strong>Empfehlungen:</strong> Die Obergrenzen für Gruppen, Schweizer Runden und K.-o.-Teilnehmer gelten nur für Vorschläge. Schweizer Runden sind auf Teilnehmerzahl minus 1 begrenzt. Die Zeitprognosen sind Richtwerte ohne Auswertungsverzögerungen.</p>
                     </div>
                   </details>
 
