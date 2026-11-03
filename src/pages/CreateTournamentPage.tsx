@@ -1129,7 +1129,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   };
   const preferredEndClock = linkedEndTime(preferredDurationMinutes, linkedTimeSettings);
   const earliestPreferredEnd = earliestLinkedEnd(linkedTimeSettings);
-  const preferredDurationMaximum = maximumLinkedDuration(linkedTimeSettings);
+
   const preferredEndDate = tournamentMode === 'multi'
     ? followingPlayingDate(scheduledDate, plannedDays - 1) : scheduledDate;
   const preferredEndDateTime = `${preferredEndDate}T${preferredEndClock ?? ''}`;
