@@ -797,12 +797,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const [preferredDurationMinutes, setPreferredDurationMinutes] = useState(restoredDraft?.preferredDurationMinutes ?? DEFAULT_RECOMMENDATION_DURATION);
   const [preferredTimePriority, setPreferredTimePriority] = useState<'duration' | 'end'>(restoredDraft?.preferredTimePriority ?? 'duration');
   const [preferredFixedEndAt, setPreferredFixedEndAt] = useState<string | null>(restoredDraft?.preferredFixedEndAt ?? null);
+  const [preferredEndError, setPreferredEndError] = useState('');
   const [preferredEarlierDaysMinutes, setPreferredEarlierDaysMinutes] = useState(
     restoredDraft?.preferredEarlierDaysMinutes
       ?? initialEarlierDaysMinutes(restoredDraft?.preferredDurationMinutes ?? DEFAULT_RECOMMENDATION_DURATION,
         restoredDraft?.tournamentMode === 'multi' ? restoredDraft?.plannedDays ?? 2 : 1));
   const [tournamentMode, setTournamentMode] = useState<'single' | 'multi'>(restoredDraft?.tournamentMode ?? (restoredDraft?.phaseDrafts.some((phase) => (phase.dayBreaks?.length ?? 0) > 0 || (phase.type === 'BREAK' && phase.breakKind === 'overnight')) ? 'multi' : 'single'));
-  const [plannedDays, setPlannedDays] = useState(restoredDraft?.plannedDays ?? 2);
+  const [plannedDays, setPlannedDays] = useState(restoredDraft?.tournamentMode === 'multi'
+    ? restoredDraft.plannedDays ?? 2 : 1);
   useEffect(() => {
     if (tournamentMode === 'single' && preferredDurationMinutes > MAX_SINGLE_DAY_DURATION) {
       setPreferredDurationMinutes(MAX_SINGLE_DAY_DURATION);
@@ -902,11 +904,40 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     setReviewRequiredPhaseIds((ids) => ids.filter((id) => normalized.some((phase) => phase.id === id)));
     setSelectedRecommendationId(null);
     setTournamentMode('single');
+    setPlannedDays(1);
+    setPreferredDurationMinutes(Math.min(displayedPreferredDuration, MAX_SINGLE_DAY_DURATION));
     setPreferredEarlierDaysMinutes(0);
     setPreferredTimePriority('duration');
     setPreferredFixedEndAt(null);
     setPhaseLimitError('');
     setPendingTournamentMode(null);
+  }
+
+  /** One visible day counter controls the single-/multi-day model.
+   * Switching back to one day must still confirm potentially destructive pause changes. */
+  function changePlannedPlayingDays(next: number) {
+    if (!Number.isInteger(next) || next < 1 || next > 14) return;
+    if (next === 1) {
+      if (tournamentMode === 'multi') setPendingTournamentMode('single');
+      return;
+    }
+    if (tournamentMode === 'multi' && plannedDays === next) return;
+    const earlier = initialEarlierDaysMinutes(displayedPreferredDuration, next);
+    const nextSettings = { scheduledStart, days: next, earlierDaysMinutes: earlier };
+    if (preferredTimePriority === 'end') {
+      const target = `${followingPlayingDate(scheduledDate, next - 1)}T${preferredEndClock ?? '14:00'}`;
+      const targetDuration = linkedDurationAt(target, nextSettings);
+      // Keep the chosen clock if feasible; otherwise keep the current duration
+      // and calculate a new valid end on the newly selected final playing day.
+      const endAt = targetDuration !== null
+        ? target : linkedEndDateTime(displayedPreferredDuration, nextSettings);
+      setPreferredFixedEndAt(endAt);
+      if (targetDuration !== null) setPreferredDurationMinutes(targetDuration);
+      else setPreferredTimePriority('duration');
+    }
+    setPreferredEarlierDaysMinutes(earlier);
+    setPlannedDays(next);
+    setTournamentMode('multi');
   }
 
   function changePreferredDuration(next: number) {
@@ -927,6 +958,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     if (proposed !== null) {
       setPreferredDurationMinutes(proposed);
       setPreferredFixedEndAt(at);
+      setPreferredEndError('');
+    } else {
+      setPreferredEndError('Diese Uhrzeit ist am letzten Spieltag nicht erreichbar. Bitte eine spätere Uhrzeit wählen.');
     }
   }
   function changePreferredEndDay(offset: 0 | 1) {
@@ -950,6 +984,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     }
   }
   function changePreferredTimePriority(next: 'duration' | 'end') {
+    setPreferredEndError('');
     if (next === 'end') setPreferredFixedEndAt(preferredEndDateTime);
     else setPreferredDurationMinutes(displayedPreferredDuration);
     setPreferredTimePriority(next);
@@ -1176,10 +1211,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const earliestEndAt = linkedEndDateTime(MIN_RECOMMENDATION_DURATION, linkedTimeSettings);
   const latestEndAt = tournamentMode === 'single'
     ? linkedEndDateTime(MAX_SINGLE_DAY_DURATION, linkedTimeSettings) : null;
-  const earliestPreferredEnd = earliestEndAt?.slice(0, 10) === preferredEndDate
-    ? earliestEndAt.slice(11, 16) : undefined;
-  const latestPreferredEnd = latestEndAt?.slice(0, 10) === preferredEndDate
-    ? latestEndAt.slice(11, 16) : undefined;
+  const earliestPreferredEnd = tournamentMode === 'multi'
+    ? '09:01' : earliestEndAt?.slice(0, 10) === preferredEndDate
+      ? earliestEndAt.slice(11, 16) : undefined;
+  const latestPreferredEnd = tournamentMode === 'multi'
+    ? '23:59' : latestEndAt?.slice(0, 10) === preferredEndDate
+      ? latestEndAt.slice(11, 16) : undefined;
   const preferredEndDayOffset = tournamentMode === 'single' && preferredEndDate !== scheduledDate ? 1 : 0;
   const canEndOnStartDay = linkedDurationAt(`${scheduledDate}T23:59`, linkedTimeSettings) !== null;
   const preferredEndTimeValid = Boolean(preferredEndDateTime && parseLocalDateTime(preferredEndDateTime)
@@ -2790,38 +2827,16 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                 <div className="format-settings-content">
                 <div className="tournament-mode-setting">
                   <div className="recommendation-period-column">
-                    <fieldset className="tournament-mode-choice">
-                      <legend>Turnierzeitraum</legend>
-                      <label className="tournament-mode-option">
-                        <input type="radio" name="tournament-mode" checked={tournamentMode === 'single'}
-                          onChange={() => { if (tournamentMode !== 'single') setPendingTournamentMode('single'); }}/>
-                        <span>Eintägig</span>
-                      </label>
-                      <label className="tournament-mode-option">
-                        <input type="radio" name="tournament-mode" checked={tournamentMode === 'multi'}
-                          onChange={() => {
-                            setPreferredEarlierDaysMinutes(initialEarlierDaysMinutes(displayedPreferredDuration, plannedDays));
-                            setPreferredTimePriority('duration');
-                            setPreferredFixedEndAt(null);
-                            setPreferredDurationMinutes(displayedPreferredDuration);
-                            setTournamentMode('multi');
-                          }}/>
-                        <span>Mehrtägig</span>
-                      </label>
-                    </fieldset>
-                    {tournamentMode === 'multi' ? (
-                      <div className="field tournament-day-count">
-                        <label htmlFor="planned-playing-days">Spieltage</label>
-                        <RecommendationNumberStepper id="planned-playing-days" label="Geplante Anzahl an Spieltagen"
-                          value={plannedDays} min={2} max={14} onChange={(next) => {
-                            setPreferredEarlierDaysMinutes(initialEarlierDaysMinutes(displayedPreferredDuration, next));
-                            setPreferredTimePriority('duration');
-                            setPreferredFixedEndAt(null);
-                            setPreferredDurationMinutes(displayedPreferredDuration);
-                            setPlannedDays(next);
-                          }}/>
-                      </div>
-                    ) : <span className="field-hint recommendation-period-hint">Maximal 24 Stunden, auch über Mitternacht</span>}
+                    <div className="field tournament-day-count">
+                      <label htmlFor="planned-playing-days">Spieltage</label>
+                      <RecommendationNumberStepper id="planned-playing-days" label="Geplante Anzahl an Spieltagen"
+                        value={tournamentMode === 'single' ? 1 : plannedDays} min={1} max={14}
+                        onChange={changePlannedPlayingDays}/>
+                    </div>
+                    <span className="field-hint recommendation-period-hint">
+                      {tournamentMode === 'single' ? '1 Spieltag · max. 24 Std. (auch über Mitternacht)'
+                        : `${plannedDays} Spieltage · Pausen zwischen Tagen zählen nicht`}
+                    </span>
                   </div>
 
                   <fieldset className="recommendation-target-choice">
@@ -2882,19 +2897,22 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                         {preferredEndClock ? `${preferredEndClock} Uhr` : 'Nicht berechenbar'}
                       </output>
                     )}
-                    {preferredTimePriority === 'end' && tournamentMode === 'single' ? (
-                      <select className="recommendation-end-day-choice" aria-label="Tag der gewünschten Endzeit"
-                        value={preferredEndDayOffset} onChange={(event) =>
-                          changePreferredEndDay(Number(event.target.value) as 0 | 1)}>
-                        <option value={0} disabled={!canEndOnStartDay}>Am Starttag</option>
-                        <option value={1}>Am Folgetag ({followingPlayingDate(scheduledDate, 1).slice(8, 10)}.{followingPlayingDate(scheduledDate, 1).slice(5, 7)}.)</option>
-                      </select>
-                    ) : (
-                      <span className="field-hint">
-                        {tournamentMode === 'multi' ? 'Letzter Spieltag' : preferredEndDayOffset === 1 ? 'Folgetag' : 'Starttag'}
-                        {' · '}{preferredEndDate.slice(8, 10)}.{preferredEndDate.slice(5, 7)}.{preferredEndDate.slice(0, 4)}
-                      </span>
-                    )}
+                    <div className="recommendation-end-subrow">
+                      {preferredTimePriority === 'end' && tournamentMode === 'single' ? (
+                        <select className="recommendation-end-day-choice" aria-label="Tag der gewünschten Endzeit"
+                          value={preferredEndDayOffset} onChange={(event) =>
+                            changePreferredEndDay(Number(event.target.value) as 0 | 1)}>
+                          <option value={0} disabled={!canEndOnStartDay}>Am Starttag</option>
+                          <option value={1}>Am Folgetag ({followingPlayingDate(scheduledDate, 1).slice(8, 10)}.{followingPlayingDate(scheduledDate, 1).slice(5, 7)}.)</option>
+                        </select>
+                      ) : (
+                        <span className="field-hint">
+                          {tournamentMode === 'multi' ? 'Letzter Spieltag' : preferredEndDayOffset === 1 ? 'Folgetag' : 'Starttag'}
+                          {' · '}{preferredEndDate.slice(8, 10)}.{preferredEndDate.slice(5, 7)}.{preferredEndDate.slice(0, 4)}
+                        </span>
+                      )}
+                    </div>
+                    {preferredEndError && <span className="field-error" role="alert">{preferredEndError}</span>}
                   </div>
 
                   {tournamentMode === 'multi' && <p className="field-hint recommendation-linked-explanation">
@@ -2949,7 +2967,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     <div className="format-help-grid">
                       <p><strong>Zeitvorgabe:</strong> Nur der gewählte Wert ist bearbeitbar.
                         Der andere wird aus dem geplanten Beginn berechnet. Eintägig sind höchstens 24 Stunden möglich – auch über Mitternacht.</p>
-                      <p><strong>Mehrtägig:</strong> Die Endzeit bezieht sich auf den letzten Spieltag.
+                      <p><strong>Spieltage:</strong> Ein Spieltag entspricht „Eintägig“. Ab zwei Spieltagen erfolgt die mehrtägige Planung. Die Endzeit bezieht sich auf den letzten Spieltag.
                         Nächtliche Unterbrechungen zählen nicht zur aktiven Turnierdauer.</p>
                       <p><strong>Vorschläge:</strong> Obergrenzen gelten nur für Empfehlungen.
                         Schweizer Runden sind auf Teilnehmerzahl minus 1 begrenzt; vor einer folgenden Phase kann eine Qualifikation nötig sein.</p>

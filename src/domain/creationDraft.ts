@@ -163,7 +163,7 @@ export function validDraft(value: unknown): value is CreationDraft {
     && [data.maxGroups, data.maxSwissRounds, data.knockoutQualifierCount]
       .every((v) => v === null || (typeof v === 'number' && Number.isInteger(v)))
     && (data.tournamentMode === undefined || data.tournamentMode === 'single' || data.tournamentMode === 'multi')
-    && (data.plannedDays === undefined || (Number.isInteger(data.plannedDays) && data.plannedDays >= 2 && data.plannedDays <= 14))
+    && (data.plannedDays === undefined || (Number.isInteger(data.plannedDays) && data.plannedDays >= 1 && data.plannedDays <= 14))
     && typeof data.preferredDurationMinutes === 'number'
     && Number.isInteger(data.preferredDurationMinutes) && data.preferredDurationMinutes >= 15
     && data.preferredDurationMinutes <= (data.tournamentMode === 'multi' ? 14 * 24 * 60 - 1 : 1440)
