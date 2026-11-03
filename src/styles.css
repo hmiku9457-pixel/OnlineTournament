@@ -7375,8 +7375,8 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 /* Wizard step 3: a short quick-settings band rather than a three-column
    explanation panel. Descriptions remain accessible in the details disclosure. */
 .wizard-workspace .format-step .format-settings-panel {
-  padding: 12px 14px;
-  gap: 9px;
+  padding: 12px 14px 10px;
+  gap: 11px;
 }
 .wizard-workspace .format-step .format-settings-head h3 { margin-bottom: 2px; }
 .wizard-workspace .format-step .format-settings-head p {
@@ -7386,26 +7386,25 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .wizard-workspace .format-step .format-settings-content {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: 13px 18px;
+  gap: 11px 18px;
   align-items: start;
 }
 .wizard-workspace .format-step .format-settings-content > .tournament-mode-setting {
   grid-column: 1 / -1;
-  display: flex;
-  align-items: end;
-  flex-wrap: wrap;
-  gap: 11px 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.13fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.05fr);
+  align-items: start;
+  gap: 12px;
   margin: 0;
   padding: 0;
   background: transparent;
   border: 0;
 }
 .wizard-workspace .format-step .tournament-mode-choice {
-  display: flex;
-  align-items: center;
-  flex: 0 1 284px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
+  width: 100%;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -7421,7 +7420,6 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   position: relative;
   display: flex;
   align-items: center;
-  flex: 1 1 108px;
   min-width: 0;
   margin: 0;
   cursor: pointer;
@@ -7465,16 +7463,14 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   outline-offset: 2px;
 }
 .wizard-workspace .format-step .tournament-mode-setting > .field {
-  flex: 0 1 210px;
   min-width: 0;
   margin: 0;
 }
-.wizard-workspace .format-step .tournament-mode-setting > .recommendation-duration-field {
-  flex: 0 1 220px;
-}
 .wizard-workspace .format-step .tournament-mode-setting > .field > label {
+  display: block;
+  margin-bottom: 5px;
   font-size: .76rem;
-  margin-bottom: 4px;
+  font-weight: 750;
   white-space: nowrap;
 }
 .wizard-workspace .format-step .format-settings-content > .format-setting-fields {
@@ -7752,101 +7748,112 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .recommendation-duration-quick-add { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* Step 3: both linked time targets stay on screen and update together. */
-.wizard-workspace .format-step .recommendation-time-linked {
+/* Compact, consistent Step 3 settings grid. Duration always precedes the
+   end clock, even when the editable target changes. */
+.wizard-workspace .format-step .recommendation-period-column,
+.wizard-workspace .format-step .recommendation-target-choice,
+.wizard-workspace .format-step .recommendation-duration-field,
+.wizard-workspace .format-step .recommendation-end-time-field {
+  min-width: 0;
+  align-self: start;
+}
+.wizard-workspace .format-step .recommendation-period-column {
   display: grid;
-  grid-template-columns: minmax(188px, 1.1fr) minmax(145px, .8fr);
-  gap: 12px;
-  flex: 1 1 380px;
-  min-width: 0;
+  gap: 6px;
 }
-.wizard-workspace .format-step .recommendation-time-linked .field {
-  min-width: 0;
-  margin: 0;
-}
-.wizard-workspace .format-step .recommendation-time-linked .field > label {
-  display: block;
-  margin-bottom: 4px;
-  font-size: .76rem;
-  white-space: normal;
-}
-.wizard-workspace .format-step .recommendation-time-linked .recommendation-duration-stepper {
-  width: 100%;
-  min-width: 0;
-}
-.wizard-workspace .format-step .recommendation-time-linked .clock-picker-trigger {
-  width: 100%;
-  min-height: 36px;
-}
-.wizard-workspace .format-step .recommendation-time-linked .field-hint {
-  font-size: .71rem;
-}
-.wizard-workspace .format-step .recommendation-linked-explanation {
-  flex: 1 1 100%;
-  margin: 0;
-}
-@media (max-width: 480px) {
-  .wizard-workspace .format-step .recommendation-time-linked {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-/* Step 3: choose one editable planning target; show the other as a
-   read-only calculation, not as a second editable time input. */
+.wizard-workspace .format-step .tournament-mode-choice,
 .wizard-workspace .format-step .recommendation-target-choice {
-  display: flex;
-  flex: 0 1 235px;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 5px;
-  min-width: 215px;
+  min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
-.wizard-workspace .format-step .recommendation-target-choice legend {
-  width: 100%;
+.wizard-workspace .format-step .recommendation-target-choice {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+.wizard-workspace .format-step .recommendation-target-choice legend,
+.wizard-workspace .format-step .tournament-mode-choice legend {
   margin: 0 0 5px;
   padding: 0;
   font-size: .76rem;
   font-weight: 750;
+  line-height: 1.3;
 }
-.wizard-workspace .format-step .recommendation-target-choice .tournament-mode-option {
-  flex: 1 1 100px;
+.wizard-workspace .format-step .tournament-mode-setting .tournament-mode-option span {
+  min-height: 36px;
+  padding: 6px 5px;
 }
-.wizard-workspace .format-step .recommendation-time-linked {
-  flex: 1 1 385px;
-  grid-template-columns: minmax(170px, 1.1fr) minmax(140px, .9fr);
-}
-.wizard-workspace .format-step .recommendation-derived-label {
+.wizard-workspace .format-step .tournament-mode-setting .field-hint {
   display: block;
-  margin-bottom: 4px;
-  font-size: .76rem;
-  font-weight: 650;
+  margin: 0;
+  padding-top: 5px;
+  color: #667085;
+  font-size: .7rem;
+  line-height: 1.3;
+}
+.wizard-workspace .format-step .recommendation-period-hint,
+.wizard-workspace .format-step .recommendation-target-hint {
+  font-size: .7rem;
+}
+.wizard-workspace .format-step .recommendation-target-hint {
+  grid-column: 1 / -1;
+}
+.wizard-workspace .format-step .recommendation-duration-stepper,
+.wizard-workspace .format-step .recommendation-end-time-field .clock-picker-trigger {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+}
+.wizard-workspace .format-step .recommendation-duration-field .recommendation-duration-stepper {
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  gap: 4px;
+}
+.wizard-workspace .format-step .recommendation-duration-field .recommendation-number-stepper-button {
+  min-height: 36px;
 }
 .wizard-workspace .format-step .recommendation-derived-value {
   display: flex;
   align-items: center;
   min-height: 36px;
   width: 100%;
+  min-width: 0;
   padding: 6px 11px;
   border: 1px solid #dce4ef;
   border-radius: 9px;
-  background: #eef3f9;
+  background: #edf2f8;
   color: #344054;
-  font-size: .84rem;
+  font-size: .82rem;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
 }
-.wizard-workspace .format-step .recommendation-derived-field .field-hint {
-  display: block;
-  padding-top: 4px;
+.wizard-workspace .format-step .recommendation-linked-explanation {
+  grid-column: 1 / -1;
+  margin: 0;
 }
-@media (max-width: 480px) {
-  .wizard-workspace .format-step .recommendation-target-choice {
-    flex: 1 1 100%;
+.wizard-workspace .format-step .format-help-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 18px;
+  padding-top: 6px;
+}
+.wizard-workspace .format-step .format-help-grid p {
+  margin: 0;
+  font-size: .72rem;
+}
+@container format-settings (max-width: 920px) {
+  .wizard-workspace .format-step .format-settings-content > .tournament-mode-setting {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
   }
-  .wizard-workspace .format-step .recommendation-time-linked {
+}
+@container format-settings (max-width: 520px) {
+  .wizard-workspace .format-step .format-settings-content > .tournament-mode-setting {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .wizard-workspace .format-step .format-help-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
