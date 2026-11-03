@@ -385,6 +385,8 @@ export function assessRecommendationTime(
     tableCount: number;
     timing: TimedMatchSettings;
     bestOfFor: (type: StageType) => number;
+    awardsEnabled?: boolean;
+    awardsAtOverride?: string | null;
   },
 ): RecommendationTimeAssessment {
   const { start, days, participants, tableCount, timing, bestOfFor } = options;
@@ -407,7 +409,8 @@ export function assessRecommendationTime(
       ...phases[0], type: 'BREAK', label: 'Spieltagsende', entrantCount: entrants,
       dayBreaks: [], breakKind: 'overnight', breakMinutes: 15,
       inlineBreakAfterRound: 0,
-    }), { scheduledStart: start });
+    }), { scheduledStart: start, awardsEnabled: options.awardsEnabled,
+      awardsAtOverride: options.awardsAtOverride });
   return {
     feasible: distribution.possible,
     daySplitPossible: days === 1 || phases.reduce((count, phase) => count + playingRounds(phase), 0) >= days,
