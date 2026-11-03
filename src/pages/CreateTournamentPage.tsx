@@ -1723,6 +1723,16 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const canCreate = centralCreationIssues.length === 0 && reviewRequiredPhaseIds.length === 0 && basicsValid && participantsValid && venueLayoutValid && gameSettingsValid
     && phaseConfigurationValid && phaseEntrantsValid && overnightDatesValid && hasVisitedPhaseStep
     && scheduleIssues.length === 0;
+  const creationBlockers = [...new Set([
+    ...(!basicsValid ? ['Grunddaten sind unvollständig oder der Turnierstart ist nicht mehr gültig.'] : []),
+    ...(!venueLayoutValid ? ['Der Spielflächenplan ist ungültig.'] : []),
+    ...(!participantsValid ? ['Die Teilnehmerliste ist unvollständig, fehlerhaft oder muss erneut bestätigt werden.'] : []),
+    ...(!phaseConfigurationValid || !phaseEntrantsValid || !overnightDatesValid
+      ? ['Phasenkonfiguration oder Teilnehmerzahlen müssen geprüft werden.'] : []),
+    ...(reviewRequiredPhaseIds.length ? ['Automatisch geänderte Phasen müssen als geprüft markiert werden.'] : []),
+    ...(!hasVisitedPhaseStep ? ['Bitte die Phasenkonfiguration prüfen.'] : []),
+    ...centralCreationIssues, ...scheduleIssues,
+  ])];
   const firstCompetition = phaseDrafts.find((phase) => phase.type !== 'BREAK');
   const actualMinimumMatches = firstCompetition ? minimumPlayedMatches(firstCompetition.type, firstCompetition.entrantCount, firstCompetition.groupCount, firstCompetition.swissRounds) : 0;
   const minimumMatchesShortfall = firstCompetition ? Math.max(0, minimumMatches - actualMinimumMatches) : 0;
@@ -2958,22 +2968,37 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 <div className="creation-review-edit-actions" aria-label="Einstellungen bearbeiten">
                   <button className="btn small" type="button" onClick={() => navigateToStep(1)}>Grunddaten</button>
                   <button className="btn small" type="button" onClick={() => navigateToStep(2)}>Teilnehmer</button>
+                  <button className="btn small" type="button" onClick={() => navigateToStep(3)}>Turnierform</button>
                   <button className="btn small" type="button" onClick={() => navigateToStep(4)}>Phasen</button>
                 </div>
                 <div className="creation-review-final-actions">
                   <button className="btn" type="button" onClick={goBack}>← Zurück</button>
                   <button className="btn primary wizard-create-button" type="button" onClick={() => { void submitTournament(); }}
+                    title={!canCreate ? 'Die nachfolgenden Erstellungshindernisse müssen zuerst behoben werden.' : undefined}
                     disabled={!canCreate || scheduleIssues.length > 0 || submittingTournament || Boolean(createdTournamentWithDraftNotice)}>Turnier erstellen</button>
                 </div>
               </div>
             </div>
-            {(minimumMatchesShortfall > 0 || scheduleIssues.length > 0) && (
+            {minimumMatchesShortfall > 0 && (
               <div className="wizard-review-check" role="status">
-                <strong>Vor Erstellung prüfen</strong>
-                {minimumMatchesShortfall > 0 && <p>Die erste Phase garantiert nur {actualMinimumMatches} tatsächlich gespielte Begegnungen pro Teilnehmer, gewünscht sind {minimumMatches}. Freilose zählen nicht als Spiele.</p>}
-                {scheduleIssues.map((issue, index) => <p key={index}>{issue}</p>)}
+                <strong>Mindestspielzahl nicht erreicht</strong>
+                <p>Die erste Phase garantiert nur {actualMinimumMatches} tatsächlich gespielte Begegnungen pro Teilnehmer, gewünscht sind {minimumMatches}. Freilose zählen nicht als Spiele.</p>
               </div>
             )}
+            {!canCreate && (
+              <div className="wizard-schedule-errors" role="alert">
+                <strong>Erstellung noch nicht möglich – bitte diese Angaben korrigieren:</strong>
+                <ul>{creationBlockers.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+                <div className="actions">
+                  {(!basicsValid || !venueLayoutValid) && <button type="button" className="btn small" onClick={() => navigateToStep(1)}>Grunddaten korrigieren</button>}
+                  {!participantsValid && <button type="button" className="btn small" onClick={() => navigateToStep(2)}>Teilnehmer korrigieren</button>}
+                  {(centralCreationIssues.length > 0 || !phaseConfigurationValid || !phaseEntrantsValid || !overnightDatesValid
+                    || reviewRequiredPhaseIds.length > 0 || scheduleIssues.length > 0)
+                    && <button type="button" className="btn small" onClick={() => navigateToStep(4)}>Phasen und Pausen korrigieren</button>}
+                </div>
+              </div>
+            )}
+            {phaseLimitError && <p className="field-error" role="alert">{phaseLimitError}</p>
             <div className="creation-review-overview" aria-label="Turnierdaten im Überblick">
               <div className="creation-review-identity">
                 <span>Dein Turnier</span>
@@ -3005,18 +3030,18 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               phaseSummaries={phaseDrafts.map((_, index) => formatPhaseOverview(phaseDrafts, index, discipline, !timedSport))}
               awardsEnabled={awardsEnabled}
               awardsAt={awardsAt}
-              onToggleAwards={(enabled) => { setAwardsEnabled(enabled); setAwardsAtOverride(null); }}
+              onToggleAwards={(enabled) => {
+                if (enabled && countCreationScheduleEntries(phaseDrafts, true) > MAX_CREATION_SCHEDULE_ENTRIES) {
+                  setPhaseLimitError(`Die Siegerehrung würde die Grenze von ${MAX_CREATION_SCHEDULE_ENTRIES} Zeitplaneinträgen überschreiten.`);
+                  return;
+                }
+                setPhaseLimitError('');
+                setAwardsEnabled(enabled);
+                setAwardsAtOverride(null);
+              }}
               onAwardsAtChange={setAwardsAtOverride}
             />
-            {centralCreationIssues.length > 0 && basicsValid && participantsValid && <div className="wizard-schedule-errors" role="alert">
-              <strong>Bitte vor der Erstellung korrigieren:</strong>
-              <ul>{centralCreationIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
-            </div>}
             {creationError && <div className="wizard-schedule-errors" role="alert"><strong>Speichern fehlgeschlagen:</strong> {creationError}</div>}
-            {scheduleIssues.length > 0 && <div className="wizard-schedule-errors" role="alert">
-              <strong>Bitte diese Zeitplan-Angaben korrigieren:</strong>
-              <ul>{scheduleIssues.map((issue, index) => <li key={index}>{issue}</li>)}</ul>
-            </div>}
           </section>
         )}
       </div>
