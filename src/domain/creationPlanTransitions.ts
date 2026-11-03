@@ -119,6 +119,41 @@ export function proposePlayingDayInsertion(
   return { dayBreaks, shifted };
 }
 
+/** Reposition a day transition without retaining dates that now run backwards.
+ * The moved transition keeps its requested date if possible; later transitions
+ * are shifted to the earliest following day and listed for explicit approval. */
+export function proposePlayingDayMove(
+  current: readonly PlayingDayBreak[], fromRound: number, toRound: number,
+  phaseStartDate: string,
+): { dayBreaks: PlayingDayBreak[]; shifted: ShiftedPlayingDate[] } {
+  const source = current.find((item) => item.afterRound === fromRound);
+  if (!source || (toRound !== fromRound && current.some((item) => item.afterRound === toRound))) {
+    return { dayBreaks: [...current].sort((a, b) => a.afterRound - b.afterRound), shifted: [] };
+  }
+  const reordered = current.map((item) => item === source ? { ...item, afterRound: toRound } : { ...item })
+    .sort((a, b) => a.afterRound - b.afterRound);
+  let previous = phaseStartDate;
+  const shifted: ShiftedPlayingDate[] = [];
+  const dayBreaks = reordered.map((item) => {
+    const date = item.date <= previous ? followingPlayingDate(previous, 1) : item.date;
+    if (date !== item.date) shifted.push({
+      afterRound: item.afterRound, previousDate: item.date, nextDate: date,
+    });
+    previous = date;
+    return date === item.date ? item : { ...item, date };
+  });
+  return { dayBreaks, shifted };
+}
+
+/** Pauses after the same round cannot coexist. */
+export function availableDayBreakRounds(
+  totalRounds: number, dayBreaks: readonly PlayingDayBreak[], inlineBreakAfterRound: number,
+): number[] {
+  return Array.from({ length: Math.max(0, totalRounds - 1) }, (_, i) => i + 1)
+    .filter((round) => round !== inlineBreakAfterRound
+      && !dayBreaks.some((item) => item.afterRound === round));
+}
+
 export function countConfiguredDayTransitions<T extends { type: string; breakKind: string; dayBreaks: readonly PlayingDayBreak[] }>(
   phases: readonly T[],
 ): number {
