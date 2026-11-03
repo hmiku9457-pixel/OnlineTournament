@@ -937,6 +937,15 @@ try {
   assert.equal(await orphanDialog.isVisible(), true,
     'backdrop dismiss cannot strand dependent phase changes');
   assert.match(await orphanDialog.innerText(), /K.-o.-Runden entfallen/);
+  await multiPage.waitForFunction(() => {
+    const saved = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft;
+    return saved.pendingDependentChange?.source === 'roster'
+      && saved.pendingDependentChange.previousRoster?.length === 3;
+  });
+  await multiPage.reload();
+  await orphanDialog.waitFor();
+  assert.match(await orphanDialog.innerText(), /K.-o.-Runden entfallen/,
+    'pending roster adjustment is retained when a draft is reopened');
   await orphanDialog.getByRole('button', { name: 'Teilnehmeränderung zurücknehmen' }).click();
   assert.equal(await multiPage.locator('.participant-roster-row').count(), 3,
     'rollback restores the last roster entry and the associated phase configuration');
@@ -949,6 +958,15 @@ try {
   await orphanFinal.getByRole('button', { name: 'Ungültige Zwischenpause entfernen' }).click();
   assert.equal(await orphanFinal.getByRole('button', { name: 'Ungültige Zwischenpause entfernen' }).count(), 0,
     'previously orphaned break can be explicitly removed after roster changes');
+  await multiPage.locator('.wizard-step').nth(1).click();
+  await multiPage.getByRole('button', { name: 'Rückgängig', exact: true }).click();
+  const undoConflict = multiPage.getByRole('alertdialog', { name: 'Geänderte Turnierplanung zurücksetzen?' });
+  await undoConflict.waitFor();
+  await undoConflict.getByRole('button', { name: 'Teilnehmer und Phasen wiederherstellen' }).click();
+  await multiPage.waitForFunction(() => {
+    const draft = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft;
+    return draft.participants.length === 3 && draft.phaseDrafts.find((phase) => phase.id === 'phase-7002')?.inlineBreakAfterRound === 1;
+  });
   await multiContext.close();
 
   // A hidden time-only setting must not block a later set-based sport.
@@ -964,6 +982,12 @@ try {
   await validityPage.locator('#match-duration').fill('45');
   await validityPage.locator('#venue-turnover').fill('300');
   assert.equal(await validityPage.locator('.wizard-continue-button').isEnabled(), false);
+  await validityPage.locator('#venue-turnover').fill('5');
+  await validityPage.locator('#sport').selectOption('basketball');
+  assert.equal(await validityPage.locator('.wizard-continue-button').isEnabled(), false,
+    'switching between timed sports requires reviewing the inherited match duration');
+  await validityPage.getByRole('button', { name: 'Spieldauer und Wechselpuffer geprüft' }).click();
+  assert.equal(await validityPage.locator('.wizard-continue-button').isEnabled(), true);
   await validityPage.locator('#sport').selectOption('table_tennis');
   assert.equal(await validityPage.locator('#venue-turnover').count(), 0);
   assert.equal(await validityPage.locator('.wizard-continue-button').isEnabled(), true,
@@ -992,6 +1016,12 @@ try {
   // A pending, uncommitted edit is protected during bulk cleanup.
   await validityPage.getByRole('button', { name: 'Ada Lovelace bearbeiten' }).first().click();
   await validityPage.locator('#participant-first').fill('Augusta');
+  await validityPage.getByRole('button', { name: 'Ada Lovelace entfernen' }).first().click();
+  const singleDeleteDialog = validityPage.getByRole('alertdialog',
+    { name: 'Ungespeicherte Teilnehmeränderungen verwerfen?' });
+  await singleDeleteDialog.waitFor();
+  await singleDeleteDialog.getByRole('button', { name: 'Bearbeitung fortsetzen' }).click();
+  assert.equal(await validityPage.locator('#participant-first').inputValue(), 'Augusta');
   await validityPage.getByRole('button', { name: 'Alle fehlerhaften Einträge entfernen' }).click();
   const bulkDialog = validityPage.getByRole('alertdialog', { name: 'Fehlerhafte Teilnehmer entfernen?' });
   await bulkDialog.waitFor();
