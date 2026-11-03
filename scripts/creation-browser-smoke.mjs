@@ -1604,8 +1604,24 @@ try {
     }];
     sessionStorage.setItem(key, JSON.stringify(payload));
   });
+  const validatedSeed = await dayPlanPage.evaluate(async () => {
+    const { validDraft } = await import('/src/domain/creationDraft.ts');
+    const payload = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new'));
+    return { valid: validDraft(payload.draft), step: payload.draft.step,
+      phases: payload.draft.phaseDrafts.length, participants: payload.draft.participants.length };
+  });
+  assert.equal(validatedSeed.valid, true,
+    `seeded multi-day draft must be valid before reload: ${JSON.stringify(validatedSeed)}`);
   await dayPlanPage.reload();
-  await dayPlanPage.locator('.phase-wizard-step').waitFor();
+  await dayPlanPage.waitForTimeout(150);
+  const reopenedDayPlan = await dayPlanPage.evaluate(() => ({
+    step: JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new') ?? '{}').draft?.step,
+    view: document.querySelector('.phase-wizard-step') ? 'phase'
+      : document.querySelector('.participant-step') ? 'participants'
+        : document.querySelector('.format-step') ? 'format' : 'other',
+  }));
+  assert.equal(reopenedDayPlan.view, 'phase',
+    `the seeded multi-day draft should reopen in Step 4: ${JSON.stringify(reopenedDayPlan)}`);
   const dayPhase = dayPlanPage.locator('.phase-config').filter({ hasText: 'Sechs Schweizer Runden' });
   await dayPhase.getByRole('button', { name: 'Spieltage und Zwischenpausen anzeigen' }).click();
   assert.equal(await dayPlanPage.locator('.phase-day-card').count(), 1,
