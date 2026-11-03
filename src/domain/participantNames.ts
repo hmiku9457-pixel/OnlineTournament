@@ -53,6 +53,50 @@ export function validParticipantRoster(entries: readonly RosterEntry[], discipli
   return true;
 }
 
+/** Indices of entries that should be corrected or removed.
+ * When two complete entries collide, retain the first valid entry so a
+ * bulk cleanup cannot accidentally delete both of them. */
+export function invalidParticipantRosterIndices(
+  entries: readonly RosterEntry[], discipline: 'SINGLES' | 'DOUBLES' | 'TEAMS',
+): Set<number> {
+  const invalid = new Set<number>();
+  const occupied = new Set<string>();
+  const person = (first: string, last: string) => [first.trim(), last.trim()].filter(Boolean).join(' ');
+  entries.forEach((entry, index) => {
+    if (discipline === 'TEAMS') {
+      const label = entry.teamName?.trim() || person(entry.firstName, entry.lastName);
+      const key = participantNameKey(label);
+      if (!key || !isAllowedParticipantName(label) || occupied.has(key)) invalid.add(index);
+      else occupied.add(key);
+      return;
+    }
+    if (!entry.firstName.trim() || !entry.lastName.trim()
+      || !isAllowedParticipantName(entry.firstName) || !isAllowedParticipantName(entry.lastName)) {
+      invalid.add(index);
+      return;
+    }
+    const first = participantNameKey(person(entry.firstName, entry.lastName));
+    if (discipline === 'SINGLES') {
+      if (occupied.has(first)) invalid.add(index);
+      else occupied.add(first);
+      return;
+    }
+    if (!entry.partnerFirstName.trim() || !entry.partnerLastName.trim()
+      || !isAllowedParticipantName(entry.partnerFirstName) || !isAllowedParticipantName(entry.partnerLastName)) {
+      invalid.add(index);
+      return;
+    }
+    const partner = participantNameKey(person(entry.partnerFirstName, entry.partnerLastName));
+    if (first === partner || occupied.has(first) || occupied.has(partner)) {
+      invalid.add(index);
+      return;
+    }
+    occupied.add(first);
+    occupied.add(partner);
+  });
+  return invalid;
+}
+
 export function sanitizeParticipantName(value: string): string {
   return value.replace(/[^\p{L}\p{M}\p{N} .()-]/gu, '');
 }
