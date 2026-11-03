@@ -137,7 +137,7 @@ try {
     'the day selector, time priority, duration and end time all have equal input heights');
   assert.ok(planningControls.fields.every((field, index) => index === 0
     || Math.abs(field.y - planningControls.fields[0].y) <= 2),
-  'all four primary controls share the same horizontal baseline');
+  `all four primary controls share the same horizontal baseline: ${JSON.stringify(planningControls.fields)}`);
   assert.ok(planningControls.fields.every((field, index) => index === 0
     || field.x > planningControls.fields[index - 1].x),
   'the controls remain ordered: playing days, target, duration, end time');
