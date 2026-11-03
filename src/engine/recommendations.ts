@@ -28,6 +28,8 @@ export interface RecommendationSettings {
   preferredDurationMinutes?: number;
   /** Number of candidates to return; 0 means return the complete pool for feasibility filtering. */
   maxResults?: number;
+  /** Require an actual final match so the recommendation crowns one unambiguous winner. */
+  requireDecisiveWinner?: boolean;
 }
 
 export interface FormatRecommendation {
@@ -255,6 +257,9 @@ export function recommendTournamentFormats(
   const tripleSwissRounds = calculateSwissPlan(tripleSwissEntrants, minimumMatches, settings.maxSwissRounds);
 
   function addRecommendation(candidate: Omit<FormatRecommendation, 'estimatedDurationMinutes' | 'estimatedMatches'>) {
+    // A final K.-o. match determines a unique champion independently of standings ties.
+    // The wizard does not offer group-only, Swiss-only or other ranking-only conclusions.
+    if (settings.requireDecisiveWinner && candidate.phases.at(-1)?.type !== 'KNOCKOUT') return;
     // All Swiss phases require at least three entrants and two rounds.
     if (candidate.phases.some((phase) => phase.type === 'SWISS'
       && ((phase.entrantCount ?? playerCount) < 3 || (phase.swissRounds ?? 0) < 2))) return;
