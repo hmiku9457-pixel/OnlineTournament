@@ -936,7 +936,7 @@ try {
   await multiPage.getByRole('radio', { name: 'Turnierdauer', exact: true }).check();
   await multiPage.locator('#preferred-duration').click();
   const resetDurationDialog = multiPage.getByRole('dialog', { name: 'Geplante Turnierdauer' });
-  await resetDurationDialog.getByLabel(/^Stunden \\(0–\\d+\\)$/).fill('3');
+  await resetDurationDialog.getByLabel(/^Stunden /).fill('3');
   await resetDurationDialog.getByLabel('Minuten (0–59)').fill('30');
   await resetDurationDialog.getByRole('button', { name: 'Dauer übernehmen' }).click();
   await multiPage.locator('#planned-playing-days').fill('2');
