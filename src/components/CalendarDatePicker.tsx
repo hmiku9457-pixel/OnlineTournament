@@ -85,7 +85,7 @@ export function CalendarDatePicker({
   function commitYear() {
     const value = Number(yearInput);
     const firstYear = minimum ? Number(minimum.slice(0, 4)) : 1;
-    if (!/^\\d{1,4}$/.test(yearInput) || !Number.isInteger(value)
+    if (!/^\d{1,4}$/.test(yearInput) || !Number.isInteger(value)
       || value < firstYear || value > 9999) {
       setYearInput(String(viewYear));
       return;
