@@ -640,6 +640,9 @@ try {
   await draftPage.waitForFunction(() => document.querySelector('#name')?.value === 'Entwurf A');
   await draftPage.getByRole('button', { name: 'Entwurf kopieren' }).click();
   await draftPage.waitForFunction(() => document.querySelectorAll('.sidebar-draft-item').length === 2);
+  // Draft-list notification can arrive before the route has finished loading
+  // the newly saved copy from IndexedDB.
+  await draftPage.waitForFunction(() => document.querySelector('#name')?.value?.includes('(Kopie)'));
   assert.match(await draftPage.locator('#name').inputValue(), /Kopie/);
 
   // A second tab saving the same named draft must not silently replace the
