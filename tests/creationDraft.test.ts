@@ -115,11 +115,18 @@ describe('tournament creation draft recovery', () => {
     delete incomplete.useCurrentTime;
     store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft: incomplete }));
     expect(loadCreationDraft(store)).toBeNull();
-    for (const invalid of [-15, 0, 12.5, 1440, 100000]) {
+    for (const invalid of [-15, 0, 12.5, 1441, 100000]) {
       const corrupted = { ...makeDraft(), preferredDurationMinutes: invalid };
       store.setItem(CREATION_DRAFT_KEY, JSON.stringify({ version: 1, draft: corrupted }));
       expect(loadCreationDraft(store)).toBeNull();
     }
+    const overnight = { ...makeDraft(), preferredDurationMinutes: 1440,
+      preferredTimePriority: 'end' as const, preferredFixedEndAt: '2026-11-02T01:00' };
+    expect(saveCreationDraft(overnight, store)).toBe(true);
+    expect(loadCreationDraft(store)?.preferredDurationMinutes).toBe(1440);
+    expect(loadCreationDraft(store)?.preferredFixedEndAt).toBe('2026-11-02T01:00');
+    expect(validDraft({ ...overnight, preferredTimePriority: 'unknown' })).toBe(false);
+    expect(validDraft({ ...overnight, preferredFixedEndAt: '01:00' })).toBe(false);
   });
 
   it('isolates a damaged optional team name instead of letting the editor crash', () => {

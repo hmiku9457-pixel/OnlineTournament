@@ -238,7 +238,7 @@ describe('creation wizard transitions', () => {
       start: '2030-11-10T23:00', days: 1, participants: 4, tableCount: 1,
       timing: { matchDurationMinutes: 60 }, bestOfFor: () => 1,
     });
-    expect(assessment.feasible).toBe(false);
+    expect(assessment.feasible).toBe(true);
     const base: DayDistributionPhase = {
       type: 'SWISS', label: 'Schweizer Runde', entrantCount: 8,
       groupCount: 2, swissRounds: 5, bestOf: 3, knockoutBestOf: [],

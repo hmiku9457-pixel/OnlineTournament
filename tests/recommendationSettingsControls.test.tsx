@@ -29,7 +29,8 @@ describe('recommendation settings numeric controls', () => {
     expect(normalizeRecommendationDuration(3, 30)).toBe(210);
     expect(normalizeRecommendationDuration(0, 15)).toBe(15);
     expect(normalizeRecommendationDuration(0, 0)).toBeNull();
-    expect(normalizeRecommendationDuration(24, 0)).toBeNull();
+    expect(normalizeRecommendationDuration(24, 0)).toBe(1440);
+    expect(normalizeRecommendationDuration(24, 1)).toBeNull();
     expect(normalizeRecommendationDuration(2, 60)).toBeNull();
     const html = renderToStaticMarkup(createElement(RecommendationDurationPicker, {
       value: 210, onChange: () => {},

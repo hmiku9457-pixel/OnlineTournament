@@ -49,6 +49,9 @@ describe('Uhr mit Zifferblatt für die geplante Turnierzeit', () => {
     expect(isClockTimeAllowed('12:33', '12:34')).toBe(false);
     expect(isClockTimeAllowed('13:00', '12:34')).toBe(true);
     expect(isClockTimeAllowed('00:00')).toBe(true);
+    expect(isClockTimeAllowed('01:00', undefined, '02:00')).toBe(true);
+    expect(isClockTimeAllowed('02:01', undefined, '02:00')).toBe(false);
+    expect(isClockTimeAllowed('01:00', '00:30', '01:00')).toBe(true);
     expect(isClockTimeAllowed('25:00', '12:34')).toBe(false);
     const hours = renderToStaticMarkup(createElement(ClockTimeDial, {
       mode: 'hours', hour: 12, minute: 34, minTime: '12:34', onPickHour: () => {}, onPickMinute: () => {},

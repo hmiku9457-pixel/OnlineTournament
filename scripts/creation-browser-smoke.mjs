@@ -548,8 +548,10 @@ try {
   const options = recPage.locator('.recommendation-list .recommendation');
   assert.ok(await options.count() >= 2);
   const titles = await options.locator('.recommendation-phase-heading').allInnerTexts();
-  assert.ok(titles.every((title) => title.includes('K.-o.-Phase')),
-    'every proposed format ends with a decisive knockout stage');
+  assert.ok(titles.some((title) => title.includes('K.-o.-Phase')),
+    'knockout remains available as a possible finish');
+  assert.ok(titles.some((title) => !title.includes('K.-o.-Phase')),
+    'the wizard also offers formats without a knockout finish');
   await options.first().click();
   assert.equal(await options.first().getAttribute('aria-pressed'), 'true');
   await options.nth(1).click();

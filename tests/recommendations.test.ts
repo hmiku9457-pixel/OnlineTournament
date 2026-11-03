@@ -28,7 +28,7 @@ describe('format recommendations', () => {
 
   it('prefers Swiss to knockout for a larger field', () => {
     const result = recommendTournamentFormats({ playerCount: 24, tableCount: 8, minimumMatches: 4 });
-    expect(result[0].id).toBe('swiss-ko');
+    expect(result[0].id.startsWith('swiss-')).toBe(true);
     expect(result.some((item) => item.id === 'groups-ko')).toBe(true);
   });
 
@@ -54,12 +54,28 @@ describe('format recommendations', () => {
   it('treats systems as independent building blocks', () => {
     const result = recommendTournamentFormats(
       { playerCount: 12, tableCount: 8, minimumMatches: 3 },
-      { enabledSystems: { knockout: false, groups: true, swiss: true } },
+      { enabledSystems: { knockout: false, groups: true, swiss: true }, maxResults: 0 },
     );
     expect(result.some((item) => item.requiredSystems.includes('knockout'))).toBe(false);
     expect(result.some((item) => item.id === 'groups-swiss')).toBe(true);
     expect(result.some((item) => item.id === 'groups')).toBe(true);
     expect(result.some((item) => item.id === 'swiss')).toBe(true);
+  });
+
+  it('offers qualifying formats ending in Swiss and round robin instead of knockout', () => {
+    const results = recommendTournamentFormats(
+      { playerCount: 16, tableCount: 8, minimumMatches: 3 },
+      { enabledSystems: { knockout: false, groups: true, swiss: true, 'round-robin': true }, maxResults: 0 },
+    );
+    expect(results.find((item) => item.id === 'groups-swiss')?.phases.map((phase) => phase.type))
+      .toEqual(['GROUPS', 'SWISS']);
+    expect(results.find((item) => item.id === 'groups-round-robin')?.phases.map((phase) => phase.type))
+      .toEqual(['GROUPS', 'ROUND_ROBIN']);
+    expect(results.find((item) => item.id === 'swiss-round-robin')?.phases.map((phase) => phase.type))
+      .toEqual(['SWISS', 'ROUND_ROBIN']);
+    expect(results.every((item) => !item.requiredSystems.includes('knockout'))).toBe(true);
+    expect(results.filter((item) => item.phases.length > 1).every((item) =>
+      item.phases[1].entrantCount! < item.phases[0].entrantCount!)).toBe(true);
   });
 
   it('removes group recommendations when groups are disabled', () => {
