@@ -51,7 +51,8 @@ import { DiscardDraftDialog } from '@/components/DiscardDraftDialog';
 import { UnsavedParticipantDialog } from '@/components/UnsavedParticipantDialog';
 import { QualificationRuleDialog } from '@/components/QualificationRuleDialog';
 import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/domain/groupQualification';
-import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, validParticipantRoster, MAX_PARTICIPANT_NAME_LENGTH } from '@/domain/participantNames';
+import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, validParticipantRoster, invalidParticipantRosterIndices, MAX_PARTICIPANT_NAME_LENGTH } from '@/domain/participantNames';
+import { convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks } from '@/domain/creationPlanTransitions';
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
 import { configuredPlayingDays, followingPlayingDate, playingRounds, suggestDaySplit, type PlayingDayBreak } from '@/domain/playingDays';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
@@ -705,6 +706,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     ...phase, breakUntilDate: phase.breakUntilDate ?? '', inlineBreakUntilDate: phase.inlineBreakUntilDate ?? '', dayBreaks: phase.dayBreaks ?? [],
   })) ?? []);
   const [reviewRequiredPhaseIds, setReviewRequiredPhaseIds] = useState<string[]>(restoredDraft?.reviewRequiredPhaseIds ?? []);
+  const [pendingRoundAdjustment, setPendingRoundAdjustment] = useState<
+    | { kind: 'rounds'; id: string; patch: Partial<PhaseDraft>; removedDays: number; removedInline: boolean }
+    | { kind: 'entrants'; index: number; entrants: number; custom: boolean; removedDays: number; removedInline: boolean }
+    | { kind: 'type'; index: number; type: StageType; removedDays: number; removedInline: boolean }
+    | null
+  >(null);
+  const [phaseLimitError, setPhaseLimitError] = useState('');
   const [editingPhaseTypeId, setEditingPhaseTypeId] = useState<string | null>(null);
   const [expandedPhaseId, setExpandedPhaseId] = useState<string | null>(null);
   const [expandedInlineBreakIds, setExpandedInlineBreakIds] = useState<string[]>([]);
@@ -1180,6 +1188,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         next[index].customEntrants = next[index].customEntrants
           || !knockoutEntrantPresets(maximum).includes(entrants);
       }
+      next[index] = reconcileRoundDependentBreaks(next[index]).phase;
     }
     return next;
   }
@@ -1253,6 +1262,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     }
     const candidate = [...phaseDrafts.slice(0, insertIndex), phase, ...phaseDrafts.slice(insertIndex)];
     if (!hasValidTerminalStageOrder(candidate.map((item) => item.type)) || !hasValidBreakStageOrder(candidate.map((item) => item.type))) return;
+    if (countCreationScheduleEntries(candidate, awardsEnabled) > MAX_CREATION_SCHEDULE_ENTRIES) {
+      setPhaseLimitError(`Maximal ${MAX_CREATION_SCHEDULE_ENTRIES} Zeitplaneinträge möglich. Bitte zuerst eine Phase oder Unterbrechung entfernen.`);
+      return;
+    }
+    setPhaseLimitError('');
     setPhaseDrafts(normalizeAndTrackPhaseChanges(phaseDrafts, candidate));
     setSelectedRecommendationId(null);
     setPhaseInsertIndex(null);
@@ -1326,11 +1340,27 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   }
 
 
-  function updatePhase(id: string, patch: Partial<PhaseDraft>) {
+  function updatePhase(id: string, patch: Partial<PhaseDraft>, confirmedRoundChange = false) {
+    const previous = phaseDrafts.find((phase) => phase.id === id);
+    if (!previous) return;
+    let adjusted = { ...previous, ...patch };
+    if (patch.dayBreaks) {
+      adjusted = { ...adjusted, dayBreaks: [...patch.dayBreaks].sort((a, b) => a.afterRound - b.afterRound) };
+    }
+    const result = reconcileRoundDependentBreaks(adjusted);
+    if (!confirmedRoundChange && (result.impact.removedDayBreaks > 0 || result.impact.removedInlineBreak)) {
+      setPendingRoundAdjustment({ kind: 'rounds', id, patch, removedDays: result.impact.removedDayBreaks,
+        removedInline: result.impact.removedInlineBreak });
+      return;
+    }
+    const candidate = phaseDrafts.map((phase) => phase.id === id ? result.phase : phase);
+    if (countCreationScheduleEntries(candidate, awardsEnabled) > MAX_CREATION_SCHEDULE_ENTRIES) {
+      setPhaseLimitError(`Maximal ${MAX_CREATION_SCHEDULE_ENTRIES} Zeitplaneinträge möglich. Bitte zuerst eine andere Unterbrechung entfernen.`);
+      return;
+    }
+    setPhaseLimitError('');
     setSelectedRecommendationId(null);
-    setPhaseDrafts((current) => current.map((phase) => (
-      phase.id === id ? { ...phase, ...patch } : phase
-    )));
+    setPhaseDrafts(candidate);
   }
 
   function togglePhaseInlineBreak(phase: PhaseDraft, totalRounds: number) {
@@ -1346,8 +1376,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     }
   }
 
-  function changePhaseType(index: number, type: StageType) {
-    setSelectedRecommendationId(null);
+  function changePhaseType(index: number, type: StageType, confirmed = false) {
     const current = phaseDrafts;
     if (!current[index]) return;
     if (current[index].type === type) return;
@@ -1355,7 +1384,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     if (type === 'GROUPS' && current[index].entrantCount < 4) return;
     if (isTerminalStage(type) && index !== current.length - 1) return;
     if (type === 'BREAK' && (index === 0 || index === current.length - 1 || current[index - 1]?.type === 'BREAK' || current[index + 1]?.type === 'BREAK')) return;
-
+    if (!confirmed && (current[index].dayBreaks.length > 0 || current[index].inlineBreakAfterRound > 0)) {
+      setPendingRoundAdjustment({ kind: 'type', index, type,
+        removedDays: current[index].dayBreaks.length, removedInline: current[index].inlineBreakAfterRound > 0 });
+      return;
+    }
+    setSelectedRecommendationId(null);
     const next = current.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
     const phase = { ...clearInlinePauseOnTypeChange(next[index]), dayBreaks: [] };
     next[index] = phase;
@@ -1380,7 +1414,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setEditingPhaseTypeId(null);
   }
 
-  function updatePhaseEntrants(index: number, entrantCount: number, customEntrants = false) {
+  function updatePhaseEntrants(index: number, entrantCount: number, customEntrants = false, confirmed = false) {
     setSelectedRecommendationId(null);
     const next = phaseDrafts.map((phase) => ({ ...phase, knockoutBestOf: [...phase.knockoutBestOf] }));
     if (!next[index] || index === 0) return;
@@ -1388,7 +1422,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const nextEntrants = Math.max(2, Math.min(maximum, entrantCount));
     next[index].entrantCount = nextEntrants;
     next[index].customEntrants = customEntrants;
-    next[index].dayBreaks = next[index].dayBreaks.filter((item) => item.afterRound < playingRounds(next[index]));
+    const impact = reconcileRoundDependentBreaks(next[index]).impact;
+    if (!confirmed && (impact.removedDayBreaks > 0 || impact.removedInlineBreak)) {
+      setPendingRoundAdjustment({ kind: 'entrants', index, entrants: nextEntrants, custom: customEntrants,
+        removedDays: impact.removedDayBreaks, removedInline: impact.removedInlineBreak });
+      return;
+    }
     if (next[index].type === 'KNOCKOUT') {
       next[index].knockoutBestOf = resizeKnockoutBestOf(next[index].knockoutBestOf,
         knockoutRoundLabels(nextEntrants).length, next[index].bestOf);
