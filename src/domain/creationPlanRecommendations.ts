@@ -475,7 +475,7 @@ export function recommendationEndTimePenalty(actualEnd: string | undefined, desi
   const desired = parseLocalDateTime(desiredEnd);
   if (!actual || !desired) return Number.POSITIVE_INFINITY;
   const minutesLate = (actual.getTime() - desired.getTime()) / 60000;
-  return minutesLate > 0 ? minutesLate * 2 : -minutesLate;
+  return minutesLate > 0 ? minutesLate * 2 : Math.abs(minutesLate);
 }
 
 /** Simulate the exact planning model used by Step 4. Enough rounds are
