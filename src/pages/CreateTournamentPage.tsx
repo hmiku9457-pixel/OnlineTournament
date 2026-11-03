@@ -743,6 +743,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [tournamentMode, setTournamentMode] = useState<'single' | 'multi'>(restoredDraft?.tournamentMode ?? (restoredDraft?.phaseDrafts.some((phase) => (phase.dayBreaks?.length ?? 0) > 0 || (phase.type === 'BREAK' && phase.breakKind === 'overnight')) ? 'multi' : 'single'));
   const [plannedDays, setPlannedDays] = useState(restoredDraft?.plannedDays ?? 2);
   const [pendingTournamentMode, setPendingTournamentMode] = useState<'single' | null>(null);
+  const [pendingAutomaticSplit, setPendingAutomaticSplit] = useState(false);
   function applySingleDayConversion(treatment: 'convert' | 'remove') {
     const adjusted = convertToSingleDay(phaseDrafts, treatment);
     const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, adjusted, undefined, true);
@@ -964,10 +965,18 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     ],
   );
 
-  const firstSelectableRecommendationIndex = recommendations.findIndex((item) =>
-    tournamentMode !== 'multi' || suggestDaySplit(item.phases.map((phase) => ({
-      ...phase, entrantCount: phase.entrantCount ?? participantCount,
-    })), plannedDays).possible);
+  const recommendationAssessments = useMemo(() => recommendations.map((item) =>
+    tournamentMode === 'single'
+      ? { feasible: true, daySplitPossible: true, reason: null }
+      : assessRecommendationTime(item, {
+        start: scheduledStart, days: plannedDays, participants: participantCount, tableCount: tables,
+        timing: timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes }
+          : { minutesPerSet: planningMinutesPerSet(sport) },
+        bestOfFor: (type) => phaseBestOfForSport(sport, type),
+      })),
+  [recommendations, tournamentMode, scheduledStart, plannedDays, participantCount,
+    tables, timedSport, matchDurationMinutes, breakMinutes, sport]);
+  const firstSelectableRecommendationIndex = recommendationAssessments.findIndex((assessment) => assessment.feasible);
 
   const selectedRecommendation = useMemo(
     () => recommendations.find((recommendation) => recommendation.id === selectedRecommendationId) ?? null,
@@ -976,6 +985,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   /** The editable phase plan is authoritative even when inputs change. */
   const recommendationPlanMatches = Boolean(selectedRecommendation
+    && configuredPlayingDays(phaseDrafts) === (tournamentMode === 'multi' ? plannedDays : 1)
     && phaseDrafts.filter((phase) => phase.type !== 'BREAK').length === selectedRecommendation.phases.length
     && phaseDrafts.filter((phase) => phase.type !== 'BREAK').every((phase, index) => {
       const original = selectedRecommendation.phases[index];
@@ -1250,6 +1260,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   }
 
   function selectRecommendation(recommendation: FormatRecommendation) {
+    const candidateIndex = recommendations.findIndex((item) => item.id === recommendation.id);
+    if (candidateIndex < 0 || !recommendationAssessments[candidateIndex]?.feasible) return;
     if (selectedRecommendationId === recommendation.id && recommendationPlanMatches) return;
     if (phaseDrafts.length > 0) {
       setPendingRecommendationId(recommendation.id);
@@ -2416,19 +2428,19 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 )}
                 {recommendations.length > 0 && firstSelectableRecommendationIndex === -1 && (
                   <div className="callout" role="status">
-                    Keine Empfehlung lässt sich auf {plannedDays} Spieltage verteilen. Reduziere die Anzahl der Spieltage oder gehe mit „Weiter“ zu Schritt 4 und lege deine Phasen und Spieltagswechsel manuell an.
+                    Keine Empfehlung ist mit den gewünschten {plannedDays} Spieltagen und den geschätzten Spielzeiten plausibel. Prüfe Startzeit, Spielflächen, Spieldauer oder Spieltage. Alternativ kannst du mit „Weiter“ die Phasen manuell anlegen.
                   </div>
                 )}
                 {recommendations.map((item, index) => {
-                  const daySplitPossible = tournamentMode !== 'multi' || suggestDaySplit(item.phases.map((phase) => ({
-                    ...phase, entrantCount: phase.entrantCount ?? participantCount,
-                  })), plannedDays).possible;
+                  const assessment = recommendationAssessments[index];
+                  const daySplitPossible = assessment.daySplitPossible;
+                  const recommendationFeasible = assessment.feasible;
                   return <button
                     className={`card recommendation recommendation-select ${selectedRecommendationId === item.id && recommendationPlanMatches ? 'selected' : ''} ${index === firstSelectableRecommendationIndex ? 'best' : ''}`}
                     key={item.id}
                     type="button"
-                    disabled={!daySplitPossible}
-                    title={!daySplitPossible ? 'Diese Empfehlung enthält zu wenige vollständige Runden für die gewünschte Anzahl Spieltage.' : undefined}
+                    disabled={!recommendationFeasible}
+                    title={assessment.reason ?? undefined}
                     onClick={() => selectRecommendation(item)}
                   >
                     <div className="recommendation-heading">
@@ -2458,7 +2470,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                         })}
                       </h3>
                       <div className="recommendation-labels">
-                        <span className="badge">{!daySplitPossible ? 'Nicht verfügbar' : index === firstSelectableRecommendationIndex ? 'Empfohlen' : 'Alternative'}</span>
+                        <span className="badge">{!recommendationFeasible ? 'Nicht verfügbar' : index === firstSelectableRecommendationIndex ? 'Empfohlen' : 'Alternative'}</span>
                         {selectedRecommendationId === item.id && <span className="badge selected-badge">{recommendationPlanMatches ? 'Ausgewählt' : 'Plan weicht ab · erneut übernehmen'}</span>}
                       </div>
                     </div>
@@ -2466,16 +2478,21 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     <div className="recommendation-metrics">
                       <span className="recommendation-metric-tag">{item.estimatedMatches} Spiele</span>
                       <span className="recommendation-metric-tag">ca. {formatDuration(item.estimatedDurationMinutes)}</span>
-                      {tournamentMode === 'multi' && <span className={`recommendation-metric-tag ${!daySplitPossible ? 'wizard-metric-warning' : ''}`}>
-                        {daySplitPossible
-                          ? `${plannedDays} Rundentagesabschnitte möglich · Uhrzeiten in Schritt 4 prüfen`
-                          : 'Nicht wählbar: zu wenige Runden für die gewünschten Spieltage'}
+                      {tournamentMode === 'multi' && <span className={`recommendation-metric-tag ${!recommendationFeasible ? 'wizard-metric-warning' : ''}`}>
+                        {!daySplitPossible
+                          ? 'Nicht wählbar: zu wenige Runden für die gewünschten Spieltage'
+                          : !recommendationFeasible
+                            ? 'Nicht wählbar: Tagesetappe zeitlich nicht plausibel'
+                            : `${plannedDays} Spieltage · geschätzte Tageszeiten geprüft`}
                       </span>}
+                      {tournamentMode === 'multi' && !recommendationFeasible && assessment.reason && (
+                        <span className="recommendation-metric-tag wizard-metric-warning">{assessment.reason}</span>
+                      )}
                       <span className={`recommendation-metric-tag ${item.minimumMatchShortfall ? 'wizard-metric-warning' : ''}`}>
                         mindestens {item.minimumGuaranteedMatches} gespielte Begegnungen
                       </span>
                     </div>
-                    {index === firstSelectableRecommendationIndex && daySplitPossible && !item.minimumMatchShortfall && (
+                    {index === firstSelectableRecommendationIndex && recommendationFeasible && !item.minimumMatchShortfall && (
                       <p className="recommendation-reason">
                         {item.estimatedDurationMinutes <= preferredDurationMinutes
                           ? `Warum empfohlen: Erfüllt dein Mindestspielziel und liegt innerhalb deiner geplanten Turnierdauer von ${formatRecommendationDuration(preferredDurationMinutes)}.`
