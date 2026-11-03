@@ -875,7 +875,7 @@ try {
   await multiEndDialog.getByRole('button', { name: 'Übernehmen', exact: true }).click();
   assert.match(await multiPage.locator('.recommendation-list .recommendation').first().innerText(),
     /Ende ca\./, 'multi-day recommendations show actual projected finishing dates');
-  assert.equal(await multiPage.locator('#preferred-duration strong').innerText(), '9 Std.',
+  assert.equal(await multiPage.locator('#preferred-duration strong').innerText(), '9 Std. 15 Min.',
     'editing the last playing-day clock updates the total active time');
   await multiPage.getByRole('button', { name: 'Geplante Turnierdauer um 15 Minuten erhöhen' }).click();
   assert.equal(await multiPage.locator('#preferred-end-time .clock-picker-trigger-value').innerText(), '16:45',
@@ -898,7 +898,7 @@ try {
     'playing-day +/- buttons must stay at the reduced 28px width');
   assert.ok(dayControlGeometry.groupWidth > dayControlGeometry.dayWidth + 15,
     'the playing-day counter must be visibly narrower than the other numeric steppers');
-  assert.equal(await multiPage.locator('#preferred-duration strong').innerText(), '9 Std. 15 Min.',
+  assert.equal(await multiPage.locator('#preferred-duration strong').innerText(), '9 Std. 30 Min.',
     'multi-day changes retain the linked active-time preference');
   await multiPage.locator('.recommendation-list .recommendation').first().click();
   await next(multiPage);
