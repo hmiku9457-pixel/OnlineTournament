@@ -132,7 +132,7 @@ async function runTournament(config) {
       const texts=await recommendations.allInnerTexts();
       const pattern=config.pick === 'groups-ko' ? /Gruppen.*K.-o./i
         : config.pick === 'swiss' ? /Schweizer System/i
-        : config.pick === 'ko' ? /Einfaches K.-o./i
+        : config.pick === 'ko' ? /^K.-o.-Phase 8\b|Einfaches K.-o./i
         : config.pick === 'groups' ? /Gruppen/i
         : /./;
       const index=texts.findIndex(t=>pattern.test(trimmed(t,300)));
