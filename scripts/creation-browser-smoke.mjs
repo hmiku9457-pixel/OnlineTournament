@@ -1566,6 +1566,86 @@ try {
     'pagination now sits between roster header and the first card');
   await doublesContext.close();
 
+  // Multi-day phase planning creates successive day cards from "bis Runde"
+  // and allows separate in-day pauses without turning them into competition phases.
+  const dayPlanContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
+  const dayPlanPage = await dayPlanContext.newPage();
+  await dayPlanPage.goto(base + '/#/tournaments/new');
+  await dayPlanPage.waitForFunction(() =>
+    Boolean(sessionStorage.getItem('online-tournament:creation-draft:v1:new')));
+  await dayPlanPage.evaluate(() => {
+    const key = 'online-tournament:creation-draft:v1:new';
+    const payload = JSON.parse(sessionStorage.getItem(key));
+    const draft = payload.draft;
+    draft.name = 'Spieltage und Zwischenpausen';
+    draft.scheduledDate = '2031-11-20';
+    draft.scheduledTime = '10:00';
+    draft.useCurrentTime = false;
+    draft.sport = 'table_tennis';
+    draft.discipline = 'SINGLES';
+    draft.participants = Array.from({ length: 8 }, (_, index) => ({
+      id: `participant-${index + 1}`, firstName: 'Spieler', lastName: String(index + 1),
+      partnerFirstName: '', partnerLastName: '', teamName: '',
+    }));
+    draft.tournamentMode = 'multi';
+    draft.plannedDays = 3;
+    draft.step = 4;
+    draft.maxReachedStep = 4;
+    draft.hasVisitedPhaseStep = true;
+    draft.phaseDrafts = [{
+      id: 'phase-day-planner-test', type: 'SWISS', label: 'Sechs Schweizer Runden',
+      bestOf: 3, groupCount: 2, swissRounds: 6, entrantCount: 8,
+      knockoutBestOf: [], customEntrants: false,
+      breakKind: 'minutes', breakMinutes: 15, nextDayStart: '09:00', nextDayDate: '',
+      breakUntil: '12:00', breakUntilDate: '', note: '',
+      inlineBreakAfterRound: 0, inlineBreakKind: 'minutes', inlineBreakMinutes: 15,
+      inlineBreakUntil: '13:00', inlineBreakUntilDate: '',
+      dayBreaks: [], extraInlineBreaks: [],
+    }];
+    sessionStorage.setItem(key, JSON.stringify(payload));
+  });
+  await dayPlanPage.reload();
+  await dayPlanPage.locator('.phase-wizard-step').waitFor();
+  const dayPhase = dayPlanPage.locator('.phase-config').filter({ hasText: 'Sechs Schweizer Runden' });
+  await dayPhase.getByRole('button', { name: 'Spieltage und Zwischenpausen anzeigen' }).click();
+  assert.equal(await dayPlanPage.locator('.phase-day-card').count(), 1,
+    'opening the planning button presents Spieltag 1, without forcing a new day');
+  await dayPlanPage.locator('#day-end-round-phase-day-planner-test-0').selectOption('2');
+  assert.equal(await dayPlanPage.locator('.phase-day-card').count(), 2,
+    'selecting bis Runde 2 automatically inserts Spieltag 2');
+  assert.equal(await dayPlanPage.getByText('Beginnt am', { exact: true }).count(), 1);
+  await dayPlanPage.locator('#day-end-round-phase-day-planner-test-1').selectOption('4');
+  assert.equal(await dayPlanPage.locator('.phase-day-card').count(), 3,
+    'selecting bis Runde 4 automatically inserts Spieltag 3');
+  assert.equal(await dayPlanPage.getByText('Beginnt am', { exact: true }).count(), 2);
+  const playDays = dayPlanPage.locator('.phase-day-card');
+  await playDays.nth(0).getByRole('button', { name: /Zwischenpause einfügen/ }).click();
+  assert.equal(await playDays.nth(0).locator('.phase-day-pause').count(), 1);
+  await playDays.nth(1).getByRole('button', { name: /Zwischenpause einfügen/ }).click();
+  assert.equal(await playDays.nth(1).locator('.phase-day-pause').count(), 1,
+    'a separate pause can be inserted on the second playing day');
+  await dayPlanPage.waitForFunction(() => {
+    const draft = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft;
+    const phase = draft.phaseDrafts.find(p => p.id === 'phase-day-planner-test');
+    return phase?.dayBreaks.length === 2
+      && phase?.extraInlineBreaks?.length === 2
+      && phase.extraInlineBreaks[0].afterRound === 1
+      && phase.extraInlineBreaks[1].afterRound === 3;
+  });
+  await playDays.nth(1).getByRole('radio', { name: 'Pause bis' }).check();
+  await dayPlanPage.waitForFunction(() => {
+    const draft = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft;
+    return draft.phaseDrafts[0].extraInlineBreaks[1].kind === 'until';
+  });
+  await playDays.nth(1).getByRole('radio', { name: 'Pause in Minuten' }).check();
+  await dayPlanPage.reload();
+  await dayPhase.getByRole('button', { name: 'Spieltage und Zwischenpausen anzeigen' }).click();
+  assert.equal(await dayPlanPage.locator('.phase-day-card').count(), 3,
+    'configured playing days survive draft reload');
+  assert.equal(await dayPlanPage.locator('.phase-day-pause').count(), 2,
+    'multiple per-day pauses survive draft reload');
+  await dayPlanContext.close();
+
   process.stdout.write('Creation wizard browser smoke tests passed.\n');
 } finally {
   await browser.close();
