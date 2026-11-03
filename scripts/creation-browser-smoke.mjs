@@ -135,12 +135,35 @@ try {
     'the playing-day stepper fills its column instead of sitting in a narrow leftover strip');
   assert.ok(planningControls.fields.every(({h}) => Math.abs(h - 40) <= 2),
     'the day selector, time priority, duration and end time all have equal input heights');
-  assert.ok(planningControls.fields.every((field, index) => index === 0
-    || Math.abs(field.y - planningControls.fields[0].y) <= 2),
-  `all four primary controls share the same horizontal baseline: ${JSON.stringify(planningControls.fields)}`);
-  assert.ok(planningControls.fields.every((field, index) => index === 0
-    || field.x > planningControls.fields[index - 1].x),
-  'the controls remain ordered: playing days, target, duration, end time');
+  const planningRows = planningControls.fields;
+  const singleRow = Math.abs(planningRows[3].y - planningRows[0].y) <= 2;
+  if (singleRow) {
+    assert.ok(planningRows.every((field, index) => index === 0
+      || field.x > planningRows[index - 1].x),
+    'at wide widths the planning controls remain in day, target, duration, end-time order');
+  } else {
+    assert.ok(Math.abs(planningRows[0].y - planningRows[1].y) <= 2
+      && Math.abs(planningRows[2].y - planningRows[3].y) <= 2
+      && planningRows[2].y > planningRows[0].y,
+    `the responsive two-column layout must create two evenly aligned rows: ${JSON.stringify(planningRows)}`);
+    assert.ok(planningRows[0].x < planningRows[1].x && planningRows[2].x < planningRows[3].x,
+      'the two rows keep the intended control order without swapping inputs');
+  }
+  // The larger content area should produce the intended four-column layout.
+  await page.setViewportSize({ width: 1700, height: 960 });
+  const widePlanning = await page.evaluate(() =>
+    [...document.querySelectorAll('.tournament-mode-setting > *')]
+      .filter(element => !element.classList.contains('recommendation-linked-explanation'))
+      .slice(0, 4)
+      .map(element => {
+        const r = element.getBoundingClientRect();
+        return {x: r.x, y: r.y, width: r.width};
+      }));
+  assert.equal(widePlanning.length, 4);
+  assert.ok(widePlanning.every((item, index) => index === 0
+    || (Math.abs(item.y - widePlanning[0].y) <= 2 && item.x > widePlanning[index - 1].x)),
+    `wide layout must show four stable columns: ${JSON.stringify(widePlanning)}`);
+  await page.setViewportSize({ width: 1440, height: 960 });
   const initialPositions = await getTimeFieldPositions();
   assert.ok(initialPositions);
   assert.ok(initialPositions.durationX < initialPositions.endX,
