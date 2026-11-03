@@ -164,7 +164,10 @@ try {
   await durationDialog.getByLabel('Minuten (0–59)').fill('10');
   await durationDialog.getByRole('button', { name: 'Dauer übernehmen' }).click();
   assert.equal(await page.locator('#preferred-duration strong').innerText(), '2 Std. 10 Min.');
-  await page.getByRole('radio', { name: 'Gewünschte Endzeit' }).check();
+  assert.equal(await page.locator('#preferred-end-time .clock-picker-trigger-value').innerText(),
+    '11:10', 'changing duration immediately updates the end clock');
+  await page.getByRole('button', { name: 'Geplante Turnierdauer um 15 Minuten erhöhen' }).click();
+  assert.equal(await page.locator('#preferred-end-time .clock-picker-trigger-value').innerText(), '11:25');
   await page.locator('#preferred-end-time').click();
   const endTimeDialog = page.getByRole('dialog', { name: 'Gewünschte Endzeit einstellen' });
   await endTimeDialog.waitFor();
@@ -172,16 +175,15 @@ try {
   await endTimeDialog.getByLabel('Minute (0–59)').fill('30');
   await endTimeDialog.getByRole('button', { name: 'Übernehmen', exact: true }).click();
   assert.equal(await page.locator('#preferred-end-time .clock-picker-trigger-value').innerText(), '14:30');
+  assert.equal(await page.locator('#preferred-duration strong').innerText(), '5 Std. 30 Min.',
+    'editing the end time immediately updates the duration');
   assert.match(await page.locator('.recommendation-list .recommendation').first().innerText(),
-    /Ende ca\.|gewünschte Endzeit:/i);
+    /Ende ca\./i);
   await page.reload();
   await page.waitForSelector('.format-step');
-  assert.equal(await page.getByRole('radio', { name: 'Gewünschte Endzeit' }).isChecked(), true,
-    'preferred end-time mode must survive a reload');
   assert.equal(await page.locator('#preferred-end-time .clock-picker-trigger-value').innerText(), '14:30');
-  await page.getByRole('radio', { name: 'Gewünschte Turnierdauer' }).check();
-  assert.equal(await page.locator('#preferred-duration strong').innerText(), '2 Std. 10 Min.',
-    'switching modes must preserve the separate duration target');
+  assert.equal(await page.locator('#preferred-duration strong').innerText(), '5 Std. 30 Min.',
+    'both linked fields remain synchronized after draft recovery');
   const swissBefore = Number(await page.locator('#max-swiss-rounds').inputValue());
   const swissLimit = Number(await page.locator('#max-swiss-rounds').getAttribute('max'));
   if (swissBefore < swissLimit) {
@@ -197,8 +199,8 @@ try {
   assert.equal(swissLimit, 3, 'four participants allow at most three distinct Swiss opponents');
   await page.reload();
   await page.waitForSelector('.format-step');
-  assert.equal(await page.locator('#preferred-duration strong').innerText(), '2 Std. 10 Min.',
-    'chosen duration must persist in the saved creation draft');
+  assert.equal(await page.locator('#preferred-duration strong').innerText(), '5 Std. 30 Min.',
+    'the coupled duration must persist in the saved creation draft');
   assert.match(await page.locator('.format-settings-head').innerText(),
     /Passe die Vorschläge an deine Veranstaltung an/,
     'the general recommendation policy belongs in the settings panel');
@@ -864,9 +866,8 @@ try {
   await next(multiPage);
   await multiPage.getByRole('radio', { name: 'Mehrtägig' }).check();
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
-  await multiPage.getByRole('radio', { name: 'Gewünschte Endzeit' }).check();
   assert.match(await multiPage.locator('.recommendation-end-time-field .field-hint').innerText(),
-    /letzten Spieltag/, 'a multi-day end clock applies to the last playing day');
+    /Letzter Spieltag/, 'a multi-day end clock applies to the last playing day');
   await multiPage.locator('#preferred-end-time').click();
   const multiEndDialog = multiPage.getByRole('dialog', { name: 'Gewünschte Endzeit einstellen' });
   await multiEndDialog.getByLabel('Stunde (0–23)').fill('16');
@@ -874,7 +875,11 @@ try {
   await multiEndDialog.getByRole('button', { name: 'Übernehmen', exact: true }).click();
   assert.match(await multiPage.locator('.recommendation-list .recommendation').first().innerText(),
     /Ende ca\./, 'multi-day recommendations show actual projected finishing dates');
-  await multiPage.getByRole('radio', { name: 'Gewünschte Turnierdauer' }).check();
+  assert.equal(await multiPage.locator('#preferred-duration strong').innerText(), '9 Std.',
+    'editing the last playing-day clock updates the total active time');
+  await multiPage.getByRole('button', { name: 'Geplante Turnierdauer um 15 Minuten erhöhen' }).click();
+  assert.equal(await multiPage.locator('#preferred-end-time .clock-picker-trigger-value').innerText(), '16:45',
+    'extra active time is assigned to the final playing day');
   const dayControlGeometry = await multiPage.evaluate(() => {
     const days = document.querySelector('.tournament-day-count .recommendation-number-stepper');
     const groups = document.querySelector('.format-setting-fields .recommendation-number-stepper');
@@ -893,8 +898,8 @@ try {
     'playing-day +/- buttons must stay at the reduced 28px width');
   assert.ok(dayControlGeometry.groupWidth > dayControlGeometry.dayWidth + 15,
     'the playing-day counter must be visibly narrower than the other numeric steppers');
-  assert.equal(await multiPage.locator('#preferred-duration strong').innerText(), '3 Std. 30 Min.',
-    'multi-day mode does not change the total active-duration preference');
+  assert.equal(await multiPage.locator('#preferred-duration strong').innerText(), '9 Std. 15 Min.',
+    'multi-day changes retain the linked active-time preference');
   await multiPage.locator('.recommendation-list .recommendation').first().click();
   await next(multiPage);
   const initialMultiRecommendation = multiPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' });
