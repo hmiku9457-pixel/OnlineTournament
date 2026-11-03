@@ -113,6 +113,34 @@ try {
       durationY: duration.y, endY: end.y, durationWidth: duration.width,
       endWidth: end.width } : null;
   });
+  const planningControls = await page.evaluate(() => {
+    const root = document.querySelector('.tournament-mode-setting');
+    const day = root?.querySelector('.recommendation-period-column');
+    const stepper = day?.querySelector('.recommendation-number-stepper');
+    const target = root?.querySelector('.recommendation-target-options');
+    const duration = root?.querySelector('.recommendation-duration-field .recommendation-duration-stepper');
+    const end = root?.querySelector('.recommendation-end-time-field .recommendation-derived-value');
+    const mode = root?.querySelector('.recommendation-target-choice');
+    if (!day || !stepper || !target || !duration || !end || !mode) return null;
+    const d = day.getBoundingClientRect();
+    const fields = [stepper, target, duration, end].map(el => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height };
+    });
+    return { availableWidth: d.width, dayStepperWidth: fields[0].w,
+      modeWidth: mode.getBoundingClientRect().width, fields };
+  });
+  assert.ok(planningControls, 'the four planning controls must be present');
+  assert.ok(planningControls.dayStepperWidth >= planningControls.availableWidth - 2,
+    'the playing-day stepper fills its column instead of sitting in a narrow leftover strip');
+  assert.ok(planningControls.fields.every(({h}) => Math.abs(h - 40) <= 2),
+    'the day selector, time priority, duration and end time all have equal input heights');
+  assert.ok(planningControls.fields.every((field, index) => index === 0
+    || Math.abs(field.y - planningControls.fields[0].y) <= 2),
+  'all four primary controls share the same horizontal baseline');
+  assert.ok(planningControls.fields.every((field, index) => index === 0
+    || field.x > planningControls.fields[index - 1].x),
+  'the controls remain ordered: playing days, target, duration, end time');
   const initialPositions = await getTimeFieldPositions();
   assert.ok(initialPositions);
   assert.ok(initialPositions.durationX < initialPositions.endX,
