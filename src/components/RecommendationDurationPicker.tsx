@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { ClockTimeDial, type ClockMode } from '@/components/ClockTimePicker';
 
 export const MIN_RECOMMENDATION_DURATION = 15;
 export const MAX_RECOMMENDATION_DURATION = 14 * 24 * 60 - 1;
@@ -25,17 +24,16 @@ interface Props {
   multiDay?: boolean;
 }
 
-/** Duration instead of a clock time, with familiar clock dial and precise HH:MM fields. */
+/** Duration editor with explicitly labeled units, not a clock-time picker. */
 export function RecommendationDurationPicker({ value, onChange, multiDay = false }: Props) {
   const maximum = multiDay ? MAX_RECOMMENDATION_DURATION : MAX_SINGLE_DAY_DURATION;
   const maxHours = Math.floor(maximum / 60);
   const titleId = useId();
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<ClockMode>('hours');
   const [hoursText, setHoursText] = useState('03');
   const [minutesText, setMinutesText] = useState('30');
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const firstTabRef = useRef<HTMLButtonElement>(null);
+  const firstTabRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
 
   const hours = /^\d{1,3}$/.test(hoursText) && Number(hoursText) <= maxHours ? Number(hoursText) : null;
@@ -45,7 +43,6 @@ export function RecommendationDurationPicker({ value, onChange, multiDay = false
   function openDialog() {
     setHoursText(String(Math.floor(value / 60)).padStart(2, '0'));
     setMinutesText(String(value % 60).padStart(2, '0'));
-    setMode('hours');
     setOpen(true);
   }
   function closeDialog() {
@@ -86,10 +83,10 @@ export function RecommendationDurationPicker({ value, onChange, multiDay = false
     <>
       <button type="button" id="preferred-duration" className="recommendation-duration-trigger"
         ref={triggerRef} aria-haspopup="dialog" aria-expanded={open}
-        aria-label={`Geplante Turnierdauer einstellen, aktuell ${formatRecommendationDuration(value)}`}
+        aria-label={`Geplante Turnierdauer als Zeitspanne einstellen, aktuell ${formatRecommendationDuration(value)}`}
         onClick={openDialog}>
-        <strong>{String(Math.floor(value / 60)).padStart(2, '0')}:{String(value % 60).padStart(2, '0')}</strong>
-        <span aria-hidden="true"> <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 6.5V12l4 2.5"/></svg></span>
+        <strong>{formatRecommendationDuration(value)}</strong>
+        <span aria-hidden="true">✎</span>
       </button>
       {open && (
         <div className="clock-picker-backdrop" role="presentation" onMouseDown={(event) => {
@@ -101,38 +98,22 @@ export function RecommendationDurationPicker({ value, onChange, multiDay = false
               <h2 id={titleId}>Geplante Turnierdauer</h2>
               <button type="button" className="clock-picker-close" aria-label="Schließen" onClick={closeDialog}>×</button>
             </div>
-            <p className="clock-picker-dialog-note">Gewünschte Dauer in Stunden und Minuten wählen – keine Uhrzeit.</p>
-            <div className="clock-picker-digital" role="group" aria-label="Stunden oder Minuten der Turnierdauer">
-              <button type="button" ref={firstTabRef} aria-pressed={mode === 'hours'}
-                className={mode === 'hours' ? 'is-active' : ''} onClick={() => setMode('hours')}>
-                {hours === null ? '--' : String(hours).padStart(2, '0')}
-              </button>
-              <span aria-hidden="true">:</span>
-              <button type="button" aria-pressed={mode === 'minutes'}
-                className={mode === 'minutes' ? 'is-active' : ''} onClick={() => setMode('minutes')}>
-                {minutes === null ? '--' : String(minutes).padStart(2, '0')}
-              </button>
-            </div>
-            <ClockTimeDial mode={mode} hour={(hours ?? 0) % 24} minute={minutes ?? 0}
-              onPickHour={(next) => { setHoursText(String(next).padStart(2, '0')); setMode('minutes'); }}
-              onPickMinute={(next) => setMinutesText(String(next).padStart(2, '0'))}/>
-            <p className="clock-picker-ring-hint">{mode === 'hours'
-              ? 'Stunden auf dem Zifferblatt auswählen (0–23); für mehrtägige Turniere höhere Werte unten eingeben.'
-              : 'Minuten in 5er-Schritten auswählen oder unten genau eingeben.'}</p>
-            <div className="clock-picker-manual">
+            <p className="clock-picker-dialog-note">Hier gibst du an, <strong>wie lange</strong> das Turnier dauern soll – keine Start- oder Enduhrzeit.</p>
+            <div className="clock-picker-manual recommendation-duration-inputs">
               <label>Stunden (0–{maxHours})
-                <input type="number" min="0" max={maxHours} inputMode="numeric" value={hoursText}
-                  onChange={(event) => { setHoursText(event.target.value); setMode('hours'); }} />
+                <input ref={firstTabRef} type="number" min="0" max={maxHours} inputMode="numeric" value={hoursText}
+                  onChange={(event) => setHoursText(event.target.value)} />
               </label>
               <label>Minuten (0–59)
                 <input type="number" min="0" max="59" inputMode="numeric" value={minutesText}
-                  onChange={(event) => { setMinutesText(event.target.value); setMode('minutes'); }} />
+                  onChange={(event) => setMinutesText(event.target.value)} />
               </label>
             </div>
+            {candidate !== null && <p className="recommendation-duration-preview" role="status">Geplante Dauer: <strong>{formatRecommendationDuration(candidate)}</strong></p> 
             {candidate === null && <p className="clock-picker-minimum-hint" role="status">Bitte eine Dauer zwischen 15 Minuten und {formatRecommendationDuration(maximum)} eingeben.</p>}
             <div className="clock-picker-actions">
               <button type="button" className="btn" onClick={closeDialog}>Abbrechen</button>
-              <button type="button" className="btn primary" disabled={candidate === null} onClick={submit}>Übernehmen</button>
+              <button type="button" className="btn primary" disabled={candidate === null} onClick={submit}>Dauer übernehmen</button>
             </div>
           </section>
         </div>
