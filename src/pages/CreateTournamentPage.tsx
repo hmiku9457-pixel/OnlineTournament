@@ -1243,6 +1243,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       const altered = needsRosterPhaseReview(oldPhase, nextPhase, index);
       return altered ? [oldPhase.id] : [];
     });
+    const losses = phaseBreakLosses(phaseDrafts, normalized);
+    if (losses.length) {
+      // Participant changes have already happened. Keep pauses untouched until
+      // the dependent edits are reviewed and confirmed.
+      setPendingPhaseChange({ next: normalized, losses, source: 'roster' });
+      return;
+    }
     if (needsReview.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...needsReview])]);
     if (JSON.stringify(normalized) !== JSON.stringify(phaseDrafts)) setPhaseDrafts(normalized);
   // Die Teilnehmerzahl ist die Quelle für das Startfeld aller Phasen.
@@ -1270,12 +1277,32 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   /** Explicitly acknowledge every participant count changed as a consequence
    * of inserting, removing or reordering phases (not just roster changes). */
-  function normalizeAndTrackPhaseChanges(previous: PhaseDraft[], proposed: PhaseDraft[], manuallyEditedId?: string): PhaseDraft[] {
-    setPhaseLimitError('');
+  function normalizeAndTrackPhaseChanges(previous: PhaseDraft[], proposed: PhaseDraft[],
+    manuallyEditedId?: string, confirmed = false): PhaseDraft[] | null {
     const normalized = normalizePhaseEntrants(proposed);
+    const retainedIds = new Set(normalized.map((phase) => phase.id));
+    const losses = phaseBreakLosses(previous, normalized).filter((loss) => retainedIds.has(loss.id));
+    if (losses.length && !confirmed) {
+      setPendingPhaseChange({ next: normalized, losses, manuallyEditedId, source: 'manual' });
+      return null;
+    }
     const changed = changedPhaseEntrantIds(previous, normalized, manuallyEditedId);
     if (changed.length) setReviewRequiredPhaseIds((current) => [...new Set([...current, ...changed])]);
+    setPhaseLimitError('');
     return normalized;
+  }
+
+  function approvePhaseChanges() {
+    if (!pendingPhaseChange) return;
+    const { next, losses, manuallyEditedId } = pendingPhaseChange;
+    const changedIds = changedPhaseEntrantIds(phaseDrafts, next, manuallyEditedId);
+    const affected = [...changedIds, ...losses.map((loss) => loss.id)];
+    if (affected.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...affected])]);
+    setPhaseDrafts(next);
+    setSelectedRecommendationId(null);
+    setPhaseLimitError('');
+    setPendingPhaseChange(null);
+    setPhaseInsertIndex(null);
   }
 
   function insertPhase(insertIndex: number, type: StageType) {
