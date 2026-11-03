@@ -109,7 +109,7 @@ export function RecommendationDurationPicker({ value, onChange, multiDay = false
                   onChange={(event) => setMinutesText(event.target.value)} />
               </label>
             </div>
-            {candidate !== null && <p className="recommendation-duration-preview" role="status">Geplante Dauer: <strong>{formatRecommendationDuration(candidate)}</strong></p> 
+            {candidate !== null && <p className="recommendation-duration-preview" role="status">Geplante Dauer: <strong>{formatRecommendationDuration(candidate)}</strong></p>}
             {candidate === null && <p className="clock-picker-minimum-hint" role="status">Bitte eine Dauer zwischen 15 Minuten und {formatRecommendationDuration(maximum)} eingeben.</p>}
             <div className="clock-picker-actions">
               <button type="button" className="btn" onClick={closeDialog}>Abbrechen</button>
