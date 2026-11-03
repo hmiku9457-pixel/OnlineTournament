@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, reconcileRoundDependentBreaks } from '@/domain/creationPlanTransitions';
 import { invalidParticipantRosterIndices } from '@/domain/participantNames';
 import { suggestDaySplit, validPlayingDayBreaks } from '@/domain/playingDays';
+import { validateTournamentCreation } from '@/domain/validateTournamentCreation';
 
 const phase = (rounds = 5) => ({
   type: 'SWISS' as const, entrantCount: 8, groupCount: 2, swissRounds: rounds,
@@ -43,6 +44,22 @@ describe('creation wizard transitions', () => {
     expect(countCreationScheduleEntries([phase()])).toBe(7);
     expect(countCreationScheduleEntries([phase()], true)).toBe(8);
     expect(countCreationScheduleEntries([{ ...phase(), dayBreaks: [], inlineBreakAfterRound: 0 }])).toBe(1);
+  });
+
+  it('blocks an oversized generated schedule before creation', () => {
+    const phases = Array.from({ length: 20 }, (_, i) => ({
+      type: 'SWISS' as const, label: `Schweizer ${i + 1}`, entrantCount: 8, groupCount: 2,
+      swissRounds: 5, bestOf: 3, knockoutBestOf: [],
+      inlineBreakAfterRound: 2, inlineBreakKind: 'minutes' as const, inlineBreakMinutes: 15,
+      dayBreaks: [{ afterRound: 4, date: '2030-11-02', time: '09:00' }],
+    }));
+    const errors = validateTournamentCreation({
+      name: 'Vereinsturnier', sport: 'table_tennis', discipline: 'SINGLES',
+      tables: 4, minimumMatches: 2,
+      participantNames: Array.from({ length: 8 }, (_, i) => `Spieler ${i + 1}`),
+      phases,
+    });
+    expect(errors.join(' ')).toContain('mehr als 80 Zeitplaneinträge');
   });
 
   it('identifies non-feasible multi-day suggestions', () => {
