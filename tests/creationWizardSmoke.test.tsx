@@ -158,5 +158,19 @@ describe('five-step tournament creation smoke test', () => {
     expect(phaseMarkup).toContain('Mindestspielzahl nicht erreicht');
     expect(phaseMarkup).toContain('Garantiert <b>1</b> von gewünschten <b>4</b>');
     expect(phaseMarkup).toContain('Phasenplanung prüfen');
+
+    draft.step = 5;
+    draft.name = '';
+    const invalidReview = renderWizard();
+    expect(invalidReview).toContain('Erstellung noch nicht möglich');
+    expect(invalidReview).toContain('Grunddaten korrigieren');
+    expect(invalidReview).toContain('Die nachfolgenden Erstellungshindernisse');
+
+    draft.step = 2;
+    draft.name = 'Vereinsmeisterschaft';
+    draft.participants.push({ id: 'participant-3', firstName: 'Ada', lastName: 'Lovelace', partnerFirstName: '', partnerLastName: '' });
+    const invalidRoster = renderWizard();
+    expect(invalidRoster).toContain('Alle fehlerhaften Einträge entfernen');
+    expect(invalidRoster).toContain('fehlerhafte');
   });
 });
