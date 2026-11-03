@@ -59,7 +59,7 @@ import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fi
 import { configuredPlayingDays, followingPlayingDate, playingRounds, type PlayingDayBreak } from '@/domain/playingDays';
 import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays, recommendationEndTimePenalty } from '@/domain/creationPlanRecommendations';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
-import { buildPlannedTimeline, formatPlannedDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, playingDayOverflowWarnings, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, formatPlannedDateTime, parseLocalDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, playingDayOverflowWarnings, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
