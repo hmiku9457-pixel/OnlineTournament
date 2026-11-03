@@ -7791,28 +7791,64 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   }
 }
 
-/* Step 3: the director can anchor either target against a live start time. */
-.wizard-workspace .format-step .recommendation-time-priority {
+/* Step 3: choose one editable planning target; show the other as a
+   read-only calculation, not as a second editable time input. */
+.wizard-workspace .format-step .recommendation-target-choice {
   display: flex;
+  flex: 0 1 235px;
   align-items: center;
   flex-wrap: wrap;
-  gap: 7px 14px;
-  flex: 1 1 100%;
+  gap: 5px;
+  min-width: 215px;
   margin: 0;
   padding: 0;
   border: 0;
-  font-size: .75rem;
 }
-.wizard-workspace .format-step .recommendation-time-priority legend {
-  float: left;
-  margin-right: 10px;
-  font-weight: 700;
+.wizard-workspace .format-step .recommendation-target-choice legend {
+  width: 100%;
+  margin: 0 0 5px;
+  padding: 0;
+  font-size: .76rem;
+  font-weight: 750;
 }
-.wizard-workspace .format-step .recommendation-time-priority label {
-  display: inline-flex;
+.wizard-workspace .format-step .recommendation-target-choice .tournament-mode-option {
+  flex: 1 1 100px;
+}
+.wizard-workspace .format-step .recommendation-time-linked {
+  flex: 1 1 385px;
+  grid-template-columns: minmax(170px, 1.1fr) minmax(140px, .9fr);
+}
+.wizard-workspace .format-step .recommendation-derived-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: .76rem;
+  font-weight: 650;
+}
+.wizard-workspace .format-step .recommendation-derived-value {
+  display: flex;
   align-items: center;
-  gap: 5px;
-  cursor: pointer;
+  min-height: 36px;
+  width: 100%;
+  padding: 6px 11px;
+  border: 1px solid #dce4ef;
+  border-radius: 9px;
+  background: #eef3f9;
+  color: #344054;
+  font-size: .84rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.wizard-workspace .format-step .recommendation-derived-field .field-hint {
+  display: block;
+  padding-top: 4px;
+}
+@media (max-width: 480px) {
+  .wizard-workspace .format-step .recommendation-target-choice {
+    flex: 1 1 100%;
+  }
+  .wizard-workspace .format-step .recommendation-time-linked {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .wizard-workspace .format-step .recommendation-end-day-choice {
   display: block;
