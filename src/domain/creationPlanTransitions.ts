@@ -15,6 +15,8 @@ export interface RoundDependentPhase {
 export interface RoundAdjustmentImpact {
   removedDayBreaks: number;
   removedInlineBreak: boolean;
+  /** Lost early KO round settings, in their former chronological order. */
+  removedKnockoutBestOf?: number[];
 }
 
 /** A change to the number of rounds must not leave invisible, invalid breaks. */
@@ -70,7 +72,7 @@ export interface PhaseBreakLoss {
 }
 
 /** Compare complete plans, including later phases altered by entrant normalization. */
-export function phaseBreakLosses<T extends RoundDependentPhase & { id: string; label: string }>(
+export function phaseBreakLosses<T extends RoundDependentPhase & { id: string; label: string; knockoutBestOf?: readonly number[] }>(
   before: readonly T[], after: readonly T[],
 ): PhaseBreakLoss[] {
   const afterById = new Map(after.map((phase) => [phase.id, phase]));
@@ -83,8 +85,12 @@ export function phaseBreakLosses<T extends RoundDependentPhase & { id: string; l
       .slice(0, removedCount).map((boundary) => boundary.afterRound);
     const removedInlineBreak = phase.inlineBreakAfterRound > 0
       && (!updated || updated.inlineBreakAfterRound === 0);
-    return removedRounds.length || removedInlineBreak
-      ? [{ id: phase.id, label: phase.label, removedRounds, removedInlineBreak }] : [];
+    const originalKo = phase.type === 'KNOCKOUT' ? phase.knockoutBestOf ?? [] : [];
+    const newKoLength = updated?.type === 'KNOCKOUT' ? updated.knockoutBestOf?.length ?? 0 : 0;
+    const removedKnockoutBestOf = originalKo.slice(0, Math.max(0, originalKo.length - newKoLength));
+    return removedRounds.length || removedInlineBreak || removedKnockoutBestOf.length
+      ? [{ id: phase.id, label: phase.label, removedRounds, removedInlineBreak,
+        ...(removedKnockoutBestOf.length ? { removedKnockoutBestOf: [...removedKnockoutBestOf] } : {}) }] : [];
   });
 }
 
