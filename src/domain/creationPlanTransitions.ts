@@ -16,8 +16,6 @@ export interface RoundDependentPhase {
 export interface RoundAdjustmentImpact {
   removedDayBreaks: number;
   removedInlineBreak: boolean;
-  /** Lost early KO round settings, in their former chronological order. */
-  removedKnockoutBestOf?: number[];
 }
 
 /** A change to the number of rounds must not leave invisible, invalid breaks. */
@@ -70,6 +68,8 @@ export interface PhaseBreakLoss {
   label: string;
   removedRounds: number[];
   removedInlineBreak: boolean;
+  /** Lost early KO round settings, in their former chronological order. */
+  removedKnockoutBestOf?: number[];
 }
 
 /** Compare complete plans, including later phases altered by entrant normalization. */
