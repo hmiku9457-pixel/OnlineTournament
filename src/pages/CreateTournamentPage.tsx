@@ -485,8 +485,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       };
       return initial;
     }
-    const draft = initialRecoveryDraft
-      ?? loadCreationDraft(typeof window !== 'undefined' ? window.sessionStorage : undefined, sessionDraftKey)
+    const draft = loadCreationDraft(typeof window !== 'undefined' ? window.sessionStorage : undefined, sessionDraftKey)
+      ?? initialRecoveryDraft
       ?? (savedDraftId ? initialNamedDraft?.draft ?? null : null);
     if (draft) {
       participantSequence = Math.max(participantSequence,
@@ -512,7 +512,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const savedDraftRevision = useRef<number | null>((() => {
     if (!savedDraftId) return null;
     const fallback = initialNamedDraft?.revision ?? 1;
-    const recovery = initialRecoveryDraft ?? loadCreationDraft(window.sessionStorage, sessionDraftKey);
+    const recovery = loadCreationDraft(window.sessionStorage, sessionDraftKey) ?? initialRecoveryDraft;
     if (!recovery) return fallback;
     const stored = Number(window.sessionStorage.getItem(`${sessionDraftKey}:base-revision`));
     return Number.isSafeInteger(stored) && stored >= 1 ? stored : fallback;
@@ -926,6 +926,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   useEffect(() => { latestDraftSnapshot.current = draftSnapshot; }, [draftSnapshot]);
   useEffect(() => {
     if (prestart) return; // Never save a director's prestart edits as a new tournament draft.
+    // Keep a small per-tab session mirror for immediate reloads and the existing
+    // browser smoke contract. Large participant lists live only in IndexedDB.
+    if (JSON.stringify(draftSnapshot).length <= 200_000) {
+      saveCreationDraft(draftSnapshot, window.sessionStorage, sessionDraftKey);
+    } else clearCreationDraft(window.sessionStorage, sessionDraftKey);
     let active = true;
     void saveCreationRecoveryAtomic(recoveryKey, draftSnapshot)
       .then(() => { if (active) setDraftSaveFailed(false); })
