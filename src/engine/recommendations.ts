@@ -26,6 +26,8 @@ export interface RecommendationSettings {
   maxRecommendedDurationMinutes?: number;
   /** Soft target: formats within the chosen duration take priority; fill with longer alternatives. */
   preferredDurationMinutes?: number;
+  /** Number of candidates to return; 0 means return the complete pool for feasibility filtering. */
+  maxResults?: number;
 }
 
 export interface FormatRecommendation {
@@ -404,7 +406,9 @@ export function recommendTournamentFormats(
   const withinWindow = recommendations.filter((item) => item.estimatedDurationMinutes <= preferredDuration).sort(byPreference);
   const longer = recommendations.filter((item) => item.estimatedDurationMinutes > preferredDuration)
     .sort((a, b) => a.estimatedDurationMinutes - b.estimatedDurationMinutes || byPreference(a, b));
+  const ranked = [...withinWindow, ...longer];
+  const maxResults = settings.maxResults ?? 5;
   return settings.maxRecommendedDurationMinutes === undefined
-    ? [...withinWindow.slice(0, 5), ...longer.slice(0, Math.max(0, 5 - withinWindow.length))]
-    : recommendations.sort(byPreference);
+    ? maxResults === 0 ? ranked : ranked.slice(0, maxResults)
+    : maxResults === 0 ? recommendations.sort(byPreference) : recommendations.sort(byPreference).slice(0, maxResults);
 }
