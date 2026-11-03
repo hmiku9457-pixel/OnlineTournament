@@ -1539,9 +1539,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       if (!adjacentPauseId) setPendingPhaseRemoval(id);
       return;
     }
+    // Close the first confirmation before any dependent phase-change dialog opens.
+    setPendingPhaseRemoval(null);
     const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, candidate, id);
     if (!normalized) return;
-    setPendingPhaseRemoval(null);
     setSelectedRecommendationId(null);
     const retainedIds = new Set(normalized.map((phase) => phase.id));
     setReviewRequiredPhaseIds((ids) => ids.filter((candidateId) => retainedIds.has(candidateId)));
