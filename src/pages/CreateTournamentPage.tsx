@@ -969,14 +969,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   );
 
   const recommendationAssessments = useMemo(() => recommendations.map((item) =>
-    tournamentMode === 'single'
-      ? { feasible: true, daySplitPossible: true, reason: null }
-      : assessRecommendationTime(item, {
-        start: scheduledStart, days: plannedDays, participants: participantCount, tableCount: tables,
-        timing: timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes }
-          : { minutesPerSet: planningMinutesPerSet(sport) },
-        bestOfFor: (type) => phaseBestOfForSport(sport, type),
-      })),
+    assessRecommendationTime(item, {
+      start: scheduledStart, days: tournamentMode === 'single' ? 1 : plannedDays,
+      participants: participantCount, tableCount: tables,
+      timing: timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes }
+        : { minutesPerSet: planningMinutesPerSet(sport) },
+      bestOfFor: (type) => phaseBestOfForSport(sport, type),
+    })),
   [recommendations, tournamentMode, scheduledStart, plannedDays, participantCount,
     tables, timedSport, matchDurationMinutes, breakMinutes, sport]);
   const firstSelectableRecommendationIndex = recommendationAssessments.findIndex((assessment) => assessment.feasible);
@@ -988,7 +987,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   /** The editable phase plan is authoritative even when inputs change. */
   const plannedDayMismatch = tournamentMode === 'multi' && configuredPlayingDays(phaseDrafts) !== plannedDays;
-  const recommendationPlanMatches = Boolean(selectedRecommendation
+  const recommendationStructureMatches = Boolean(selectedRecommendation
     && !plannedDayMismatch && configuredPlayingDays(phaseDrafts) === (tournamentMode === 'multi' ? plannedDays : 1)
     && phaseDrafts.filter((phase) => phase.type !== 'BREAK').length === selectedRecommendation.phases.length
     && phaseDrafts.filter((phase) => phase.type !== 'BREAK').every((phase, index) => {
@@ -998,6 +997,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         && (phase.type !== 'GROUPS' || phase.groupCount === (original.groupCount ?? 2))
         && (phase.type !== 'SWISS' || phase.swissRounds === (original.swissRounds ?? 1));
     }));
+  const currentRecommendationAssessment = recommendationAssessments[recommendations.findIndex(
+    (item) => item.id === selectedRecommendationId)];
+  const recommendationTimeMatches = Boolean(recommendationStructureMatches && currentRecommendationAssessment?.feasible
+    && currentRecommendationAssessment.scheduleSignature === creationPlanScheduleSignature(phaseDrafts));
+  const recommendationPlanMatches = Boolean(recommendationStructureMatches && recommendationTimeMatches);
   // Frühere Einstellungen dürfen vorhandene manuell angepasste Phasen nicht
   // unbemerkt löschen oder eine Empfehlung erneut über die Änderungen legen.
   useEffect(() => {
@@ -1231,27 +1235,15 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const timing = timedSport
       ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes }
       : { minutesPerSet: planningMinutesPerSet(sport) };
-    const split = suggestDaySplit(created.map((phase) => ({
-      ...phase, estimatedMinutes: estimatePhaseMetrics(phase, tables, timing).estimatedDurationMinutes,
-    })), plannedDays);
-    if (!split.possible) return created;
-    const withBreaks: PhaseDraft[] = [];
-    let day = 0;
-    for (let index = 0; index < created.length; index++) {
-      const phase = created[index];
-      phase.dayBreaks = split.insidePhases.filter((item) => item.phaseIndex === index).map((item) => ({
-        afterRound: item.afterRound, date: followingPlayingDate(scheduledDate, ++day), time: '09:00',
-      }));
-      withBreaks.push(phase);
-      if (split.betweenPhases.includes(index)) {
-        const pause = phaseDraftFromTemplate(createPhaseTemplate('BREAK', index + 1, { entrantCount: phase.entrantCount }), participantCount, sport);
+    const proposal = distributePlayingDays(created, plannedDays, scheduledDate, tables, timing,
+      (entrants) => {
+        const pause = phaseDraftFromTemplate(
+          createPhaseTemplate('BREAK', created.length + 1, { entrantCount: entrants }), participantCount, sport);
         pause.label = 'Spieltagsende';
         pause.breakKind = 'overnight';
-        pause.nextDayDate = followingPlayingDate(scheduledDate, ++day);
-        withBreaks.push(pause);
-      }
-    }
-    return withBreaks;
+        return pause;
+      }, { scheduledStart });
+    return proposal.possible ? proposal.phases : created;
   }
 
   function applyAutomaticPlayingDays() {
