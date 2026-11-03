@@ -7697,3 +7697,12 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   line-height: 1.35;
   text-align: center;
 }
+
+/* Infeasible multi-day recommendations stay visible for comparison, but cannot be selected. */
+.wizard-workspace .format-step .recommendation-select:disabled,
+.wizard-workspace .format-step .recommendation-select:disabled:hover {
+  cursor: not-allowed;
+  opacity: .68;
+  border-color: #dce4f0;
+  background: #f8fafc;
+}
