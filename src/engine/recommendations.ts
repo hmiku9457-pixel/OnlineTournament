@@ -410,5 +410,5 @@ export function recommendTournamentFormats(
   const maxResults = settings.maxResults ?? 5;
   return settings.maxRecommendedDurationMinutes === undefined
     ? maxResults === 0 ? ranked : ranked.slice(0, maxResults)
-    : maxResults === 0 ? recommendations.sort(byPreference) : recommendations.sort(byPreference).slice(0, maxResults);
+    : recommendations.sort(byPreference);
 }
