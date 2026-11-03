@@ -4030,7 +4030,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
               <button type="button" className="btn primary" onClick={() => applySingleDayConversion('convert')}>
                 Als normale Pausen behalten
               </button>
-              {phaseDrafts.some((phase) => phase.type === 'BREAK' && phase.breakKind === 'overnight') || singleDayFixedPauseConflicts(phaseDrafts, scheduledDate).length > 0) && (
+              {(phaseDrafts.some((phase) => phase.type === 'BREAK' && phase.breakKind === 'overnight') || singleDayFixedPauseConflicts(phaseDrafts, scheduledDate).length > 0) && (
                 <button type="button" className="btn danger-outline" onClick={() => applySingleDayConversion('remove')}>
                   Mehrtägige Pausen löschen
                 </button>)}
