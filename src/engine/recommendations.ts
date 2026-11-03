@@ -230,11 +230,13 @@ export function recommendTournamentFormats(
   const swiss = calculateSwissPlan(playerCount, minimumMatches, settings.maxSwissRounds);
   const defaultQualifiers = playerCount >= 16 ? 8 : 4;
   // A combined format must cut the field before the K.-o. phase.
-  const maximumQualifiers = Math.min(playerCount - 1,
-    clampInteger(settings.knockoutQualifierCount, defaultQualifiers, 2, Math.max(2, playerCount)));
-  // Prefer a conventional bracket that actually eliminates players; the user's
-  // configured number is a ceiling rather than a requirement to retain everyone.
-  const qualifiers = [64, 32, 16, 8, 4, 2].find((size) => size <= maximumQualifiers) ?? 2;
+  const requestedQualifiers = clampInteger(settings.knockoutQualifierCount, defaultQualifiers, 2, Math.max(2, playerCount));
+  const maximumQualifiers = Math.min(playerCount - 1, requestedQualifiers);
+  // Respect an explicitly selected custom bracket size (for example six).
+  // Only reduce the field if the request would leave everyone advancing.
+  const qualifiers = requestedQualifiers < playerCount
+    ? requestedQualifiers
+    : [64, 32, 16, 8, 4, 2].find((size) => size <= maximumQualifiers) ?? 2;
   // Unequal group qualification counts are permitted and resolved by the
   // existing group-comparison/tiebreaker rules.
   const groupSwissEntrants = playerCount >= 4
