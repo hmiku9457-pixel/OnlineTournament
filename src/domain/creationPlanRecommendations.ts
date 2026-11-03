@@ -49,7 +49,7 @@ export interface PlayingDaySearchOptions {
 export function creationPlanTimeIssues(
   phases: readonly DayDistributionPhase[], scheduledStart: string,
   tables: number, timing: TimedMatchSettings, awardsEnabled = false,
-  awardsAtOverride?: string | null,
+  awardsAtOverride?: string | null, allowNextDayWithin24Hours = false,
 ): string[] {
   if (countCreationScheduleEntries(phases, awardsEnabled) > MAX_CREATION_SCHEDULE_ENTRIES) {
     return ['Die automatische Verteilung überschreitet die Grenze von 80 Zeitplaneinträgen.'];
@@ -77,7 +77,7 @@ export function creationPlanTimeIssues(
     ...(awardsEnabled && awardsAtOverride && awardsAtOverride < timeline.estimatedEnd
       ? [`Die fest geplante Siegerehrung um ${awardsAtOverride.replace('T', ' ')} liegt vor dem geschätzten Turnierende ${timeline.estimatedEnd.replace('T', ' ')}.`] : []),
     ...plannedTimelineConflicts(timeline),
-    ...playingDayOverflowWarnings(timeline),
+    ...playingDayOverflowWarnings(timeline, allowNextDayWithin24Hours),
     ...validatePlannedSchedule(timeline.items),
   ];
 }
@@ -198,7 +198,7 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
   if (!competition.length) return impossible('Mindestens eine Wettkampfphase erforderlich.');
   const scheduledStart = options.scheduledStart ?? `${startDate}T09:00`;
   const issuesFor = (candidate: readonly T[]) => creationPlanTimeIssues(candidate, scheduledStart,
-    tableCount, timing, options.awardsEnabled, options.awardsAtOverride);
+    tableCount, timing, options.awardsEnabled, options.awardsAtOverride, days === 1);
   if (days === 1) {
     const result = distributeAtBoundaries(phases, [], startDate, createOvernight);
     const issues = issuesFor(result.phases);

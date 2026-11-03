@@ -74,6 +74,10 @@ export interface CreationDraft {
   /** Frozen active-time allocation for all but the final playing day.
    * Both duration and end clock are derived from the same editable target. */
   preferredEarlierDaysMinutes?: number;
+  /** Which of the linked planning targets remains fixed when the live start time advances. */
+  preferredTimePriority?: 'duration' | 'end';
+  /** Absolute local date/time, deliberately not just an HH:mm clock. */
+  preferredFixedEndAt?: string | null;
   tournamentMode?: 'single' | 'multi';
   plannedDays?: number;
   awardsEnabled: boolean;
@@ -162,10 +166,13 @@ export function validDraft(value: unknown): value is CreationDraft {
     && (data.plannedDays === undefined || (Number.isInteger(data.plannedDays) && data.plannedDays >= 2 && data.plannedDays <= 14))
     && typeof data.preferredDurationMinutes === 'number'
     && Number.isInteger(data.preferredDurationMinutes) && data.preferredDurationMinutes >= 15
-    && data.preferredDurationMinutes <= (data.tournamentMode === 'multi' ? 14 * 24 * 60 - 1 : 1439)
+    && data.preferredDurationMinutes <= (data.tournamentMode === 'multi' ? 14 * 24 * 60 - 1 : 1440)
     && (data.preferredEarlierDaysMinutes === undefined
       || (Number.isInteger(data.preferredEarlierDaysMinutes) && data.preferredEarlierDaysMinutes >= 0
         && data.preferredEarlierDaysMinutes < Number.MAX_SAFE_INTEGER))
+    && (data.preferredTimePriority === undefined || ['duration', 'end'].includes(data.preferredTimePriority))
+    && (data.preferredFixedEndAt === undefined || data.preferredFixedEndAt === null
+      || (typeof data.preferredFixedEndAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(data.preferredFixedEndAt)))
     && (data.selectedRecommendationId === null || typeof data.selectedRecommendationId === 'string')
     && typeof data.awardsEnabled === 'boolean'
     && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string')

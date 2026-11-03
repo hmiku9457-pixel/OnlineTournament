@@ -34,8 +34,7 @@ function playableMinutesUntilMidnight(startWallClock: string): number {
 
 /** Maximum total active minutes on all playing days, excluding overnight gaps. */
 export function maximumLinkedActiveDuration(settings: LinkedTournamentTime): number {
-  if (settings.days <= 1) return Math.min(MAX_SINGLE_DAY_DURATION,
-    playableMinutesUntilMidnight(settings.scheduledStart));
+  if (settings.days <= 1) return MAX_SINGLE_DAY_DURATION;
   let total = playableMinutesUntilMidnight(settings.scheduledStart);
   const first = settings.scheduledStart.slice(0, 10);
   for (let day = 1; day < settings.days; day++) {
@@ -51,6 +50,7 @@ function previousDaysCapacity(settings: LinkedTournamentTime): number {
 }
 
 export function maximumLinkedDuration(settings: LinkedTournamentTime): number {
+  if (settings.days <= 1) return MAX_SINGLE_DAY_DURATION;
   const start = parseLocalDateTime(finalPlayingDayStart(settings));
   if (!start) return settings.days <= 1 ? MAX_SINGLE_DAY_DURATION : MAX_RECOMMENDATION_DURATION;
   const date = toLocalDateTime(start).slice(0, 10);
@@ -61,28 +61,41 @@ export function maximumLinkedDuration(settings: LinkedTournamentTime): number {
     (settings.days <= 1 ? 0 : settings.earlierDaysMinutes) + dailyLimit);
 }
 
-export function linkedEndTime(duration: number, settings: LinkedTournamentTime): string | null {
+/** A full date/time is required to distinguish 01:00 tonight from 01:00 tomorrow. */
+export function linkedEndDateTime(duration: number, settings: LinkedTournamentTime): string | null {
   const finalStart = parseLocalDateTime(finalPlayingDayStart(settings));
   if (!finalStart || !Number.isInteger(duration) || duration < MIN_RECOMMENDATION_DURATION
     || duration > maximumLinkedDuration(settings)) return null;
   const activeFinal = duration - (settings.days <= 1 ? 0 : settings.earlierDaysMinutes);
   if (activeFinal < 1) return null;
-  const actualEnd = new Date(finalStart.getTime() + activeFinal * 60_000);
-  return toLocalDateTime(actualEnd).slice(0, 10) === toLocalDateTime(finalStart).slice(0, 10)
-    ? toLocalDateTime(actualEnd).slice(11, 16) : null;
+  const actualEnd = toLocalDateTime(new Date(finalStart.getTime() + activeFinal * 60_000));
+  return settings.days <= 1 || actualEnd.slice(0, 10) === toLocalDateTime(finalStart).slice(0, 10)
+    ? actualEnd : null;
 }
 
-export function linkedDuration(endClock: string, settings: LinkedTournamentTime): number | null {
+export function linkedEndTime(duration: number, settings: LinkedTournamentTime): string | null {
+  return linkedEndDateTime(duration, settings)?.slice(11, 16) ?? null;
+}
+
+/** Calculate the duration against an absolute end. For a single-day tournament
+ * this may be on the following calendar date, but never later than 24 hours. */
+export function linkedDurationAt(endDateTime: string, settings: LinkedTournamentTime): number | null {
   const start = parseLocalDateTime(finalPlayingDayStart(settings));
-  if (!start) return null;
-  const date = toLocalDateTime(start).slice(0, 10);
-  const end = parseLocalDateTime(`${date}T${endClock}`);
-  if (!end) return null;
-  const dailyMinutes = Math.floor((end.getTime() - start.getTime()) / 60_000);
-  const duration = dailyMinutes + (settings.days <= 1 ? 0 : settings.earlierDaysMinutes);
-  if (dailyMinutes < 1 || duration < MIN_RECOMMENDATION_DURATION
+  const end = parseLocalDateTime(endDateTime);
+  if (!start || !end || (settings.days > 1
+    && endDateTime.slice(0, 10) !== toLocalDateTime(start).slice(0, 10))) return null;
+  const finalMinutes = Math.floor((end.getTime() - start.getTime()) / 60_000);
+  const duration = finalMinutes + (settings.days <= 1 ? 0 : settings.earlierDaysMinutes);
+  if (finalMinutes < 1 || duration < MIN_RECOMMENDATION_DURATION
     || duration > maximumLinkedDuration(settings)) return null;
   return duration;
+}
+
+/** Retains the older clock-based API for controls that explicitly select a day. */
+export function linkedDuration(endClock: string, settings: LinkedTournamentTime, followingDay = false): number | null {
+  const day = finalPlayingDayStart(settings).slice(0, 10);
+  const date = followingDay ? followingPlayingDate(day, 1) : day;
+  return linkedDurationAt(`${date}T${endClock}`, settings);
 }
 
 /** When a director chooses an unusually long duration, rebalance the unedited

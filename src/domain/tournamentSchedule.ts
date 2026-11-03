@@ -361,7 +361,17 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
 
 /** Verify that play never spills over midnight without an explicit day break.
  * Ordinary overnight pause entries are separators and are excluded here. */
-export function playingDayOverflowWarnings(timeline: PlannedTimeline): string[] {
+export function playingDayOverflowWarnings(timeline: PlannedTimeline, allowNextDayWithin24Hours = false): string[] {
+  if (allowNextDayWithin24Hours) {
+    const first = timeline.items.find((item) => item.type === 'competition')?.at;
+    const start = first ? parseLocalDateTime(first) : null;
+    const end = timeline.estimatedEnd ? parseLocalDateTime(timeline.estimatedEnd) : null;
+    if (!start || !end) return ['Der geplante Turnierzeitraum ist ungültig.'];
+    if (end.getTime() - start.getTime() > 24 * 60 * 60_000) {
+      return ['Ein eintägiges Turnier darf höchstens 24 Stunden dauern (einschließlich Pausen).'];
+    }
+    return [];
+  }
   const issues: string[] = [];
   let start: string | null = null;
   for (let index = 0; index < timeline.items.length; index++) {

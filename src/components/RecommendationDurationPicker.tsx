@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 
 export const MIN_RECOMMENDATION_DURATION = 15;
 export const MAX_RECOMMENDATION_DURATION = 14 * 24 * 60 - 1;
-export const MAX_SINGLE_DAY_DURATION = 23 * 60 + 59;
+export const MAX_SINGLE_DAY_DURATION = 24 * 60;
 export const DEFAULT_RECOMMENDATION_DURATION = 210;
 
 export function formatRecommendationDuration(minutes: number): string {

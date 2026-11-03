@@ -257,8 +257,8 @@ export function recommendTournamentFormats(
   const tripleSwissRounds = calculateSwissPlan(tripleSwissEntrants, minimumMatches, settings.maxSwissRounds);
 
   function addRecommendation(candidate: Omit<FormatRecommendation, 'estimatedDurationMinutes' | 'estimatedMatches'>) {
-    // A final K.-o. match determines a unique champion independently of standings ties.
-    // The wizard does not offer group-only, Swiss-only or other ranking-only conclusions.
+    // Explicitly requiring an unambiguous final is optional; rankings-only finals
+    // are valid choices and use the existing standings/tiebreaker rules.
     if (settings.requireDecisiveWinner && candidate.phases.at(-1)?.type !== 'KNOCKOUT') return;
     // All Swiss phases require at least three entrants and two rounds.
     if (candidate.phases.some((phase) => phase.type === 'SWISS'
@@ -386,6 +386,38 @@ export function recommendTournamentFormats(
         createPhaseTemplate('KNOCKOUT', 2, { entrantCount: count }),
       ],
     }));
+  }
+
+  if (playerCount >= 4 && systemsEnabled(['groups', 'round-robin'], settings)) {
+    const entrants = groupSwissEntrants;
+    addRecommendation({
+      id: 'groups-round-robin',
+      label: `${group.groupCount} Gruppen → ${entrants} Qualifizierte → Jeder gegen jeden`,
+      description: `Nach der Gruppenphase spielen die ${entrants} Bestplatzierten eine gemeinsame Finalrunde, deren Tabelle die Platzierungen bestimmt.`,
+      minimumGuaranteedMatches: group.minimumGuaranteedMatches,
+      score: playerCount <= 16 ? 82 : 65,
+      requiredSystems: ['groups', 'round-robin'],
+      phases: [
+        createPhaseTemplate('GROUPS', 1, { groupCount: group.groupCount, entrantCount: playerCount }),
+        createPhaseTemplate('ROUND_ROBIN', 2, { entrantCount: entrants }),
+      ],
+    });
+  }
+
+  if (playerCount >= 4 && systemsEnabled(['swiss', 'round-robin'], settings)) {
+    const entrants = Math.max(2, Math.min(playerCount - 1, qualifiers));
+    addRecommendation({
+      id: 'swiss-round-robin',
+      label: `${swiss.rounds} Runden Schweizer System → ${entrants} Qualifizierte → Jeder gegen jeden`,
+      description: `Eine Schweizer Qualifikation bestimmt die ${entrants} Finalisten, die anschließend in einer Jeder-gegen-jeden-Runde die Platzierungen ausspielen.`,
+      minimumGuaranteedMatches: minimumPlayedMatches('SWISS', playerCount, 2, swiss.rounds),
+      score: playerCount <= 16 ? 76 : 60,
+      requiredSystems: ['swiss', 'round-robin'],
+      phases: [
+        createPhaseTemplate('SWISS', 1, { swissRounds: swiss.rounds, entrantCount: playerCount }),
+        createPhaseTemplate('ROUND_ROBIN', 2, { entrantCount: entrants }),
+      ],
+    });
   }
 
   if (playerCount >= 4 && systemsEnabled(['groups', 'swiss'], settings)) {
