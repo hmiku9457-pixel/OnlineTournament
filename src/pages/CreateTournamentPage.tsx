@@ -755,8 +755,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     operation: 'insert' | 'move';
   } | null>(null);
   const [phaseLimitError, setPhaseLimitError] = useState('');
-  useEffect(() => { setPhaseLimitError(''); },
-    [phaseDrafts, participantCount, plannedDays, tournamentMode, awardsEnabled]);
   const [editingPhaseTypeId, setEditingPhaseTypeId] = useState<string | null>(null);
   const [expandedPhaseId, setExpandedPhaseId] = useState<string | null>(null);
   const [expandedInlineBreakIds, setExpandedInlineBreakIds] = useState<string[]>([]);
@@ -771,6 +769,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [tournamentMode, setTournamentMode] = useState<'single' | 'multi'>(restoredDraft?.tournamentMode ?? (restoredDraft?.phaseDrafts.some((phase) => (phase.dayBreaks?.length ?? 0) > 0 || (phase.type === 'BREAK' && phase.breakKind === 'overnight')) ? 'multi' : 'single'));
   const [plannedDays, setPlannedDays] = useState(restoredDraft?.plannedDays ?? 2);
   const [pendingTournamentMode, setPendingTournamentMode] = useState<'single' | null>(null);
+  useEffect(() => { setPhaseLimitError(''); },
+    [phaseDrafts, participantCount, plannedDays, tournamentMode, awardsEnabled]);
   const [pendingAutomaticSplit, setPendingAutomaticSplit] = useState(false);
   function applySingleDayConversion(treatment: 'convert' | 'remove') {
     const adjusted = convertToSingleDay(phaseDrafts, treatment);
