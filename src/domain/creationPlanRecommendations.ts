@@ -213,11 +213,11 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
   const total = cumulative[cumulative.length - 1];
   // Precompute the only positions which do not duplicate an existing inline
   // pause, including round boundaries across phases.
-  const validCuts = Array.from({ length: slots.length - 1 }, (_, i) => i + 1).filter((position) => {
+  const validCuts = new Set(Array.from({ length: slots.length - 1 }, (_, i) => i + 1).filter((position) => {
     const here = slots[position - 1], nextSlot = slots[position];
     return !(here.phaseIndex === nextSlot.phaseIndex
       && competition[here.phaseIndex].inlineBreakAfterRound === here.afterRound);
-  });
+  }));
   type PartialPlan = { cuts: number[]; score: number };
   let beam: PartialPlan[] = [{ cuts: [], score: 0 }];
   for (let day = 1; day < days; day++) {
@@ -251,7 +251,7 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
         candidatePositions.add(budgetCut + distance);
       }
       const candidates = [...candidatePositions].filter((position) => position >= lower
-        && position <= upper && validCuts.includes(position));
+        && position <= upper && validCuts.has(position));
       candidates.sort((a, b) => Math.abs(cumulative[a] - target) - Math.abs(cumulative[b] - target) || a - b);
       for (const position of candidates) {
         const boundary = slots[position - 1];
@@ -278,6 +278,69 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
       const following = slots[position];
       return { phaseIndex: last.phaseIndex, afterRound: last.afterRound,
         atPhaseEnd: following.phaseIndex !== last.phaseIndex };
+    });
+    const candidate = distributeAtBoundaries(phases, boundaries, startDate, createOvernight);
+    if (configuredPlayingDays(candidate.phases) !== days) continue;
+    const issues = issuesFor(candidate.phases);
+    if (!issues.length) return candidate;
+    if (!firstIssue) firstIssue = issues[0];
+  }
+  // Exact O(days × rounds) reachability fallback. Unlike a beam, this never
+  // drops a legal cutoff only because it is far from the balanced target.
+  // A final full-timeline validation still handles fixed pauses and dates.
+  const knownTimes = phases.flatMap((phase) => [
+    ...(phase.type === 'BREAK' && phase.breakKind === 'overnight' ? [phase.nextDayStart] : []),
+    ...phase.dayBreaks.map((item) => item.time),
+  ]);
+  const starts = [scheduledStart.slice(11, 16),
+    ...Array.from({ length: days - 1 }, (_, i) => knownTimes[i] || '09:00')];
+  const budgets = starts.map((time) => {
+    const match = /^(\\d{2}):(\\d{2})$/.exec(time);
+    return match ? 1440 - Number(match[1]) * 60 - Number(match[2]) : 900;
+  });
+  const n = slots.length;
+  let previousScores = new Float64Array(n + 1).fill(Infinity);
+  previousScores[0] = 0;
+  const predecessors: Int32Array[] = [];
+  for (let day = 1; day < days; day++) {
+    const currentScores = new Float64Array(n + 1).fill(Infinity);
+    const parent = new Int32Array(n + 1).fill(-1);
+    const queue: number[] = [];
+    let start = 0, cursor = 0;
+    for (let position = day; position <= n - (days - day); position++) {
+      const prior = position - 1;
+      if (Number.isFinite(previousScores[prior])) {
+        while (queue.length > start && previousScores[queue[queue.length - 1]] >= previousScores[prior])
+          queue.pop();
+        queue.push(prior);
+      }
+      while (queue.length > start && cumulative[position] - cumulative[queue[start]] > budgets[day - 1]) start++;
+      // Compaction preserves O(n) rather than letting the queue grow.
+      if (start > 1024) { queue.splice(0, start); start = 0; }
+      if (!validCuts.has(position) || queue.length <= start) continue;
+      const p = queue[start];
+      currentScores[position] = previousScores[p] + Math.abs(cumulative[position] - total * day / days);
+      parent[position] = p;
+    }
+    predecessors.push(parent);
+    previousScores = currentScores;
+  }
+  const lastCut = [...validCuts]
+    .filter((position) => Number.isFinite(previousScores[position])
+      && total - cumulative[position] <= budgets[days - 1])
+    .sort((a, b) => previousScores[a] - previousScores[b]);
+  for (const finish of lastCut.slice(0, 10)) {
+    const cuts = [finish];
+    let position = finish;
+    for (let day = days - 2; day >= 0; day--) {
+      position = predecessors[day][position];
+      if (position > 0) cuts.unshift(position);
+    }
+    if (cuts.length !== days - 1) continue;
+    const boundaries = cuts.map((cutoff) => {
+      const prior = slots[cutoff - 1], following = slots[cutoff];
+      return { phaseIndex: prior.phaseIndex, afterRound: prior.afterRound,
+        atPhaseEnd: following.phaseIndex !== prior.phaseIndex };
     });
     const candidate = distributeAtBoundaries(phases, boundaries, startDate, createOvernight);
     if (configuredPlayingDays(candidate.phases) !== days) continue;
