@@ -2177,7 +2177,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     <legend>Turnierzeitraum</legend>
                     <label className="tournament-mode-option">
                       <input type="radio" name="tournament-mode" checked={tournamentMode === 'single'}
-                        onChange={() => setPendingTournamentMode('single')}/>
+                        onChange={() => { if (tournamentMode !== 'single') setPendingTournamentMode('single'); }}/>
                       <span>Eintägig</span>
                     </label>
                     <label className="tournament-mode-option">
@@ -2258,11 +2258,16 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 {recommendations.length === 0 && (
                   <div className="callout">Mit den aktuellen Vorgaben gibt es keinen sinnvollen automatischen Vorschlag innerhalb des Zeitmodells. Du kannst trotzdem weitergehen und die Phasen manuell anlegen.</div>
                 )}
-                {recommendations.map((item, index) => (
-                  <button
+                {recommendations.map((item, index) => {
+                  const daySplitPossible = tournamentMode !== 'multi' || suggestDaySplit(item.phases.map((phase) => ({
+                    ...phase, entrantCount: phase.entrantCount ?? participantCount,
+                  })), plannedDays).possible;
+                  return <button
                     className={`card recommendation recommendation-select ${selectedRecommendationId === item.id && recommendationPlanMatches ? 'selected' : ''} ${index === 0 ? 'best' : ''}`}
                     key={item.id}
                     type="button"
+                    disabled={!daySplitPossible}
+                    title={!daySplitPossible ? 'Diese Empfehlung enthält zu wenige vollständige Runden für die gewünschte Anzahl Spieltage.' : undefined}
                     onClick={() => selectRecommendation(item)}
                   >
                     <div className="recommendation-heading">
@@ -2300,12 +2305,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     <div className="recommendation-metrics">
                       <span className="recommendation-metric-tag">{item.estimatedMatches} Spiele</span>
                       <span className="recommendation-metric-tag">ca. {formatDuration(item.estimatedDurationMinutes)}</span>
-                      {tournamentMode === 'multi' && <span className="recommendation-metric-tag">
-                        {suggestDaySplit(item.phases.map((phase) => ({
-                          ...phase, entrantCount: phase.entrantCount ?? participantCount,
-                        })), plannedDays).possible
+                      {tournamentMode === 'multi' && <span className={`recommendation-metric-tag ${!daySplitPossible ? 'wizard-metric-warning' : ''}`}>
+                        {daySplitPossible
                           ? `${plannedDays} Rundentagesabschnitte möglich · Uhrzeiten in Schritt 4 prüfen`
-                          : 'Zu wenige teilbare Runden für diese Anzahl Spieltage'}
+                          : 'Nicht wählbar: zu wenige Runden für die gewünschten Spieltage'}
                       </span>}
                       <span className={`recommendation-metric-tag ${item.minimumMatchShortfall ? 'wizard-metric-warning' : ''}`}>
                         mindestens {item.minimumGuaranteedMatches} gespielte Begegnungen
@@ -2318,8 +2321,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                           : `Warum empfohlen: Erfüllt dein Mindestspielziel; die geschätzte Dauer übersteigt deine Zielzeit von ${formatRecommendationDuration(preferredDurationMinutes)}.`}
                       </p>
                     )}
-                  </button>
-                ))}
+                  </button>;
+                })}
               </div>
 
             </div>
@@ -2330,6 +2333,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           <section className="phase-wizard-step">
             <h2>Phasen konfigurieren</h2>
             <p className="muted">Ordne deine Phasen an und öffne bei Bedarf die Einstellungen.</p>
+            <p className="field-hint">Zeitplaneinträge: {countCreationScheduleEntries(phaseDrafts, awardsEnabled)} von {MAX_CREATION_SCHEDULE_ENTRIES} möglich (Pausen und Fortsetzungen eingeschlossen).</p>
+            {phaseLimitError && <p className="field-error" role="alert">{phaseLimitError}</p>}
             {!prestart && !canCreate && (
               <div className="wizard-schedule-errors" role="alert">
                 <strong>Bitte vor der Zusammenfassung korrigieren:</strong>
@@ -2781,7 +2786,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                               <div className="playing-day-editor-heading">
                                 <div><strong>Spieltage innerhalb der Phase</strong>
                                   <p className="field-hint">Unterbrechung nach einer vollständigen Runde mit konkreter Fortsetzung am nächsten Spieltag.</p></div>
-                                <button type="button" className="btn small" disabled={dayRoundCount < 2 || phase.dayBreaks.length >= dayRoundCount - 1 || configuredPlayingDays(phaseDrafts) >= 14}
+                                <button type="button" className="btn small" disabled={dayRoundCount < 2 || phase.dayBreaks.length >= dayRoundCount - 1 || configuredPlayingDays(phaseDrafts) >= 14 || countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES}
                                   onClick={() => {
                                     const available = Array.from({ length: dayRoundCount - 1 }, (_, i) => i + 1)
                                       .find((round) => round !== phase.inlineBreakAfterRound && !phase.dayBreaks.some((item) => item.afterRound === round));
@@ -3286,15 +3291,44 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             onKeyDown={(event) => { if (event.key === 'Escape') setPendingTournamentMode(null); }}>
             <h2>Auf eintägiges Turnier umstellen?</h2>
             <p>Die Veranstaltung wird wieder für einen Spieltag geplant. Die gewünschte aktive Turnierdauer und alle anderen Einstellungen bleiben erhalten.</p>
-            {configuredPlayingDays(phaseDrafts) > 1 && (
-              <p className="modal-mode-warning">Im Phasenplan sind bereits Spieltagsenden eingerichtet. Sie werden nicht automatisch gelöscht und müssen vor der Erstellung angepasst werden.</p>
+            {countConfiguredDayTransitions(phaseDrafts) > 0 && (
+              <p className="modal-mode-warning">{countConfiguredDayTransitions(phaseDrafts)} vorhandene Spieltagswechsel werden entfernt. Normale Pausen in Minuten oder bis Uhrzeit bleiben bestehen.</p>
             )}
             <div className="sport-change-dialog-actions">
               <button type="button" className="btn" autoFocus onClick={() => setPendingTournamentMode(null)}>Mehrtägig behalten</button>
               <button type="button" className="btn primary" onClick={() => {
+                const adjusted = convertToSingleDay(phaseDrafts);
+                setPhaseDrafts(normalizeAndTrackPhaseChanges(phaseDrafts, adjusted));
+                setReviewRequiredPhaseIds((ids) => ids.filter((id) => adjusted.some((phase) => phase.id === id)));
+                setSelectedRecommendationId(null);
                 setTournamentMode('single');
+                setPhaseLimitError('');
                 setPendingTournamentMode(null);
               }}>Auf eintägig umstellen</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {pendingRoundAdjustment && (
+        <div className="sport-change-backdrop" role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingRoundAdjustment(null); }}>
+          <section className="sport-change-dialog phase-replacement-dialog" role="alertdialog" aria-modal="true"
+            aria-label="Rundenabhängige Pausen anpassen?"
+            onKeyDown={(event) => { if (event.key === 'Escape') setPendingRoundAdjustment(null); }}>
+            <h2>Rundenabhängige Pausen anpassen?</h2>
+            <p>Die Änderung macht {pendingRoundAdjustment.removedDays > 0
+              ? `${pendingRoundAdjustment.removedDays} Spieltagswechsel` : ''}
+              {pendingRoundAdjustment.removedDays > 0 && pendingRoundAdjustment.removedInline ? ' und ' : ''}
+              {pendingRoundAdjustment.removedInline ? 'eine Zwischenpause' : ''} ungültig. Diese Unterbrechungen werden entfernt; alle weiterhin möglichen bleiben erhalten.</p>
+            <div className="sport-change-dialog-actions">
+              <button className="btn" type="button" autoFocus onClick={() => setPendingRoundAdjustment(null)}>Änderung abbrechen</button>
+              <button className="btn primary" type="button" onClick={() => {
+                const pending = pendingRoundAdjustment;
+                setPendingRoundAdjustment(null);
+                if (pending.kind === 'rounds') updatePhase(pending.id, pending.patch, true);
+                else if (pending.kind === 'entrants') updatePhaseEntrants(pending.index, pending.entrants, pending.custom, true);
+                else changePhaseType(pending.index, pending.type, true);
+              }}>Änderung übernehmen und Pausen anpassen</button>
             </div>
           </section>
         </div>
