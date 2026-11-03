@@ -8784,3 +8784,212 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   outline: 2px solid #175cd3;
   outline-offset: 2px;
 }
+
+/* Unified multi-day phase planner: one chronological stack of playing days,
+   their round boundaries and their optional in-day interruptions. */
+.wizard-workspace .phase-wizard-step .phase-day-planner {
+  margin: 10px 0 0;
+  padding: 12px;
+  border: 1px solid #d7e2f1;
+  border-radius: 12px;
+  background: #f8faff;
+}
+.wizard-workspace .phase-wizard-step .phase-day-planner-head {
+  margin-bottom: 10px;
+}
+.wizard-workspace .phase-wizard-step .phase-day-planner-head strong {
+  display: block;
+  color: #1f3b5b;
+  font-size: .88rem;
+  font-weight: 750;
+}
+.wizard-workspace .phase-wizard-step .phase-day-planner-head p {
+  margin: 3px 0 0;
+  font-size: .73rem;
+  line-height: 1.45;
+}
+.wizard-workspace .phase-wizard-step .phase-day-list {
+  display: grid;
+  gap: 9px;
+}
+.wizard-workspace .phase-wizard-step .phase-day-card {
+  padding: 11px 12px;
+  border: 1px solid #dfe6f1;
+  border-radius: 10px;
+  background: #fff;
+  min-width: 0;
+}
+.wizard-workspace .phase-wizard-step .phase-day-card-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 24px;
+  margin-bottom: 9px;
+}
+.wizard-workspace .phase-wizard-step .phase-day-card-title strong {
+  color: #183d67;
+  font-size: .84rem;
+  font-weight: 800;
+}
+.wizard-workspace .phase-wizard-step .phase-day-card-title > span {
+  color: #65758a;
+  font-size: .72rem;
+}
+.wizard-workspace .phase-wizard-step .phase-day-card-title > button {
+  margin-left: auto;
+}
+.wizard-workspace .phase-wizard-step .phase-day-round-settings {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.wizard-workspace .phase-wizard-step .phase-day-round-settings > .field {
+  display: grid;
+  gap: 5px;
+  flex: 0 1 210px;
+  min-width: 145px;
+  font-size: .77rem;
+  font-weight: 720;
+}
+.wizard-workspace .phase-wizard-step .phase-day-round-settings > .field > select {
+  height: 39px;
+  min-height: 39px;
+}
+.wizard-workspace .phase-wizard-step .phase-day-round-settings > .field-hint {
+  flex: 1 1 230px;
+  padding-bottom: 8px;
+  color: #728096;
+  font-size: .71rem;
+}
+.wizard-workspace .phase-wizard-step .phase-day-start {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin: 0 0 9px;
+  padding: 8px 10px;
+  border: 1px solid #e3eaf4;
+  border-radius: 8px;
+  background: #f5f8fd;
+}
+.wizard-workspace .phase-wizard-step .phase-day-start-label {
+  color: #344054;
+  font-size: .76rem;
+  font-weight: 750;
+  padding-bottom: 12px;
+}
+.wizard-workspace .phase-wizard-step .phase-day-date-fields {
+  display: grid;
+  grid-template-columns: minmax(135px, 1fr) minmax(118px, 1fr);
+  gap: 8px;
+  flex: 1 1 320px;
+  min-width: 0;
+  align-items: end;
+}
+.wizard-workspace .phase-wizard-step .phase-day-date-fields .clock-picker-trigger,
+.wizard-workspace .phase-wizard-step .phase-day-date-fields .calendar-picker-trigger {
+  min-height: 39px;
+  width: 100%;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pauses {
+  display: grid;
+  gap: 7px;
+  margin: 11px 0 8px;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause {
+  padding: 9px 10px;
+  border: 1px solid #e1e8f2;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause-title strong {
+  color: #345372;
+  font-size: .77rem;
+  font-weight: 750;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause-fields {
+  display: grid;
+  grid-template-columns: minmax(125px, .7fr) minmax(230px, 1.35fr) minmax(210px, 1.15fr);
+  align-items: end;
+  gap: 9px;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause-fields .field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: #344054;
+  font-size: .76rem;
+  font-weight: 720;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause-fields .field > select {
+  min-height: 40px;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause-fields > .phase-day-date-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex-basis: auto;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause-fields .phase-pause-minutes .recommendation-number-stepper {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  height: 40px;
+  min-height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause-fields .phase-pause-minutes .recommendation-number-stepper > input,
+.wizard-workspace .phase-wizard-step .phase-day-pause-fields .phase-pause-minutes .recommendation-number-stepper-button {
+  min-height: 38px;
+  height: 38px;
+  box-sizing: border-box;
+  border: 0;
+  background: #fff;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause-fields .phase-pause-minutes .recommendation-number-stepper-button:first-child {
+  border-right: 1px solid #e2e8f0;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause-fields .phase-pause-minutes .recommendation-number-stepper-button:last-child {
+  border-left: 1px solid #e2e8f0;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause-type {
+  min-width: 0;
+}
+.wizard-workspace .phase-wizard-step .phase-day-pause-type .break-phase-choice-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+.wizard-workspace .phase-wizard-step .phase-day-add-pause {
+  margin-top: 9px;
+  border-color: #c8d9ee;
+  background: #f5f9ff;
+  color: #205ea7;
+  font-size: .75rem;
+}
+.wizard-workspace .phase-wizard-step .phase-day-add-pause:hover:not(:disabled) {
+  background: #eaf3ff;
+}
+@media (max-width: 1050px) {
+  .wizard-workspace .phase-wizard-step .phase-day-pause-fields {
+    grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.25fr);
+  }
+  .wizard-workspace .phase-wizard-step .phase-day-pause-type {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 600px) {
+  .wizard-workspace .phase-wizard-step .phase-day-pause-fields,
+  .wizard-workspace .phase-wizard-step .phase-day-date-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .wizard-workspace .phase-wizard-step .phase-day-start-label { padding-bottom: 0; }
+  .wizard-workspace .phase-wizard-step .phase-day-card { padding: 9px; }
+}
