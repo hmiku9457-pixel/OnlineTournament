@@ -40,4 +40,4 @@ jobs:
             if curl -fsS http://127.0.0.1:4173/tournaments/new >/dev/null; then break; fi
             sleep 1
           done
-          node scripts/creation-browser-smoke.mjs
+          node scripts/novice-usability-simulation.mjs
