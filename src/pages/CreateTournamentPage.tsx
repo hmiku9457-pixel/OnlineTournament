@@ -3481,17 +3481,22 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                                 <div className="break-phase-choice-options">
                                   <label><input type="radio" name={`break-kind-${phase.id}`} aria-label="Pause in Minuten"
                                     checked={phase.breakKind === 'minutes'}
-                                    onChange={() => updatePhase(phase.id, { breakKind: 'minutes' })} /><span>Minuten</span></label>
+                                    onChange={() => updatePhase(phase.id, { breakKind: 'minutes' })} /><span>Dauer (Min.)</span></label>
                                   <label><input type="radio" name={`break-kind-${phase.id}`} aria-label="Pause bis"
-                                    checked={phase.breakKind === 'until'}
-                                    onChange={() => updatePhase(phase.id, { breakKind: 'until' })} /><span>Bis</span></label>
-                                  <label title={tournamentMode === 'single' ? 'Spieltagsende ist nur für mehrtägige Turniere verfügbar.' : undefined}>
-                                    <input type="radio" name={`break-kind-${phase.id}`} aria-label="Spieltagsende"
-                                      checked={phase.breakKind === 'overnight'}
-                                      disabled={tournamentMode === 'single'}
-                                      onChange={() => updatePhase(phase.id, { breakKind: 'overnight' })} /><span>Spieltagsende</span>
-                                  </label>
+                                    checked={phase.breakKind !== 'minutes'}
+                                    onChange={() => {
+                                      if (phase.breakKind === 'minutes') updatePhase(phase.id, { breakKind: 'until' });
+                                    }} /><span>Bis Datum/Uhrzeit</span></label>
                                 </div>
+                                {tournamentMode === 'multi' && phase.breakKind !== 'minutes' && (
+                                  <label className="break-phase-next-day"
+                                    title="Die Pause beendet den aktuellen Spieltag. Datum und Uhrzeit bestimmen, wann der nächste Spieltag beginnt.">
+                                    <input type="checkbox" checked={phase.breakKind === 'overnight'}
+                                      onChange={(event) => updatePhase(phase.id,
+                                        { breakKind: event.target.checked ? 'overnight' : 'until' })}/>
+                                    <span>Als Spieltagsende planen</span>
+                                  </label>
+                                )}
                               </fieldset>
                               {(phase.breakKind === 'until' || phase.breakKind === 'overnight')
                                 && plannedTimeline.warnings.filter((warning) => warning.phaseIndex === index).map((warning) => (
@@ -3754,10 +3759,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                                       <div className="break-phase-choice-options">
                                         <label><input type="radio" name={`inline-break-kind-${phase.id}`} aria-label="Pause in Minuten"
                                           checked={phase.inlineBreakKind === 'minutes'}
-                                          onChange={() => updatePhase(phase.id, { inlineBreakKind: 'minutes' })} /><span>Minuten</span></label>
+                                          onChange={() => updatePhase(phase.id, { inlineBreakKind: 'minutes' })} /><span>Dauer (Min.)</span></label>
                                         <label><input type="radio" name={`inline-break-kind-${phase.id}`} aria-label="Pause bis"
                                           checked={phase.inlineBreakKind === 'until'}
-                                          onChange={() => updatePhase(phase.id, { inlineBreakKind: 'until' })} /><span>Bis</span></label>
+                                          onChange={() => updatePhase(phase.id, { inlineBreakKind: 'until' })} /><span>Bis Datum/Uhrzeit</span></label>
                                       </div>
                                     </fieldset>
                                     {plannedTimeline.warnings.filter((warning) => warning.phaseIndex === index).map((warning) =>
