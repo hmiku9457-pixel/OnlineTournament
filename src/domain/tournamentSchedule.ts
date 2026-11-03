@@ -171,6 +171,7 @@ export interface SchedulePhaseProposal {
   inlineBreakUntil?: string;
   inlineBreakUntilDate?: string;
   dayBreaks?: import('./playingDays').PlayingDayBreak[];
+  extraInlineBreaks?: import('./playingDays').PlayingRoundPause[];
 }
 
 export interface PlannedTimeline {
@@ -224,7 +225,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
       const totalDuration = Math.max(0, phase.estimatedMinutes);
       const roundCount = Math.max(0, Math.trunc(phase.roundCount ?? 0));
       const afterRound = Number(phase.inlineBreakAfterRound) || 0;
-      if (phase.dayBreaks?.length) {
+      if (phase.dayBreaks?.length || phase.extraInlineBreaks?.length) {
         // Rounds are indivisible. Equal cumulative rounding preserves the exact
         // phase estimate; knockout rounds use their individual Best-of durations.
         const rounds = Math.max(1, roundCount);
@@ -255,6 +256,35 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
             }
             items.push({ id: `inline-resume-${index + 1}`, at: toLocalDateTime(cursor),
               title: generatedScheduleTitle(`Fortsetzung Runde ${round + 1}`, phase.label), type: 'competition' });
+          }
+          // Several distinct pauses may be configured in the same phase,
+          // including different playing days. Each pause retains its own
+          // round key for the live director's release state.
+          for (const pause of phase.extraInlineBreaks?.filter((entry) => entry.afterRound === round) ?? []) {
+            const pauseStart = cursor;
+            const item: PlannedScheduleItem = {
+              id: `inline-break-${index + 1}-${round}`, at: toLocalDateTime(cursor),
+              title: generatedScheduleTitle(`Pause nach Runde ${round}`, phase.label),
+              type: 'break', durationApproximate: pause.kind === 'until',
+            };
+            items.push(item);
+            const target = pause.untilDate
+              ? parseLocalDateTime(`${pause.untilDate}T${pause.until}`)
+              : clockAt(cursor, pause.until);
+            const resume = pause.kind === 'until'
+              ? target : new Date(cursor.getTime() + Math.max(1, pause.minutes) * 60000);
+            if (!resume || resume.getTime() < cursor.getTime()) {
+              warnings.push({ phaseIndex: index,
+                message: `„${phase.label}“: Zwischenpause nach Runde ${round} endet vor dem geschätzten Beginn. Bitte das feste Datum und die Uhrzeit korrigieren.` });
+            } else {
+              item.durationMinutes = Math.round((resume.getTime() - pauseStart.getTime()) / 60000);
+              cursor = resume;
+            }
+            items.push({
+              id: `inline-resume-${index + 1}-${round}`, at: toLocalDateTime(cursor),
+              title: generatedScheduleTitle(`Fortsetzung ab Runde ${round + 1}`, phase.label),
+              type: 'competition',
+            });
           }
           const boundary = boundaries.find((value) => value.afterRound === round);
           if (!boundary) continue;
