@@ -1335,18 +1335,22 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       return;
     }
     setPhaseLimitError('');
-    setPhaseDrafts(normalizeAndTrackPhaseChanges(phaseDrafts, candidate));
+    const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, candidate);
+    if (!normalized) return;
+    setPhaseDrafts(normalized);
     setSelectedRecommendationId(null);
     setPhaseInsertIndex(null);
     setExpandedPhaseId(phase.id);
   }
 
   function removePhase(id: string) {
+    const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, phaseDrafts.filter((phase) => phase.id !== id));
+    if (!normalized) return;
     setSelectedRecommendationId(null);
     setReviewRequiredPhaseIds((ids) => ids.filter((candidate) => candidate !== id));
     if (editingPhaseTypeId === id) setEditingPhaseTypeId(null);
     if (expandedPhaseId === id) setExpandedPhaseId(null);
-    setPhaseDrafts(normalizeAndTrackPhaseChanges(phaseDrafts, phaseDrafts.filter((phase) => phase.id !== id)));
+    setPhaseDrafts(normalized);
   }
 
   function reorderedPhases(fromIndex: number, toIndex: number): PhaseDraft[] | null {
@@ -1365,8 +1369,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   function reorderPhase(fromIndex: number, toIndex: number) {
     const candidate = reorderedPhases(fromIndex, toIndex);
     if (!candidate) return;
+    const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, candidate);
+    if (!normalized) return;
     setSelectedRecommendationId(null);
-    setPhaseDrafts(normalizeAndTrackPhaseChanges(phaseDrafts, candidate));
+    setPhaseDrafts(normalized);
     setPhaseInsertIndex(null);
   }
 
