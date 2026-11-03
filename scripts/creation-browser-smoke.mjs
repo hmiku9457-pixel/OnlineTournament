@@ -994,22 +994,25 @@ try {
     'extra active time is assigned to the final playing day');
   const dayControlGeometry = await multiPage.evaluate(() => {
     const days = document.querySelector('.tournament-day-count .recommendation-number-stepper');
+    const parent = document.querySelector('.recommendation-period-column');
     const groups = document.querySelector('.format-setting-fields .recommendation-number-stepper');
-    if (!days || !groups) return null;
-    const d = days.getBoundingClientRect(), g = groups.getBoundingClientRect();
+    if (!days || !parent || !groups) return null;
+    const d = days.getBoundingClientRect(), p = parent.getBoundingClientRect();
     const dayButtons = [...days.querySelectorAll('button')].map(button => button.getBoundingClientRect());
     const groupButtons = [...groups.querySelectorAll('button')].map(button => button.getBoundingClientRect());
-    return { dayWidth: d.width, groupWidth: g.width,
+    return { dayWidth: d.width, parentWidth: p.width,
       buttonWidths: dayButtons.map((r) => r.width),
       referenceWidths: groupButtons.map((r) => r.width) };
   });
   assert.ok(dayControlGeometry, 'days and groups steppers must both exist');
-  assert.ok(dayControlGeometry.dayWidth >= 118 && dayControlGeometry.dayWidth <= 122,
-    `playing days stepper must stay at the reduced 120px width: ${dayControlGeometry.dayWidth}px`);
-  assert.ok(dayControlGeometry.buttonWidths.every((width) => Math.abs(width - 28) <= 1),
-    'playing-day +/- buttons must stay at the reduced 28px width');
-  assert.ok(dayControlGeometry.groupWidth > dayControlGeometry.dayWidth + 15,
-    'the playing-day counter must be visibly narrower than the other numeric steppers');
+  assert.ok(Math.abs(dayControlGeometry.dayWidth - dayControlGeometry.parentWidth) <= 2,
+    'the playing-day counter must fill the same column as other planning inputs');
+  assert.ok(dayControlGeometry.dayWidth >= 150,
+    'playing-day control must no longer be a tiny isolated 120px stepper');
+  assert.ok(dayControlGeometry.buttonWidths.every((width) => Math.abs(width - 38) <= 1),
+    'the day selector uses full-size, balanced +/- buttons');
+  assert.ok(dayControlGeometry.referenceWidths.every((width) => Math.abs(width - 29) <= 1),
+    'compact recommendation filter steppers remain unchanged');
   assert.equal(await multiPage.locator('#preferred-duration strong').innerText(), '9 Std. 30 Min.',
     'multi-day changes retain the linked active-time preference');
   await multiPage.locator('.recommendation-list .recommendation').first().click();
