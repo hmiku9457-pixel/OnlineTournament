@@ -239,8 +239,15 @@ describe('creation wizard transitions', () => {
       timing: { matchDurationMinutes: 60 }, bestOfFor: () => 1,
     });
     expect(assessment.feasible).toBe(false);
-    const base = phase();
-    const old = creationPlanScheduleSignature([{ ...base, dayBreaks: [] }]);
+    const base: DayDistributionPhase = {
+      type: 'SWISS', label: 'Schweizer Runde', entrantCount: 8,
+      groupCount: 2, swissRounds: 5, bestOf: 3, knockoutBestOf: [],
+      dayBreaks: [], inlineBreakAfterRound: 0, inlineBreakKind: 'minutes',
+      inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '',
+      breakKind: 'minutes', breakMinutes: 15, breakUntil: '12:00', breakUntilDate: '',
+      nextDayDate: '', nextDayStart: '09:00',
+    };
+    const old = creationPlanScheduleSignature([base]);
     const changed = creationPlanScheduleSignature([{ ...base, dayBreaks: [{ afterRound: 1,
       date: '2030-11-11', time: '09:00' }] }]);
     expect(old).not.toBe(changed);
