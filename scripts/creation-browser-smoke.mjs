@@ -1203,6 +1203,26 @@ try {
   });
   await multiPage.reload();
   await multiPage.locator('.phase-wizard-step').waitFor();
+  // Inline breaks in Step 4 use the same +/- minute control as standalone pauses.
+  const inlineFinal = multiPage.locator('.phase-config').filter({ hasText: 'Finale' }).last();
+  await inlineFinal.locator('.phase-config-head').click();
+  await inlineFinal.locator('.phase-inline-break-card .phase-inline-break-header').click();
+  const inlineMinutes = inlineFinal.getByRole('spinbutton', { name: 'Zwischenpausendauer in Minuten' });
+  assert.equal(await inlineMinutes.inputValue(), '15');
+  await inlineFinal.getByRole('button', { name: 'Zwischenpausendauer in Minuten erhöhen' }).click();
+  assert.equal(await inlineMinutes.inputValue(), '16');
+  await inlineFinal.getByRole('button', { name: 'Zwischenpausendauer in Minuten verringern' }).click();
+  assert.equal(await inlineMinutes.inputValue(), '15');
+  await inlineMinutes.fill('1');
+  assert.equal(await inlineFinal.getByRole('button', { name: 'Zwischenpausendauer in Minuten verringern' }).isDisabled(), true);
+  await inlineMinutes.fill('1440');
+  assert.equal(await inlineFinal.getByRole('button', { name: 'Zwischenpausendauer in Minuten erhöhen' }).isDisabled(), true);
+  await inlineMinutes.fill('15');
+  await inlineMinutes.blur();
+  await multiPage.waitForFunction(() => {
+    const draft = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft;
+    return draft.phaseDrafts.find(p => p.id === 'phase-7002')?.inlineBreakMinutes === 15;
+  });
   await multiPage.locator('.wizard-step').nth(1).click();
   for (let index = 1; index <= 6; index++) {
     // Removing from the beginning keeps every next target on the visible page,
@@ -1277,6 +1297,26 @@ try {
   });
   await multiPage.reload();
   await multiPage.locator('.phase-wizard-step').waitFor();
+  const pauseCard = multiPage.locator('.phase-config').filter({ hasText: 'Mittagspause' });
+  await pauseCard.locator('.phase-config-head').click();
+  const pauseMinutes = pauseCard.getByRole('spinbutton', { name: 'Pausendauer in Minuten' });
+  assert.equal(await pauseMinutes.inputValue(), '30');
+  await pauseCard.getByRole('button', { name: 'Pausendauer in Minuten erhöhen' }).click();
+  assert.equal(await pauseMinutes.inputValue(), '31',
+    'standalone pause increases immediately by one minute');
+  await pauseCard.getByRole('button', { name: 'Pausendauer in Minuten verringern' }).click();
+  assert.equal(await pauseMinutes.inputValue(), '30',
+    'standalone pause decreases immediately by one minute');
+  await pauseMinutes.fill('1');
+  assert.equal(await pauseCard.getByRole('button', { name: 'Pausendauer in Minuten verringern' }).isDisabled(), true);
+  await pauseMinutes.fill('1440');
+  assert.equal(await pauseCard.getByRole('button', { name: 'Pausendauer in Minuten erhöhen' }).isDisabled(), true);
+  await pauseMinutes.fill('30');
+  await pauseMinutes.blur();
+  await multiPage.waitForFunction(() => {
+    const draft = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft;
+    return draft.phaseDrafts.find(p => p.id === 'phase-9102')?.breakMinutes === 30;
+  });
   const middlePhase = multiPage.locator('.phase-config').filter({ hasText: 'Zwischenrunde' });
   await middlePhase.getByRole('button', { name: 'Entfernen', exact: true }).click();
   const firstConfirm = multiPage.getByRole('alertdialog', { name: 'Phase entfernen bestätigen' });
