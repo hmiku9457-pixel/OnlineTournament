@@ -657,7 +657,8 @@ try {
     'banner action re-enables live current time and resolves the issue');
   await context3.close();
 
-  // Replacing a carefully configured recommendation requires explicit consent.
+  // Selecting a visible recommendation applies it on navigation without any
+  // confirmation. Removed/infeasible suggestions are automatically deselected.
   const recContext = await browser.newContext();
   const recPage = await recContext.newPage();
   await recPage.goto(base + '/#/tournaments/new');
@@ -693,33 +694,51 @@ try {
     'clicking a selected recommendation deselects it');
   await options.first().click();
   await next(recPage);
-  const replaceDialog = recPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' });
-  await replaceDialog.waitFor();
-  assert.match(await replaceDialog.innerText(), /Empfehlung als Phasenplan übernehmen/,
-    'even the first transition to step 4 requires explicit confirmation');
-  await replaceDialog.getByRole('button', { name: 'Zurück zur Auswahl' }).click();
-  assert.equal(await replaceDialog.count(), 0);
-  assert.equal(await recPage.locator('.format-step').count(), 1);
-  assert.equal(await recPage.locator('.phase-config').count(), 0);
-  await next(recPage);
-  await replaceDialog.getByRole('button', { name: 'Empfehlung übernehmen und weiter' }).click();
   await recPage.locator('.phase-wizard-step').waitFor();
+  assert.equal(await recPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' }).count(), 0,
+    'the first transfer to Step 4 needs no recommendation confirmation');
   const originalPhaseLabels = await recPage.locator('.phase-config').allInnerTexts();
   assert.ok(originalPhaseLabels.length >= 1);
   await recPage.locator('.wizard-step').nth(2).click();
   const alternatives = recPage.locator('.recommendation-list .recommendation');
   await alternatives.nth(1).click();
-  assert.equal(await replaceDialog.count(), 0);
+  assert.equal(await alternatives.nth(1).getAttribute('aria-pressed'), 'true');
   await next(recPage);
-  await replaceDialog.waitFor();
-  assert.match(await replaceDialog.innerText(), /Bestehende Phasenplanung ersetzen/,
-    'only the transition to step 4 checks an existing configured plan');
-  await replaceDialog.getByRole('button', { name: 'Zurück zur Auswahl' }).click();
-  assert.equal(await recPage.locator('.format-step').count(), 1);
-  await next(recPage);
-  await replaceDialog.getByRole('button', { name: 'Phasen ersetzen und weiter' }).click();
   await recPage.locator('.phase-wizard-step').waitFor();
+  assert.equal(await recPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' }).count(), 0,
+    'choosing another offered recommendation also replaces the plan without a modal');
   assert.ok(await recPage.locator('.phase-config').count() >= 1);
+
+  // A setting can remove a selected suggestion, including when a proposal
+  // becomes infeasible rather than disappearing from the generator entirely.
+  await recPage.locator('.wizard-step').nth(2).click();
+  await recPage.locator('.recommendation-list .recommendation').filter({ hasText: 'K.-o.-Phase' }).first().click();
+  assert.equal(await recPage.locator('.recommendation-list .recommendation[aria-pressed="true"]').count(), 1);
+  await recPage.locator('.format-toggle-group').getByLabel('K.-o.-Phase').uncheck();
+  assert.equal(await recPage.locator('.recommendation-list .recommendation[aria-pressed="true"]').count(), 0,
+    'removing the selected format deselects its card');
+  const beforeManualContinuation = await recPage.locator('.wizard-side-summary').innerText();
+  await next(recPage);
+  await recPage.locator('.phase-wizard-step').waitFor();
+  assert.equal(await recPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' }).count(), 0);
+  assert.ok(await recPage.locator('.phase-config').count() >= 1,
+    'proceeding without a selection retains the existing manual phase plan');
+  assert.ok(beforeManualContinuation.length > 0);
+  await recPage.locator('.wizard-step').nth(2).click();
+  await recPage.locator('.format-toggle-group').getByLabel('K.-o.-Phase').check();
+  // Make a chosen suggestion infeasible by requesting more days than it has
+  // rounds. Its previously saved ID must not silently survive.
+  await recPage.locator('.recommendation-list .recommendation:not(:disabled)').first().click();
+  assert.equal(await recPage.locator('.recommendation-list .recommendation[aria-pressed="true"]').count(), 1);
+  await recPage.locator('#planned-playing-days').fill('14');
+  await recPage.locator('#planned-playing-days').blur();
+  assert.equal(await recPage.locator('#planned-playing-days').inputValue(), '14');
+  assert.equal(await recPage.locator('.recommendation-list .recommendation[aria-pressed="true"]').count(), 0,
+    'an infeasible or no longer visible suggestion is automatically deselected');
+  await recPage.locator('#planned-playing-days').fill('1');
+  await recPage.locator('#planned-playing-days').blur();
+  assert.equal(await recPage.locator('.recommendation-list .recommendation[aria-pressed="true"]').count(), 0,
+    'the stale selection is not restored when the old settings return');
   await recContext.close();
 
   // A non-existent clock hour during the DST jump must explain the failure.
@@ -1097,32 +1116,20 @@ try {
     'multi-day changes retain the linked active-time preference');
   await multiPage.locator('.recommendation-list .recommendation').first().click();
   await next(multiPage);
-  const initialMultiRecommendation = multiPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' });
-  await initialMultiRecommendation.waitFor();
-  await initialMultiRecommendation.getByRole('button', { name: 'Empfehlung übernehmen und weiter' }).click();
   await multiPage.locator('.phase-wizard-step').waitFor();
+  assert.equal(await multiPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' }).count(), 0);
   const daysInPlan = await multiPage.evaluate(() => [...document.querySelectorAll('.phase-config')].length);
   assert.ok(daysInPlan >= 1, 'multi-day recommendation produces editable phases');
   await multiPage.reload();
   await multiPage.locator('.phase-wizard-step').waitFor();
   await multiPage.locator('.wizard-step').nth(2).click();
-  // Replacement confirmation must keep both actions on the same line.
   await multiPage.locator('.recommendation-list .recommendation').nth(1).click();
   assert.equal(await multiPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' }).count(), 0);
   await next(multiPage);
-  const daySplitReplaceDialog = multiPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' });
-  await daySplitReplaceDialog.waitFor();
-  const replacementActionPositions = await daySplitReplaceDialog.locator('.sport-change-dialog-actions .btn')
-    .evaluateAll(buttons => buttons.map(button => {
-      const r = button.getBoundingClientRect();
-      return {left: r.left, top: r.top, right: r.right, bottom: r.bottom};
-    }));
-  assert.equal(replacementActionPositions.length, 2);
-  assert.ok(Math.abs(replacementActionPositions[0].top - replacementActionPositions[1].top) <= 2,
-    'both replacement actions must be side by side');
-  assert.ok(replacementActionPositions[0].right <= replacementActionPositions[1].left,
-    'the cancel button is left of the destructive replacement action');
-  await daySplitReplaceDialog.getByRole('button', { name: 'Zurück zur Auswahl' }).click();
+  await multiPage.locator('.phase-wizard-step').waitFor();
+  assert.equal(await multiPage.getByRole('alertdialog', { name: 'Übernahme der Empfehlung bestätigen?' }).count(), 0,
+    'replacing a multi-day recommendation does not require a separate confirmation');
+  await multiPage.locator('.wizard-step').nth(2).click();
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
   const phasePlanBefore = await multiPage.evaluate(() =>
     JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft.phaseDrafts
