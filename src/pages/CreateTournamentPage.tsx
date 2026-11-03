@@ -2208,7 +2208,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   return (
     <>
-      <div className={prestart ? 'creation-page-container is-prestart-phase-editor' : 'creation-page-container'}>
+      <div inert={savingNamedDraft} className={prestart ? 'creation-page-container is-prestart-phase-editor' : 'creation-page-container'}>
       {!prestart ? <header className="page-head creation-page-head">
         <div className="creation-page-heading">
           <h1>{savedDraftId ? 'Turnierentwurf bearbeiten' : 'Turnier erstellen'}</h1>
@@ -3066,7 +3066,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                   aria-label={inlineBreakActive ? 'Zwischenpause deaktivieren' : 'Zwischenpause aktivieren'}
                                   title={inlineBreakActive ? 'Zwischenpause deaktivieren'
                                     : phase.dayBreaks.length >= inlineBreakRounds - 1 ? 'Alle Rundengrenzen haben bereits ein Spieltagsende.'
-                                      : 'Zwischenpause aktivieren'}
+                                      : countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES
+                                        ? 'Die Höchstzahl von 80 Zeitplaneinträgen ist erreicht.'
+                                        : 'Zwischenpause aktivieren'}
                                   disabled={!inlineBreakActive && (phase.dayBreaks.length >= inlineBreakRounds - 1
                                     || countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES)}
                                   onClick={() => togglePhaseInlineBreak(phase, inlineBreakRounds)}
@@ -3335,7 +3337,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                     || countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES}
                                   title={freeDayBreakRounds.length === 0
                                     ? 'Keine freie Rundengrenze: Hier liegt bereits eine Zwischenpause oder ein Spieltagsende.'
-                                    : undefined}
+                                    : configuredPlayingDays(phaseDrafts) >= 14
+                                      ? 'Die Höchstzahl von 14 Spieltagen ist erreicht.'
+                                      : countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES
+                                        ? 'Die Höchstzahl von 80 Zeitplaneinträgen ist erreicht.' : undefined}
                                   onClick={() => {
                                     const available = freeDayBreakRounds[0];
                                     if (!available) return;
@@ -4013,9 +4018,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               <button type="button" className="btn primary" onClick={() => applySingleDayConversion('convert')}>
                 Als normale Pausen behalten
               </button>
-              {phaseDrafts.some((phase) => phase.type === 'BREAK' && phase.breakKind === 'overnight') && (
+              {phaseDrafts.some((phase) => phase.type === 'BREAK' && phase.breakKind === 'overnight') || singleDayFixedPauseConflicts(phaseDrafts, scheduledDate).length > 0) && (
                 <button type="button" className="btn danger-outline" onClick={() => applySingleDayConversion('remove')}>
-                  Spieltagsende-Phasen löschen
+                  Mehrtägige Pausen löschen
                 </button>)}
             </div>
           </section>
