@@ -8744,3 +8744,43 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   }
   .wizard-workspace .phase-wizard-step .break-phase-time-hint { grid-column: 1; }
 }
+
+/* Step 4 pause modes: both standalone and in-phase pauses now offer the
+   same two clearly labeled choices; a new playing day is an explicit
+   sub-option of a fixed end date, not a competing third pause mode. */
+.wizard-workspace .phase-wizard-step .break-phase-choice-segmented .break-phase-choice-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-segmented .break-phase-choice-options > label > span {
+  font-size: .7rem;
+  white-space: nowrap;
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-segmented .break-phase-next-day {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 7px 0 0;
+  padding: 2px 1px;
+  min-width: 0;
+  color: #475467;
+  font-size: .72rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: normal;
+  cursor: pointer;
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-segmented .break-phase-next-day input[type="checkbox"] {
+  box-sizing: border-box;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  margin: 0;
+  accent-color: #175cd3;
+  cursor: pointer;
+}
+.wizard-workspace .phase-wizard-step .break-phase-choice-segmented .break-phase-next-day input:focus-visible {
+  outline: 2px solid #175cd3;
+  outline-offset: 2px;
+}
