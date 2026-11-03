@@ -875,6 +875,49 @@ try {
   });
   await multiContext.close();
 
+  // A hidden time-only setting must not block a later set-based sport.
+  const validityContext = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  const validityPage = await validityContext.newPage();
+  await validityPage.goto(base + '/#/tournaments/new');
+  await validityPage.locator('#name').fill('Sportwechsel ohne versteckte Sperren');
+  await validityPage.locator('#tournament-date').click();
+  await validityPage.locator('.calendar-picker-dialog input[aria-label="Jahr"]').fill('2030');
+  await validityPage.locator('.calendar-picker-dialog select[aria-label="Monat"]').selectOption('10');
+  await validityPage.locator('.calendar-picker-day').filter({ hasText: /^24$/ }).click();
+  await validityPage.locator('#sport').selectOption('football');
+  await validityPage.locator('#match-duration').fill('45');
+  await validityPage.locator('#venue-turnover').fill('300');
+  assert.equal(await validityPage.locator('.wizard-continue-button').isEnabled(), false);
+  await validityPage.locator('#sport').selectOption('table_tennis');
+  assert.equal(await validityPage.locator('#venue-turnover').count(), 0);
+  assert.equal(await validityPage.locator('.wizard-continue-button').isEnabled(), true,
+    'hidden invalid turnover must not block set-based sports');
+  await next(validityPage);
+  for (const [first, last] of [['Ada', 'Lovelace'], ['Grace', 'Hopper']]) {
+    await validityPage.locator('#participant-first').fill(first);
+    await validityPage.locator('#participant-last').fill(last);
+    await validityPage.getByRole('button', { name: 'Spieler hinzufügen' }).click();
+  }
+  await validityPage.evaluate(() => {
+    const key = 'online-tournament:creation-draft:v1:new';
+    const payload = JSON.parse(sessionStorage.getItem(key));
+    const first = payload.draft.participants[0];
+    payload.draft.participants.push({ ...first, id: 'participant-1000' });
+    sessionStorage.setItem(key, JSON.stringify(payload));
+  });
+  await validityPage.reload();
+  await validityPage.locator('.participant-roster-row').first().waitFor();
+  assert.equal(await validityPage.locator('.participant-roster-row').count(), 3);
+  await validityPage.getByRole('button', { name: 'Alle fehlerhaften Einträge entfernen' }).click();
+  const bulkDialog = validityPage.getByRole('alertdialog', { name: 'Fehlerhafte Teilnehmer entfernen?' });
+  await bulkDialog.waitFor();
+  assert.match(await bulkDialog.innerText(), /Ada Lovelace/);
+  await bulkDialog.getByRole('button', { name: 'Fehlerhafte Einträge entfernen' }).click();
+  assert.equal(await validityPage.locator('.participant-roster-row').count(), 2);
+  await validityPage.getByRole('button', { name: 'Gesamte Bereinigung rückgängig' }).click();
+  assert.equal(await validityPage.locator('.participant-roster-row').count(), 3);
+  await validityContext.close();
+
   // Doubles keep the original taller card, with one player per line.
   const doublesContext = await browser.newContext({ viewport: { width: 1440, height: 960 } });
   const doublesPage = await doublesContext.newPage();
