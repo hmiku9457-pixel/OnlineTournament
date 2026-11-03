@@ -1,5 +1,6 @@
 import { followingPlayingDate, playingRounds, type PlayingDayBreak } from './playingDays';
 import type { StageType } from './types';
+import { buildPlannedTimeline, type SchedulePhaseProposal } from './tournamentSchedule';
 
 export const MAX_CREATION_SCHEDULE_ENTRIES = 80;
 
@@ -98,6 +99,24 @@ export interface ShiftedPlayingDate {
   afterRound: number;
   previousDate: string;
   nextDate: string;
+}
+
+/** Use the projected finish of the actual chosen round, including preceding
+ * breaks, rather than guessing from the start date of its phase. */
+export function earliestRoundContinuationDate(
+  scheduledStart: string, phases: readonly SchedulePhaseProposal[],
+  phaseIndex: number, afterRound: number,
+): string {
+  const simulation = phases.map((phase, index) => index !== phaseIndex ? phase : ({
+    ...phase,
+    dayBreaks: [
+      ...(phase.dayBreaks ?? []).filter((item) => item.afterRound !== afterRound),
+      { afterRound, date: '9999-12-31', time: '09:00' },
+    ],
+  }));
+  const timeline = buildPlannedTimeline(scheduledStart, simulation);
+  const finish = timeline.items.find((item) => item.id === `day-break-${phaseIndex + 1}-${afterRound}`)?.at;
+  return followingPlayingDate((finish || scheduledStart).slice(0, 10), 1);
 }
 
 /** Insert at the actual round position; offer dependent date shifts before applying. */
