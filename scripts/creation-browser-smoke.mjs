@@ -142,18 +142,18 @@ try {
   await page.locator('.format-help-details summary').click();
   // Recommendation settings are directly editable and expose bounded
   // + / - actions. The duration is a soft preference, not a hard filter.
-  assert.equal(await page.locator('#preferred-duration').innerText(), '3 Std. 30 Min.');
+  assert.equal(await page.locator('#preferred-duration strong').innerText(), '3 Std. 30 Min.');
   await page.getByRole('button', { name: 'Geplante Turnierdauer um 15 Minuten erhöhen' }).click();
-  assert.equal(await page.locator('#preferred-duration').innerText(), '3 Std. 45 Min.');
+  assert.equal(await page.locator('#preferred-duration strong').innerText(), '3 Std. 45 Min.');
   await page.getByRole('button', { name: 'Geplante Turnierdauer um 15 Minuten verringern' }).click();
-  assert.equal(await page.locator('#preferred-duration').innerText(), '3 Std. 30 Min.');
+  assert.equal(await page.locator('#preferred-duration strong').innerText(), '3 Std. 30 Min.');
   await page.locator('#preferred-duration').click();
   const durationDialog = page.getByRole('dialog', { name: 'Geplante Turnierdauer' });
   await durationDialog.waitFor();
   await durationDialog.getByLabel('Stunden (0–23)').fill('2');
   await durationDialog.getByLabel('Minuten (0–59)').fill('10');
   await durationDialog.getByRole('button', { name: 'Dauer übernehmen' }).click();
-  assert.equal(await page.locator('#preferred-duration').innerText(), '2 Std. 10 Min.');
+  assert.equal(await page.locator('#preferred-duration strong').innerText(), '2 Std. 10 Min.');
   const swissBefore = Number(await page.locator('#max-swiss-rounds').inputValue());
   const swissLimit = Number(await page.locator('#max-swiss-rounds').getAttribute('max'));
   if (swissBefore < swissLimit) {
@@ -169,7 +169,7 @@ try {
   assert.equal(swissLimit, 3, 'four participants allow at most three distinct Swiss opponents');
   await page.reload();
   await page.waitForSelector('.format-step');
-  assert.equal(await page.locator('#preferred-duration').innerText(), '2 Std. 10 Min.',
+  assert.equal(await page.locator('#preferred-duration strong').innerText(), '2 Std. 10 Min.',
     'chosen duration must persist in the saved creation draft');
   assert.match(await page.locator('.format-settings-head').innerText(),
     /Passe die Vorschläge an deine Veranstaltung an/,
@@ -854,7 +854,7 @@ try {
     'playing-day +/- buttons must stay at the reduced 28px width');
   assert.ok(dayControlGeometry.groupWidth > dayControlGeometry.dayWidth + 15,
     'the playing-day counter must be visibly narrower than the other numeric steppers');
-  assert.equal(await multiPage.locator('#preferred-duration').innerText(), '3 Std. 30 Min.',
+  assert.equal(await multiPage.locator('#preferred-duration strong').innerText(), '3 Std. 30 Min.',
     'multi-day mode does not change the total active-duration preference');
   await multiPage.locator('.recommendation-list .recommendation').first().click();
   await next(multiPage);
