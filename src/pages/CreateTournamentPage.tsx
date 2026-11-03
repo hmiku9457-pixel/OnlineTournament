@@ -2146,7 +2146,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               <span>„{participantDisplayName(recentlyRemovedParticipant.participant, discipline)}“ wurde entfernt.</span>
               <button className="btn small" type="button" onClick={undoRemoveParticipant}>Rückgängig</button>
             </div>}
-            {undoRemoveError && <p className="field-error" role="alert">{undoRemoveError}</p>
+            {undoRemoveError && <p className="field-error" role="alert">{undoRemoveError}</p>}
             {!savedParticipantNamesValid && <p className="field-error" role="alert">Mindestens ein gespeicherter Teilnehmereintrag ist unvollständig, ungültig oder doppelt. Bitte die markierten Einträge überprüfen.</p>}
             {invalidRosterIndices.size > 0 && (
               <div className="wizard-invalid-participants" role="status">
