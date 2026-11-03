@@ -1719,7 +1719,23 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   }
 
   function removePhase(id: string, adjacentPauseId?: string, confirmed = false) {
-    if (!confirmed) {
+    const phase = phaseDrafts.find((item) => item.id === id);
+    if (!phase) return;
+    // Newly inserted defaults can be removed directly. Protect customized
+    // rounds, annotations, best-of values and interruption dates.
+    const customized = phase.type === 'BREAK'
+      || phase.dayBreaks.length > 0 || phase.inlineBreakAfterRound > 0
+      || phase.label !== stageLabel(phase.type)
+      || phase.bestOf !== phaseBestOfForSport(sport, phase.type)
+      || (phase.type === 'KNOCKOUT' && phase.knockoutBestOf.some((value) =>
+        value !== phaseBestOfForSport(sport, phase.type)))
+      || (phase.type === 'GROUPS'
+        && phase.groupCount !== recommendGroupCount(phase.entrantCount,
+          phaseDrafts.slice(phaseDrafts.indexOf(phase) + 1)
+            .find((item) => item.type !== 'BREAK')?.entrantCount))
+      || (phase.type === 'SWISS'
+        && phase.swissRounds !== recommendedSwissRounds(phase.entrantCount, minimumMatches));
+    if (!confirmed && customized) {
       setPendingConfirmPhaseRemoval(id);
       return;
     }
