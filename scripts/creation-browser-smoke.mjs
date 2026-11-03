@@ -129,7 +129,7 @@ try {
     };
   });
   assert.equal(quickSettings.systems, 4);
-  assert.ok(quickSettings.height < 320, `quick settings should remain compact: ${quickSettings.height}px`);
+  assert.ok(quickSettings.height < 390, `quick settings should remain readable with explicit duration units: ${quickSettings.height}px`);
   assert.equal(quickSettings.allActive, true);
   assert.ok(quickSettings.chipHeight < 46);
   assert.notEqual(quickSettings.chipBackground, 'rgb(255, 255, 255)', 'active systems are highlighted chips');
