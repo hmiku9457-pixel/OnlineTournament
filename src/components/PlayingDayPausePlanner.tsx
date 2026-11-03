@@ -59,8 +59,8 @@ export function PlayingDayPausePlanner({
           const followingBoundary = boundaries[dayIndex + 1];
           const options = boundary
             ? allRounds(beginning, (followingBoundary?.afterRound ?? roundCount) - 1)
-            : [...allRounds(beginning, roundCount - 1).filter((round) =>
-              !maximumDaysReached && !maximumScheduleReached), roundCount];
+            : [...(!maximumDaysReached && !maximumScheduleReached
+              ? allRounds(beginning, roundCount - 1) : []), roundCount];
           const possibleEnds = options.filter((round) => round === ending || !occupied.has(round));
           const dayPauses = pauses.filter((pause) => pause.afterRound >= beginning
             && pause.afterRound < ending).sort((a, b) => a.afterRound - b.afterRound);

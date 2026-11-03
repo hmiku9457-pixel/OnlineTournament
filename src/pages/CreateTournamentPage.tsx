@@ -55,7 +55,7 @@ import { UnsavedParticipantDialog } from '@/components/UnsavedParticipantDialog'
 import { QualificationRuleDialog } from '@/components/QualificationRuleDialog';
 import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/domain/groupQualification';
 import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, invalidParticipantRosterIndices, MAX_PARTICIPANT_NAME_LENGTH } from '@/domain/participantNames';
-import { availableDayBreakRounds, convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, earliestRoundContinuationDate, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
+import { convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, earliestRoundContinuationDate, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
 import { configuredPlayingDays, followingPlayingDate, playingRounds, type PlayingDayBreak, type PlayingRoundPause } from '@/domain/playingDays';
 import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays, recommendationEndTimePenalty } from '@/domain/creationPlanRecommendations';
@@ -3208,8 +3208,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                       const invalidInlineBreak = phase.inlineBreakAfterRound > 0
                         && (inlineBreakRounds <= 1 || phase.inlineBreakAfterRound >= inlineBreakRounds);
                       const inlineBreakActive = !invalidInlineBreak && inlineBreakRounds > 1 && phase.inlineBreakAfterRound > 0;
-                      const freeDayBreakRounds = availableDayBreakRounds(dayRoundCount, phase.dayBreaks,
-                        phase.inlineBreakAfterRound, phase.extraInlineBreaks);
                       const inlineBreakExpanded = expandedInlineBreakIds.includes(phase.id);
                       const editingPhaseType = editingPhaseTypeId === phase.id;
                       const isExpanded = expandedPhaseId === phase.id;
