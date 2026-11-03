@@ -864,8 +864,15 @@ try {
   await multiModeDialog.getByRole('button', { name: 'Mehrtägig behalten' }).click();
   assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägig' }).isChecked(), true);
   await multiPage.getByRole('radio', { name: 'Eintägig' }).click();
-  await multiModeDialog.getByRole('button', { name: 'Auf eintägig umstellen' }).click();
+  await multiModeDialog.getByRole('button', { name: 'Als normale Pausen behalten' }).click();
   assert.equal(await multiPage.getByRole('radio', { name: 'Eintägig' }).isChecked(), true);
+  await multiPage.waitForFunction(() => {
+    const raw = sessionStorage.getItem('online-tournament:creation-draft:v1:new');
+    if (!raw) return false;
+    const draft = JSON.parse(raw).draft;
+    return draft?.tournamentMode === 'single' && draft.phaseDrafts.every((phase) =>
+      !phase.dayBreaks?.length && !(phase.type === 'BREAK' && phase.breakKind === 'overnight'));
+  });
   await multiContext.close();
 
   // Doubles keep the original taller card, with one player per line.
