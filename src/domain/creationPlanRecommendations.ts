@@ -1,5 +1,5 @@
 import { estimateKnockoutRoundMinutes, estimateRoundRobinRoundMinutes, estimatePhaseMetrics, knockoutRoundLabels, type TimedMatchSettings } from './tournamentCreation';
-import { buildPlannedTimeline, plannedTimelineConflicts, playingDayOverflowWarnings, validatePlannedSchedule } from './tournamentSchedule';
+import { buildPlannedTimeline, parseLocalDateTime, plannedTimelineConflicts, playingDayOverflowWarnings, validatePlannedSchedule } from './tournamentSchedule';
 import { countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES } from './creationPlanTransitions';
 import { configuredPlayingDays, followingPlayingDate, playingRounds, validPlayingDayBreaks, type PlayingDayBreak } from './playingDays';
 import type { StageType } from './types';
@@ -204,11 +204,15 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
   ]);
   const starts = [scheduledStart.slice(11, 16),
     ...Array.from({ length: days - 1 }, (_, i) => knownTimes[i] || '09:00')];
-  const budgetFor = (time: string) => {
-    const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
-    return match ? 1440 - Number(match[1]) * 60 - Number(match[2]) : 900;
-  };
-  const budgets = starts.map(budgetFor);
+  // A local calendar day need not contain 1440 elapsed minutes at a DST
+  // transition. Use actual instants for every planned playing day.
+  const budgets = starts.map((time, dayIndex) => {
+    const day = followingPlayingDate(startDate, dayIndex);
+    const following = followingPlayingDate(day, 1);
+    const from = parseLocalDateTime(`${day}T${time}`);
+    const until = parseLocalDateTime(`${following}T00:00`);
+    return from && until ? Math.max(0, Math.round((until.getTime() - from.getTime()) / 60000)) : 0;
+  });
   const slots = competition.flatMap((phase, phaseIndex) => {
     const rounds = playingRounds(phase);
     const totalMinutes = estimatePhaseMetrics(phase, tableCount, timing).estimatedDurationMinutes;
