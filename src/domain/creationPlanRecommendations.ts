@@ -42,11 +42,14 @@ export interface PlayingDaySearchOptions {
   scheduledStart?: string;
   /** Whether the awards ceremony occupies the final time-plan entry. */
   awardsEnabled?: boolean;
+  /** Manually fixed awards-ceremony start, which must not precede the end. */
+  awardsAtOverride?: string | null;
 }
 
 export function creationPlanTimeIssues(
   phases: readonly DayDistributionPhase[], scheduledStart: string,
   tables: number, timing: TimedMatchSettings, awardsEnabled = false,
+  awardsAtOverride?: string | null,
 ): string[] {
   if (countCreationScheduleEntries(phases, awardsEnabled) > MAX_CREATION_SCHEDULE_ENTRIES) {
     return ['Die automatische Verteilung überschreitet die Grenze von 80 Zeitplaneinträgen.'];
@@ -55,6 +58,14 @@ export function creationPlanTimeIssues(
     if (phase.type === 'BREAK') continue;
     if (!validPlayingDayBreaks(phase.dayBreaks, playingRounds(phase))) {
       return [`„${phase.label}“: Spieltagswechsel müssen an gültigen, unterschiedlichen Rundengrenzen liegen.`];
+    }
+    if (phase.inlineBreakAfterRound > 0) {
+      const rounds = playingRounds(phase);
+      if (!['SWISS', 'KNOCKOUT'].includes(phase.type)
+        || !Number.isInteger(phase.inlineBreakAfterRound)
+        || phase.inlineBreakAfterRound >= rounds) {
+        return [`„${phase.label}“: Eine bisherige Zwischenpause liegt außerhalb der verfügbaren Rundengrenzen und muss zuerst korrigiert werden.`];
+      }
     }
     if (phase.dayBreaks.some((entry) => entry.afterRound === phase.inlineBreakAfterRound)) {
       return [`„${phase.label}“: Zwischenpause und Spieltagsende dürfen nicht auf dieselbe Runde fallen.`];
@@ -77,6 +88,8 @@ export function creationPlanTimeIssues(
   })));
   if (!timeline.estimatedEnd) return ['Das gewählte Turnierdatum oder die Startuhrzeit ist ungültig.'];
   return [
+    ...(awardsEnabled && awardsAtOverride && awardsAtOverride < timeline.estimatedEnd
+      ? [`Die fest geplante Siegerehrung um ${awardsAtOverride.replace('T', ' ')} liegt vor dem geschätzten Turnierende ${timeline.estimatedEnd.replace('T', ' ')}.`] : []),
     ...plannedTimelineConflicts(timeline),
     ...playingDayOverflowWarnings(timeline),
     ...validatePlannedSchedule(timeline.items),
@@ -93,6 +106,14 @@ function distributeAtBoundaries<T extends DayDistributionPhase>(
     inside.set(phaseIndex, [...(inside.get(phaseIndex) ?? []), afterRound]);
   });
   let dayIndex = 0;
+  // Reuse the existing sequence of continuation times, even when the new
+  // round cut lies elsewhere. A director's 07:00 start should not become 09:00.
+  const originalTimes = phases.flatMap((phase) => [
+    ...(phase.type === 'BREAK' && phase.breakKind === 'overnight'
+      ? [phase.nextDayStart] : []),
+    ...phase.dayBreaks.map((item) => item.time),
+  ]).filter((value) => /^([01]\d|2[0-3]):[0-5]\d$/.test(value));
+  const nextTime = () => originalTimes[dayIndex - 1] ?? '09:00';
   let competitionIndex = -1;
   let convertedExistingBreaks = 0;
   let insertedOvernightBreaks = 0;
@@ -103,7 +124,7 @@ function distributeAtBoundaries<T extends DayDistributionPhase>(
       if (becomesOvernight) {
         dayIndex++;
         result.push({ ...phase, dayBreaks: [], breakKind: 'overnight',
-          nextDayDate: followingPlayingDate(startDate, dayIndex), nextDayStart: '09:00' });
+          nextDayDate: followingPlayingDate(startDate, dayIndex), nextDayStart: nextTime() });
       } else {
         result.push({ ...phase, dayBreaks: [], ...(phase.breakKind === 'overnight'
           ? { breakKind: 'minutes' as const, breakMinutes: 15 } : {}) });
@@ -114,12 +135,12 @@ function distributeAtBoundaries<T extends DayDistributionPhase>(
     }
     competitionIndex++;
     const dayBreaks = (inside.get(competitionIndex) ?? []).sort((a, b) => a - b)
-      .map((afterRound) => ({ afterRound, date: followingPlayingDate(startDate, ++dayIndex), time: '09:00' }));
+      .map((afterRound) => ({ afterRound, date: followingPlayingDate(startDate, ++dayIndex), time: nextTime() }));
     result.push({ ...phase, dayBreaks });
     if (between.has(competitionIndex) && phases[index + 1]?.type !== 'BREAK') {
       const nextDayDate = followingPlayingDate(startDate, ++dayIndex);
       result.push({ ...createOvernight(phase.entrantCount), breakKind: 'overnight',
-        nextDayDate, nextDayStart: '09:00', dayBreaks: [] });
+        nextDayDate, nextDayStart: nextTime(), dayBreaks: [] });
       insertedOvernightBreaks++;
     }
   });
@@ -167,24 +188,36 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
   });
   if (!competition.length) return impossible('Mindestens eine Wettkampfphase erforderlich.');
   const scheduledStart = options.scheduledStart ?? `${startDate}T09:00`;
+  const issuesFor = (candidate: readonly T[]) => creationPlanTimeIssues(candidate, scheduledStart,
+    tableCount, timing, options.awardsEnabled, options.awardsAtOverride);
   if (days === 1) {
     const result = distributeAtBoundaries(phases, [], startDate, createOvernight);
-    const issues = creationPlanTimeIssues(result.phases, scheduledStart, tableCount, timing, options.awardsEnabled);
+    const issues = issuesFor(result.phases);
     return issues.length ? impossible(issues[0]) : result;
   }
   if (days < 2 || days > 14) return impossible('Die Anzahl der Spieltage muss zwischen 2 und 14 liegen.');
   const slots = competition.flatMap((phase, phaseIndex) => {
     const rounds = playingRounds(phase);
     const totalMinutes = estimatePhaseMetrics(phase, tableCount, timing).estimatedDurationMinutes;
+    const koDurations = phase.type === 'KNOCKOUT'
+      ? estimateKnockoutRoundMinutes(phase.entrantCount, tableCount, phase.bestOf, phase.knockoutBestOf, timing)
+      : [];
     return Array.from({ length: rounds }, (_, round) => ({
       phaseIndex, afterRound: round + 1,
-      weight: Math.max(1, totalMinutes / rounds),
+      weight: Math.max(1, koDurations[round] ?? totalMinutes / rounds),
     }));
   });
   if (slots.length < days) return impossible('Zu wenige vollständige Rundengrenzen für die gewünschten Spieltage.');
   const cumulative = [0];
   slots.forEach((slot) => cumulative.push(cumulative[cumulative.length - 1] + slot.weight));
   const total = cumulative[cumulative.length - 1];
+  // Precompute the only positions which do not duplicate an existing inline
+  // pause, including round boundaries across phases.
+  const validCuts = Array.from({ length: slots.length - 1 }, (_, i) => i + 1).filter((position) => {
+    const here = slots[position - 1], nextSlot = slots[position];
+    return !(here.phaseIndex === nextSlot.phaseIndex
+      && competition[here.phaseIndex].inlineBreakAfterRound === here.afterRound);
+  });
   type PartialPlan = { cuts: number[]; score: number };
   let beam: PartialPlan[] = [{ cuts: [], score: 0 }];
   for (let day = 1; day < days; day++) {
@@ -193,18 +226,34 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
     for (const plan of beam) {
       const lower = (plan.cuts.at(-1) ?? 0) + 1;
       const upper = slots.length - (days - day);
-      const candidates: number[] = [];
-      // Always consider nearby alternatives, not only the balanced boundary.
-      for (let position = lower; position <= upper; position++) {
-        const here = slots[position - 1];
-        const nextSlot = slots[position];
-        // Existing inline pauses cannot double as day-end boundaries.
-        if (here.phaseIndex === nextSlot.phaseIndex
-          && competition[here.phaseIndex].inlineBreakAfterRound === here.afterRound) continue;
-        candidates.push(position);
+      // Search near the target in logarithmic time instead of sorting every
+      // possible position in each beam state. Include time-limit cutoffs and
+      // both extremes, so late starts can split far from the midpoint.
+      let left = lower, right = upper;
+      while (left < right) {
+        const mid = (left + right) >>> 1;
+        if (cumulative[mid] < target) left = mid + 1;
+        else right = mid;
       }
+      const budget = day === 1
+        ? 24 * 60 - (Number(scheduledStart.slice(11, 13)) * 60 + Number(scheduledStart.slice(14, 16)))
+        : 24 * 60 - (Number((phases.find((p) => p.type === 'BREAK' && p.breakKind === 'overnight')?.nextDayStart || '09:00').slice(0, 2)) * 60);
+      let budgetCut = lower;
+      let budgetHi = upper;
+      while (budgetCut < budgetHi) {
+        const mid = Math.ceil((budgetCut + budgetHi) / 2);
+        if (cumulative[mid] - cumulative[plan.cuts.at(-1) ?? 0] <= budget) budgetCut = mid;
+        else budgetHi = mid - 1;
+      }
+      const candidatePositions = new Set<number>([lower, upper, left, budgetCut, budgetCut - 1]);
+      for (let distance = -16; distance <= 16; distance++) {
+        candidatePositions.add(left + distance);
+        candidatePositions.add(budgetCut + distance);
+      }
+      const candidates = [...candidatePositions].filter((position) => position >= lower
+        && position <= upper && validCuts.includes(position));
       candidates.sort((a, b) => Math.abs(cumulative[a] - target) - Math.abs(cumulative[b] - target) || a - b);
-      for (const position of candidates.slice(0, 14)) {
+      for (const position of candidates) {
         const boundary = slots[position - 1];
         const phase = competition[boundary.phaseIndex];
         // Discourage converting existing fixed-length/until pauses if another
@@ -232,7 +281,7 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
     });
     const candidate = distributeAtBoundaries(phases, boundaries, startDate, createOvernight);
     if (configuredPlayingDays(candidate.phases) !== days) continue;
-    const issues = creationPlanTimeIssues(candidate.phases, scheduledStart, tableCount, timing, options.awardsEnabled);
+    const issues = issuesFor(candidate.phases);
     if (!issues.length) return candidate;
     if (!firstIssue) firstIssue = issues[0];
   }
