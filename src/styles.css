@@ -7719,3 +7719,19 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .single-day-choice-dialog { width: min(660px, calc(100vw - 32px)); max-width: 660px; }
 .single-day-choice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .single-day-choice-actions > button { flex: 1 1 auto; }
+
+/* Automatic playing-day distribution stays compact in the phase wizard. */
+.phase-auto-day-plan {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 8px 0 12px;
+}
+.phase-auto-day-plan > div { flex: 1 1 270px; min-width: 0; }
+.phase-auto-day-plan p { margin: 4px 0 0; }
+.phase-auto-day-plan > button { flex: 0 0 auto; }
+@media (max-width: 600px) {
+  .phase-auto-day-plan > button { width: 100%; }
+}
