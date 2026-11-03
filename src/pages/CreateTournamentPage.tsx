@@ -44,7 +44,7 @@ import { CREATION_DRAFT_KEY, loadCreationDraft, saveCreationDraft, clearCreation
 import { saveNamedCreationDraftAtomic, removeSavedCreationDraftAtomic } from '@/domain/savedCreationDraftStore';
 import { creationRecoveryKey, saveCreationRecoveryAtomic, clearCreationRecoveryAtomic } from '@/domain/creationRecoveryStore';
 import { ClockTimePicker, parseClockTime } from '@/components/ClockTimePicker';
-import { RecommendationDurationPicker, DEFAULT_RECOMMENDATION_DURATION, MIN_RECOMMENDATION_DURATION, MAX_RECOMMENDATION_DURATION, MAX_SINGLE_DAY_DURATION, formatRecommendationDuration } from '@/components/RecommendationDurationPicker';
+import { RecommendationDurationPicker, DEFAULT_RECOMMENDATION_DURATION, MIN_RECOMMENDATION_DURATION, MAX_SINGLE_DAY_DURATION, formatRecommendationDuration } from '@/components/RecommendationDurationPicker';
 import { RecommendationNumberStepper } from '@/components/RecommendationNumberStepper';
 import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { DisciplineChangeDialog } from '@/components/DisciplineChangeDialog';
