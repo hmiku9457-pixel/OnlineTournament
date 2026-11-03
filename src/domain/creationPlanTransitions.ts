@@ -48,19 +48,59 @@ export function countCreationScheduleEntries(
   }, 0);
 }
 
-/** A single-day plan has no overnight phase or round-level day boundaries. */
-export function convertToSingleDay<T extends RoundDependentPhase & { breakKind: string; breakMinutes?: number }>(
+/** Fixed deadlines on another calendar day must not survive a single-day switch. */
+export function singleDayFixedPauseConflicts<T extends RoundDependentPhase & {
+  breakKind: string; breakUntilDate?: string; inlineBreakUntilDate?: string;
+  inlineBreakKind?: string;
+}>(phases: readonly T[], startDate: string): string[] {
+  return phases.flatMap((phase, index) => {
+    const conflicts: string[] = [];
+    if (phase.type === 'BREAK' && phase.breakKind === 'until'
+      && phase.breakUntilDate && phase.breakUntilDate > startDate) {
+      conflicts.push(`Pause ${index + 1}: festes Ende ${phase.breakUntilDate}`);
+    }
+    if (phase.type !== 'BREAK' && phase.inlineBreakAfterRound > 0
+      && phase.inlineBreakKind === 'until'
+      && phase.inlineBreakUntilDate && phase.inlineBreakUntilDate > startDate) {
+      conflicts.push(`Phase ${index + 1}: Zwischenpause bis ${phase.inlineBreakUntilDate}`);
+    }
+    return conflicts;
+  });
+}
+
+/** Preserve data unless the director explicitly agrees to converting or
+ * deleting inter-day pauses in the confirmation dialog. */
+export function convertToSingleDay<T extends RoundDependentPhase & {
+  breakKind: string; breakMinutes?: number; breakUntilDate?: string;
+  inlineBreakKind?: 'minutes' | 'until'; inlineBreakMinutes?: number;
+  inlineBreakUntilDate?: string;
+}>(
   phases: readonly T[],
   overnightTreatment: 'remove' | 'convert' = 'remove',
+  startDate = '',
 ): T[] {
   return phases
-    .filter((phase) => overnightTreatment === 'convert' || phase.type !== 'BREAK' || phase.breakKind !== 'overnight')
-    .map((phase) => ({
-      ...phase,
-      dayBreaks: [],
-      ...(overnightTreatment === 'convert' && phase.type === 'BREAK' && phase.breakKind === 'overnight'
-        ? { breakKind: 'minutes', breakMinutes: 15 } : {}),
-    } as T));
+    .filter((phase) => overnightTreatment === 'convert' || phase.type !== 'BREAK'
+      || (phase.breakKind !== 'overnight'
+        && !(phase.breakKind === 'until' && startDate && phase.breakUntilDate && phase.breakUntilDate > startDate)))
+    .map((phase) => {
+      const convertsFixedBreak = phase.type === 'BREAK' && phase.breakKind === 'until'
+        && Boolean(startDate && phase.breakUntilDate && phase.breakUntilDate > startDate);
+      const convertsOvernight = phase.type === 'BREAK' && phase.breakKind === 'overnight';
+      const convertsInline = phase.type !== 'BREAK' && phase.inlineBreakAfterRound > 0
+        && phase.inlineBreakKind === 'until'
+        && Boolean(startDate && phase.inlineBreakUntilDate && phase.inlineBreakUntilDate > startDate);
+      return {
+        ...phase,
+        dayBreaks: [],
+        ...((convertsOvernight || convertsFixedBreak) && overnightTreatment === 'convert'
+          ? { breakKind: 'minutes', breakMinutes: 15, breakUntilDate: '' } : {}),
+        ...(convertsInline
+          ? overnightTreatment === 'remove'
+            ? { inlineBreakAfterRound: 0, inlineBreakUntilDate: '' }
+            : { inlineBreakKind: 'minutes', inlineBreakMinutes: 15, inlineBreakUntilDate: '' } : {}),
+      } as T;
+    });
 }
 
 export interface PhaseBreakLoss {

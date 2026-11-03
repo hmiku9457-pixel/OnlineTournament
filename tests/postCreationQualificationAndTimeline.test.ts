@@ -6,7 +6,7 @@ import { buildMockGroups } from '@/services/mockCompetitionViews';
 import { completeMockMatch, getMockStageMatches, getPendingGroupCutoff,
   getPendingMockApproval, getEditableGroupCutoffs, resolveGroupCutoff, approveMockProgress } from '@/services/mockRuntime';
 import { getLiveScheduleDeviations } from '@/services/mockLiveSchedule';
-import { buildPlannedTimeline } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, parseLocalDateTime } from '@/domain/tournamentSchedule';
 
 const storage = new Map<string, string>();
 beforeEach(() => {
@@ -111,7 +111,7 @@ describe('original schedule and live shift indicators', () => {
     const phaseKey = 'online-tournament:mock-phase-lifecycle:v1';
     storage.set(phaseKey, JSON.stringify([{ tournamentId: t.id,
       startedStageIds: [t.stages[0].id], completedStageIds: [],
-      stageStartedAt: { [t.stages[0].id]: '2030-11-21T09:00:00.000Z' },
+      stageStartedAt: { [t.stages[0].id]: parseLocalDateTime('2030-11-21T09:00')!.toISOString() },
       stageExtraMinutes: { [t.stages[0].id]: 10 },
     }]));
     const absorbed = getLiveScheduleDeviations(t);
@@ -119,12 +119,12 @@ describe('original schedule and live shift indicators', () => {
     expect(absorbed['phase-2'].offsetMinutes).toBe(10);
     expect(absorbed['phase-3'].offsetMinutes).toBe(0);
     const plannedAfterPause = timeline.items.find((item) => item.id === 'phase-3')!.at;
-    const resumeAt = new Date(plannedAfterPause);
+    const resumeAt = parseLocalDateTime(plannedAfterPause)!;
     resumeAt.setMinutes(resumeAt.getMinutes() + 15);
     storage.set(phaseKey, JSON.stringify([{ tournamentId: t.id,
       startedStageIds: [t.stages[0].id, t.stages[1].id], completedStageIds: [],
       stageStartedAt: { [t.stages[0].id]: '2030-11-21T09:00:00.000Z',
-        [t.stages[1].id]: '2030-11-21T09:25:00.000Z' },
+        [t.stages[1].id]: parseLocalDateTime('2030-11-21T09:25')!.toISOString() },
       stageExtraMinutes: { [t.stages[0].id]: 10 },
       breakResumeAt: { [t.stages[1].id]: resumeAt.toISOString() },
     }]));

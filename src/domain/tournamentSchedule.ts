@@ -1,3 +1,6 @@
+import { TOURNAMENT_TIME_ZONE, nextTournamentCalendarDate, tournamentWallClock,
+  tournamentWallClockCandidates } from './tournamentLocalTime';
+
 /** Public, explicitly non-binding timetable. No competition lifecycle uses it. */
 export interface PlannedScheduleItem {
   id: string;
@@ -19,30 +22,13 @@ export interface PlannedScheduleItem {
 /** A local clock hour can repeat when DST ends. The current draft format does not
  * preserve a UTC offset, so never guess which occurrence the director intended. */
 export function isAmbiguousLocalDateTime(value: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
-  if (!match) return false;
-  const [, y, mo, d, h, mi] = match.map(Number);
-  const first = new Date(y, mo - 1, d, h, mi);
-  if (first.getFullYear() !== y || first.getMonth() + 1 !== mo || first.getDate() !== d
-    || first.getHours() !== h || first.getMinutes() !== mi) return false;
-  const laterOffset = new Date(first.getTime() + 3 * 60 * 60000).getTimezoneOffset();
-  const extraMinutes = laterOffset - first.getTimezoneOffset();
-  if (extraMinutes <= 0) return false;
-  const repeated = new Date(first.getTime() + extraMinutes * 60000);
-  return repeated.getFullYear() === y && repeated.getMonth() + 1 === mo && repeated.getDate() === d
-    && repeated.getHours() === h && repeated.getMinutes() === mi;
+  return tournamentWallClockCandidates(value).length > 1;
 }
 
-/** The browser's local wall clock is used intentionally, not Date.toISOString(). */
+/** Berlin wall-clock timestamps have exactly one matching real instant. */
 export function parseLocalDateTime(value: string): Date | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
-  if (!match) return null;
-  const [, y, mo, d, h, mi] = match;
-  const date = new Date(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi));
-  if (date.getFullYear() !== Number(y) || date.getMonth() + 1 !== Number(mo)
-    || date.getDate() !== Number(d) || date.getHours() !== Number(h)
-    || date.getMinutes() !== Number(mi) || isAmbiguousLocalDateTime(value)) return null;
-  return date;
+  const candidates = tournamentWallClockCandidates(value);
+  return candidates.length === 1 ? candidates[0] : null;
 }
 
 export function isValidLocalDateTime(value: string): boolean {
@@ -58,25 +44,22 @@ export function plannedTimelineDurationMinutes(start: string, end: string): numb
 }
 
 export function toLocalDateTime(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return tournamentWallClock(date);
 }
 
-/** Creation accepts the current calendar minute (seconds are not editable)
- * or a future minute. Compare Date values to respect DST boundaries. */
+/** Compare absolute instants, rounded to the current minute. */
 export function isStartAtOrAfterNow(start: string, now = new Date()): boolean {
   const scheduled = parseLocalDateTime(start);
   if (!scheduled || Number.isNaN(now.getTime())) return false;
-  const thisMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes());
-  return scheduled.getTime() >= thisMinute.getTime();
+  return scheduled.getTime() >= Math.floor(now.getTime() / 60000) * 60000;
 }
 
 export function formatPlannedDateTime(value: string, withDate = true): string {
   const date = parseLocalDateTime(value);
   if (!date) return 'Termin nicht festgelegt';
   return date.toLocaleString('de-DE', withDate
-    ? { dateStyle: 'medium', timeStyle: 'short' }
-    : { timeStyle: 'short' }) + ' Uhr';
+    ? { timeZone: TOURNAMENT_TIME_ZONE, dateStyle: 'medium', timeStyle: 'short' }
+    : { timeZone: TOURNAMENT_TIME_ZONE, timeStyle: 'short' }) + ' Uhr';
 }
 
 /** Display break length rather than a fictitious exact pause-start time.
@@ -127,6 +110,7 @@ export function groupPlannedScheduleDays(items: PlannedScheduleItem[], scheduled
       date,
       label: date === 'unknown' ? 'Datum noch offen'
         : parseLocalDateTime(`${date}T12:00`)!.toLocaleDateString('de-DE', {
+          timeZone: TOURNAMENT_TIME_ZONE,
           weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
         }),
       items: entries,
@@ -199,12 +183,20 @@ export interface PlannedTimeline {
 }
 
 function clockAt(current: Date, time: string, followingDay = false): Date {
-  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
-  if (!match) return new Date(current);
-  const next = new Date(current);
-  if (followingDay) next.setDate(next.getDate() + 1);
-  next.setHours(Number(match[1]), Number(match[2]), 0, 0);
-  return next;
+  const day = toLocalDateTime(current).slice(0, 10);
+  const next = followingDay ? nextTournamentCalendarDate(day) : day;
+  return parseLocalDateTime(`${next}T${time}`) ?? new Date(NaN);
+}
+
+/** Generated timeline headings must respect the storage limit without
+ * shortening the user's actual phase name. */
+export function generatedScheduleTitle(prefix: string, phaseLabel: string): string {
+  const maximum = 80;
+  const available = maximum - prefix.length - 3;
+  if (available <= 0) return prefix.slice(0, maximum);
+  return phaseLabel.length <= available
+    ? `${prefix} · ${phaseLabel}`
+    : `${prefix} · ${phaseLabel.slice(0, Math.max(1, available - 1)).trimEnd()}…`;
 }
 
 /** Calculate the whole non-binding timetable, starting with the first tournament
@@ -246,7 +238,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
           if (afterRound === round && phase.inlineBreakAfterRound && phase.inlineBreakKind) {
             const item: PlannedScheduleItem = {
               id: `inline-break-${index + 1}`, at: toLocalDateTime(cursor),
-              title: `Pause nach Runde ${round} · ${phase.label}`, type: 'break',
+              title: generatedScheduleTitle(`Pause nach Runde ${round}`, phase.label), type: 'break',
               durationApproximate: phase.inlineBreakKind === 'until',
             };
             items.push(item);
@@ -262,7 +254,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
               cursor = resume;
             }
             items.push({ id: `inline-resume-${index + 1}`, at: toLocalDateTime(cursor),
-              title: `Fortsetzung Runde ${round + 1} · ${phase.label}`, type: 'competition' });
+              title: generatedScheduleTitle(`Fortsetzung Runde ${round + 1}`, phase.label), type: 'competition' });
           }
           const boundary = boundaries.find((value) => value.afterRound === round);
           if (!boundary) continue;
@@ -272,7 +264,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
             && resume.getTime() > finish.getTime());
           const dayBreak: PlannedScheduleItem = {
             id: `day-break-${index + 1}-${round}`, at: toLocalDateTime(finish),
-            title: `Spieltagsende nach Runde ${round} · ${phase.label}`,
+            title: generatedScheduleTitle(`Spieltagsende nach Runde ${round}`, phase.label),
             type: 'break', breakKind: 'overnight', durationApproximate: true,
           };
           items.push(dayBreak);
@@ -283,7 +275,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
             cursor = resume!;
           }
           items.push({ id: `day-resume-${index + 1}-${round}`, at: toLocalDateTime(cursor),
-            title: `Fortsetzung ab Runde ${round + 1} · ${phase.label}`, type: 'competition' });
+            title: generatedScheduleTitle(`Fortsetzung ab Runde ${round + 1}`, phase.label), type: 'competition' });
         }
       } else if (roundCount > 1 && afterRound >= 1 && afterRound < roundCount) {
         const roundMinutes = phase.roundDurationsMinutes;
@@ -295,7 +287,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
         const after = Math.round(totalDuration) - before;
         const inlineStart = new Date(cursor.getTime() + before * 60000);
         const inlinePause: PlannedScheduleItem = { id: `inline-break-${index + 1}`, at: toLocalDateTime(inlineStart),
-          title: `Pause nach Runde ${afterRound} · ${phase.label}`, type: 'break',
+          title: generatedScheduleTitle(`Pause nach Runde ${afterRound}`, phase.label), type: 'break',
           durationApproximate: phase.inlineBreakKind === 'until' };
         items.push(inlinePause);
         let resume = inlineStart;
@@ -314,16 +306,14 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
         } else resume = new Date(inlineStart.getTime() + Math.max(1, phase.inlineBreakMinutes ?? 15) * 60000);
         if (validDuration) inlinePause.durationMinutes = Math.max(0, Math.round((resume.getTime() - inlineStart.getTime()) / 60000));
         items.push({ id: `inline-resume-${index + 1}`, at: toLocalDateTime(resume),
-          title: `Fortsetzung Runde ${afterRound + 1} · ${phase.label}`, type: 'competition' });
+          title: generatedScheduleTitle(`Fortsetzung Runde ${afterRound + 1}`, phase.label), type: 'competition' });
         cursor = new Date(resume.getTime() + after * 60000);
       } else cursor = new Date(cursor.getTime() + totalDuration * 60000);
     } else if (phase.breakKind === 'overnight') {
       const pauseStart = cursor;
       const explicit = phase.nextDayDate ? parseLocalDateTime(phase.nextDayDate + 'T' + (phase.nextDayStart ?? '09:00')) : null;
-      const following = new Date(cursor);
-      following.setHours(12, 0, 0, 0);
-      following.setDate(following.getDate() + 1);
-      const requestedNextDay = toLocalDateTime(following).slice(0, 10) + 'T' + (phase.nextDayStart ?? '09:00');
+      const requestedNextDay = nextTournamentCalendarDate(toLocalDateTime(cursor).slice(0, 10))
+        + 'T' + (phase.nextDayStart ?? '09:00');
       const implicit = parseLocalDateTime(requestedNextDay);
       if (!phase.nextDayDate && !implicit) {
         warnings.push({ phaseIndex: index, message: isAmbiguousLocalDateTime(requestedNextDay)

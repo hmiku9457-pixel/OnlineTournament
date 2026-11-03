@@ -2,7 +2,8 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { ClockTimeDial, type ClockMode } from '@/components/ClockTimePicker';
 
 export const MIN_RECOMMENDATION_DURATION = 15;
-export const MAX_RECOMMENDATION_DURATION = 23 * 60 + 59;
+export const MAX_RECOMMENDATION_DURATION = 14 * 24 * 60 - 1;
+export const MAX_SINGLE_DAY_DURATION = 23 * 60 + 59;
 export const DEFAULT_RECOMMENDATION_DURATION = 210;
 
 export function formatRecommendationDuration(minutes: number): string {
@@ -11,20 +12,23 @@ export function formatRecommendationDuration(minutes: number): string {
   return hours ? `${hours} Std. ${rest ? `${rest} Min.` : ''}`.trim() : `${rest} Min.`;
 }
 
-export function normalizeRecommendationDuration(hours: number, minutes: number): number | null {
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23
+export function normalizeRecommendationDuration(hours: number, minutes: number, maximum = MAX_SINGLE_DAY_DURATION): number | null {
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > Math.floor(maximum / 60)
     || minutes < 0 || minutes > 59) return null;
   const total = hours * 60 + minutes;
-  return total >= MIN_RECOMMENDATION_DURATION && total <= MAX_RECOMMENDATION_DURATION ? total : null;
+  return total >= MIN_RECOMMENDATION_DURATION && total <= maximum ? total : null;
 }
 
 interface Props {
   value: number;
   onChange: (minutes: number) => void;
+  multiDay?: boolean;
 }
 
 /** Duration instead of a clock time, with familiar clock dial and precise HH:MM fields. */
-export function RecommendationDurationPicker({ value, onChange }: Props) {
+export function RecommendationDurationPicker({ value, onChange, multiDay = false }: Props) {
+  const maximum = multiDay ? MAX_RECOMMENDATION_DURATION : MAX_SINGLE_DAY_DURATION;
+  const maxHours = Math.floor(maximum / 60);
   const titleId = useId();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<ClockMode>('hours');
@@ -34,9 +38,9 @@ export function RecommendationDurationPicker({ value, onChange }: Props) {
   const firstTabRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
 
-  const hours = /^\d{1,2}$/.test(hoursText) && Number(hoursText) <= 23 ? Number(hoursText) : null;
+  const hours = /^\d{1,3}$/.test(hoursText) && Number(hoursText) <= maxHours ? Number(hoursText) : null;
   const minutes = /^\d{1,2}$/.test(minutesText) && Number(minutesText) <= 59 ? Number(minutesText) : null;
-  const candidate = hours === null || minutes === null ? null : normalizeRecommendationDuration(hours, minutes);
+  const candidate = hours === null || minutes === null ? null : normalizeRecommendationDuration(hours, minutes, maximum);
 
   function openDialog() {
     setHoursText(String(Math.floor(value / 60)).padStart(2, '0'));
@@ -109,15 +113,15 @@ export function RecommendationDurationPicker({ value, onChange }: Props) {
                 {minutes === null ? '--' : String(minutes).padStart(2, '0')}
               </button>
             </div>
-            <ClockTimeDial mode={mode} hour={hours ?? 0} minute={minutes ?? 0}
+            <ClockTimeDial mode={mode} hour={(hours ?? 0) % 24} minute={minutes ?? 0}
               onPickHour={(next) => { setHoursText(String(next).padStart(2, '0')); setMode('minutes'); }}
               onPickMinute={(next) => setMinutesText(String(next).padStart(2, '0'))}/>
             <p className="clock-picker-ring-hint">{mode === 'hours'
-              ? 'Stunden auf dem Zifferblatt auswählen (0–23).'
+              ? 'Stunden auf dem Zifferblatt auswählen (0–23); für mehrtägige Turniere höhere Werte unten eingeben.'
               : 'Minuten in 5er-Schritten auswählen oder unten genau eingeben.'}</p>
             <div className="clock-picker-manual">
-              <label>Stunden (0–23)
-                <input type="number" min="0" max="23" inputMode="numeric" value={hoursText}
+              <label>Stunden (0–{maxHours})
+                <input type="number" min="0" max={maxHours} inputMode="numeric" value={hoursText}
                   onChange={(event) => { setHoursText(event.target.value); setMode('hours'); }} />
               </label>
               <label>Minuten (0–59)
@@ -125,7 +129,7 @@ export function RecommendationDurationPicker({ value, onChange }: Props) {
                   onChange={(event) => { setMinutesText(event.target.value); setMode('minutes'); }} />
               </label>
             </div>
-            {candidate === null && <p className="clock-picker-minimum-hint" role="status">Bitte eine Dauer zwischen 15 Minuten und 23 Std. 59 Min. eingeben.</p>}
+            {candidate === null && <p className="clock-picker-minimum-hint" role="status">Bitte eine Dauer zwischen 15 Minuten und {formatRecommendationDuration(maximum)} eingeben.</p>}
             <div className="clock-picker-actions">
               <button type="button" className="btn" onClick={closeDialog}>Abbrechen</button>
               <button type="button" className="btn primary" disabled={candidate === null} onClick={submit}>Übernehmen</button>

@@ -237,6 +237,11 @@ export function recommendTournamentFormats(
   const qualifiers = requestedQualifiers < playerCount
     ? requestedQualifiers
     : [64, 32, 16, 8, 4, 2].find((size) => size <= maximumQualifiers) ?? 2;
+  // The configured qualifier number is an upper bound. Include smaller
+  // feasible brackets instead of treating the limit as an exact requirement.
+  const qualifierOptions = [...new Set([qualifiers, ...[64, 32, 16, 8, 4, 2]
+    .filter((count) => count < playerCount && count <= maximumQualifiers)])]
+    .filter((count) => count >= 2);
   // Unequal group qualification counts are permitted and resolved by the
   // existing group-comparison/tiebreaker rules.
   const groupSwissEntrants = playerCount >= 4
@@ -334,7 +339,7 @@ export function recommendTournamentFormats(
     });
   }
 
-  if (minimumMatches <= 1 && systemsEnabled(['knockout'], settings)) {
+  if (systemsEnabled(['knockout'], settings)) {
     addRecommendation({
       id: 'single-ko',
       label: 'Einfaches K.-o.',
@@ -349,33 +354,33 @@ export function recommendTournamentFormats(
   if (playerCount >= 3 && systemsEnabled(['groups', 'knockout'], settings)) {
     const groupTableBonus = Math.min(tableCount, group.groupCount) * 2;
     const largeFieldPenalty = playerCount >= 20 ? 20 : playerCount >= 16 ? 10 : 0;
-    addRecommendation({
-      id: 'groups-ko',
-      label: `${group.groupCount} Gruppen → ${qualifiers} Qualifizierte → K.-o.`,
-      description: `Gruppenphase mit anschließender K.-o.-Phase für ${qualifiers} bestplatzierte Teilnehmer.`,
+    qualifierOptions.forEach((count, index) => addRecommendation({
+      id: index === 0 ? 'groups-ko' : `groups-ko-${count}`,
+      label: `${group.groupCount} Gruppen → ${count} Qualifizierte → K.-o.`,
+      description: `Gruppenphase mit anschließender K.-o.-Phase für ${count} bestplatzierte Teilnehmer.`,
       minimumGuaranteedMatches: group.minimumGuaranteedMatches,
-      score: group.fitScore + groupTableBonus - largeFieldPenalty,
+      score: group.fitScore + groupTableBonus - largeFieldPenalty - index * 2,
       requiredSystems: ['groups', 'knockout'],
       phases: [
         createPhaseTemplate('GROUPS', 1, { groupCount: group.groupCount, entrantCount: playerCount }),
-        createPhaseTemplate('KNOCKOUT', 2, { entrantCount: qualifiers }),
+        createPhaseTemplate('KNOCKOUT', 2, { entrantCount: count }),
       ],
-    });
+    }));
   }
 
   if (playerCount >= 3 && systemsEnabled(['swiss', 'knockout'], settings)) {
-    addRecommendation({
-      id: 'swiss-ko',
-      label: `${swiss.rounds} Runden Schweizer System → ${qualifiers} Qualifizierte → K.-o.`,
-      description: `${swiss.rounds} Schweizer Runden mit anschließender K.-o.-Phase für ${qualifiers} bestplatzierte Teilnehmer.`,
+    qualifierOptions.forEach((count, index) => addRecommendation({
+      id: index === 0 ? 'swiss-ko' : `swiss-ko-${count}`,
+      label: `${swiss.rounds} Runden Schweizer System → ${count} Qualifizierte → K.-o.`,
+      description: `${swiss.rounds} Schweizer Runden mit anschließender K.-o.-Phase für ${count} bestplatzierte Teilnehmer.`,
       minimumGuaranteedMatches: minimumPlayedMatches('SWISS', playerCount, 2, swiss.rounds),
-      score: (playerCount >= 16 ? 95 + Math.min(tableCount, 5) : 70) - swiss.roundsBelowMinimum * 25,
+      score: (playerCount >= 16 ? 95 + Math.min(tableCount, 5) : 70) - swiss.roundsBelowMinimum * 25 - index * 2,
       requiredSystems: ['swiss', 'knockout'],
       phases: [
         createPhaseTemplate('SWISS', 1, { swissRounds: swiss.rounds, entrantCount: playerCount }),
-        createPhaseTemplate('KNOCKOUT', 2, { entrantCount: qualifiers }),
+        createPhaseTemplate('KNOCKOUT', 2, { entrantCount: count }),
       ],
-    });
+    }));
   }
 
   if (playerCount >= 4 && systemsEnabled(['groups', 'swiss'], settings)) {
@@ -415,13 +420,24 @@ export function recommendTournamentFormats(
   // Minimum games remain a soft preference, never a feasibility constraint.
   const preferenceCost = (item: FormatRecommendation) =>
     (item.minimumMatchShortfall ?? 0) * 40
-      + Math.max(0, item.estimatedDurationMinutes - preferredDuration) * 0.75;
+      + Math.max(0, item.estimatedDurationMinutes - preferredDuration) * 0.75
+      + Math.max(0, preferredDuration - item.estimatedDurationMinutes) * 0.02;
   const byPreference = (a: FormatRecommendation, b: FormatRecommendation) =>
     preferenceCost(a) - preferenceCost(b)
       || b.score - a.score || a.estimatedDurationMinutes - b.estimatedDurationMinutes;
+  // Additional smaller KO brackets are fallback candidates. Keep the primary
+  // format families represented before filling with bracket-size variants.
   const ranked = recommendations.sort(byPreference);
+  const primary = ranked.filter((item) => !/-(?:ko)-(?:2|4|8|16|32|64)$/.test(item.id));
+  const alternatives = ranked.filter((item) => /-(?:ko)-(?:2|4|8|16|32|64)$/.test(item.id));
+  const prioritized = [...primary, ...alternatives].sort((a, b) =>
+    (a.estimatedDurationMinutes > preferredDuration ? 1 : 0)
+      - (b.estimatedDurationMinutes > preferredDuration ? 1 : 0)
+      || Number(/-(?:ko)-(?:2|4|8|16|32|64)$/.test(a.id))
+        - Number(/-(?:ko)-(?:2|4|8|16|32|64)$/.test(b.id))
+      || byPreference(a, b));
   const maxResults = settings.maxResults ?? 5;
   return settings.maxRecommendedDurationMinutes === undefined
-    ? maxResults === 0 ? ranked : ranked.slice(0, maxResults)
-    : ranked;
+    ? maxResults === 0 ? prioritized : prioritized.slice(0, maxResults)
+    : prioritized;
 }

@@ -13,7 +13,8 @@ import { NotFoundPage } from '@/pages/NotFoundPage';
 import { StorageIntegrityBanner } from '@/components/StorageIntegrityBanner';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
 import { getSavedCreationDraftAtomic } from '@/domain/savedCreationDraftStore';
-import type { SavedCreationDraft } from '@/domain/creationDraft';
+import type { CreationDraft, SavedCreationDraft } from '@/domain/creationDraft';
+import { creationRecoveryKey, readCreationRecoveryAtomic } from '@/domain/creationRecoveryStore';
 
 /** Force a fresh controller instance when navigating from tournament A to B.
  * React Router otherwise reuses the same component for the parameterized
@@ -29,31 +30,47 @@ function TournamentControlRoute() {
 }
 
 function DraftEditorLoader({ draftId }: { draftId: string }) {
-  const [saved, setSaved] = useState<SavedCreationDraft | null | undefined>();
+  const [loaded, setLoaded] = useState<{ saved: SavedCreationDraft | null; recovery: CreationDraft | null }>();
   const [error, setError] = useState('');
   useEffect(() => {
     let cancelled = false;
-    getSavedCreationDraftAtomic(draftId).then((draft) => {
-      if (!cancelled) setSaved(draft);
-    }).catch((error: unknown) => {
+    Promise.all([
+      getSavedCreationDraftAtomic(draftId),
+      readCreationRecoveryAtomic(creationRecoveryKey(draftId)).catch(() => null),
+    ]).then(([saved, recovery]) => {
+      if (!cancelled) setLoaded({ saved, recovery });
+    }).catch((failure: unknown) => {
       if (!cancelled) {
-        const detail = error instanceof Error ? error.message : '';
+        const detail = failure instanceof Error ? failure.message : '';
         setError(`Die gespeicherten Entwürfe sind nicht verfügbar. IndexedDB ist möglicherweise blockiert. Bitte den Browserspeicher freigeben und die Seite erneut öffnen.${detail ? ` (${detail})` : ''}`);
       }
     });
     return () => { cancelled = true; };
   }, [draftId]);
   if (error) return <div className="card" role="alert">{error}</div>;
-  if (saved === undefined) return <p role="status">Gespeicherten Entwurf öffnen …</p>;
-  if (saved === null) return <div className="card" role="alert">Dieser Entwurf ist nicht mehr vorhanden. Bitte einen anderen Entwurf auswählen.</div>;
-  return <CreateTournamentPage key={draftId} initialNamedDraft={saved} />;
+  if (!loaded) return <p role="status">Gespeicherten Entwurf öffnen …</p>;
+  if (loaded.saved === null) return <div className="card" role="alert">Dieser Entwurf ist nicht mehr vorhanden. Bitte einen anderen Entwurf auswählen.</div>;
+  return <CreateTournamentPage key={draftId} initialNamedDraft={loaded.saved} initialRecoveryDraft={loaded.recovery} />;
+}
+
+function NewTournamentLoader() {
+  const [recovery, setRecovery] = useState<CreationDraft | null | undefined>();
+  useEffect(() => {
+    let cancelled = false;
+    readCreationRecoveryAtomic(creationRecoveryKey(null))
+      .then((draft) => { if (!cancelled) setRecovery(draft); })
+      .catch(() => { if (!cancelled) setRecovery(null); });
+    return () => { cancelled = true; };
+  }, []);
+  if (recovery === undefined) return <p role="status">Turnierentwurf vorbereiten …</p>;
+  return <CreateTournamentPage key="new" initialRecoveryDraft={recovery} />;
 }
 
 function CreateTournamentRoute() {
   const location = useLocation();
   const draftId = new URLSearchParams(location.search).get('draft');
   return draftId ? <DraftEditorLoader key={draftId} draftId={draftId} />
-    : <CreateTournamentPage key="new" />;
+    : <NewTournamentLoader />;
 }
 
 export default function App() {

@@ -1,7 +1,16 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { tournamentWallClock } from '@/domain/tournamentLocalTime';
 
 const months = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+/** Avoid Date's legacy 1900 offset for four-digit years 0001–0099. */
+function calendarDate(year: number, month: number, day: number): Date {
+  const date = new Date(0);
+  date.setFullYear(year, month, day);
+  date.setHours(12, 0, 0, 0);
+  return date;
+}
 
 export function parseCalendarDate(value: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -9,9 +18,7 @@ export function parseCalendarDate(value: string): Date | null {
   const year = Number(match[1]);
   const month = Number(match[2]) - 1;
   const day = Number(match[3]);
-  const date = new Date(0);
-  date.setFullYear(year, month, day);
-  date.setHours(12, 0, 0, 0);
+  const date = calendarDate(year, month, day);
   return date.getFullYear() === year && date.getMonth() === month && date.getDate() === day ? date : null;
 }
 
@@ -28,8 +35,8 @@ export function nextCalendarDate(date: string): string {
 }
 
 export function calendarMonthDays(year: number, month: number): (number | null)[] {
-  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstWeekday = (calendarDate(year, month, 1).getDay() + 6) % 7;
+  const daysInMonth = calendarDate(year, month + 1, 0).getDate();
   return [
     ...Array.from({ length: firstWeekday }, () => null),
     ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
@@ -58,7 +65,7 @@ export function CalendarDatePicker({
   const [yearInput, setYearInput] = useState('2026');
   const selected = parseCalendarDate(value);
   const minimum = minDate && parseCalendarDate(minDate) ? minDate : '';
-  const today = toCalendarDate(new Date());
+  const today = tournamentWallClock(new Date()).slice(0, 10);
   const displayDate = (date: Date) => date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const days = calendarMonthDays(viewYear, viewMonth);
   const previousMonthUnavailable = Boolean(minimum && `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}` <= minimum.slice(0, 7));
@@ -75,7 +82,7 @@ export function CalendarDatePicker({
     triggerRef.current?.focus();
   }
   function navigateMonths(delta: number) {
-    const date = new Date(viewYear, viewMonth + delta, 1);
+    const date = calendarDate(viewYear, viewMonth + delta, 1);
     if (date.getFullYear() > 9999 || date.getFullYear() < 1
       || (minimum && `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` < minimum.slice(0, 7))) return;
     setViewYear(date.getFullYear());
@@ -185,7 +192,7 @@ export function CalendarDatePicker({
                 const date = String(viewYear).padStart(4, '0') + '-' + String(viewMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
                 return (
                   <button key={date} type="button" className={'calendar-picker-day' + (value === date ? ' is-selected' : '') + (today === date ? ' is-today' : '')}
-                    aria-label={new Date(viewYear, viewMonth, day).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                    aria-label={calendarDate(viewYear, viewMonth, day).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                     aria-pressed={value === date} disabled={Boolean(minimum && date < minimum)} onClick={() => choose(date)}>
                     {day}
                   </button>
