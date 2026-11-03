@@ -75,6 +75,17 @@ export interface CreationDraft {
   plannedDays?: number;
   awardsEnabled: boolean;
   awardsAtOverride: string | null;
+  /** A dependent roster/phase decision survives refresh with its exact rollback. */
+  pendingDependentChange?: {
+    next: CreationDraftPhase[];
+    losses: Array<{ id: string; label: string; removedRounds: number[];
+      removedInlineBreak: boolean; removedKnockoutBestOf?: number[] }>;
+    manuallyEditedId?: string;
+    source: 'manual' | 'roster';
+    previousRoster?: CreationDraftParticipant[];
+  } | null;
+  /** Values retained across a switch between two timed sports until acknowledged. */
+  timeValuesReviewRequired?: boolean;
 }
 
 export function validDraft(value: unknown): value is CreationDraft {
@@ -148,7 +159,25 @@ export function validDraft(value: unknown): value is CreationDraft {
     && data.preferredDurationMinutes <= 1439
     && (data.selectedRecommendationId === null || typeof data.selectedRecommendationId === 'string')
     && typeof data.awardsEnabled === 'boolean'
-    && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string');
+    && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string')
+    && (data.timeValuesReviewRequired === undefined || typeof data.timeValuesReviewRequired === 'boolean')
+    && (data.pendingDependentChange === undefined || data.pendingDependentChange === null
+      || (Array.isArray(data.pendingDependentChange.next)
+        && data.pendingDependentChange.next.length <= 80
+        && data.pendingDependentChange.next.every((entry) => entry && typeof entry.id === 'string'
+          && Array.isArray(entry.dayBreaks) && Array.isArray(entry.knockoutBestOf))
+        && Array.isArray(data.pendingDependentChange.losses)
+        && data.pendingDependentChange.losses.length <= 80
+        && data.pendingDependentChange.losses.every((loss) => loss && typeof loss.id === 'string'
+          && typeof loss.label === 'string' && Array.isArray(loss.removedRounds)
+          && typeof loss.removedInlineBreak === 'boolean')
+        && ['manual','roster'].includes(data.pendingDependentChange.source)
+        && (data.pendingDependentChange.previousRoster === undefined
+          || (Array.isArray(data.pendingDependentChange.previousRoster)
+            && data.pendingDependentChange.previousRoster.length <= 10000
+            && data.pendingDependentChange.previousRoster.every((entry) =>
+              entry && typeof entry.id === 'string' && typeof entry.firstName === 'string'
+              && typeof entry.lastName === 'string')))));
 }
 
 /** Restored numeric IDs must not collide with newly created entries. */
