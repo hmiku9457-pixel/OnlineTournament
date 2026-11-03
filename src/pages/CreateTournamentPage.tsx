@@ -12,6 +12,7 @@ import {
   defaultBestOfForStage,
   estimatePhaseMetrics,
   estimateKnockoutRoundMinutes,
+  estimateRoundRobinRoundMinutes,
   minimumPlayedMatches,
   formatGroupDistribution,
   hasValidTerminalStageOrder,
@@ -483,7 +484,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const draft = loadCreationDraft(typeof window !== 'undefined' ? window.sessionStorage : undefined, sessionDraftKey)
       ?? (savedDraftId ? initialNamedDraft?.draft ?? null : null);
     if (draft) {
-      participantSequence = Math.max(participantSequence, highestDraftSequence(draft.participants, 'participant'));
+      participantSequence = Math.max(participantSequence,
+        highestDraftSequence(draft.participants, 'participant'),
+        highestDraftSequence(draft.pendingDependentChange?.previousRoster ?? [], 'participant'));
       phaseSequence = Math.max(phaseSequence, highestDraftSequence(draft.phaseDrafts, 'phase'));
     }
     return draft;
@@ -495,6 +498,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [creationError, setCreationError] = useState<string | null>(null);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
   const [namedDraftMessage, setNamedDraftMessage] = useState('');
+  const [savedDraftFingerprint, setSavedDraftFingerprint] = useState<string | null>(null);
   const [savingNamedDraft, setSavingNamedDraft] = useState(false);
   // An unsaved recovery snapshot belongs to the revision originally opened,
   // NOT the newest revision fetched after reloading this browser tab. Otherwise
@@ -535,6 +539,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>((restoredDraft?.maxReachedStep ?? 1) as WizardStep);
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(restoredDraft?.hasVisitedPhaseStep ?? false);
   const [name, setName] = useState(restoredDraft?.name ?? '');
+  const nameCollision = useMemo(() => !prestart && name.trim()
+    ? findTournamentNameConflict(name) : null, [name, prestart]);
+  const collisionAlreadyStarted = Boolean(nameCollision
+    && hasStartedAnyStage(nameCollision, getPhaseLifecycle(nameCollision).startedStageIds));
   // Keep the local time in sync while the wizard is open. Date and time are
   // minute-precise; a live "Jetzt" selection follows minute and day rollovers.
   const [currentLocalMinute, setCurrentLocalMinute] = useState(() => toLocalDateTime(new Date()));
@@ -706,8 +714,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [pendingBulkCleanup, setPendingBulkCleanup] = useState(false);
   const [bulkCleanupUndo, setBulkCleanupUndo] = useState<{ before: ParticipantDraft[]; after: ParticipantDraft[]; removed: number } | null>(null);
   const [undoRemoveError, setUndoRemoveError] = useState('');
-  const [groupRecommendationNotice, setGroupRecommendationNotice] = useState<string | null>(null);
-  const previousRosterCount = useRef<number>(restoredDraft?.participants.length ?? 0);
   // Keep the preceding roster until dependent phase edits have been accepted.
   const rosterBeforeLastChange = useRef<ParticipantDraft[]>(restoredDraft?.participants ?? []);
   const [participantForm, setParticipantForm] = useState<ParticipantFields>(restoredDraft?.participantForm ?? emptyParticipantFields());
@@ -749,6 +755,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     operation: 'insert' | 'move';
   } | null>(null);
   const [phaseLimitError, setPhaseLimitError] = useState('');
+  useEffect(() => { setPhaseLimitError(''); },
+    [phaseDrafts, participantCount, plannedDays, tournamentMode, awardsEnabled]);
   const [editingPhaseTypeId, setEditingPhaseTypeId] = useState<string | null>(null);
   const [expandedPhaseId, setExpandedPhaseId] = useState<string | null>(null);
   const [expandedInlineBreakIds, setExpandedInlineBreakIds] = useState<string[]>([]);
@@ -921,6 +929,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         try { window.sessionStorage.setItem(`${sessionDraftKey}:base-revision`, String(savedDraftRevision.current)); }
         catch { /* Best-effort recovery metadata. */ }
       }
+      setSavedDraftFingerprint(JSON.stringify(data));
       setNamedDraftMessage(copy ? 'Kopie als neuer Entwurf gespeichert.' : 'Entwurf gespeichert.');
       if (copy || entry.id !== savedDraftId) {
         clearCreationDraft(window.sessionStorage, sessionDraftKey);
@@ -1138,7 +1147,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       lastName: participant.lastName,
       partnerFirstName: participant.partnerFirstName,
       partnerLastName: participant.partnerLastName,
-      teamName: participant.teamName ?? '',
+      teamName: participant.teamName?.trim() || displayPersonName(participant.firstName, participant.lastName),
     });
     setParticipantErrors({});
     setEditingParticipantId(participant.id);
@@ -1383,24 +1392,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     rosterBeforeLastChange.current = participants;
   }, [participants]);
 
-  // Reuse the same recommendation logic as the director's pre-start editor.
-  // Existing manual group plans remain untouched after roster changes.
-  useEffect(() => {
-    const previous = previousRosterCount.current;
-    previousRosterCount.current = participantCount;
-    if (previous === participantCount) return;
+  // Current phase settings determine the hint, never the previously displayed state.
+  const groupRecommendationNotice = useMemo(() => {
     const groupIndex = phaseDrafts.findIndex((phase) => phase.type === 'GROUPS');
-    if (groupIndex < 0 || participantCount < 4) {
-      setGroupRecommendationNotice(null);
-      return;
-    }
+    if (groupIndex < 0 || participantCount < 4) return null;
     const phase = phaseDrafts[groupIndex];
-    const entrants = groupIndex === 0 ? participantCount : phase.entrantCount;
     const following = phaseDrafts.slice(groupIndex + 1).find((item) => item.type !== 'BREAK');
-    setGroupRecommendationNotice(changedGroupRecommendationMessage(entrants, phase.groupCount, following?.entrantCount));
-  // Group-change hints should appear when roster size changes, not every edit.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [participantCount]);
+    return changedGroupRecommendationMessage(phase.entrantCount, phase.groupCount, following?.entrantCount);
+  }, [phaseDrafts, participantCount]);
 
   function updateRemovalUndoPostPhases(afterPhases: PhaseDraft[], afterReviews: string[]) {
     setRemovalHistory((history) => {
@@ -1785,10 +1784,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       resetParticipantEditor();
       // Keep first name, surname, and both partner fields intact.
     }
-    if (sport && sport !== nextSport && sportScoring(sport).mode === 'score'
-      && sportScoring(nextSport).mode === 'score' && timedMatchMinutes.trim()) {
+    // Retain outstanding time-value review across intervening set-based sports.
+    if (sport && sport !== nextSport && sportScoring(nextSport).mode === 'score'
+      && (timedMatchMinutes.trim() || venueTurnoverMinutes.trim())) {
       setTimeValuesReviewRequired(true);
-    } else setTimeValuesReviewRequired(false);
+    }
     setSport(nextSport);
     setPhaseDrafts((current) => current.map((phase) => ({
       ...phase,
@@ -1947,7 +1947,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     roundDurationsMinutes: phase.type === 'KNOCKOUT'
       ? estimateKnockoutRoundMinutes(phase.entrantCount, tables, phase.bestOf, phase.knockoutBestOf,
         timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : { minutesPerSet: planningMinutesPerSet(sport) })
-      : undefined,
+      : phase.type === 'GROUPS' || phase.type === 'ROUND_ROBIN'
+        ? estimateRoundRobinRoundMinutes(phase.type, phase.entrantCount, phase.groupCount, tables, phase.bestOf,
+          timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes } : { minutesPerSet: planningMinutesPerSet(sport) })
+        : undefined,
     inlineBreakAfterRound: phase.inlineBreakAfterRound,
     inlineBreakKind: phase.inlineBreakKind,
     inlineBreakMinutes: phase.inlineBreakMinutes,
@@ -2035,7 +2038,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             {savedDraftId && <button className="btn" type="button" disabled={savingNamedDraft} onClick={() => { void saveNamedDraft(true); }}>Entwurf kopieren</button>}
             <button ref={discardDraftButtonRef} className="btn danger creation-discard-button" type="button" onClick={() => setDiscardDraftDialogOpen(true)}>Entwurf verwerfen</button>
           </div>
-          {namedDraftMessage && <span className="field-hint" role="status">{namedDraftMessage}</span>}
+          {namedDraftMessage && (!namedDraftMessage.includes('gespeichert.') || savedDraftFingerprint === JSON.stringify(draftSnapshot))
+            && <span className="field-hint" role="status">{namedDraftMessage}</span>}
         </div>
       </header> : <header className="page-head creation-page-head">
         <div className="creation-page-heading">
@@ -2225,13 +2229,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               </div>
               <div className="field match-timing-fields">
                 <label htmlFor="match-duration">{timedSport ? <>Spieldauer (Minuten) <span className="wizard-required-mark" aria-hidden="true">*</span></> : 'Satzdauer (Minuten)'}</label>
-                <input id="match-duration" type="number" min="1" step="1" required={timedSport} value={timedSport ? timedMatchMinutes : planningMinutesPerSet(sport)} disabled={!timedSport} placeholder={timedSport ? 'Pflichtfeld – z. B. 12' : undefined} onChange={(event) => { setTimedMatchMinutes(event.target.value); setTimeValuesReviewRequired(false); }} />
+                <input id="match-duration" type="number" min="1" step="1" required={timedSport} value={timedSport ? timedMatchMinutes : planningMinutesPerSet(sport)} disabled={!timedSport} placeholder={timedSport ? 'Pflichtfeld – z. B. 12' : undefined} onChange={(event) => setTimedMatchMinutes(event.target.value)} />
                 {!timedSport && <span className="field-hint">Automatischer Planungswert: {planningMinutesPerSet(sport)} Minuten pro Satz. Dieser Wert wird für die Dauerprognose verwendet.</span>}
                 {timedSport && <>
                   <span className="field-hint">Geplante Dauer eines Spiels in vollen Minuten. Sie wird für die Zeitprognose verwendet.</span>
-                  <label htmlFor="venue-turnover">Zeitpuffer zwischen Spielen (Minuten) <span className="wizard-optional-tag">Optional</span></label>
-                  <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => { setVenueTurnoverMinutes(event.target.value); setTimeValuesReviewRequired(false); }} />
-                  <span className="field-hint">Zusätzliche Zeit zwischen zwei Spielen auf derselben Spielfläche. Ein leeres Feld entspricht 0 Minuten.</span>
+                  <label htmlFor="venue-turnover">Wechselpuffer inklusive Freigabe der Spielfläche (Minuten) <span className="wizard-optional-tag">Optional</span></label>
+                  <input id="venue-turnover" type="number" min="0" step="1" placeholder="Optional – z. B. 5" value={venueTurnoverMinutes} onChange={(event) => setVenueTurnoverMinutes(event.target.value)} />
+                  <span className="field-hint">Zusätzliche Zeit zum Räumen der Spielfläche nach jeder Partie, auch nach dem letzten Spiel einer Phase. Ein leeres Feld entspricht 0 Minuten.</span>
                   {(Number(timedMatchMinutes) > 240 || Number(venueTurnoverMinutes) > 60) && validMatchDuration && validTurnover && <span className="field-hint" role="status">Ungewöhnlich lange Spieldauer oder Wechselpause – bitte kontrolliere die Zeitangabe.</span>}
                   {(!validMatchDuration || !validTurnover) && <span className="field-error">Die Spieldauer muss zwischen 1 und 1440 Minuten liegen; der Zeitpuffer zwischen 0 und 240 Minuten.</span>}
                   {timeValuesReviewRequired && (
@@ -2296,7 +2300,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                       <input
                         id="participant-first"
                         className={participantErrors.firstName || participantErrors.teamName ? 'input-error' : ''}
-                        value={discipline === 'TEAMS' ? (participantForm.teamName || displayPersonName(participantForm.firstName, participantForm.lastName)) : participantForm.firstName}
+                        value={discipline === 'TEAMS' ? participantForm.teamName : participantForm.firstName}
                         onChange={(event) => updateParticipantForm(discipline === 'TEAMS' ? 'teamName' : 'firstName', event.target.value)}
                         aria-invalid={Boolean(participantErrors.firstName || participantErrors.teamName)}
                         maxLength={MAX_PARTICIPANT_NAME_LENGTH}
