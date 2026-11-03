@@ -54,7 +54,7 @@ import { UnsavedParticipantDialog } from '@/components/UnsavedParticipantDialog'
 import { QualificationRuleDialog } from '@/components/QualificationRuleDialog';
 import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/domain/groupQualification';
 import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, invalidParticipantRosterIndices, MAX_PARTICIPANT_NAME_LENGTH } from '@/domain/participantNames';
-import { availableDayBreakRounds, convertToSingleDay, singleDayFixedPauseConflicts, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, earliestRoundContinuationDate, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
+import { availableDayBreakRounds, convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, earliestRoundContinuationDate, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
 import { configuredPlayingDays, followingPlayingDate, playingRounds, type PlayingDayBreak } from '@/domain/playingDays';
 import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays, recommendationEndTimePenalty } from '@/domain/creationPlanRecommendations';
@@ -810,7 +810,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       setPreferredDurationMinutes(MAX_SINGLE_DAY_DURATION);
     }
   }, [tournamentMode, preferredDurationMinutes]);
-  const [pendingTournamentMode, setPendingTournamentMode] = useState<'single' | null>(null);
   useEffect(() => { setPhaseLimitError(''); },
     [phaseDrafts, participants, plannedDays, tournamentMode, awardsEnabled, step, scheduledDate, scheduledTime]);
   const [pendingAutomaticSplit, setPendingAutomaticSplit] = useState(false);
@@ -821,7 +820,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     overwriteTournamentId && 'overwrite', pendingDeleteParticipantId && 'delete-participant',
     pendingUndoConflict && 'undo', pendingBulkUndoConflict && 'bulk-undo',
     pendingPhaseRemoval && 'remove-phase', pendingConfirmPhaseRemoval && 'confirm-remove-phase', pendingPhaseTypeLoss && 'phase-type',
-    pendingTournamentMode && 'single-day', pendingPhaseChange && 'dependent-phase',
+    pendingPhaseChange && 'dependent-phase',
     pendingAutomaticSplit && 'day-split', pendingDayInsertion && 'day-insert',
     pendingBulkCleanup && 'cleanup', pendingRecommendationId && 'recommendation',
     draftConflictOpen && 'draft-conflict', recoveryChoiceOpen && 'recovery',
@@ -896,29 +895,56 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
     };
   }, [inlineModalKey, pendingPhaseChange?.source]);
-  function applySingleDayConversion(treatment: 'convert' | 'remove') {
-    const adjusted = convertToSingleDay(phaseDrafts, treatment, scheduledDate);
-    const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, adjusted, undefined, true);
-    if (!normalized) return;
-    setPhaseDrafts(normalized);
-    setReviewRequiredPhaseIds((ids) => ids.filter((id) => normalized.some((phase) => phase.id === id)));
-    setSelectedRecommendationId(null);
+  /** Changing the planning horizon is immediate, even after Step 4.
+   * Keep competition phases; translate dated or overnight pauses into regular
+   * 15-minute pauses only when there is an existing day-specific configuration. */
+  function applySingleDayConversion() {
+    const needsConversion = phaseDrafts.some((phase) =>
+      phase.dayBreaks.length > 0
+      || (phase.type === 'BREAK' && (phase.breakKind === 'overnight'
+        || (phase.breakKind === 'until' && phase.breakUntilDate > scheduledDate)))
+      || (phase.type !== 'BREAK' && phase.inlineBreakAfterRound > 0
+        && phase.inlineBreakKind === 'until' && phase.inlineBreakUntilDate > scheduledDate));
+    if (needsConversion) {
+      const adjusted = convertToSingleDay(phaseDrafts, 'convert', scheduledDate);
+      const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, adjusted, undefined, true);
+      if (!normalized) return;
+      setPhaseDrafts(normalized);
+      setReviewRequiredPhaseIds((ids) => ids.filter((id) => normalized.some((phase) => phase.id === id)));
+      setSelectedRecommendationId(null);
+    }
+    const settings = { scheduledStart, days: 1, earlierDaysMinutes: 0 };
+    const capped = Math.min(displayedPreferredDuration, MAX_SINGLE_DAY_DURATION);
+    if (preferredTimePriority === 'end' && preferredEndClock) {
+      // A multi-day end date cannot follow a switch to one day. Retain its
+      // selected clock when it fits within the next 24 hours.
+      const onStartDay = `${scheduledDate}T${preferredEndClock}`;
+      const onNextDay = `${followingPlayingDate(scheduledDate, 1)}T${preferredEndClock}`;
+      const target = [onStartDay, onNextDay].find((at) => linkedDurationAt(at, settings) !== null);
+      if (target) {
+        setPreferredFixedEndAt(target);
+        setPreferredDurationMinutes(linkedDurationAt(target, settings)!);
+      } else {
+        setPreferredTimePriority('duration');
+        setPreferredFixedEndAt(null);
+        setPreferredDurationMinutes(capped);
+      }
+    } else {
+      setPreferredFixedEndAt(null);
+      setPreferredDurationMinutes(capped);
+    }
     setTournamentMode('single');
     setPlannedDays(1);
-    setPreferredDurationMinutes(Math.min(displayedPreferredDuration, MAX_SINGLE_DAY_DURATION));
     setPreferredEarlierDaysMinutes(0);
-    setPreferredTimePriority('duration');
-    setPreferredFixedEndAt(null);
+    setPreferredEndError('');
     setPhaseLimitError('');
-    setPendingTournamentMode(null);
   }
 
-  /** One visible day counter controls the single-/multi-day model.
-   * Switching back to one day must still confirm potentially destructive pause changes. */
+  /** One playing-day counter replaces the former single-/multi-day selector. */
   function changePlannedPlayingDays(next: number) {
     if (!Number.isInteger(next) || next < 1 || next > 14) return;
     if (next === 1) {
-      if (tournamentMode === 'multi') setPendingTournamentMode('single');
+      if (tournamentMode === 'multi') applySingleDayConversion();
       return;
     }
     if (tournamentMode === 'multi' && plannedDays === next) return;
@@ -927,8 +953,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     if (preferredTimePriority === 'end') {
       const target = `${followingPlayingDate(scheduledDate, next - 1)}T${preferredEndClock ?? '14:00'}`;
       const targetDuration = linkedDurationAt(target, nextSettings);
-      // Keep the chosen clock if feasible; otherwise keep the current duration
-      // and calculate a new valid end on the newly selected final playing day.
       const endAt = targetDuration !== null
         ? target : linkedEndDateTime(displayedPreferredDuration, nextSettings);
       setPreferredFixedEndAt(endAt);
@@ -938,6 +962,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     setPreferredEarlierDaysMinutes(earlier);
     setPlannedDays(next);
     setTournamentMode('multi');
+    setPreferredEndError('');
   }
 
   function changePreferredDuration(next: number) {
@@ -2829,13 +2854,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                   <div className="recommendation-period-column">
                     <div className="field tournament-day-count">
                       <label htmlFor="planned-playing-days">Spieltage</label>
-                      <RecommendationNumberStepper key={pendingTournamentMode ? 'confirm-single-day' : 'stable-playing-days'}
-                        id="planned-playing-days" label="Geplante Anzahl an Spieltagen"
+                      <RecommendationNumberStepper id="planned-playing-days" label="Geplante Anzahl an Spieltagen"
                         value={tournamentMode === 'single' ? 1 : plannedDays} min={1} max={14}
                         onChange={changePlannedPlayingDays}/>
                     </div>
                     <span className="field-hint recommendation-period-hint">
-                      {tournamentMode === 'single' ? '1 Spieltag · max. 24 Std. (auch über Mitternacht)'
+                      {tournamentMode === 'single' ? 'Max. 24 Std. · Ende auch am Folgetag'
                         : `${plannedDays} Spieltage · Pausen zwischen Tagen zählen nicht`}
                     </span>
                   </div>
@@ -2852,7 +2876,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                         onChange={() => changePreferredTimePriority('end')}/>
                       <span>Endzeit</span>
                     </label>
-                    <span className="field-hint recommendation-target-hint">Der gewählte Wert bleibt fest</span>
+                    <span className="field-hint recommendation-target-hint">Auswahl bleibt beim Planen fest</span>
                   </fieldset>
 
                   <div className={`field recommendation-duration-field${preferredTimePriority === 'end' ? ' recommendation-derived-field' : ''}`}>
@@ -2880,7 +2904,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                       </output>
                     )}
                     <span className="field-hint">
-                      {preferredTimePriority === 'duration' ? 'Vorgegeben' : 'Automatisch berechnet'} · Aktive Spielzeit
+                      {preferredTimePriority === 'duration' ? 'Festgelegt' : 'Berechnet'} · ohne Nächte
                     </span>
                   </div>
 
@@ -2917,8 +2941,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                   </div>
 
                   {tournamentMode === 'multi' && <p className="field-hint recommendation-linked-explanation">
-                    Für die ersten Spieltage sind {formatRecommendationDuration(preferredEarlierDaysMinutes)} reserviert;
-                    der letzte beginnt rechnerisch um 09:00 Uhr. Den tatsächlichen Ablauf stellst du in Schritt 4 ein.
+                    Aktive Spielzeit vor dem letzten Tag: {formatRecommendationDuration(preferredEarlierDaysMinutes)}.
+                    Der letzte startet rechnerisch um 09:00 Uhr.
                   </p>}
                   {!preferredEndTimeValid && <p className="field-error recommendation-linked-explanation" role="status">
                     Die festgelegte Endzeit ist für den aktuellen Start nicht mehr erreichbar.
@@ -2967,9 +2991,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     <summary>Einstellungen erklärt</summary>
                     <div className="format-help-grid">
                       <p><strong>Zeitvorgabe:</strong> Nur der gewählte Wert ist bearbeitbar.
-                        Der andere wird aus dem geplanten Beginn berechnet. Eintägig sind höchstens 24 Stunden möglich – auch über Mitternacht.</p>
-                      <p><strong>Spieltage:</strong> Ein Spieltag entspricht „Eintägig“. Ab zwei Spieltagen erfolgt die mehrtägige Planung. Die Endzeit bezieht sich auf den letzten Spieltag.
-                        Nächtliche Unterbrechungen zählen nicht zur aktiven Turnierdauer.</p>
+                        Der andere wird aus dem geplanten Beginn berechnet. Das Ziel bleibt auch bei laufender Startzeit fest.</p>
+                      <p><strong>Spieltage:</strong> Ein Spieltag darf maximal 24 Stunden dauern. Ab zwei Spieltagen wird die Endzeit am letzten Tag berechnet; Übernachtungen zählen nicht zur Spielzeit.</p>
                       <p><strong>Vorschläge:</strong> Obergrenzen gelten nur für Empfehlungen.
                         Schweizer Runden sind auf Teilnehmerzahl minus 1 begrenzt; vor einer folgenden Phase kann eine Qualifikation nötig sein.</p>
                       <p><strong>Zeitplanung:</strong> Deine Vorgabe ist ein Richtwert.
@@ -2977,7 +3000,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                         Die konkreten Spieltage legst du in Schritt 4 fest.</p>
                     </div>
                   </details>
-                  <p className="format-settings-footnote">Nur Empfehlungen betroffen · Schätzungen ohne Auswertungsverzögerungen</p>
+
                 </div>
               </aside>
               <div className="recommendation-list">
@@ -4235,43 +4258,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
           </section>
         </div>;
       })()}
-      {pendingTournamentMode && (
-        <div className="sport-change-backdrop" role="presentation"
-          onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingTournamentMode(null); }}>
-          <section className="sport-change-dialog single-day-choice-dialog" role="alertdialog" aria-modal="true"
-            aria-label="Turniermodus wechseln?"
-            onKeyDown={(event) => { if (event.key === 'Escape') setPendingTournamentMode(null); }}>
-            <h2>Auf eintägiges Turnier umstellen?</h2>
-            <p>Alle Spieltagswechsel innerhalb der Phasen werden entfernt. Pausen auf späteren Kalendertagen müssen ebenfalls behandelt werden.</p>
-            {singleDayFixedPauseConflicts(phaseDrafts, scheduledDate).length > 0 && <>
-              <p className="modal-mode-warning">Folgende feste Pausenziele liegen nach dem Turniertag. Sie werden bei „Behalten“ zu 15-Minuten-Pausen und bei „Löschen“ entfernt:</p>
-              <ul className="wizard-confirm-details">
-                {singleDayFixedPauseConflicts(phaseDrafts, scheduledDate).map((description, index) => <li key={index}>{description}</li>)}
-              </ul>
-            </>}
-            {phaseDrafts.some((phase) => phase.type === 'BREAK' && phase.breakKind === 'overnight') && <>
-              <p className="modal-mode-warning">Folgende eigenständige Spieltagsende-Phasen enthalten eigene Namen oder Hinweise. Entscheide, ob sie als 15-Minuten-Pausen erhalten bleiben oder vollständig gelöscht werden sollen:</p>
-              <ul className="wizard-confirm-details">
-                {phaseDrafts.filter((phase) => phase.type === 'BREAK' && phase.breakKind === 'overnight').map((phase) =>
-                  <li key={phase.id}><strong>{phase.label}</strong>{phase.note && <span> · {phase.note}</span>}</li>)}
-              </ul>
-            </>}
-            {countConfiguredDayTransitions(phaseDrafts) > 0 && (
-              <p className="field-hint">Betroffene Spieltagswechsel: {countConfiguredDayTransitions(phaseDrafts)}.</p>
-            )}
-            <div className="sport-change-dialog-actions single-day-choice-actions">
-              <button type="button" className="btn" autoFocus onClick={() => setPendingTournamentMode(null)}>Abbrechen</button>
-              <button type="button" className="btn primary" onClick={() => applySingleDayConversion('convert')}>
-                Als normale Pausen behalten
-              </button>
-              {(phaseDrafts.some((phase) => phase.type === 'BREAK' && phase.breakKind === 'overnight') || singleDayFixedPauseConflicts(phaseDrafts, scheduledDate).length > 0) && (
-                <button type="button" className="btn danger-outline" onClick={() => applySingleDayConversion('remove')}>
-                  Mehrtägige Pausen löschen
-                </button>)}
-            </div>
-          </section>
-        </div>
-      )}
       {pendingPhaseChange && (
         <div className="sport-change-backdrop" role="presentation"
           onMouseDown={(event) => { if (event.target === event.currentTarget) dismissPhaseChange(); }}>
