@@ -233,7 +233,7 @@ export function buildPlannedTimeline(start: string, phases: SchedulePhaseProposa
           ? phase.roundDurationsMinutes
           : Array.from({ length: rounds }, (_, round) =>
             Math.round(totalDuration * (round + 1) / rounds) - Math.round(totalDuration * round / rounds));
-        const boundaries = [...phase.dayBreaks].sort((a, b) => a.afterRound - b.afterRound);
+        const boundaries = [...(phase.dayBreaks ?? [])].sort((a, b) => a.afterRound - b.afterRound);
         for (let round = 1; round <= rounds; round++) {
           cursor = new Date(cursor.getTime() + (fractions[round - 1] ?? 0) * 60000);
           if (afterRound === round && phase.inlineBreakAfterRound && phase.inlineBreakKind) {
