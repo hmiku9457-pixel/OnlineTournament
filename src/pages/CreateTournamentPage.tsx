@@ -2413,7 +2413,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
             {recentlyRemovedParticipant && <div className="creation-undo-remove" role="status">
               <span>„{participantDisplayName(recentlyRemovedParticipant.participant, discipline)}“ wurde entfernt.</span>
-              <button className="btn small" type="button" onClick={undoRemoveParticipant}>Rückgängig</button>
+              <button className="btn small" type="button" onClick={() => undoRemoveParticipant()}>Rückgängig</button>
             </div>}
             {bulkCleanupUndo && <div className="creation-undo-remove" role="status">
               <span>{bulkCleanupUndo.removed} fehlerhafte Einträge wurden entfernt.</span>
