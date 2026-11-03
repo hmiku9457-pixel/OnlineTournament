@@ -1414,7 +1414,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   }
 
 
-  function updatePhase(id: string, patch: Partial<PhaseDraft>, confirmedRoundChange = false) {
+  function updatePhase(id: string, patch: Partial<PhaseDraft>, explicitRemoval = false) {
     const previous = phaseDrafts.find((phase) => phase.id === id);
     if (!previous) return;
     let adjusted = { ...previous, ...patch };
@@ -1422,12 +1422,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       adjusted = { ...adjusted, dayBreaks: [...patch.dayBreaks].sort((a, b) => a.afterRound - b.afterRound) };
     }
     const result = reconcileRoundDependentBreaks(adjusted);
-    if (!confirmedRoundChange && (result.impact.removedDayBreaks > 0 || result.impact.removedInlineBreak)) {
-      setPendingRoundAdjustment({ kind: 'rounds', id, patch, removedDays: result.impact.removedDayBreaks,
-        removedInline: result.impact.removedInlineBreak });
+    const candidate = phaseDrafts.map((phase) => phase.id === id ? result.phase : phase);
+    const losses = phaseBreakLosses(phaseDrafts, candidate);
+    if (losses.length && !explicitRemoval) {
+      setPendingPhaseChange({ next: candidate, losses, source: 'manual' });
       return;
     }
-    const candidate = phaseDrafts.map((phase) => phase.id === id ? result.phase : phase);
     if (countCreationScheduleEntries(candidate, awardsEnabled) > MAX_CREATION_SCHEDULE_ENTRIES) {
       setPhaseLimitError(`Maximal ${MAX_CREATION_SCHEDULE_ENTRIES} Zeitplaneinträge möglich. Bitte zuerst eine andere Unterbrechung entfernen.`);
       return;
@@ -1440,7 +1440,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   function togglePhaseInlineBreak(phase: PhaseDraft, totalRounds: number) {
     if (totalRounds < 2) return;
     const enable = phase.inlineBreakAfterRound <= 0;
-    updatePhase(phase.id, { inlineBreakAfterRound: enable ? Math.min(2, totalRounds - 1) : 0 });
+    const availableRound = Array.from({ length: totalRounds - 1 }, (_, index) => index + 1)
+      .find((round) => !phase.dayBreaks.some((boundary) => boundary.afterRound === round));
+    if (enable && (!availableRound
+      || countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES)) return;
+    updatePhase(phase.id, { inlineBreakAfterRound: enable ? availableRound! : 0 }, !enable);
     setExpandedInlineBreakIds((current) => enable
       ? [...new Set([...current, phase.id])]
       : current.filter((id) => id !== phase.id));
