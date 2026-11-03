@@ -3430,10 +3430,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                                     onChange={(event) => updatePhase(phase.id, { label: event.target.value })} />
                                 </label>
                                 {phase.breakKind === 'minutes' ? (
-                                  <label className="field">Dauer in Minuten
-                                    <BufferedNumberInput min={1} max={1440} value={phase.breakMinutes}
-                                      onCommit={(value) => updatePhase(phase.id, { breakMinutes: value })} />
-                                  </label>
+                                  <div className="field phase-pause-minutes">
+                                    <label htmlFor={`pause-minutes-${phase.id}`}>Dauer in Minuten</label>
+                                    <RecommendationNumberStepper id={`pause-minutes-${phase.id}`}
+                                      label="Pausendauer in Minuten" min={1} max={1440} value={phase.breakMinutes}
+                                      onChange={(value) => updatePhase(phase.id, { breakMinutes: value })}/>
+                                  </div>
                                 ) : phase.breakKind === 'until' ? (
                                   <>
                                     <label className="field">Pause bis (Datum)
@@ -3713,10 +3715,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                                         </select>
                                       </label>
                                       {phase.inlineBreakKind === 'minutes' ? (
-                                        <label className="field">Dauer in Minuten
-                                          <BufferedNumberInput min={1} max={1440} value={phase.inlineBreakMinutes}
-                                            onCommit={(value) => updatePhase(phase.id, { inlineBreakMinutes: value })} />
-                                        </label>
+                                        <div className="field phase-pause-minutes">
+                                          <label htmlFor={`inline-break-minutes-${phase.id}`}>Dauer in Minuten</label>
+                                          <RecommendationNumberStepper id={`inline-break-minutes-${phase.id}`}
+                                            label="Zwischenpausendauer in Minuten" min={1} max={1440} value={phase.inlineBreakMinutes}
+                                            onChange={(value) => updatePhase(phase.id, { inlineBreakMinutes: value })}/>
+                                        </div>
                                       ) : (
                                         <>
                                           <label className="field">Pause bis (Datum)
