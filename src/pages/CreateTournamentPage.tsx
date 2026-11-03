@@ -956,6 +956,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     ],
   );
 
+  const firstSelectableRecommendationIndex = recommendations.findIndex((item) =>
+    tournamentMode !== 'multi' || suggestDaySplit(item.phases.map((phase) => ({
+      ...phase, entrantCount: phase.entrantCount ?? participantCount,
+    })), plannedDays).possible);
+
   const selectedRecommendation = useMemo(
     () => recommendations.find((recommendation) => recommendation.id === selectedRecommendationId) ?? null,
     [recommendations, selectedRecommendationId],
@@ -2341,12 +2346,17 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 {recommendations.length === 0 && (
                   <div className="callout">Mit den aktuellen Vorgaben gibt es keinen sinnvollen automatischen Vorschlag innerhalb des Zeitmodells. Du kannst trotzdem weitergehen und die Phasen manuell anlegen.</div>
                 )}
+                {recommendations.length > 0 && firstSelectableRecommendationIndex === -1 && (
+                  <div className="callout" role="status">
+                    Keine Empfehlung lässt sich auf {plannedDays} Spieltage verteilen. Reduziere die Anzahl der Spieltage oder gehe mit „Weiter“ zu Schritt 4 und lege deine Phasen und Spieltagswechsel manuell an.
+                  </div>
+                )}
                 {recommendations.map((item, index) => {
                   const daySplitPossible = tournamentMode !== 'multi' || suggestDaySplit(item.phases.map((phase) => ({
                     ...phase, entrantCount: phase.entrantCount ?? participantCount,
                   })), plannedDays).possible;
                   return <button
-                    className={`card recommendation recommendation-select ${selectedRecommendationId === item.id && recommendationPlanMatches ? 'selected' : ''} ${index === 0 ? 'best' : ''}`}
+                    className={`card recommendation recommendation-select ${selectedRecommendationId === item.id && recommendationPlanMatches ? 'selected' : ''} ${index === firstSelectableRecommendationIndex ? 'best' : ''}`}
                     key={item.id}
                     type="button"
                     disabled={!daySplitPossible}
@@ -2380,7 +2390,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                         })}
                       </h3>
                       <div className="recommendation-labels">
-                        <span className="badge">{index === 0 ? 'Empfohlen' : 'Alternative'}</span>
+                        <span className="badge">{!daySplitPossible ? 'Nicht verfügbar' : index === firstSelectableRecommendationIndex ? 'Empfohlen' : 'Alternative'}</span>
                         {selectedRecommendationId === item.id && <span className="badge selected-badge">{recommendationPlanMatches ? 'Ausgewählt' : 'Plan weicht ab · erneut übernehmen'}</span>}
                       </div>
                     </div>
@@ -2397,7 +2407,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                         mindestens {item.minimumGuaranteedMatches} gespielte Begegnungen
                       </span>
                     </div>
-                    {index === 0 && !item.minimumMatchShortfall && (
+                    {index === firstSelectableRecommendationIndex && daySplitPossible && !item.minimumMatchShortfall && (
                       <p className="recommendation-reason">
                         {item.estimatedDurationMinutes <= preferredDurationMinutes
                           ? `Warum empfohlen: Erfüllt dein Mindestspielziel und liegt innerhalb deiner geplanten Turnierdauer von ${formatRecommendationDuration(preferredDurationMinutes)}.`
@@ -2752,8 +2762,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                   onChange={() => updatePhase(phase.id, { breakKind: 'minutes' })} /> Pause in Minuten</label>
                                 <label><input type="radio" name={`break-kind-${phase.id}`} checked={phase.breakKind === 'until'}
                                   onChange={() => updatePhase(phase.id, { breakKind: 'until' })} /> Pause bis</label>
-                                <label><input type="radio" name={`break-kind-${phase.id}`} checked={phase.breakKind === 'overnight'}
-                                  onChange={() => updatePhase(phase.id, { breakKind: 'overnight' })} /> Spieltagsende</label>
+                                <label title={tournamentMode === 'single' ? 'Spieltagsende ist nur für mehrtägige Turniere verfügbar.' : undefined}>
+                                  <input type="radio" name={`break-kind-${phase.id}`} checked={phase.breakKind === 'overnight'}
+                                    disabled={tournamentMode === 'single'}
+                                    onChange={() => updatePhase(phase.id, { breakKind: 'overnight' })} /> Spieltagsende
+                                </label>
                               </fieldset>
                               {(phase.breakKind === 'until' || phase.breakKind === 'overnight')
                                 && plannedTimeline.warnings.filter((warning) => warning.phaseIndex === index).map((warning) => (
