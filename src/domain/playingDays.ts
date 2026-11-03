@@ -27,7 +27,7 @@ export function validPlayingRoundPauses(
         || !['minutes', 'until'].includes(pause.kind)
         || !Number.isInteger(pause.minutes) || pause.minutes < 1 || pause.minutes > 1440
         || !/^([01]\d|2[0-3]):[0-5]\d$/.test(pause.until)
-        || !pause.untilDate || !/^\d{4}-\d{2}-\d{2}$/.test(pause.untilDate)) return false;
+        || (pause.untilDate !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(pause.untilDate))) return false;
       used.add(pause.afterRound);
       return true;
     }));

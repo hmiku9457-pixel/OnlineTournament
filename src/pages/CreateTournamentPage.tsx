@@ -46,6 +46,7 @@ import { creationRecoveryKey, saveCreationRecoveryAtomic, clearCreationRecoveryA
 import { ClockTimePicker, parseClockTime } from '@/components/ClockTimePicker';
 import { RecommendationDurationPicker, DEFAULT_RECOMMENDATION_DURATION, MIN_RECOMMENDATION_DURATION, MAX_SINGLE_DAY_DURATION, formatRecommendationDuration } from '@/components/RecommendationDurationPicker';
 import { RecommendationNumberStepper } from '@/components/RecommendationNumberStepper';
+import { PlayingDayPausePlanner } from '@/components/PlayingDayPausePlanner';
 import { SportChangeDialog } from '@/components/SportChangeDialog';
 import { DisciplineChangeDialog } from '@/components/DisciplineChangeDialog';
 import { TestParticipantsDialog } from '@/components/TestParticipantsDialog';
@@ -903,7 +904,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       || (phase.type === 'BREAK' && (phase.breakKind === 'overnight'
         || (phase.breakKind === 'until' && phase.breakUntilDate > scheduledDate)))
       || (phase.type !== 'BREAK' && phase.inlineBreakAfterRound > 0
-        && phase.inlineBreakKind === 'until' && phase.inlineBreakUntilDate > scheduledDate));
+        && phase.inlineBreakKind === 'until' && phase.inlineBreakUntilDate > scheduledDate)
+      || phase.extraInlineBreaks.some((pause) => pause.kind === 'until' && pause.untilDate > scheduledDate));
     if (needsConversion) {
       const adjusted = convertToSingleDay(phaseDrafts, 'convert', scheduledDate);
       const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, adjusted, undefined, true);
@@ -3206,7 +3208,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                       const invalidInlineBreak = phase.inlineBreakAfterRound > 0
                         && (inlineBreakRounds <= 1 || phase.inlineBreakAfterRound >= inlineBreakRounds);
                       const inlineBreakActive = !invalidInlineBreak && inlineBreakRounds > 1 && phase.inlineBreakAfterRound > 0;
-                      const freeDayBreakRounds = availableDayBreakRounds(dayRoundCount, phase.dayBreaks, phase.inlineBreakAfterRound);
+                      const freeDayBreakRounds = availableDayBreakRounds(dayRoundCount, phase.dayBreaks,
+                        phase.inlineBreakAfterRound, phase.extraInlineBreaks);
                       const inlineBreakExpanded = expandedInlineBreakIds.includes(phase.id);
                       const editingPhaseType = editingPhaseTypeId === phase.id;
                       const isExpanded = expandedPhaseId === phase.id;
@@ -3328,22 +3331,26 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                               >
                                 {editingPhaseType ? 'Typ schließen' : 'Typ ändern'}
                               </button>
-                              {inlineBreakRounds > 1 && (
+                              {(tournamentMode === 'multi' ? dayRoundCount > 0 : inlineBreakRounds > 1) && (
                                 <button
-                                  className={`btn small phase-inline-break-action ${inlineBreakActive ? 'is-active' : ''}`}
+                                  className={`btn small phase-inline-break-action ${tournamentMode === 'multi'
+                                    ? (inlineBreakExpanded ? 'is-active' : '') : (inlineBreakActive ? 'is-active' : '')}`}
                                   type="button"
-                                  aria-pressed={inlineBreakActive}
-                                  aria-label={inlineBreakActive ? 'Zwischenpause deaktivieren' : 'Zwischenpause aktivieren'}
-                                  title={inlineBreakActive ? 'Zwischenpause deaktivieren'
-                                    : phase.dayBreaks.length >= inlineBreakRounds - 1 ? 'Alle Rundengrenzen haben bereits ein Spieltagsende.'
-                                      : countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES
-                                        ? 'Die Höchstzahl von 80 Zeitplaneinträgen ist erreicht.'
-                                        : 'Zwischenpause aktivieren'}
-                                  disabled={!inlineBreakActive && (phase.dayBreaks.length >= inlineBreakRounds - 1
-                                    || countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES)}
-                                  onClick={() => togglePhaseInlineBreak(phase, inlineBreakRounds)}
-                                >
-                                  Zwischenpause
+                                  aria-pressed={tournamentMode === 'multi' ? inlineBreakExpanded : inlineBreakActive}
+                                  aria-label={tournamentMode === 'multi'
+                                    ? 'Spieltage und Zwischenpausen anzeigen'
+                                    : inlineBreakActive ? 'Zwischenpause deaktivieren' : 'Zwischenpause aktivieren'}
+                                  disabled={tournamentMode === 'single' && !inlineBreakActive
+                                    && (phase.dayBreaks.length + phase.extraInlineBreaks.length >= inlineBreakRounds - 1
+                                      || countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES)}
+                                  onClick={() => {
+                                    if (tournamentMode === 'multi') {
+                                      setExpandedPhaseId(phase.id);
+                                      setExpandedInlineBreakIds((current) => current.includes(phase.id)
+                                        ? current.filter((id) => id !== phase.id) : [...current, phase.id]);
+                                    } else togglePhaseInlineBreak(phase, inlineBreakRounds);
+                                  }}>
+                                  {tournamentMode === 'multi' ? 'Spieltage und Zwischenpausen' : 'Zwischenpause'}
                                 </button>
                               )}
                               {!isTerminalStage(phase.type) && (
@@ -3612,69 +3619,70 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                             </div>
                           )}
                           </div>}
-                          {isExpanded && tournamentMode === 'multi' && phase.type !== 'BREAK' && (
-                            <section className="playing-day-editor" aria-label={`Spieltagswechsel innerhalb Phase ${index + 1}`}>
-                              <div className="playing-day-editor-heading">
-                                <div><strong>Spieltage innerhalb der Phase</strong>
-                                  <p className="field-hint">Unterbrechung nach einer vollständigen Runde mit konkreter Fortsetzung am nächsten Spieltag.</p></div>
-                                <button type="button" className="btn small"
-                                  disabled={freeDayBreakRounds.length === 0 || configuredPlayingDays(phaseDrafts) >= 14
-                                    || countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES}
-                                  title={freeDayBreakRounds.length === 0
-                                    ? 'Keine freie Rundengrenze: Hier liegt bereits eine Zwischenpause oder ein Spieltagsende.'
-                                    : configuredPlayingDays(phaseDrafts) >= 14
-                                      ? 'Die Höchstzahl von 14 Spieltagen ist erreicht.'
-                                      : countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES
-                                        ? 'Die Höchstzahl von 80 Zeitplaneinträgen ist erreicht.' : undefined}
-                                  onClick={() => {
-                                    const available = freeDayBreakRounds[0];
-                                    if (!available) return;
-                                    const minimumDate = earliestRoundContinuationDate(
-                                      scheduledStart, phaseScheduleProposals, index, available);
-                                    const insertion = proposePlayingDayInsertion(phase.dayBreaks, available,
-                                      (plannedPhaseStart ?? scheduledStart).slice(0, 10),
-                                      '09:00', minimumDate);
-                                    if (insertion.shifted.length) {
-                                      setPendingDayInsertion({ phaseId: phase.id, nextBreaks: insertion.dayBreaks,
-                                        shifted: insertion.shifted, operation: 'insert' });
-                                    } else updatePhase(phase.id, { dayBreaks: insertion.dayBreaks });
-                                  }}>+ Spieltagsende nach Runde</button>
-                              </div>
-                              {phase.dayBreaks.map((boundary, position) => {
-                                const boundaryTime = plannedTimeline.items.find((item) => item.id === `day-break-${index + 1}-${boundary.afterRound}`)?.at;
-                                return <div className="playing-day-editor-row" key={position}>
-                                  <label className="field">Nach Runde
-                                    <select value={boundary.afterRound} onChange={(event) => {
-                                      const movedRound = Number(event.target.value);
-                                      const minimum = earliestRoundContinuationDate(
-                                        scheduledStart, phaseScheduleProposals, index, movedRound);
-                                      const moved = proposePlayingDayMove(phase.dayBreaks, boundary.afterRound,
-                                        movedRound, (plannedPhaseStart ?? scheduledStart).slice(0, 10), minimum);
-                                      if (moved.shifted.length) {
-                                        setPendingDayInsertion({ phaseId: phase.id, nextBreaks: moved.dayBreaks,
-                                          shifted: moved.shifted, operation: 'move' });
-                                      } else updatePhase(phase.id, { dayBreaks: moved.dayBreaks });
-                                    }}>
-                                      {Array.from({ length: dayRoundCount - 1 }, (_, i) => i + 1)
-                                        .filter((round) => round === boundary.afterRound || (round !== phase.inlineBreakAfterRound && !phase.dayBreaks.some((entry) => entry.afterRound === round)))
-                                        .map((round) => <option value={round} key={round}>Runde {round}</option>)}
-                                    </select>
-                                  </label>
-                                  <label className="field">Fortsetzungsdatum
-                                    <CalendarDatePicker id={`day-break-date-${phase.id}-${position}`} label="Fortsetzungsdatum" value={boundary.date}
-                                      minDate={followingPlayingDate((boundaryTime ?? scheduledStart).slice(0,10), 1)}
-                                      onChange={(date) => updatePhase(phase.id, { dayBreaks: phase.dayBreaks.map((item,i) => i === position ? { ...item, date } : item) })}/>
-                                  </label>
-                                  <label className="field">Fortsetzungsuhrzeit
-                                    <ClockTimePicker id={`day-break-time-${phase.id}-${position}`} label="Fortsetzungsuhrzeit" value={boundary.time}
-                                      onChange={(time) => updatePhase(phase.id, { dayBreaks: phase.dayBreaks.map((item,i) => i === position ? { ...item, time } : item) })}/>
-                                  </label>
-                                  <button type="button" className="btn small danger-outline" onClick={() => updatePhase(phase.id, {
-                                    dayBreaks: phase.dayBreaks.filter((_, i) => i !== position),
-                                  }, true)}>Entfernen</button>
-                                </div>;
+                          {isExpanded && tournamentMode === 'multi' && phase.type !== 'BREAK'
+                            && inlineBreakExpanded && (
+                            <PlayingDayPausePlanner
+                              phaseId={phase.id} phaseIndex={index} roundCount={dayRoundCount}
+                              scheduledStart={scheduledStart} phaseStart={plannedPhaseStart ?? scheduledStart}
+                              timeline={plannedTimeline} dayBreaks={phase.dayBreaks}
+                              pauses={[
+                                ...(inlineBreakActive ? [{
+                                  source: 'legacy' as const, index: -1, afterRound: phase.inlineBreakAfterRound,
+                                  kind: phase.inlineBreakKind, minutes: phase.inlineBreakMinutes,
+                                  until: phase.inlineBreakUntil, untilDate: phase.inlineBreakUntilDate,
+                                }] : []),
+                                ...phase.extraInlineBreaks.map((pause, position) => ({
+                                  ...pause, source: 'extra' as const, index: position,
+                                })),
+                              ]}
+                              maximumDaysReached={configuredPlayingDays(phaseDrafts) >= 14}
+                              maximumScheduleReached={countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES}
+                              onDayEndChange={(dayIndex, round) => {
+                                const previous = phase.dayBreaks[dayIndex];
+                                const minimumDate = earliestRoundContinuationDate(
+                                  scheduledStart, phaseScheduleProposals, index, round);
+                                const changed = previous
+                                  ? proposePlayingDayMove(phase.dayBreaks, previous.afterRound, round,
+                                    (plannedPhaseStart ?? scheduledStart).slice(0, 10), minimumDate)
+                                  : proposePlayingDayInsertion(phase.dayBreaks, round,
+                                    (plannedPhaseStart ?? scheduledStart).slice(0, 10), '09:00', minimumDate);
+                                if (changed.shifted.length) {
+                                  setPendingDayInsertion({ phaseId: phase.id, nextBreaks: changed.dayBreaks,
+                                    shifted: changed.shifted, operation: previous ? 'move' : 'insert' });
+                                } else updatePhase(phase.id, { dayBreaks: changed.dayBreaks });
+                              }}
+                              onDayRemove={(boundaryIndex) => updatePhase(phase.id, {
+                                dayBreaks: phase.dayBreaks.filter((_, position) => position !== boundaryIndex),
+                              }, true)}
+                              onDayChange={(boundaryIndex, patch) => updatePhase(phase.id, {
+                                dayBreaks: phase.dayBreaks.map((boundary, position) =>
+                                  position === boundaryIndex ? { ...boundary, ...patch } : boundary),
                               })}
-                            </section>
+                              onAddPause={(afterRound) => updatePhase(phase.id, {
+                                extraInlineBreaks: [...phase.extraInlineBreaks,
+                                  { afterRound, kind: 'minutes', minutes: 15, until: '13:00', untilDate: '' }],
+                              })}
+                              onPauseChange={(pause, patch) => {
+                                if (pause.source === 'legacy') {
+                                  updatePhase(phase.id, {
+                                    ...(patch.afterRound !== undefined ? { inlineBreakAfterRound: patch.afterRound } : {}),
+                                    ...(patch.kind ? { inlineBreakKind: patch.kind } : {}),
+                                    ...(patch.minutes !== undefined ? { inlineBreakMinutes: patch.minutes } : {}),
+                                    ...(patch.until !== undefined ? { inlineBreakUntil: patch.until } : {}),
+                                    ...(patch.untilDate !== undefined ? { inlineBreakUntilDate: patch.untilDate } : {}),
+                                  });
+                                } else updatePhase(phase.id, {
+                                  extraInlineBreaks: phase.extraInlineBreaks.map((item, position) =>
+                                    position === pause.index ? { ...item, ...patch } : item),
+                                });
+                              }}
+                              onPauseRemove={(pause) => {
+                                if (pause.source === 'legacy') updatePhase(phase.id, { inlineBreakAfterRound: 0 }, true);
+                                else updatePhase(phase.id, {
+                                  extraInlineBreaks: phase.extraInlineBreaks.filter((_, position) => position !== pause.index),
+                                }, true);
+                              }}
+                            />
                           )}
                           {isExpanded && invalidInlineBreak && (
                             <div className="phase-review-acknowledgement" role="alert">
@@ -3686,7 +3694,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                               </button>
                             </div>
                           )}
-                          {isExpanded && inlineBreakActive && (
+                          {isExpanded && tournamentMode === 'single' && inlineBreakActive && (
                             <section
                               className={`phase-inline-break phase-inline-break-card ${inlineBreakExpanded ? 'is-expanded' : 'is-collapsed'}`}
                               aria-label={`Zwischenpause nach Runde ${phase.inlineBreakAfterRound}`}
