@@ -71,10 +71,6 @@ export interface CreationDraft {
   maxSwissRounds: number | null;
   knockoutQualifierCount: number | null;
   preferredDurationMinutes: number;
-  /** Preference for a desired absolute finish clock versus an active-time target. */
-  preferredTimeMode?: 'duration' | 'end-time';
-  /** HH:mm on the final playing day, using the tournament timezone. */
-  preferredEndTime?: string;
   /** Frozen active-time allocation for all but the final playing day.
    * Both duration and end clock are derived from the same editable target. */
   preferredEarlierDaysMinutes?: number;
@@ -170,10 +166,6 @@ export function validDraft(value: unknown): value is CreationDraft {
     && (data.preferredEarlierDaysMinutes === undefined
       || (Number.isInteger(data.preferredEarlierDaysMinutes) && data.preferredEarlierDaysMinutes >= 0
         && data.preferredEarlierDaysMinutes < Number.MAX_SAFE_INTEGER))
-    && (data.preferredTimeMode === undefined || ['duration', 'end-time'].includes(data.preferredTimeMode))
-    && (data.preferredEndTime === undefined
-      || (typeof data.preferredEndTime === 'string'
-        && /^([01]\d|2[0-3]):[0-5]\d$/.test(data.preferredEndTime)))
     && (data.selectedRecommendationId === null || typeof data.selectedRecommendationId === 'string')
     && typeof data.awardsEnabled === 'boolean'
     && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string')
