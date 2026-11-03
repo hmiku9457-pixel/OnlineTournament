@@ -52,9 +52,9 @@ import { UnsavedParticipantDialog } from '@/components/UnsavedParticipantDialog'
 import { QualificationRuleDialog } from '@/components/QualificationRuleDialog';
 import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/domain/groupQualification';
 import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, invalidParticipantRosterIndices, MAX_PARTICIPANT_NAME_LENGTH } from '@/domain/participantNames';
-import { availableDayBreakRounds, convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
+import { availableDayBreakRounds, convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, earliestRoundContinuationDate, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
-import { configuredPlayingDays, followingPlayingDate, playingRounds, suggestDaySplit, type PlayingDayBreak } from '@/domain/playingDays';
+import { configuredPlayingDays, followingPlayingDate, playingRounds, type PlayingDayBreak } from '@/domain/playingDays';
 import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays } from '@/domain/creationPlanRecommendations';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, playingDayOverflowWarnings, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
@@ -3061,8 +3061,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                   onClick={() => {
                                     const available = freeDayBreakRounds[0];
                                     if (!available) return;
+                                    const minimumDate = earliestRoundContinuationDate(
+                                      scheduledStart, phaseScheduleProposals, index, available);
                                     const insertion = proposePlayingDayInsertion(phase.dayBreaks, available,
-                                      (plannedPhaseStart ?? scheduledStart).slice(0, 10));
+                                      followingPlayingDate(minimumDate, -1));
                                     if (insertion.shifted.length) {
                                       setPendingDayInsertion({ phaseId: phase.id, nextBreaks: insertion.dayBreaks,
                                         shifted: insertion.shifted, operation: 'insert' });
