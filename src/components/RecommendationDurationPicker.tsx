@@ -22,11 +22,13 @@ interface Props {
   value: number;
   onChange: (minutes: number) => void;
   multiDay?: boolean;
+  maximumMinutes?: number;
 }
 
 /** Duration editor with explicitly labeled units, not a clock-time picker. */
-export function RecommendationDurationPicker({ value, onChange, multiDay = false }: Props) {
-  const maximum = multiDay ? MAX_RECOMMENDATION_DURATION : MAX_SINGLE_DAY_DURATION;
+export function RecommendationDurationPicker({ value, onChange, multiDay = false, maximumMinutes }: Props) {
+  const maximum = Math.min(multiDay ? MAX_RECOMMENDATION_DURATION : MAX_SINGLE_DAY_DURATION,
+    maximumMinutes ?? MAX_RECOMMENDATION_DURATION);
   const maxHours = Math.floor(maximum / 60);
   const titleId = useId();
   const [open, setOpen] = useState(false);
