@@ -94,7 +94,8 @@ describe('optionaler vorläufiger Zeitplan', () => {
   });
 
   it('blocks past tournament starts at minute precision, including invalid timestamps', () => {
-    const now = new Date(2030, 10, 21, 12, 34, 59);
+    const now = parseLocalDateTime('2030-11-21T12:34')!;
+    now.setSeconds(59);
     expect(isStartAtOrAfterNow('2030-11-21T12:34', now)).toBe(true);
     expect(isStartAtOrAfterNow('2030-11-21T12:33', now)).toBe(false);
     expect(isStartAtOrAfterNow('2030-11-21T12:35', now)).toBe(true);
