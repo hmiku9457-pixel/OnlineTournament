@@ -83,6 +83,7 @@ export interface CreationDraft {
     manuallyEditedId?: string;
     source: 'manual' | 'roster';
     previousRoster?: CreationDraftParticipant[];
+    previousDiscipline?: Discipline;
   } | null;
   /** Values retained across a switch between two timed sports until acknowledged. */
   timeValuesReviewRequired?: boolean;
@@ -156,7 +157,7 @@ export function validDraft(value: unknown): value is CreationDraft {
     && (data.plannedDays === undefined || (Number.isInteger(data.plannedDays) && data.plannedDays >= 2 && data.plannedDays <= 14))
     && typeof data.preferredDurationMinutes === 'number'
     && Number.isInteger(data.preferredDurationMinutes) && data.preferredDurationMinutes >= 15
-    && data.preferredDurationMinutes <= 1439
+    && data.preferredDurationMinutes <= 14 * 24 * 60 - 1
     && (data.selectedRecommendationId === null || typeof data.selectedRecommendationId === 'string')
     && typeof data.awardsEnabled === 'boolean'
     && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string')
@@ -172,6 +173,8 @@ export function validDraft(value: unknown): value is CreationDraft {
           && typeof loss.label === 'string' && Array.isArray(loss.removedRounds)
           && typeof loss.removedInlineBreak === 'boolean')
         && ['manual','roster'].includes(data.pendingDependentChange.source)
+        && (data.pendingDependentChange.previousDiscipline === undefined
+          || ['SINGLES', 'DOUBLES', 'TEAMS'].includes(data.pendingDependentChange.previousDiscipline))
         && (data.pendingDependentChange.previousRoster === undefined
           || (Array.isArray(data.pendingDependentChange.previousRoster)
             && data.pendingDependentChange.previousRoster.length <= 10000
