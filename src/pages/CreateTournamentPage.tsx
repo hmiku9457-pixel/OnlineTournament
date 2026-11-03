@@ -1483,12 +1483,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   function selectRecommendation(recommendation: FormatRecommendation) {
     const candidateIndex = recommendations.findIndex((item) => item.id === recommendation.id);
     if (candidateIndex < 0 || !recommendationAssessments[candidateIndex]?.feasible) return;
-    if (selectedRecommendationId === recommendation.id && recommendationPlanMatches) return;
-    if (phaseDrafts.length > 0) {
-      setPendingRecommendationId(recommendation.id);
-      return;
-    }
-    applyRecommendation(recommendation);
+    // Selection is provisional until the actual transition to Step 4.
+    setSelectedRecommendationId((current) => current === recommendation.id ? null : recommendation.id);
   }
 
   function normalizePhaseEntrants(phases: PhaseDraft[]): PhaseDraft[] {
@@ -1935,12 +1931,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   }
 
   function applyStepNavigation(target: WizardStep, focusDate = false, advance = false) {
-    if (step === 3 && advance) {
-      if (phaseDrafts.length === 0 && selectedRecommendation) {
-        setPhaseDrafts(recommendedPhaseDrafts(selectedRecommendation));
-      }
-      setHasVisitedPhaseStep(true);
-    }
+    if (step === 3 && target === 4) setHasVisitedPhaseStep(true);
     if (advance) setMaxReachedStep((current) => Math.max(current, target) as WizardStep);
     setStep(target);
     if (focusDate) setFocusStartSettings(true);
@@ -1952,6 +1943,18 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     if (step === 2 && participantEditorDirty) {
       setPendingStepNavigation({ target, focusDate, advance });
       return;
+    }
+    // Do not check or overwrite while browsing cards. Check on EVERY Step 3 → 4
+    // transition, including the very first one and direct wizard navigation.
+    if (step === 3 && target === 4 && selectedRecommendation) {
+      if (!currentRecommendationAssessment?.feasible) {
+        setSelectedRecommendationId(null);
+      } else if (phaseDrafts.length > 0 && !recommendationPlanMatches) {
+        setPendingRecommendationId(selectedRecommendation.id);
+        return;
+      } else if (phaseDrafts.length === 0) {
+        applyRecommendation(selectedRecommendation);
+      }
     }
     applyStepNavigation(target, focusDate, advance);
   }
@@ -2713,7 +2716,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                       value={plannedDays} min={2} max={14} onChange={setPlannedDays}/>
                   </div>}
                   <div className="field recommendation-duration-field">
-                    <label htmlFor="preferred-duration" title="Die gesamte aktive Turnierdauer als Zielwert. Mit ± in 15-Minuten-Schritten ändern.">Geplante Turnierdauer</label>
+                    <label htmlFor="preferred-duration" title="Zeitspanne in Stunden und Minuten, keine Uhrzeit. Mit ± in 15-Minuten-Schritten ändern.">Turnierdauer (Std. + Min.)</label>
                     <div className="recommendation-duration-stepper" role="group" aria-label="Geplante Turnierdauer anpassen">
                       <button type="button" className="recommendation-number-stepper-button"
                         aria-label="Geplante Turnierdauer um 15 Minuten verringern"
@@ -2725,6 +2728,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                         disabled={preferredDurationMinutes >= (tournamentMode === 'multi' ? MAX_RECOMMENDATION_DURATION : MAX_SINGLE_DAY_DURATION)}
                         onClick={() => adjustPreferredDuration(15)}>+</button>
                     </div>
+                    <span className="field-hint">Dauer, keine Uhrzeit · z. B. 3 Std. 30 Min.</span>
                   </div>
                 </div>
                 <div className="format-setting-fields">
@@ -2776,6 +2780,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
               </aside>
               <div className="recommendation-list">
                 <h3 className="recommendation-section-title">Vorschläge</h3>
+                <p className="field-hint">Erneut klicken zum Abwählen. Die Vorlage wird erst beim Wechsel zu Schritt 4 übernommen.</p>
                 {recommendations.length === 0 && (
                   <div className="callout">Mit den aktuellen Vorgaben gibt es keinen sinnvollen automatischen Vorschlag innerhalb des Zeitmodells. Du kannst trotzdem weitergehen und die Phasen manuell anlegen.</div>
                 )}
@@ -2792,11 +2797,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                   const daySplitPossible = assessment.daySplitPossible;
                   const recommendationFeasible = assessment.feasible;
                   return <button
-                    className={`card recommendation recommendation-select ${selectedRecommendationId === item.id && recommendationPlanMatches ? 'selected' : ''} ${index === firstSelectableRecommendationIndex ? 'best' : ''}`}
+                    className={`card recommendation recommendation-select ${selectedRecommendationId === item.id ? 'selected' : ''} ${index === firstSelectableRecommendationIndex ? 'best' : ''}`}
                     key={item.id}
                     type="button"
                     disabled={!recommendationFeasible}
-                    title={assessment.reason ?? undefined}
+                    aria-pressed={selectedRecommendationId === item.id}
+                    title={assessment.reason ?? (selectedRecommendationId === item.id ? 'Erneut klicken, um diese Empfehlung abzuwählen.' : undefined)}
                     onClick={() => selectRecommendation(item)}
                   >
                     <div className="recommendation-heading">
@@ -2827,10 +2833,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                       </h3>
                       <div className="recommendation-labels">
                         <span className="badge">{!recommendationFeasible ? 'Nicht verfügbar' : index === firstSelectableRecommendationIndex ? 'Empfohlen' : 'Alternative'}</span>
-                        {selectedRecommendationId === item.id && <span className="badge selected-badge">{recommendationPlanMatches
-                          ? 'Ausgewählt' : plannedDayMismatch ? 'Spieltage noch anzupassen'
-                            : recommendationStructureMatches && !recommendationTimeMatches
-                              ? 'Struktur stimmt · Zeitplan abweichend' : 'Plan weicht ab · erneut übernehmen'}</span>}
+                        {selectedRecommendationId === item.id && <span className="badge selected-badge">Ausgewählt</span>}
                       </div>
                     </div>
                     <p>{item.description}</p>
@@ -2870,6 +2873,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
           <section className="phase-wizard-step">
             <h2>Phasen konfigurieren</h2>
             <p className="muted">Ordne deine Phasen an und öffne bei Bedarf die Einstellungen.</p>
+            {!selectedRecommendation && <div className="callout" role="status">
+              Du stellst dein Turnier jetzt selbst zusammen. Füge unten die gewünschten Phasen hinzu oder gehe einen Schritt zurück, um eine Turnierempfehlung als Grundlage zu wählen.
+            </div>}
             <p className="field-hint">Zeitplaneinträge: {countCreationScheduleEntries(phaseDrafts, awardsEnabled)} von {MAX_CREATION_SCHEDULE_ENTRIES} möglich (Pausen und Fortsetzungen eingeschlossen).</p>
             {phaseLimitError && <p className="field-error" role="alert">{phaseLimitError}</p>}
             {!prestart && !canCreate && (
@@ -4171,17 +4177,22 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       {pendingRecommendationId && (
         <div className="sport-change-backdrop" role="presentation"
           onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingRecommendationId(null); }}>
-          <section className="sport-change-dialog phase-replacement-dialog" role="alertdialog" aria-modal="true" aria-label="Phasenplanung ersetzen?"
+          <section className="sport-change-dialog phase-replacement-dialog" role="alertdialog" aria-modal="true" aria-label="Übernahme der Empfehlung bestätigen?"
             onKeyDown={(event) => { if (event.key === 'Escape') setPendingRecommendationId(null); }}>
             <h2>Bestehende Phasenplanung ersetzen?</h2>
-            <p>Die ausgewählte Empfehlung ersetzt alle derzeit konfigurierten Phasen. Individuelle Best-of-Werte, Qualifikationsplätze und Pausen gehen verloren.</p>
+            <p>Beim Wechsel zu Schritt 4 ersetzt die ausgewählte Empfehlung alle bereits konfigurierten Phasen. Individuelle Best-of-Werte, Qualifikationsplätze und Pausen gehen verloren.</p>
+            <p className="field-hint">Du kannst die Empfehlung auch abwählen und deinen vorhandenen Plan unverändert weiterbearbeiten.</p>
             <div className="sport-change-dialog-actions">
-              <button type="button" className="btn" autoFocus onClick={() => setPendingRecommendationId(null)}>Bisherige Planung behalten</button>
+              <button type="button" className="btn" autoFocus onClick={() => setPendingRecommendationId(null)}>Zurück zur Auswahl</button>
               <button type="button" className="btn danger" onClick={() => {
-                const recommendation = recommendations.find((item) => item.id === pendingRecommendationId);
+                const recommendation = assessedRecommendations.find(({ item, assessment }) =>
+                  item.id === pendingRecommendationId && assessment.feasible)?.item;
                 setPendingRecommendationId(null);
-                if (recommendation) applyRecommendation(recommendation);
-              }}>Phasen durch Empfehlung ersetzen</button>
+                if (recommendation) {
+                  applyRecommendation(recommendation);
+                  applyStepNavigation(4, false, true);
+                }
+              }}>Phasen ersetzen und weiter</button>
             </div>
           </section>
         </div>
