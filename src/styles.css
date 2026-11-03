@@ -7736,44 +7736,6 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .phase-auto-day-plan > button { width: 100%; }
 }
 
-/* Step 3: choose a target finish clock or active tournament duration. */
-.wizard-workspace .format-step .recommendation-time-choice {
-  display: flex;
-  flex: 1 1 330px;
-  align-items: end;
-  flex-wrap: wrap;
-  min-width: 0;
-  gap: 5px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-.wizard-workspace .format-step .recommendation-time-choice legend {
-  width: 100%;
-  margin: 0 0 5px;
-  font-size: .76rem;
-  font-weight: 750;
-}
-.wizard-workspace .format-step .recommendation-time-choice .tournament-mode-option {
-  flex: 1 1 145px;
-}
-.wizard-workspace .format-step .recommendation-time-choice .tournament-mode-option span {
-  min-height: 36px;
-  padding: 6px 8px;
-  text-align: center;
-  font-size: .76rem;
-}
-.wizard-workspace .format-step .tournament-mode-setting > .recommendation-end-time-field {
-  flex: 0 1 235px;
-  min-width: 0;
-  margin: 0;
-}
-.wizard-workspace .format-step .recommendation-end-time-field .clock-picker-trigger {
-  min-height: 36px;
-}
-.wizard-workspace .format-step .recommendation-time-choice + .field .field-hint {
-  max-width: 260px;
-}
 .recommendation-duration-quick-add {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
