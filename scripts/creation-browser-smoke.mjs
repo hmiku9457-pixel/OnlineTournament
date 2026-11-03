@@ -1216,6 +1216,25 @@ try {
   assert.equal(inlineLabelStyles.length, 2, 'both inline-break labels are present');
   assert.deepEqual(inlineLabelStyles[0], inlineLabelStyles[1],
     'Unterbrechung nach and Dauer in Minuten have identical font size and weight');
+  const inlineSelector = inlineFinal.locator('.phase-inline-break-settings .break-phase-choice-segmented');
+  assert.equal(await inlineSelector.locator('label').count(), 2);
+  assert.equal(await inlineSelector.getByRole('radio', { name: 'Pause in Minuten' }).isChecked(), true);
+  const inlineBreakGeometry = await inlineFinal.locator('.phase-inline-break-settings .break-phase-fields')
+    .evaluate(root => {
+      const inputs = root.querySelector('.break-phase-inputs').getBoundingClientRect();
+      const selector = root.querySelector('.break-phase-choice-segmented').getBoundingClientRect();
+      const inlineRow = root.querySelector('.phase-inline-round-select').getBoundingClientRect();
+      const inlineDuration = root.querySelector('.phase-pause-minutes').getBoundingClientRect();
+      return { inputsY: inputs.y, selectorY: selector.y,
+        firstY: inlineRow.y, secondY: inlineDuration.y, selectorX: selector.x, inputsRight: inputs.right };
+    });
+  assert.ok(Math.abs(inlineBreakGeometry.firstY - inlineBreakGeometry.secondY) <= 2,
+    'inline-break round selector and duration occupy one compact row');
+  await inlineSelector.getByRole('radio', { name: 'Pause bis' }).check();
+  assert.equal(await inlineFinal.locator('.break-phase-datetime-fields').count(), 1,
+    'changing an inline break to a fixed time shows the grouped date and clock controls');
+  await inlineSelector.getByRole('radio', { name: 'Pause in Minuten' }).check();
+  assert.equal(await inlineFinal.locator('.phase-pause-minutes').count(), 1);
   const inlineMinutes = inlineFinal.getByRole('spinbutton', { name: 'Zwischenpausendauer in Minuten' });
   assert.equal(await inlineMinutes.inputValue(), '15');
   await inlineFinal.getByRole('button', { name: 'Zwischenpausendauer in Minuten erhöhen' }).click();
@@ -1317,6 +1336,27 @@ try {
   assert.equal(pauseLabelStyles.length, 2, 'both standalone pause labels are present');
   assert.deepEqual(pauseLabelStyles[0], pauseLabelStyles[1],
     'Name der Pause and Dauer in Minuten have identical font size and weight');
+  const pauseChoices = pauseCard.locator('.break-phase-choice-segmented');
+  assert.equal(await pauseChoices.locator('label').count(), 3);
+  assert.equal(await pauseChoices.getByRole('radio', { name: 'Pause in Minuten' }).isChecked(), true);
+  assert.equal(await pauseChoices.getByRole('radio', { name: 'Spieltagsende' }).isDisabled(), true,
+    'a single-day tournament cannot select an overnight break');
+  const compactPause = await pauseCard.locator('.break-phase-fields').evaluate(root => {
+    const name = root.querySelector('.phase-pause-name').getBoundingClientRect();
+    const duration = root.querySelector('.phase-pause-minutes').getBoundingClientRect();
+    const type = root.querySelector('.break-phase-choice-segmented').getBoundingClientRect();
+    const notes = root.querySelector('.break-phase-notes textarea').getBoundingClientRect();
+    return { nameX: name.x, durationX: duration.x, typeX: type.x,
+      nameY: name.y, durationY: duration.y, typeY: type.y, notesHeight: notes.height };
+  });
+  assert.ok(Math.abs(compactPause.nameY - compactPause.durationY) <= 2,
+    'name and duration are aligned on a compact pause card');
+  assert.ok(compactPause.notesHeight <= 44, 'the optional player note starts as a single line');
+  await pauseChoices.getByRole('radio', { name: 'Pause bis' }).check();
+  assert.equal(await pauseCard.locator('.break-phase-datetime-fields').count(), 1,
+    'standalone fixed-end pause keeps date and clock together');
+  await pauseChoices.getByRole('radio', { name: 'Pause in Minuten' }).check();
+  assert.equal(await pauseCard.locator('.phase-pause-minutes').count(), 1);
   const pauseMinutes = pauseCard.getByRole('spinbutton', { name: 'Pausendauer in Minuten' });
   assert.equal(await pauseMinutes.inputValue(), '30');
   await pauseCard.getByRole('button', { name: 'Pausendauer in Minuten erhöhen' }).click();
