@@ -59,7 +59,7 @@ import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fi
 import { configuredPlayingDays, followingPlayingDate, playingRounds, type PlayingDayBreak } from '@/domain/playingDays';
 import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays, recommendationEndTimePenalty } from '@/domain/creationPlanRecommendations';
 import { initialEarlierDaysMinutes, earliestLinkedEnd, linkedDuration, linkedEndTime,
-  rebalanceEarlierDays } from '@/domain/linkedCreationTime';
+  maximumLinkedActiveDuration, rebalanceEarlierDays } from '@/domain/linkedCreationTime';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, parseLocalDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, playingDayOverflowWarnings, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
@@ -906,8 +906,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   }
 
   function changePreferredDuration(next: number) {
-    const max = tournamentMode === 'multi' ? MAX_RECOMMENDATION_DURATION : MAX_SINGLE_DAY_DURATION;
-    const bounded = Math.max(MIN_RECOMMENDATION_DURATION, Math.min(max, next));
+    const maximum = maximumLinkedActiveDuration(linkedTimeSettings);
+    const bounded = Math.max(MIN_RECOMMENDATION_DURATION, Math.min(maximum, next));
     setPreferredEarlierDaysMinutes((earlier) => rebalanceEarlierDays(bounded, {
       scheduledStart, days: tournamentMode === 'multi' ? plannedDays : 1, earlierDaysMinutes: earlier,
     }));
@@ -1127,6 +1127,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     scheduledStart, days: tournamentMode === 'multi' ? plannedDays : 1,
     earlierDaysMinutes: tournamentMode === 'multi' ? preferredEarlierDaysMinutes : 0,
   };
+  const preferredDurationMaximum = maximumLinkedActiveDuration(linkedTimeSettings);
   const preferredEndClock = linkedEndTime(preferredDurationMinutes, linkedTimeSettings);
   const earliestPreferredEnd = earliestLinkedEnd(linkedTimeSettings);
 
@@ -2767,10 +2768,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                           disabled={preferredDurationMinutes <= MIN_RECOMMENDATION_DURATION}
                           onClick={() => adjustPreferredDuration(-15)}>−</button>
                         <RecommendationDurationPicker value={preferredDurationMinutes}
-                          multiDay={tournamentMode === 'multi'} onChange={changePreferredDuration}/>
+                          multiDay={tournamentMode === 'multi'} maximumMinutes={preferredDurationMaximum}
+                          onChange={changePreferredDuration}/>
                         <button type="button" className="recommendation-number-stepper-button"
                           aria-label="Geplante Turnierdauer um 15 Minuten erhöhen"
-                          disabled={preferredDurationMinutes >= MAX_RECOMMENDATION_DURATION}
+                          disabled={preferredDurationMinutes >= preferredDurationMaximum}
                           onClick={() => adjustPreferredDuration(15)}>+</button>
                       </div>
                       <span className="field-hint">Aktive Spielzeit ohne Nächte</span>
