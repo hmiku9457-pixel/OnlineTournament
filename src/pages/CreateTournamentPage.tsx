@@ -3424,7 +3424,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                           {phase.type === 'BREAK' ? (
                             <div className="break-phase-fields">
                               <div className="break-phase-inputs">
-                                <label className={phase.breakKind === 'overnight' ? 'field break-overnight-name' : 'field'}>Name der Pause
+                                <label className={phase.breakKind === 'overnight' ? 'field break-overnight-name phase-pause-name' : 'field phase-pause-name'}>Name der Pause
                                   <input type="text" maxLength={80} value={phase.label}
                                     placeholder="z. B. Mittagspause"
                                     onChange={(event) => updatePhase(phase.id, { label: event.target.value })} />
@@ -3705,7 +3705,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                                 <div id={`inline-break-settings-${phase.id}`} className="phase-inline-break-settings">
                                   <div className="break-phase-fields">
                                     <div className="break-phase-inputs">
-                                      <label className="field">Unterbrechung nach
+                                      <label className="field phase-inline-round-select">Unterbrechung nach
                                         <select value={Math.min(phase.inlineBreakAfterRound, inlineBreakRounds - 1)}
                                           onChange={(event) => updatePhase(phase.id, { inlineBreakAfterRound: Number(event.target.value) })}>
                                           {Array.from({ length: inlineBreakRounds - 1 }, (_, round) => round + 1)
