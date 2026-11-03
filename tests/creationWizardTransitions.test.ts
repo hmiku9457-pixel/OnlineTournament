@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, reconcileRoundDependentBreaks } from '@/domain/creationPlanTransitions';
+import { convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, reconcileRoundDependentBreaks, phaseBreakLosses, proposePlayingDayInsertion } from '@/domain/creationPlanTransitions';
 import { invalidParticipantRosterIndices } from '@/domain/participantNames';
 import { suggestDaySplit, validPlayingDayBreaks } from '@/domain/playingDays';
 import { validateTournamentCreation } from '@/domain/validateTournamentCreation';
@@ -31,6 +31,49 @@ describe('creation wizard transitions', () => {
     expect(result.phase.inlineBreakAfterRound).toBe(0);
     const reversed = reconcileRoundDependentBreaks({ ...phase(), inlineBreakAfterRound: 3, dayBreaks: [...phase().dayBreaks].reverse() });
     expect(reversed.phase.dayBreaks.map((x) => x.afterRound)).toEqual([2, 4]);
+  });
+
+  it('preserves names and notes when overnight phases become standard breaks', () => {
+    const phases = [
+      { ...phase(), id: 'a', label: 'Vorrunde', note: '' },
+      { ...phase(), id: 'break', label: 'Abendprogramm', note: 'Gemeinsames Essen',
+        type: 'BREAK' as const, breakKind: 'overnight', breakMinutes: 30, dayBreaks: [], inlineBreakAfterRound: 0 },
+    ];
+    const converted = convertToSingleDay(phases, 'convert');
+    expect(converted).toHaveLength(2);
+    expect(converted[1]).toMatchObject({
+      label: 'Abendprogramm', note: 'Gemeinsames Essen', type: 'BREAK', breakKind: 'minutes', breakMinutes: 15,
+    });
+    expect(countConfiguredDayTransitions(converted)).toBe(0);
+  });
+
+  it('identifies dependent losses in later phases rather than just the phase edited', () => {
+    const before = [
+      { ...phase(), id: 'a', label: 'Vorrunde' },
+      { ...phase(), id: 'b', label: 'Endrunde' },
+    ];
+    const after = [
+      before[0],
+      { ...phase(3), id: 'b', label: 'Endrunde', dayBreaks: [before[1].dayBreaks[0]], inlineBreakAfterRound: 0 },
+    ];
+    expect(phaseBreakLosses(before, after)).toEqual([
+      { id: 'b', label: 'Endrunde', removedRounds: [4], removedInlineBreak: true },
+    ]);
+  });
+
+  it('inserts an early playing day in order and offers affected date shifts', () => {
+    const current = [{ afterRound: 4, date: '2030-11-11', time: '09:00' }];
+    const insertion = proposePlayingDayInsertion(current, 1, '2030-11-10');
+    expect(insertion.dayBreaks).toEqual([
+      { afterRound: 1, date: '2030-11-11', time: '09:00' },
+      { afterRound: 4, date: '2030-11-12', time: '09:00' },
+    ]);
+    expect(insertion.shifted).toEqual([
+      { afterRound: 4, previousDate: '2030-11-11', nextDate: '2030-11-12' },
+    ]);
+    const later = proposePlayingDayInsertion(current, 5, '2030-11-10');
+    expect(later.shifted).toHaveLength(0);
+    expect(later.dayBreaks[1].date).toBe('2030-11-12');
   });
 
   it('rejects chronologically inverted playing days', () => {
