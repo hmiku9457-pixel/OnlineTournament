@@ -8431,3 +8431,84 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .recommendation-duration-adjust-button { font-size: .7rem; }
   .recommendation-duration-dialog .recommendation-duration-preview strong { font-size: .93rem; }
 }
+
+/* Step 4: consistent, editable +/− controls for both standalone pauses
+   and in-phase round breaks. Match other 46px phase input fields. */
+.wizard-workspace .phase-wizard-step .phase-pause-minutes .recommendation-number-stepper {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 39px minmax(0, 1fr) 39px;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+}
+.wizard-workspace .phase-wizard-step .phase-pause-minutes .recommendation-number-stepper > input {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  margin: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #182230;
+  text-align: center;
+  font-size: .87rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.wizard-workspace .phase-wizard-step .phase-pause-minutes .recommendation-number-stepper > input::-webkit-inner-spin-button,
+.wizard-workspace .phase-wizard-step .phase-pause-minutes .recommendation-number-stepper > input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.wizard-workspace .phase-wizard-step .phase-pause-minutes .recommendation-number-stepper-button {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #344054;
+  font-size: 1.2rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+.wizard-workspace .phase-wizard-step .phase-pause-minutes .recommendation-number-stepper-button:first-child {
+  border-right: 1px solid #e2e8f0;
+}
+.wizard-workspace .phase-wizard-step .phase-pause-minutes .recommendation-number-stepper-button:last-child {
+  border-left: 1px solid #e2e8f0;
+}
+.wizard-workspace .phase-wizard-step .phase-pause-minutes .recommendation-number-stepper-button:hover:not(:disabled) {
+  color: #175cd3;
+  background: #eff6ff;
+}
+.wizard-workspace .phase-wizard-step .phase-pause-minutes .recommendation-number-stepper-button:disabled {
+  color: #98a2b3;
+  background: #f2f4f7;
+  cursor: not-allowed;
+}
+.wizard-workspace .phase-wizard-step .phase-pause-minutes .recommendation-number-stepper > input:focus-visible,
+.wizard-workspace .phase-wizard-step .phase-pause-minutes .recommendation-number-stepper-button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #175cd3;
+  outline-offset: -2px;
+}
