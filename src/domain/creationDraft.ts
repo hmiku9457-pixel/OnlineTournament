@@ -167,7 +167,7 @@ export function validDraft(value: unknown): value is CreationDraft {
     && (data.preferredTimeMode === undefined || ['duration', 'end-time'].includes(data.preferredTimeMode))
     && (data.preferredEndTime === undefined
       || (typeof data.preferredEndTime === 'string'
-        && /^([01]\\d|2[0-3]):[0-5]\\d$/.test(data.preferredEndTime)))
+        && /^([01]\d|2[0-3]):[0-5]\d$/.test(data.preferredEndTime)))
     && (data.selectedRecommendationId === null || typeof data.selectedRecommendationId === 'string')
     && typeof data.awardsEnabled === 'boolean'
     && (data.awardsAtOverride === null || typeof data.awardsAtOverride === 'string')
