@@ -152,8 +152,36 @@ try {
   await durationDialog.waitFor();
   await durationDialog.getByLabel('Stunden (0–23)').fill('2');
   await durationDialog.getByLabel('Minuten (0–59)').fill('10');
+  await durationDialog.getByRole('button', { name: '+1 Min.' }).click();
+  assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '11');
+  await durationDialog.getByRole('button', { name: '+5 Min.' }).click();
+  assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '16');
+  await durationDialog.getByRole('button', { name: '+15 Min.' }).click();
+  assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '31');
+  await durationDialog.getByRole('button', { name: '+1 Std.' }).click();
+  assert.equal(await durationDialog.getByLabel('Stunden (0–23)').inputValue(), '03');
+  await durationDialog.getByLabel('Stunden (0–23)').fill('2');
+  await durationDialog.getByLabel('Minuten (0–59)').fill('10');
   await durationDialog.getByRole('button', { name: 'Dauer übernehmen' }).click();
   assert.equal(await page.locator('#preferred-duration strong').innerText(), '2 Std. 10 Min.');
+  await page.getByRole('radio', { name: 'Gewünschte Endzeit' }).check();
+  await page.locator('#preferred-end-time').click();
+  const endTimeDialog = page.getByRole('dialog', { name: 'Gewünschte Endzeit einstellen' });
+  await endTimeDialog.waitFor();
+  await endTimeDialog.getByLabel('Stunde (0–23)').fill('14');
+  await endTimeDialog.getByLabel('Minute (0–59)').fill('30');
+  await endTimeDialog.getByRole('button', { name: 'Übernehmen', exact: true }).click();
+  assert.equal(await page.locator('#preferred-end-time .clock-picker-trigger-value').innerText(), '14:30');
+  assert.match(await page.locator('.recommendation-list .recommendation').first().innerText(),
+    /Ende ca\.|gewünschte Endzeit:/i);
+  await page.reload();
+  await page.waitForSelector('.format-step');
+  assert.equal(await page.getByRole('radio', { name: 'Gewünschte Endzeit' }).isChecked(), true,
+    'preferred end-time mode must survive a reload');
+  assert.equal(await page.locator('#preferred-end-time .clock-picker-trigger-value').innerText(), '14:30');
+  await page.getByRole('radio', { name: 'Gewünschte Turnierdauer' }).check();
+  assert.equal(await page.locator('#preferred-duration strong').innerText(), '2 Std. 10 Min.',
+    'switching modes must preserve the separate duration target');
   const swissBefore = Number(await page.locator('#max-swiss-rounds').inputValue());
   const swissLimit = Number(await page.locator('#max-swiss-rounds').getAttribute('max'));
   if (swissBefore < swissLimit) {
