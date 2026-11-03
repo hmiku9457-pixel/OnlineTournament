@@ -10,6 +10,8 @@ export interface RosterReviewPhase {
   groupCount: number;
   swissRounds: number;
   knockoutBestOf: readonly number[];
+  inlineBreakAfterRound?: number;
+  dayBreaks?: readonly { afterRound: number; date: string; time: string }[];
 }
 
 /** Review all previously existing phases whose entrant count was changed
@@ -26,6 +28,8 @@ export function needsRosterPhaseReview(before: RosterReviewPhase, after: RosterR
   return (index > 0 && before.type !== 'BREAK' && before.entrantCount !== after.entrantCount)
     || before.groupCount !== after.groupCount
     || JSON.stringify(before.knockoutBestOf) !== JSON.stringify(after.knockoutBestOf)
+    || before.inlineBreakAfterRound !== after.inlineBreakAfterRound
+    || JSON.stringify(before.dayBreaks) !== JSON.stringify(after.dayBreaks)
     || (after.type === 'SWISS' && !isValidSwissRoundCount(after.swissRounds, after.entrantCount))
     || (after.type === 'GROUPS' && (after.entrantCount < 4
       || after.groupCount > Math.floor(after.entrantCount / 2)));
