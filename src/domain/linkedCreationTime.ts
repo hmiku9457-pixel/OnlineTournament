@@ -25,6 +25,31 @@ export function finalPlayingDayStart(settings: LinkedTournamentTime): string {
   return `${followingPlayingDate(startDay, settings.days - 1)}T09:00`;
 }
 
+function playableMinutesUntilMidnight(startWallClock: string): number {
+  const start = parseLocalDateTime(startWallClock);
+  const date = start ? toLocalDateTime(start).slice(0, 10) : '';
+  const end = date ? parseLocalDateTime(`${date}T23:59`) : null;
+  return start && end ? Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60_000)) : 0;
+}
+
+/** Maximum total active minutes on all playing days, excluding overnight gaps. */
+export function maximumLinkedActiveDuration(settings: LinkedTournamentTime): number {
+  if (settings.days <= 1) return Math.min(MAX_SINGLE_DAY_DURATION,
+    playableMinutesUntilMidnight(settings.scheduledStart));
+  let total = playableMinutesUntilMidnight(settings.scheduledStart);
+  const first = settings.scheduledStart.slice(0, 10);
+  for (let day = 1; day < settings.days; day++) {
+    total += playableMinutesUntilMidnight(`${followingPlayingDate(first, day)}T09:00`);
+  }
+  return Math.min(MAX_RECOMMENDATION_DURATION, total);
+}
+
+function previousDaysCapacity(settings: LinkedTournamentTime): number {
+  if (settings.days <= 1) return 0;
+  const final = playableMinutesUntilMidnight(finalPlayingDayStart(settings));
+  return Math.max(0, maximumLinkedActiveDuration(settings) - final);
+}
+
 export function maximumLinkedDuration(settings: LinkedTournamentTime): number {
   const start = parseLocalDateTime(finalPlayingDayStart(settings));
   if (!start) return settings.days <= 1 ? MAX_SINGLE_DAY_DURATION : MAX_RECOMMENDATION_DURATION;
@@ -64,8 +89,10 @@ export function linkedDuration(endClock: string, settings: LinkedTournamentTime)
  * earlier days rather than allowing an invalid, unsynchronised end clock. */
 export function rebalanceEarlierDays(duration: number, settings: LinkedTournamentTime): number {
   if (settings.days <= 1) return 0;
-  if (linkedEndTime(duration, settings)) return settings.earlierDaysMinutes;
-  return initialEarlierDaysMinutes(duration, settings.days);
+  const finalCapacity = playableMinutesUntilMidnight(finalPlayingDayStart(settings));
+  const minEarlier = Math.max(0, duration - finalCapacity);
+  const maxEarlier = Math.min(duration - 1, previousDaysCapacity(settings));
+  return Math.max(minEarlier, Math.min(maxEarlier, settings.earlierDaysMinutes));
 }
 
 export function earliestLinkedEnd(settings: LinkedTournamentTime): string | undefined {
