@@ -421,13 +421,23 @@ export function recommendTournamentFormats(
   const preferenceCost = (item: FormatRecommendation) =>
     (item.minimumMatchShortfall ?? 0) * 40
       + Math.max(0, item.estimatedDurationMinutes - preferredDuration) * 0.75
-      + Math.max(0, preferredDuration - item.estimatedDurationMinutes) * 0.08;
+      + Math.max(0, preferredDuration - item.estimatedDurationMinutes) * 0.02;
   const byPreference = (a: FormatRecommendation, b: FormatRecommendation) =>
     preferenceCost(a) - preferenceCost(b)
       || b.score - a.score || a.estimatedDurationMinutes - b.estimatedDurationMinutes;
+  // Additional smaller KO brackets are fallback candidates. Keep the primary
+  // format families represented before filling with bracket-size variants.
   const ranked = recommendations.sort(byPreference);
+  const primary = ranked.filter((item) => !/-(?:ko)-(?:2|4|8|16|32|64)$/.test(item.id));
+  const alternatives = ranked.filter((item) => /-(?:ko)-(?:2|4|8|16|32|64)$/.test(item.id));
+  const prioritized = [...primary, ...alternatives].sort((a, b) =>
+    (a.estimatedDurationMinutes > preferredDuration ? 1 : 0)
+      - (b.estimatedDurationMinutes > preferredDuration ? 1 : 0)
+      || Number(/-(?:ko)-(?:2|4|8|16|32|64)$/.test(a.id))
+        - Number(/-(?:ko)-(?:2|4|8|16|32|64)$/.test(b.id))
+      || byPreference(a, b));
   const maxResults = settings.maxResults ?? 5;
   return settings.maxRecommendedDurationMinutes === undefined
-    ? maxResults === 0 ? ranked : ranked.slice(0, maxResults)
-    : ranked;
+    ? maxResults === 0 ? prioritized : prioritized.slice(0, maxResults)
+    : prioritized;
 }
