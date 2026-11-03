@@ -790,6 +790,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [preferredDurationMinutes, setPreferredDurationMinutes] = useState(restoredDraft?.preferredDurationMinutes ?? DEFAULT_RECOMMENDATION_DURATION);
   const [tournamentMode, setTournamentMode] = useState<'single' | 'multi'>(restoredDraft?.tournamentMode ?? (restoredDraft?.phaseDrafts.some((phase) => (phase.dayBreaks?.length ?? 0) > 0 || (phase.type === 'BREAK' && phase.breakKind === 'overnight')) ? 'multi' : 'single'));
   const [plannedDays, setPlannedDays] = useState(restoredDraft?.plannedDays ?? 2);
+  useEffect(() => {
+    if (tournamentMode === 'single' && preferredDurationMinutes > MAX_SINGLE_DAY_DURATION) {
+      setPreferredDurationMinutes(MAX_SINGLE_DAY_DURATION);
+    }
+  }, [tournamentMode, preferredDurationMinutes]);
   const [pendingTournamentMode, setPendingTournamentMode] = useState<'single' | null>(null);
   useEffect(() => { setPhaseLimitError(''); },
     [phaseDrafts, participants, plannedDays, tournamentMode, awardsEnabled, step, scheduledDate, scheduledTime]);
@@ -839,7 +844,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     };
   }, [inlineModalKey]);
   function applySingleDayConversion(treatment: 'convert' | 'remove') {
-    const adjusted = convertToSingleDay(phaseDrafts, treatment);
+    const adjusted = convertToSingleDay(phaseDrafts, treatment, scheduledDate);
     const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, adjusted, undefined, true);
     if (!normalized) return;
     setPhaseDrafts(normalized);
@@ -851,7 +856,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   }
 
   function adjustPreferredDuration(delta: number) {
-    setPreferredDurationMinutes((value) => Math.min(MAX_RECOMMENDATION_DURATION,
+    setPreferredDurationMinutes((value) => Math.min(tournamentMode === 'multi' ? MAX_RECOMMENDATION_DURATION : MAX_SINGLE_DAY_DURATION,
       Math.max(MIN_RECOMMENDATION_DURATION, value + delta)));
   }
 
@@ -1044,7 +1049,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         maxGroups: effectiveMaxGroups,
         maxSwissRounds: effectiveMaxSwissRounds,
         knockoutQualifierCount: effectiveKnockoutQualifierCount,
-        preferredDurationMinutes,
+        preferredDurationMinutes: tournamentMode === 'multi' ? preferredDurationMinutes : Math.min(preferredDurationMinutes, MAX_SINGLE_DAY_DURATION),
         maxResults: 0,
       },
     ),
@@ -1466,7 +1471,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     if (losses.length) {
       // The roster is already edited; preserve an exact rollback snapshot.
       setPendingPhaseChange({ next: normalized, losses, source: 'roster',
-        previousRoster: rosterBeforeLastChange.current });
+        previousRoster: rosterBeforeLastChange.current,
+        ...(disciplineBeforeLastChange.current !== discipline ? {
+          previousDiscipline: disciplineBeforeLastChange.current,
+          previousRosterReviewRequired: rosterReviewBeforeLastChange.current,
+        } : {}),
+        ...(sportBeforeLastChange.current !== sport ? { previousSport: sportBeforeLastChange.current } : {}),
+      });
       return;
     }
     if (needsReview.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...needsReview])]);
@@ -1480,10 +1491,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participantCount]);
   useEffect(() => {
-    // Declared after the normalization effect so its snapshot still refers to
-    // the previous participant list when that effect detects a count change.
+    // The roster, discipline and sport form one rollback snapshot.
     rosterBeforeLastChange.current = participants;
-  }, [participants]);
+    disciplineBeforeLastChange.current = discipline;
+    sportBeforeLastChange.current = sport;
+    rosterReviewBeforeLastChange.current = rosterReviewRequired;
+  }, [participants, discipline, sport, rosterReviewRequired]);
 
   // Current phase settings determine the hint, never the previously displayed state.
   const groupRecommendationNotice = useMemo(() => {
@@ -1557,6 +1570,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     }
     setPendingPhaseChange(null);
     participantSequence = Math.max(participantSequence, highestDraftSequence(previous, 'participant'));
+    if (pendingPhaseChange.previousSport !== undefined) setSport(pendingPhaseChange.previousSport);
+    if (pendingPhaseChange.previousDiscipline !== undefined) {
+      setDiscipline(pendingPhaseChange.previousDiscipline);
+      setRosterReviewRequired(pendingPhaseChange.previousRosterReviewRequired ?? false);
+    }
     setParticipants(previous);
     setRemovalHistory([]);
     setBulkCleanupUndo(null);
@@ -1876,6 +1894,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   function confirmDisciplineChange() {
     if (!pendingDiscipline) return;
+    disciplineBeforeLastChange.current = discipline;
+    sportBeforeLastChange.current = sport;
+    rosterReviewBeforeLastChange.current = rosterReviewRequired;
     if (participants.length > 0) setRosterReviewRequired(true);
     setDiscipline(pendingDiscipline);
     resetParticipantEditor();
@@ -1887,6 +1908,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const nextDiscipline = allowed.some((option) => option.value === discipline)
       ? discipline : allowed[0]?.value ?? 'SINGLES';
     if (nextDiscipline !== discipline) {
+      disciplineBeforeLastChange.current = discipline;
+      sportBeforeLastChange.current = sport;
+      rosterReviewBeforeLastChange.current = rosterReviewRequired;
       if (participants.length > 0) setRosterReviewRequired(true);
       setDiscipline(nextDiscipline);
       resetParticipantEditor();
@@ -2398,8 +2422,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                     )}
                     <button className="btn small wizard-test-player-button" type="button" ref={testParticipantsButtonRef}
                       onClick={() => setTestParticipantsDialogOpen(true)}
-                      disabled={participantCount >= 19}
-                      title={participantCount >= 19 ? 'Bereits mindestens 19 Teilnehmer gespeichert.' : 'Nur für Testturniere: Teilnehmerliste mit Testeinträgen auf 19 ergänzen'}>
+                      disabled={participantCount >= 19 || participants.length >= 10000}
+                      title={participants.length >= 10000 ? 'Die Teilnehmerliste enthält bereits 10.000 Einträge.' : participantCount >= 19 ? 'Bereits mindestens 19 Teilnehmer gespeichert.' : 'Nur für Testturniere: Teilnehmerliste mit Testeinträgen auf 19 ergänzen'}>
                       {discipline === 'TEAMS' ? '19 Testmannschaften erzeugen' : discipline === 'SINGLES' ? '19 Testspieler erzeugen' : '19 Testdoppel erzeugen'}
                     </button>
                   </div>
@@ -3174,7 +3198,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                             {index > 0 && !isTerminalStage(phase.type) && (
                               <div className="field">
                                 <label htmlFor={`entrants-${phase.id}`}>Weiterkommende Teilnehmer aus Phase {previousCompetitionPhaseNumber}</label>
-                                <BufferedNumberInput id={`entrants-${phase.id}`} min={2} max={maximumPhaseEntrants}
+                                <BufferedNumberInput id={`entrants-${phase.id}`} min={phase.type === 'GROUPS' ? 4 : phase.type === 'SWISS' ? 3 : 2} max={maximumPhaseEntrants}
                                   value={phase.entrantCount} onCommit={(value) => updatePhaseEntrants(index, value)} />
                               </div>
                             )}
