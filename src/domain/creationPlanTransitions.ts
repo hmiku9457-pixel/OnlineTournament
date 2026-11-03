@@ -122,14 +122,17 @@ export function earliestRoundContinuationDate(
 /** Insert at the actual round position; offer dependent date shifts before applying. */
 export function proposePlayingDayInsertion(
   current: readonly PlayingDayBreak[], afterRound: number,
-  phaseStartDate: string, time = '09:00',
+  phaseStartDate: string, time = '09:00', minimumContinuationDate?: string,
 ): { dayBreaks: PlayingDayBreak[]; shifted: ShiftedPlayingDate[] } {
   if (current.some((item) => item.afterRound === afterRound)) {
     return { dayBreaks: [...current].sort((a, b) => a.afterRound - b.afterRound), shifted: [] };
   }
   const sorted = [...current].sort((a, b) => a.afterRound - b.afterRound);
   const previous = [...sorted].reverse().find((entry) => entry.afterRound < afterRound);
-  const insertedDate = followingPlayingDate(previous?.date || phaseStartDate, 1);
+  const base = followingPlayingDate(previous?.date || phaseStartDate, 1);
+  // The actual round may finish later than the prior day-transition date.
+  const insertedDate = minimumContinuationDate && minimumContinuationDate > base
+    ? minimumContinuationDate : base;
   const next = [...sorted, { afterRound, date: insertedDate, time }].sort((a, b) => a.afterRound - b.afterRound);
   const shifted: ShiftedPlayingDate[] = [];
   let latest = phaseStartDate;
@@ -149,7 +152,7 @@ export function proposePlayingDayInsertion(
  * are shifted to the earliest following day and listed for explicit approval. */
 export function proposePlayingDayMove(
   current: readonly PlayingDayBreak[], fromRound: number, toRound: number,
-  phaseStartDate: string,
+  phaseStartDate: string, minimumContinuationDate?: string,
 ): { dayBreaks: PlayingDayBreak[]; shifted: ShiftedPlayingDate[] } {
   const source = current.find((item) => item.afterRound === fromRound);
   if (!source || (toRound !== fromRound && current.some((item) => item.afterRound === toRound))) {
@@ -160,7 +163,10 @@ export function proposePlayingDayMove(
   let previous = phaseStartDate;
   const shifted: ShiftedPlayingDate[] = [];
   const dayBreaks = reordered.map((item) => {
-    const date = item.date <= previous ? followingPlayingDate(previous, 1) : item.date;
+    const earliest = item.afterRound === toRound && minimumContinuationDate
+      ? minimumContinuationDate : followingPlayingDate(previous, 1);
+    const date = [item.date, followingPlayingDate(previous, 1), earliest]
+      .sort().at(-1)!;
     if (date !== item.date) shifted.push({
       afterRound: item.afterRound, previousDate: item.date, nextDate: date,
     });
