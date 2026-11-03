@@ -249,6 +249,38 @@ export function estimateKnockoutRoundMinutes(
   });
 }
 
+/** Per-round durations keep the exact fixture waves rather than assigning an
+ * equal fraction of a group/round-robin phase to every calendar round. */
+export function estimateRoundRobinRoundMinutes(
+  type: 'GROUPS' | 'ROUND_ROBIN', entrantCount: number, groupCount: number,
+  tableCount: number, bestOf: number, timing?: TimedMatchSettings, groupSizes?: number[],
+): number[] {
+  const entrants = Math.max(2, Math.trunc(entrantCount));
+  const groups = type === 'ROUND_ROBIN' ? 1
+    : Math.max(2, Math.min(Math.floor(entrants / 2), Math.trunc(groupCount)));
+  const balanced = Array.from({ length: groups }, (_, index) =>
+    Math.floor(entrants / groups) + (index < entrants % groups ? 1 : 0));
+  const sizes = groupSizes?.length === groups
+    && groupSizes.every((size) => Number.isInteger(size) && size >= 0)
+    && groupSizes.reduce((sum, size) => sum + size, 0) === entrants ? groupSizes : balanced;
+  const rounds = Math.max(0, ...sizes.map((size) => size % 2 === 0 ? size - 1 : size));
+  const tables = Math.max(1, Math.trunc(tableCount));
+  const minutesPerWave = timing?.matchDurationMinutes
+    ? Math.max(1, timing.matchDurationMinutes) + Math.max(0, timing.venueTurnoverMinutes ?? 0)
+    : averageSetsForBestOf(bestOf) * (timing?.minutesPerSet ?? MINUTES_PER_SET);
+  let cumulative = 0;
+  let rounded = 0;
+  return Array.from({ length: rounds }, (_, index) => {
+    const matches = sizes.reduce((total, size) => total +
+      (index < (size % 2 === 0 ? size - 1 : size) ? Math.floor(size / 2) : 0), 0);
+    cumulative += Math.ceil(matches / tables) * minutesPerWave;
+    const next = Math.round(cumulative);
+    const duration = next - rounded;
+    rounded = next;
+    return duration;
+  });
+}
+
 export function estimatePhaseMetrics(
   phase: TournamentDurationPhaseInput,
   tableCount: number,
@@ -268,21 +300,17 @@ export function estimatePhaseMetrics(
   switch (phase.type) {
     case 'ROUND_ROBIN': {
       const matches = roundRobinMatchCount(entrants);
-      const waves = roundRobinPlayingWaves([entrants], tables);
-      const minutes = timing?.matchDurationMinutes
-        ? gameMinutes : averageSetsForBestOf(phase.bestOf) * (timing?.minutesPerSet ?? MINUTES_PER_SET);
-      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waves * minutes), approximate: true };
+      const durations = estimateRoundRobinRoundMinutes('ROUND_ROBIN', entrants, 1, tables, phase.bestOf, timing);
+      return { estimatedMatches: matches, estimatedDurationMinutes: durations.reduce((sum, value) => sum + value, 0), approximate: true };
     }
     case 'GROUPS': {
       const groups = Math.max(1, Math.min(entrants, Math.trunc(phase.groupCount ?? 2)));
       const balanced = Array.from({ length: groups }, (_, i) => Math.floor(entrants / groups) + (i < entrants % groups ? 1 : 0));
       const actual = phase.groupSizes?.length === groups && phase.groupSizes.every((count) => Number.isInteger(count) && count >= 0)
         && phase.groupSizes.reduce((total, count) => total + count, 0) === entrants ? phase.groupSizes : balanced;
-      const waves = roundRobinPlayingWaves(actual, tables);
+      const durations = estimateRoundRobinRoundMinutes('GROUPS', entrants, groups, tables, phase.bestOf, timing, actual);
       const matches = actual.reduce((sum, count) => sum + count * (count - 1) / 2, 0);
-      const minutes = timing?.matchDurationMinutes
-        ? gameMinutes : averageSetsForBestOf(phase.bestOf) * (timing?.minutesPerSet ?? MINUTES_PER_SET);
-      return { estimatedMatches: matches, estimatedDurationMinutes: Math.round(waves * minutes), approximate: true };
+      return { estimatedMatches: matches, estimatedDurationMinutes: durations.reduce((sum, value) => sum + value, 0), approximate: true };
     }
     case 'SWISS': {
       const matchesPerRound = Math.floor(entrants / 2);
