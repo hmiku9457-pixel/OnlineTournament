@@ -930,6 +930,20 @@ try {
   }
   const orphanDialog = multiPage.getByRole('alertdialog', { name: 'Abhängige Phasenänderungen bestätigen?' });
   await orphanDialog.waitFor();
+  await multiPage.keyboard.press('Escape');
+  assert.equal(await orphanDialog.isVisible(), true,
+    'Escape cannot strand an already edited roster with unnormalized phases');
+  await multiPage.mouse.click(2, 2);
+  assert.equal(await orphanDialog.isVisible(), true,
+    'backdrop dismiss cannot strand dependent phase changes');
+  assert.match(await orphanDialog.innerText(), /K.-o.-Runden entfallen/);
+  await orphanDialog.getByRole('button', { name: 'Teilnehmeränderung zurücknehmen' }).click();
+  assert.equal(await multiPage.locator('.participant-roster-row').count(), 0,
+    'roster is not rendered on the current phase page');
+  await multiPage.locator('.wizard-step').nth(1).click();
+  assert.equal(await multiPage.locator('.participant-roster-row').count(), 3);
+  await multiPage.getByRole('button', { name: 'Spieler 6 entfernen' }).click();
+  await orphanDialog.waitFor();
   await orphanDialog.getByRole('button', { name: 'Pausen beibehalten und manuell korrigieren' }).click();
   await multiPage.locator('.wizard-step').nth(3).click();
   const orphanFinal = multiPage.locator('.phase-config').filter({ hasText: 'Finale' }).last();
