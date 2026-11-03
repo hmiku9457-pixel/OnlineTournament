@@ -58,7 +58,7 @@ export function RecommendationDurationPicker({ value, onChange, multiDay = false
   }
   function addDurationMinutes(amount: number) {
     const entered = hours !== null && minutes !== null ? hours * 60 + minutes : value;
-    const next = Math.min(maximum, entered + amount);
+    const next = Math.max(MIN_RECOMMENDATION_DURATION, Math.min(maximum, entered + amount));
     setHoursText(String(Math.floor(next / 60)).padStart(2, '0'));
     setMinutesText(String(next % 60).padStart(2, '0'));
   }
@@ -106,7 +106,10 @@ export function RecommendationDurationPicker({ value, onChange, multiDay = false
               <h2 id={titleId}>Geplante Turnierdauer</h2>
               <button type="button" className="clock-picker-close" aria-label="Schließen" onClick={closeDialog}>×</button>
             </div>
-            <p className="clock-picker-dialog-note">Hier gibst du an, <strong>wie lange</strong> das Turnier dauern soll – keine Start- oder Enduhrzeit.</p>
+            <p className="clock-picker-dialog-note">
+              Lege die gewünschte Turnierdauer fest. Die Endzeit wird automatisch daraus berechnet.
+              {multiDay && <span className="recommendation-duration-note-extra"> Nächtliche Unterbrechungen zählen nicht zur Spielzeit.</span>}
+            </p>
             <div className="clock-picker-manual recommendation-duration-inputs">
               <label>Stunden (0–{maxHours})
                 <input ref={firstTabRef} type="number" min="0" max={maxHours} inputMode="numeric" value={hoursText}
@@ -117,17 +120,39 @@ export function RecommendationDurationPicker({ value, onChange, multiDay = false
                   onChange={(event) => setMinutesText(event.target.value)} />
               </label>
             </div>
-            <div className="recommendation-duration-quick-add" role="group" aria-label="Turnierdauer schnell erhöhen">
-              {([1, 5, 15, 60] as const).map((amount) => (
-                <button key={amount} type="button" className="btn"
-                  disabled={hours !== null && minutes !== null && hours * 60 + minutes >= maximum}
-                  onClick={() => addDurationMinutes(amount)}>
-                  +{amount === 60 ? '1 Std.' : `${amount} Min.`}
-                </button>
-              ))}
+            <div className="recommendation-duration-adjustments">
+              <span className="recommendation-duration-section-label">Schnell anpassen</span>
+              <div className="recommendation-duration-adjustment-group" role="group" aria-label="Turnierdauer verkürzen">
+                <span className="recommendation-duration-adjustment-caption">Verkürzen</span>
+                <div className="recommendation-duration-quick-buttons">
+                  {([1, 5, 15, 60] as const).map((amount) => (
+                    <button key={amount} type="button" className="recommendation-duration-adjust-button"
+                      disabled={(hours !== null && minutes !== null ? hours * 60 + minutes : value) <= MIN_RECOMMENDATION_DURATION}
+                      onClick={() => addDurationMinutes(-amount)}>
+                      −{amount === 60 ? '1 Std.' : `${amount} Min.`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="recommendation-duration-adjustment-group" role="group" aria-label="Turnierdauer verlängern">
+                <span className="recommendation-duration-adjustment-caption">Verlängern</span>
+                <div className="recommendation-duration-quick-buttons">
+                  {([1, 5, 15, 60] as const).map((amount) => (
+                    <button key={amount} type="button" className="recommendation-duration-adjust-button"
+                      disabled={(hours !== null && minutes !== null ? hours * 60 + minutes : value) >= maximum}
+                      onClick={() => addDurationMinutes(amount)}>
+                      +{amount === 60 ? '1 Std.' : `${amount} Min.`}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            {candidate !== null && <p className="recommendation-duration-preview" role="status">Geplante Dauer: <strong>{formatRecommendationDuration(candidate)}</strong></p>}
-            {candidate === null && <p className="clock-picker-minimum-hint" role="status">Bitte eine Dauer zwischen 15 Minuten und {formatRecommendationDuration(maximum)} eingeben.</p>}
+            <div className="recommendation-duration-preview" role="status">
+              <span>Geplante Dauer</span>
+              {candidate !== null
+                ? <strong>{formatRecommendationDuration(candidate)}</strong>
+                : <span className="recommendation-duration-invalid">15 Min. bis {formatRecommendationDuration(maximum)} eingeben</span>}
+            </div>
             <div className="clock-picker-actions">
               <button type="button" className="btn" onClick={closeDialog}>Abbrechen</button>
               <button type="button" className="btn primary" disabled={candidate === null} onClick={submit}>Dauer übernehmen</button>
