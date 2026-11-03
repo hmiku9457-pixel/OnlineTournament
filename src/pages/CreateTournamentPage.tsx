@@ -3816,7 +3816,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
             <button className="btn" type="button" onClick={() => {
               clearCreationDraft(window.sessionStorage, sessionDraftKey);
               try { window.sessionStorage.removeItem(`${sessionDraftKey}:base-revision`); } catch { /* ignored */ }
-              window.location.reload();
+              void clearCreationRecoveryAtomic(recoveryKey).finally(() => window.location.reload());
             }}>Aktuellen Speicherstand laden</button>
             <button className="btn" type="button" onClick={() => setDraftConflictOpen(false)}>Weiter bearbeiten</button>
           </div>
@@ -3831,7 +3831,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
             <button className="btn" type="button" onClick={() => {
               clearCreationDraft(window.sessionStorage, sessionDraftKey);
               try { window.sessionStorage.removeItem(`${sessionDraftKey}:base-revision`); } catch { /* ignored */ }
-              window.location.reload();
+              void clearCreationRecoveryAtomic(recoveryKey).finally(() => window.location.reload());
             }}>Gespeicherten Stand laden</button>
           </div>
         </section>
