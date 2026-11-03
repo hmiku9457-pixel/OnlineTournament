@@ -864,6 +864,17 @@ try {
   await next(multiPage);
   await multiPage.getByRole('radio', { name: 'Mehrtägig' }).check();
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
+  await multiPage.getByRole('radio', { name: 'Gewünschte Endzeit' }).check();
+  assert.match(await multiPage.locator('.recommendation-end-time-field .field-hint').innerText(),
+    /letzten Spieltag/, 'a multi-day end clock applies to the last playing day');
+  await multiPage.locator('#preferred-end-time').click();
+  const multiEndDialog = multiPage.getByRole('dialog', { name: 'Gewünschte Endzeit einstellen' });
+  await multiEndDialog.getByLabel('Stunde (0–23)').fill('16');
+  await multiEndDialog.getByLabel('Minute (0–59)').fill('30');
+  await multiEndDialog.getByRole('button', { name: 'Übernehmen', exact: true }).click();
+  assert.match(await multiPage.locator('.recommendation-list .recommendation').first().innerText(),
+    /Ende ca\./, 'multi-day recommendations show actual projected finishing dates');
+  await multiPage.getByRole('radio', { name: 'Gewünschte Turnierdauer' }).check();
   const dayControlGeometry = await multiPage.evaluate(() => {
     const days = document.querySelector('.tournament-day-count .recommendation-number-stepper');
     const groups = document.querySelector('.format-setting-fields .recommendation-number-stepper');
