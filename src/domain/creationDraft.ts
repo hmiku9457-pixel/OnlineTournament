@@ -36,6 +36,7 @@ export interface CreationDraftPhase {
   inlineBreakUntil: string;
   inlineBreakUntilDate?: string;
   dayBreaks?: import('./playingDays').PlayingDayBreak[];
+  extraInlineBreaks?: import('./playingDays').PlayingRoundPause[];
 }
 
 export interface CreationDraft {
@@ -147,7 +148,12 @@ export function validDraft(value: unknown): value is CreationDraft {
       && Number.isInteger(entry.inlineBreakMinutes)
       && typeof entry.inlineBreakUntil === 'string' && (entry.inlineBreakUntilDate === undefined || typeof entry.inlineBreakUntilDate === 'string')
       && (entry.dayBreaks === undefined || (Array.isArray(entry.dayBreaks) && entry.dayBreaks.length <= 13
-        && entry.dayBreaks.every((item) => item && Number.isInteger(item.afterRound) && typeof item.date === 'string' && typeof item.time === 'string'))))
+        && entry.dayBreaks.every((item) => item && Number.isInteger(item.afterRound) && typeof item.date === 'string' && typeof item.time === 'string')))
+      && (entry.extraInlineBreaks === undefined || (Array.isArray(entry.extraInlineBreaks) && entry.extraInlineBreaks.length <= 79
+        && entry.extraInlineBreaks.every((pause) => pause && Number.isInteger(pause.afterRound)
+          && ['minutes', 'until'].includes(pause.kind) && Number.isInteger(pause.minutes)
+          && pause.minutes >= 1 && pause.minutes <= 1440 && typeof pause.until === 'string'
+          && typeof pause.untilDate === 'string'))))
     && data.participantForm !== null && typeof data.participantForm === 'object'
     && ['firstName', 'lastName', 'partnerFirstName', 'partnerLastName']
       .every((key) => typeof (data.participantForm as unknown as Record<string, unknown>)[key] === 'string')

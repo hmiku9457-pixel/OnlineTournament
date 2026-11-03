@@ -1,4 +1,4 @@
-import { parseSavedPlayingDayBreaks, playingRounds, validPlayingDayBreaks } from './playingDays';
+import { parseSavedPlayingDayBreaks, parseSavedRoundPauses, playingRounds, validPlayingDayBreaks } from './playingDays';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { StageType } from '@/domain/types';
 import {
@@ -35,6 +35,7 @@ export interface PrestartPhaseDraft {
   inlineBreakUntil: string;
   inlineBreakUntilDate: string;
   dayBreaks?: import('./playingDays').PlayingDayBreak[];
+  extraInlineBreaks?: import('./playingDays').PlayingRoundPause[];
 }
 
 const competitive = (phase: PrestartPhaseDraft) => phase.type !== 'BREAK';
@@ -64,6 +65,7 @@ export function initialPrestartPhases(tournament: DemoTournament): PrestartPhase
     inlineBreakUntil: String(stage.settings.inlineBreakUntil ?? '13:00'),
     inlineBreakUntilDate: String(stage.settings.inlineBreakUntilDate ?? ''),
     dayBreaks: parseSavedPlayingDayBreaks(stage.settings.dayBreaks),
+    extraInlineBreaks: parseSavedRoundPauses(stage.settings.extraInlineBreaks),
   }));
 }
 
@@ -229,7 +231,7 @@ export function createPrestartPhase(type: StageType, participants: number, next?
     swissRounds: recommendedSwissRounds(entrants),
     knockoutBestOf: Array.from({ length: knockoutRoundLabels(entrants).length }, () => bestOf),
     breakKind: 'minutes', breakMinutes: 15, nextDayStart: '09:00', nextDayDate: '', breakUntil: '12:00', breakUntilDate: '', note: '',
-    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '', dayBreaks: [],
+    inlineBreakAfterRound: 0, inlineBreakKind: 'until', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '', dayBreaks: [], extraInlineBreaks: [],
   };
 }
 

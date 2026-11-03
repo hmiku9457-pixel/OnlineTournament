@@ -43,6 +43,7 @@ export interface MockPhaseInput {
   inlineBreakUntil?: string;
   inlineBreakUntilDate?: string;
   dayBreaks?: import('@/domain/playingDays').PlayingDayBreak[];
+  extraInlineBreaks?: import('@/domain/playingDays').PlayingRoundPause[];
 }
 
 export interface CreateMockTournamentInput {
@@ -178,6 +179,7 @@ function toStage(tournamentId: string, phase: MockPhaseInput, index: number, nex
     settings.note = phase.note ?? '';
   }
   if (phase.dayBreaks?.length) settings.dayBreaks = JSON.stringify(phase.dayBreaks);
+  if (phase.extraInlineBreaks?.length) settings.extraInlineBreaks = JSON.stringify(phase.extraInlineBreaks);
   if ((phase.type === 'SWISS' || phase.type === 'KNOCKOUT') && phase.inlineBreakAfterRound) {
     settings.inlineBreakAfterRound = phase.inlineBreakAfterRound;
     settings.inlineBreakKind = phase.inlineBreakKind ?? 'until';

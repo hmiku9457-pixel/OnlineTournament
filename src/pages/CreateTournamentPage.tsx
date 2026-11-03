@@ -56,7 +56,7 @@ import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/d
 import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, invalidParticipantRosterIndices, MAX_PARTICIPANT_NAME_LENGTH } from '@/domain/participantNames';
 import { availableDayBreakRounds, convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, earliestRoundContinuationDate, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
-import { configuredPlayingDays, followingPlayingDate, playingRounds, type PlayingDayBreak } from '@/domain/playingDays';
+import { configuredPlayingDays, followingPlayingDate, playingRounds, type PlayingDayBreak, type PlayingRoundPause } from '@/domain/playingDays';
 import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays, recommendationEndTimePenalty } from '@/domain/creationPlanRecommendations';
 import { initialEarlierDaysMinutes, linkedDurationAt, linkedEndDateTime,
   maximumLinkedActiveDuration, rebalanceEarlierDays } from '@/domain/linkedCreationTime';
@@ -104,6 +104,7 @@ type PhaseDraft = {
   inlineBreakUntil: string;
   inlineBreakUntilDate: string;
   dayBreaks: PlayingDayBreak[];
+  extraInlineBreaks: PlayingRoundPause[];
 };
 
 const stepLabels = ['Grunddaten', 'Teilnehmer', 'Turnierform', 'Phasen', 'Zusammenfassung'];
@@ -301,7 +302,7 @@ function phaseDraftFromTemplate(template: CreationPhaseTemplate, participantCoun
     breakUntil: '12:00',
     breakUntilDate: '',
     note: '',
-    inlineBreakAfterRound: 0, inlineBreakKind: 'minutes', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '', dayBreaks: [],
+    inlineBreakAfterRound: 0, inlineBreakKind: 'minutes', inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '', dayBreaks: [], extraInlineBreaks: [],
   };
 }
 
@@ -427,7 +428,7 @@ function prestartPhaseSignature(phase: PrestartPhaseDraft): unknown[] {
     phase.groupCount, phase.swissRounds, phase.knockoutBestOf, phase.breakKind,
     phase.breakMinutes, phase.nextDayStart, phase.nextDayDate ?? '', phase.breakUntil, phase.breakUntilDate,
     phase.note, phase.inlineBreakAfterRound, phase.inlineBreakKind,
-    phase.inlineBreakMinutes, phase.inlineBreakUntil, phase.inlineBreakUntilDate, phase.dayBreaks];
+    phase.inlineBreakMinutes, phase.inlineBreakUntil, phase.inlineBreakUntilDate, phase.dayBreaks, phase.extraInlineBreaks];
 }
 
 export interface PrestartPhaseMode {
@@ -760,6 +761,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const [selectedRecommendationId, setSelectedRecommendationId] = useState<string | null>(restoredDraft?.selectedRecommendationId ?? null);
   const [phaseDrafts, setPhaseDrafts] = useState<PhaseDraft[]>(restoredDraft?.phaseDrafts.map((phase) => ({
     ...phase, breakUntilDate: phase.breakUntilDate ?? '', inlineBreakUntilDate: phase.inlineBreakUntilDate ?? '', dayBreaks: phase.dayBreaks ?? [],
+    extraInlineBreaks: phase.extraInlineBreaks ?? [],
   })) ?? []);
   const [reviewRequiredPhaseIds, setReviewRequiredPhaseIds] = useState<string[]>(restoredDraft?.reviewRequiredPhaseIds ?? []);
   const [pendingPhaseChange, setPendingPhaseChange] = useState<{
@@ -773,8 +775,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     previousRosterReviewRequired?: boolean;
   } | null>(() => restoredDraft?.pendingDependentChange
     ? { ...restoredDraft.pendingDependentChange, next: restoredDraft.pendingDependentChange.next.map((phase) => ({
-      ...phase, dayBreaks: phase.dayBreaks ?? [], breakUntilDate: phase.breakUntilDate ?? '',
-      inlineBreakUntilDate: phase.inlineBreakUntilDate ?? '',
+      ...phase, dayBreaks: phase.dayBreaks ?? [], extraInlineBreaks: phase.extraInlineBreaks ?? [],
+      breakUntilDate: phase.breakUntilDate ?? '', inlineBreakUntilDate: phase.inlineBreakUntilDate ?? '',
     })) } : null);
   const [pendingDayInsertion, setPendingDayInsertion] = useState<{
     phaseId: string;
@@ -1072,7 +1074,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     breakUntilDate: phase.breakUntilDate, note: phase.note, inlineBreakAfterRound: phase.inlineBreakAfterRound,
     inlineBreakKind: phase.inlineBreakKind, inlineBreakMinutes: phase.inlineBreakMinutes,
     inlineBreakUntil: phase.inlineBreakUntil, inlineBreakUntilDate: phase.inlineBreakUntilDate,
-    dayBreaks: phase.dayBreaks,
+    dayBreaks: phase.dayBreaks, extraInlineBreaks: phase.extraInlineBreaks,
   }));
   const currentPrestartSignature = JSON.stringify([
     prestartPhaseDrafts.map(prestartPhaseSignature),
@@ -2260,7 +2262,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
         inlineBreakMinutes: phase.inlineBreakMinutes,
         inlineBreakUntil: phase.inlineBreakUntil,
         inlineBreakUntilDate: phase.inlineBreakUntilDate || finalTimeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at.slice(0, 10),
-        dayBreaks: phase.dayBreaks,
+        dayBreaks: phase.dayBreaks, extraInlineBreaks: phase.extraInlineBreaks,
       })),
       estimatedDurationMinutes: estimatedPlayingMinutes + plannedActiveBreakMinutes(finalTimeline),
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
@@ -2331,7 +2333,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     inlineBreakMinutes: phase.inlineBreakMinutes,
     inlineBreakUntil: phase.inlineBreakUntil,
     inlineBreakUntilDate: phase.inlineBreakUntilDate || undefined,
-    dayBreaks: phase.dayBreaks,
+    dayBreaks: phase.dayBreaks, extraInlineBreaks: phase.extraInlineBreaks,
   })), [phaseDrafts, phaseEstimates, tables, timedSport, matchDurationMinutes, breakMinutes, sport]);
   const plannedTimeline = useMemo(() => buildPlannedTimeline(scheduledStart, phaseScheduleProposals),
     [scheduledStart, phaseScheduleProposals]);

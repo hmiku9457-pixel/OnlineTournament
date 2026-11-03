@@ -5,6 +5,41 @@ export interface PlayingDayBreak {
   date: string;
   time: string;
 }
+/** Independent within-day pauses may be placed at several distinct rounds.
+ * Day transitions use PlayingDayBreak instead of consuming a pause slot. */
+export interface PlayingRoundPause {
+  afterRound: number;
+  kind: 'minutes' | 'until';
+  minutes: number;
+  until: string;
+  untilDate: string;
+}
+export function validPlayingRoundPauses(
+  pauses: readonly PlayingRoundPause[] | undefined,
+  rounds: number,
+  occupied: readonly number[] = [],
+): boolean {
+  const used = new Set(occupied);
+  return !pauses || (pauses.length <= Math.max(0, rounds - 1)
+    && pauses.every((pause) => {
+      if (!pause || !Number.isInteger(pause.afterRound)
+        || pause.afterRound < 1 || pause.afterRound >= rounds || used.has(pause.afterRound)
+        || !['minutes', 'until'].includes(pause.kind)
+        || !Number.isInteger(pause.minutes) || pause.minutes < 1 || pause.minutes > 1440
+        || !/^([01]\d|2[0-3]):[0-5]\d$/.test(pause.until)
+        || !pause.untilDate || !/^\d{4}-\d{2}-\d{2}$/.test(pause.untilDate)) return false;
+      used.add(pause.afterRound);
+      return true;
+    }));
+}
+export function parseSavedRoundPauses(value: unknown): PlayingRoundPause[] {
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) && validPlayingRoundPauses(parsed as PlayingRoundPause[], 9999)
+      ? parsed as PlayingRoundPause[] : [];
+  } catch { return []; }
+}
 export interface PlayingDayPhase {
   type: StageType;
   entrantCount: number;
