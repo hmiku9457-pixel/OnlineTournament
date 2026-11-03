@@ -2528,7 +2528,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                       <div className="recommendation-labels">
                         <span className="badge">{!recommendationFeasible ? 'Nicht verfügbar' : index === firstSelectableRecommendationIndex ? 'Empfohlen' : 'Alternative'}</span>
                         {selectedRecommendationId === item.id && <span className="badge selected-badge">{recommendationPlanMatches
-                          ? 'Ausgewählt' : plannedDayMismatch ? 'Spieltage noch anzupassen' : 'Plan weicht ab · erneut übernehmen'}</span>}
+                          ? 'Ausgewählt' : plannedDayMismatch ? 'Spieltage noch anzupassen'
+                            : recommendationStructureMatches && !recommendationTimeMatches
+                              ? 'Struktur stimmt · Zeitplan abweichend' : 'Plan weicht ab · erneut übernehmen'}</span>}
                       </div>
                     </div>
                     <p>{item.description}</p>
@@ -2595,11 +2597,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               <div className="phase-step-main">
                 {selectedRecommendation && (
                   <div className="selected-format-summary">
-                    <span className="badge">{recommendationPlanMatches ? 'Vorlage' : plannedDayMismatch ? 'Spieltage noch anzupassen' : 'Individuell angepasst'}</span>
+                    <span className="badge">{recommendationPlanMatches ? 'Vorlage' : plannedDayMismatch ? 'Spieltage noch anzupassen'
+                      : recommendationStructureMatches ? 'Zeitplan abweichend' : 'Individuell angepasst'}</span>
                     <strong>{selectedRecommendation.label}</strong>
                     {!recommendationPlanMatches && <span className="wizard-review-warning">
                       {plannedDayMismatch ? `Für ${plannedDays} Spieltage sind erst ${configuredPlayingDays(phaseDrafts)} eingerichtet. Deine Phasen bleiben erhalten.`
-                        : 'Der Phasenplan weicht von der Empfehlung ab. Deine Phasen bleiben erhalten.'}
+                        : recommendationStructureMatches
+                          ? 'Die Turnierstruktur stimmt mit der Empfehlung überein, aber die Spieltags- oder Pausenplanung weicht ab.'
+                          : 'Der Phasenplan weicht von der Empfehlung ab. Deine Phasen bleiben erhalten.'}
                     </span>}
                     <span className="muted">Alle Einstellungen unten bleiben frei änderbar.</span>
                   </div>
@@ -3390,7 +3395,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           <button type="button" className="wizard-side-fact" disabled={maxReachedStep < 3} onClick={() => navigateToStep(3)}>
             <span>Turnierform {maxReachedStep >= 3 && <span aria-hidden="true">↗</span>}</span>
             <strong>{phaseDrafts.length ? `${phaseDrafts.length} ${phaseDrafts.length === 1 ? 'Phase' : 'Phasen'} konfiguriert` : 'Noch keine Form gewählt'}</strong>
-            <small>{selectedRecommendation ? recommendationPlanMatches ? 'Empfehlung übernommen – frei anpassbar' : 'Individuell angepasst – ursprüngliche Empfehlung weicht ab' : 'Individuelle Phasenauswahl'}</small>
+            <small>{selectedRecommendation ? recommendationPlanMatches ? 'Empfehlung übernommen – frei anpassbar'
+                : recommendationStructureMatches ? 'Turnierstruktur stimmt – Zeitplan bitte überprüfen'
+                  : 'Individuell angepasst – ursprüngliche Empfehlung weicht ab' : 'Individuelle Phasenauswahl'}</small>
           </button>
         </div>
         <div className="wizard-side-phase-summary">
