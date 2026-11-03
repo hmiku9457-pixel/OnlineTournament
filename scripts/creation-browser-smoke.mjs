@@ -861,7 +861,7 @@ try {
   assert.ok(dialogGeometry.dialogCentered);
   assert.equal(await multiPage.locator('.wizard-side-summary').innerText(), summaryBeforeModeSwitch,
     'opening the confirmation must not overwrite the tournament summary');
-  await multiModeDialog.getByRole('button', { name: 'Mehrtägig behalten' }).click();
+  await multiModeDialog.getByRole('button', { name: 'Abbrechen' }).click();
   assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägig' }).isChecked(), true);
   await multiPage.getByRole('radio', { name: 'Eintägig' }).click();
   await multiModeDialog.getByRole('button', { name: 'Als normale Pausen behalten' }).click();
