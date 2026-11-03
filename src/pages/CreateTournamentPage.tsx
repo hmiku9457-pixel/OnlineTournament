@@ -539,7 +539,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>((restoredDraft?.maxReachedStep ?? 1) as WizardStep);
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(restoredDraft?.hasVisitedPhaseStep ?? false);
   const [name, setName] = useState(restoredDraft?.name ?? '');
-  const nameCollision = useMemo(() => !prestart && name.trim()
+  const nameCollision = useMemo(() => typeof window !== 'undefined' && !prestart && name.trim()
     ? findTournamentNameConflict(name) : null, [name, prestart]);
   const collisionAlreadyStarted = Boolean(nameCollision
     && hasStartedAnyStage(nameCollision, getPhaseLifecycle(nameCollision).startedStageIds));
@@ -775,7 +775,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [plannedDays, setPlannedDays] = useState(restoredDraft?.plannedDays ?? 2);
   const [pendingTournamentMode, setPendingTournamentMode] = useState<'single' | null>(null);
   useEffect(() => { setPhaseLimitError(''); },
-    [phaseDrafts, participantCount, plannedDays, tournamentMode, awardsEnabled]);
+    [phaseDrafts, participants, plannedDays, tournamentMode, awardsEnabled]);
   const [pendingAutomaticSplit, setPendingAutomaticSplit] = useState(false);
   // Legacy inline confirmation dialogs share one keyboard/focus contract.
   // Inert the wizard behind them so Tab cannot escape into the form.
