@@ -1,4 +1,5 @@
 import { participantNameKey } from '@/domain/participantNames';
+import { countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES } from '@/domain/creationPlanTransitions';
 import { disciplineOptionsForSport } from '@/domain/sports';
 import { hasValidBreakStageOrder, hasValidTerminalStageOrder, isValidSwissRoundCount, knockoutRoundLabels } from '@/domain/tournamentCreation';
 import { validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
@@ -76,6 +77,10 @@ export function validateTournamentCreation(input: CreationValidationInput): stri
   if (actualDays !== expectedDays) errors.push(`Es sind ${expectedDays} Spieltage geplant, aber ${actualDays} im Phasenplan eingerichtet.`);
   if (!input.phases.some((phase) => phase.type !== 'BREAK')) errors.push('Mindestens eine Spielphase ist erforderlich.');
   if (input.phases.length > 80) errors.push('Es dürfen höchstens 80 Phasen angelegt werden.');
+  if (countCreationScheduleEntries(input.phases.map((phase) => ({ ...phase, dayBreaks: phase.dayBreaks ?? [], inlineBreakAfterRound: phase.inlineBreakAfterRound ?? 0 })),
+    Boolean(input.plannedSchedule?.some((item) => item.id === 'award-ceremony'))) > MAX_CREATION_SCHEDULE_ENTRIES) {
+    errors.push(`Der Phasenplan erzeugt mehr als ${MAX_CREATION_SCHEDULE_ENTRIES} Zeitplaneinträge. Bitte Phasen oder Unterbrechungen reduzieren.`);
+  }
   if (input.phases.some((phase) => !['BREAK', 'ROUND_ROBIN', 'GROUPS', 'SWISS', 'KNOCKOUT'].includes(phase.type)))
     errors.push('Unbekanntes Turniersystem.');
   if (!hasValidTerminalStageOrder(input.phases.map((phase) => phase.type))) errors.push('K.-o. muss die letzte Phase sein.');
