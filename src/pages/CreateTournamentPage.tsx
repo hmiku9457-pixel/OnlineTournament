@@ -1110,7 +1110,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         setParticipantErrors({ firstName: 'Maximal 10.000 Teilnehmer möglich. Bitte zuerst einen Eintrag entfernen.' });
         return;
       }
-      setRecentlyRemovedParticipant(null);
+      setRemovalHistory([]);
       setBulkCleanupUndo(null);
       setUndoRemoveError('');
       setRosterBackStack([]);
@@ -1140,59 +1140,44 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setEditingParticipantId(participant.id);
   }
 
-  function removeParticipant(id: string) {
+  function removeParticipant(id: string, confirmed = false) {
     const index = participants.findIndex((participant) => participant.id === id);
     if (index < 0) return;
+    // Do not discard the unfinished edit of the very same roster entry.
+    if (editingParticipantId === id && participantEditorDirty && !confirmed) {
+      setPendingDeleteParticipantId(id);
+      return;
+    }
     const after = participants.filter((participant) => participant.id !== id);
-    setRecentlyRemovedParticipant({ participant: participants[index], index, before: participants, after });
+    setRemovalHistory((history) => [...history.slice(-9), {
+      participant: participants[index], index, before: participants, after,
+      beforePhases: phaseDrafts, afterPhases: phaseDrafts,
+      beforeReviews: reviewRequiredPhaseIds, afterReviews: reviewRequiredPhaseIds,
+    }]);
     setBulkCleanupUndo(null);
     setUndoRemoveError('');
     setParticipants(after);
     if (editingParticipantId === id) resetParticipantEditor();
   }
 
-  function undoRemoveParticipant() {
-    if (!recentlyRemovedParticipant) return;
-    const { participant, index, before, after } = recentlyRemovedParticipant;
-    if (participants.some((item) => item.id === participant.id)) {
-      setUndoRemoveError('Wiederherstellung nicht möglich: Die Teilnehmer-ID ist bereits vergeben.');
-      setRecentlyRemovedParticipant(null);
+  function undoRemoveParticipant(overrideConflict = false) {
+    const entry = removalHistory.at(-1);
+    if (!entry) return;
+    const rosterMatches = JSON.stringify(participants) === JSON.stringify(entry.after);
+    const planMatches = JSON.stringify(phaseDrafts) === JSON.stringify(entry.afterPhases)
+      && JSON.stringify(reviewRequiredPhaseIds) === JSON.stringify(entry.afterReviews);
+    if ((!rosterMatches || !planMatches) && !overrideConflict) {
+      setPendingUndoConflict(true);
       return;
     }
-    // Exact undo must restore even a formerly incomplete or invalid entry.
-    // If the roster has since changed, only NEW name collisions may prevent it.
-    if (JSON.stringify(participants) === JSON.stringify(after)) {
-      setParticipants(before);
-      setRecentlyRemovedParticipant(null);
-      setUndoRemoveError('');
-      return;
-    }
-    const identityKeys = (item: ParticipantDraft): string[] => {
-      const person = (first: string, last: string) =>
-        participantNameKey(displayPersonName(first, last));
-      if (discipline === 'TEAMS') return [participantNameKey(item.teamName?.trim()
-        || displayPersonName(item.firstName, item.lastName))].filter(Boolean);
-      return [person(item.firstName, item.lastName),
-        ...(discipline === 'DOUBLES' ? [person(item.partnerFirstName, item.partnerLastName)] : [])]
-        .filter(Boolean);
-    };
-    const removedKeys = new Set(identityKeys(participant));
-    const oldById = new Map(before.map((item) => [item.id, item]));
-    const newlyColliding = participants.some((item) => {
-      const matchingNow = identityKeys(item).some((key) => removedKeys.has(key));
-      if (!matchingNow) return false;
-      const old = oldById.get(item.id);
-      return !old || !identityKeys(old).some((key) => removedKeys.has(key));
-    });
-    if (newlyColliding) {
-      setUndoRemoveError('Wiederherstellung nicht möglich: Seit dem Löschen ist ein neuer Namenskonflikt entstanden.');
-      setRecentlyRemovedParticipant(null);
-      return;
-    }
-    const restored = [...participants.slice(0, index), participant, ...participants.slice(index)];
-    setParticipants(restored);
-    setRecentlyRemovedParticipant(null);
+    // Apply the original roster and the phase configuration as one transaction.
+    setParticipants(entry.before);
+    setPhaseDrafts(entry.beforePhases);
+    setReviewRequiredPhaseIds(entry.beforeReviews);
+    setRemovalHistory((history) => history.slice(0, -1));
+    setPendingUndoConflict(false);
     setUndoRemoveError('');
+    setSelectedRecommendationId(null);
   }
 
   function removeInvalidParticipants() {
@@ -1202,7 +1187,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setBulkCleanupUndo({ before: participants, after: next, removed: invalidIds.size });
     setParticipants(next);
     if (participantEditorDirty || (editingParticipantId && invalidIds.has(editingParticipantId))) resetParticipantEditor();
-    setRecentlyRemovedParticipant(null);
+    setRemovalHistory([]);
     setUndoRemoveError('');
     setPendingBulkCleanup(false);
     setRosterBackStack([]);
@@ -1223,6 +1208,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   function generateTestParticipants() {
     const targetCount = 19;
+    setRemovalHistory([]);
     setParticipants((current) => {
       const next = [...current];
       let sequence = 1;
