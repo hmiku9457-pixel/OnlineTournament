@@ -2784,7 +2784,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
               <aside className="format-settings-panel">
                 <div className="format-settings-head">
                   <h3>Vorgaben für Vorschläge</h3>
-                  <p className="muted">Passe die Vorschläge an deine Veranstaltung an. Deine manuelle Phasenplanung bleibt unabhängig von diesen Vorgaben.</p>
+                  <p className="muted">Diese Einstellungen steuern nur die Empfehlungen – deine manuelle Phasenplanung bleibt unabhängig.</p>
                 </div>
 
                 <div className="format-settings-content">
@@ -2946,10 +2946,17 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                 <div className="format-settings-bottom">
                   <details className="format-help-details">
                     <summary>Einstellungen erklärt</summary>
-                    <p>Die Obergrenzen gelten nur für die Empfehlungen. Schweizer Runden haben das Limit Teilnehmerzahl minus 1; bei kombinierten Turnierformen muss vor der K.-o.-Phase mindestens eine Person ausscheiden.</p>
-                    <p>Endzeit und aktive Turnierdauer sind gekoppelt. Jede Änderung aktualisiert auch den anderen Wert. Mehrtägig gilt die Endzeit für den letzten Spieltag; Nächte zählen nicht zur aktiven Dauer.</p>
-                    <p>Die gekoppelte Zeitvorgabe ist ein weiches Ziel: Empfehlungen dürfen davon abweichen. Nutze das Uhr-Modal oder die Schnellbuttons im Dauer-Dialog.</p>
-                    <p>Die Schätzungen berücksichtigen parallele Spiele, aber keine zusätzlichen Verzögerungen bei der Auswertung. Die konkreten Spieltage konfigurierst du in Schritt 4.</p>
+                    <div className="format-help-grid">
+                      <p><strong>Zeitvorgabe:</strong> Nur der gewählte Wert ist bearbeitbar.
+                        Der andere wird aus dem geplanten Beginn berechnet. Eintägig sind höchstens 24 Stunden möglich – auch über Mitternacht.</p>
+                      <p><strong>Mehrtägig:</strong> Die Endzeit bezieht sich auf den letzten Spieltag.
+                        Nächtliche Unterbrechungen zählen nicht zur aktiven Turnierdauer.</p>
+                      <p><strong>Vorschläge:</strong> Obergrenzen gelten nur für Empfehlungen.
+                        Schweizer Runden sind auf Teilnehmerzahl minus 1 begrenzt; vor einer folgenden Phase kann eine Qualifikation nötig sein.</p>
+                      <p><strong>Zeitplanung:</strong> Deine Vorgabe ist ein Richtwert.
+                        Schätzungen berücksichtigen parallele Spiele, aber keine Auswertungsverzögerungen.
+                        Die konkreten Spieltage legst du in Schritt 4 fest.</p>
+                    </div>
                   </details>
                   <p className="format-settings-footnote">Nur Empfehlungen betroffen · Schätzungen ohne Auswertungsverzögerungen</p>
                 </div>
@@ -2963,7 +2970,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                 {recommendations.length > 0 && firstSelectableRecommendationIndex === -1 && (
                   <div className="callout" role="status">
                     {tournamentMode === 'single'
-                      ? 'Keine vorgeschlagene Turnierform lässt sich am gewählten Tag bis Mitternacht abschließen. Prüfe Startzeit, Spielflächen oder Spieldauer.'
+                      ? 'Keine vorgeschlagene Turnierform lässt sich innerhalb von 24 Stunden ab dem geplanten Beginn abschließen. Prüfe Startzeit, Spielflächen oder Spieldauer.'
                       : `Keine Empfehlung ist für ${plannedDays} Spieltage und die geschätzten Spielzeiten plausibel. Prüfe Startzeit, Spielflächen oder die Spieltagszahl.`}
                     Du kannst im nächsten Schritt die Phasen auch selbst zusammenstellen.
                   </div>
