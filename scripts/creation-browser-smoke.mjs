@@ -129,7 +129,7 @@ try {
     };
   });
   assert.equal(quickSettings.systems, 4);
-  assert.ok(quickSettings.height < 390, `quick settings should remain readable with explicit duration units: ${quickSettings.height}px`);
+  assert.ok(quickSettings.height < 470, `quick settings should remain readable with both time-preference options: ${quickSettings.height}px`);
   assert.equal(quickSettings.allActive, true);
   assert.ok(quickSettings.chipHeight < 46);
   assert.notEqual(quickSettings.chipBackground, 'rgb(255, 255, 255)', 'active systems are highlighted chips');
