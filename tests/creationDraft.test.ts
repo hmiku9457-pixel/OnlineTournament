@@ -157,6 +157,36 @@ describe('tournament creation draft recovery', () => {
     expect(validDraft({ ...draft, rosterReviewRequired: 'false' })).toBe(false);
   });
 
+  it('round-trips a pending roster-to-phase confirmation with a real rollback snapshot', () => {
+    const storage = fakeStorage();
+    const before = makeDraft();
+    const current = { ...before, participants: before.participants.slice(0, 1) };
+    current.pendingDependentChange = {
+      next: [{ ...before.phaseDrafts[0], dayBreaks: [], entrantCount: 1 }],
+      source: 'roster', previousRoster: before.participants,
+      losses: [{ id: 'phase-one', label: 'Schweizer System',
+        removedRounds: [], removedInlineBreak: true, removedKnockoutBestOf: [] }],
+    };
+    current.timeValuesReviewRequired = true;
+    expect(validDraft(current)).toBe(true);
+    expect(saveCreationDraft(current, storage)).toBe(true);
+    const restored = loadCreationDraft(storage);
+    expect(restored?.pendingDependentChange?.previousRoster).toEqual(before.participants);
+    expect(restored?.pendingDependentChange?.next[0].entrantCount).toBe(1);
+    expect(restored?.timeValuesReviewRequired).toBe(true);
+    expect(validDraft({ ...current, pendingDependentChange:
+      { ...current.pendingDependentChange, source: 'unknown' } })).toBe(false);
+  });
+
+  it('rejects more than 10000 saved participants without invalidating the valid preceding state', () => {
+    const draft = makeDraft();
+    draft.participants = Array.from({ length: 10000 }, (_, index) =>
+      ({ ...draft.participants[0], id: `entry-${index}` }));
+    expect(validDraft(draft)).toBe(true);
+    draft.participants.push({ ...draft.participants[0], id: 'entry-10000' });
+    expect(validDraft(draft)).toBe(false);
+  });
+
   it('starts new internal identifiers after the highest restored identifier', () => {
     expect(highestDraftSequence([{ id: 'participant-3' }, { id: 'participant-19' }, { id: 'other' }], 'participant')).toBe(19);
     expect(highestDraftSequence([{ id: 'phase-2' }, { id: 'phase-6' }], 'phase')).toBe(6);
