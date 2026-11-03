@@ -811,11 +811,12 @@ try {
       referenceWidths: groupButtons.map((r) => r.width) };
   });
   assert.ok(dayControlGeometry, 'days and groups steppers must both exist');
-  assert.ok(dayControlGeometry.dayWidth >= 150 && dayControlGeometry.dayWidth <= 170,
-    `playing days stepper should have a consistently compact width: ${dayControlGeometry.dayWidth}px`);
-  assert.ok(dayControlGeometry.buttonWidths.every((width, index) =>
-    Math.abs(width - dayControlGeometry.referenceWidths[index]) <= 1),
-    'playing-day +/- buttons should match the other numeric inputs');
+  assert.ok(dayControlGeometry.dayWidth >= 118 && dayControlGeometry.dayWidth <= 122,
+    `playing days stepper must stay at the reduced 120px width: ${dayControlGeometry.dayWidth}px`);
+  assert.ok(dayControlGeometry.buttonWidths.every((width) => Math.abs(width - 28) <= 1),
+    'playing-day +/- buttons must stay at the reduced 28px width');
+  assert.ok(dayControlGeometry.groupWidth > dayControlGeometry.dayWidth + 15,
+    'the playing-day counter must be visibly narrower than the other numeric steppers');
   assert.equal(await multiPage.locator('#preferred-duration').innerText(), '03:30',
     'multi-day mode does not change the total active-duration preference');
   await multiPage.locator('.recommendation-list .recommendation').first().click();
