@@ -150,7 +150,7 @@ try {
   await page.locator('#preferred-duration').click();
   const durationDialog = page.getByRole('dialog', { name: 'Geplante Turnierdauer' });
   await durationDialog.waitFor();
-  await durationDialog.getByLabel('Stunden (0–23)').fill('2');
+  await durationDialog.getByLabel(/^Stunden \\(0–\\d+\\)$/).fill('2');
   await durationDialog.getByLabel('Minuten (0–59)').fill('10');
   await durationDialog.getByRole('button', { name: '+1 Min.' }).click();
   assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '11');
@@ -159,8 +159,8 @@ try {
   await durationDialog.getByRole('button', { name: '+15 Min.' }).click();
   assert.equal(await durationDialog.getByLabel('Minuten (0–59)').inputValue(), '31');
   await durationDialog.getByRole('button', { name: '+1 Std.' }).click();
-  assert.equal(await durationDialog.getByLabel('Stunden (0–23)').inputValue(), '03');
-  await durationDialog.getByLabel('Stunden (0–23)').fill('2');
+  assert.equal(await durationDialog.getByLabel(/^Stunden \\(0–\\d+\\)$/).inputValue(), '03');
+  await durationDialog.getByLabel(/^Stunden \\(0–\\d+\\)$/).fill('2');
   await durationDialog.getByLabel('Minuten (0–59)').fill('10');
   await durationDialog.getByRole('button', { name: 'Dauer übernehmen' }).click();
   assert.equal(await page.locator('#preferred-duration strong').innerText(), '2 Std. 10 Min.');
