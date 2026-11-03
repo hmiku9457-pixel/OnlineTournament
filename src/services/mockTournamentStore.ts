@@ -421,7 +421,7 @@ function recalculatedPrestartPlan(tournament: DemoTournament, phases: PrestartPh
       inlineBreakKind: phase.inlineBreakKind,
       inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
       inlineBreakUntilDate: phase.inlineBreakUntilDate || undefined,
-      dayBreaks: phase.dayBreaks,
+      dayBreaks: phase.dayBreaks, extraInlineBreaks: phase.extraInlineBreaks,
     })));
     const playing = minutes.reduce((total, value, index) => total + (stages[index].type === 'BREAK' ? 0 : value), 0);
     return { timeline, duration: playing + plannedActiveBreakMinutes(timeline) };
@@ -543,6 +543,7 @@ function samePrestartPlan(tournament: DemoTournament, drafts: PrestartPhaseDraft
     inlineBreakUntil: phase.inlineBreakAfterRound && phase.inlineBreakKind === 'until' ? phase.inlineBreakUntil : null,
     inlineBreakUntilDate: phase.inlineBreakAfterRound && phase.inlineBreakKind === 'until' ? phase.inlineBreakUntilDate : null,
     dayBreaks: phase.dayBreaks ?? [],
+    extraInlineBreaks: phase.extraInlineBreaks ?? [],
   });
   return before.every((phase, index) => canonical(phase) === canonical(drafts[index]));
 }
@@ -673,7 +674,7 @@ export function updatePrestartTournamentPhases(
     note: phase.note, inlineBreakAfterRound: phase.inlineBreakAfterRound, inlineBreakKind: phase.inlineBreakKind,
     inlineBreakMinutes: phase.inlineBreakMinutes, inlineBreakUntil: phase.inlineBreakUntil,
     inlineBreakUntilDate: phase.inlineBreakUntilDate || newPlan?.timeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at.slice(0, 10),
-    dayBreaks: phase.dayBreaks,
+    dayBreaks: phase.dayBreaks, extraInlineBreaks: phase.extraInlineBreaks,
   }));
   const stages = phases.map((phase, index) => {
     const nextPlaying = phases.slice(index + 1).find((item) => item.type !== 'BREAK');

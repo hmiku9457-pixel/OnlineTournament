@@ -51,7 +51,8 @@ export function getLiveScheduleDeviations(tournament: DemoTournament): Record<st
     } else {
       const inline = getInlineBreakStatus(tournament, stage);
       if (inline?.resumeAt) {
-        const originalResume = planned.find((item) => item.id === `inline-resume-${index + 1}`);
+        const originalResume = planned.find((item) => item.id === `inline-resume-${index + 1}-${inline.config.afterRound}`)
+          ?? planned.find((item) => item.id === `inline-resume-${index + 1}`);
         const expected = originalResume ? parseLocalDateTime(originalResume.at) : null;
         if (expected) {
           const extra = minutesBetween(inline.resumeAt, expected);
