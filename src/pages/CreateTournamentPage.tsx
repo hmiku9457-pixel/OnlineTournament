@@ -777,6 +777,50 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   useEffect(() => { setPhaseLimitError(''); },
     [phaseDrafts, participantCount, plannedDays, tournamentMode, awardsEnabled]);
   const [pendingAutomaticSplit, setPendingAutomaticSplit] = useState(false);
+  // Legacy inline confirmation dialogs share one keyboard/focus contract.
+  // Inert the wizard behind them so Tab cannot escape into the form.
+  const inlineModalKey = [
+    confirmPrestartSave && 'prestart-save', confirmPrestartDiscard && 'prestart-discard',
+    overwriteTournamentId && 'overwrite', pendingDeleteParticipantId && 'delete-participant',
+    pendingUndoConflict && 'undo', pendingBulkUndoConflict && 'bulk-undo',
+    pendingPhaseRemoval && 'remove-phase', pendingPhaseTypeLoss && 'phase-type',
+    pendingTournamentMode && 'single-day', pendingPhaseChange && 'dependent-phase',
+    pendingAutomaticSplit && 'day-split', pendingDayInsertion && 'day-insert',
+    pendingBulkCleanup && 'cleanup', pendingRecommendationId && 'recommendation',
+    draftConflictOpen && 'draft-conflict', recoveryChoiceOpen && 'recovery',
+  ].filter(Boolean).join(':');
+  useEffect(() => {
+    if (!inlineModalKey) return;
+    const dialogs = Array.from(document.querySelectorAll<HTMLElement>(
+      '.sport-change-dialog[role="alertdialog"], .prototype-modal[role="alertdialog"]'));
+    const dialog = dialogs.at(-1);
+    if (!dialog) return;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const background = document.querySelector<HTMLElement>('.creation-page-container');
+    background?.setAttribute('inert', '');
+    const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])'))
+      .filter((item) => item.getClientRects().length > 0);
+    if (!dialog.contains(document.activeElement)) (focusable()[0] ?? dialog).focus();
+    const contain = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const elements = focusable();
+      if (!elements.length) { event.preventDefault(); return; }
+      const first = elements[0], last = elements[elements.length - 1];
+      if (!dialog.contains(document.activeElement)
+        || (event.shiftKey && document.activeElement === first)
+        || (!event.shiftKey && document.activeElement === last)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      }
+    };
+    document.addEventListener('keydown', contain, true);
+    return () => {
+      document.removeEventListener('keydown', contain, true);
+      background?.removeAttribute('inert');
+      if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();
+    };
+  }, [inlineModalKey]);
   function applySingleDayConversion(treatment: 'convert' | 'remove') {
     const adjusted = convertToSingleDay(phaseDrafts, treatment);
     const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, adjusted, undefined, true);
@@ -1115,6 +1159,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   }
 
   function saveParticipant() {
+    if (discipline === 'TEAMS' && !participantForm.teamName?.trim()) {
+      setParticipantErrors({ teamName: 'Bitte einen Mannschaftsnamen eingeben.' });
+      return;
+    }
     const errors = validateParticipant(participantForm, discipline, participants, editingParticipantId);
     setParticipantErrors(errors);
     if (Object.keys(errors).length > 0) return;
@@ -2471,7 +2519,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             </div>}
             {bulkCleanupUndo && <div className="creation-undo-remove" role="status">
               <span>{bulkCleanupUndo.removed} fehlerhafte Einträge wurden entfernt.</span>
-              <button className="btn small" type="button" onClick={undoBulkCleanup}>Gesamte Bereinigung rückgängig</button>
+              <button className="btn small" type="button" onClick={() => undoBulkCleanup()}>Gesamte Bereinigung rückgängig</button>
             </div>}
             {undoRemoveError && <p className="field-error" role="alert">{undoRemoveError}</p>}
             {!savedParticipantNamesValid && <p className="field-error" role="alert">Mindestens ein gespeicherter Teilnehmereintrag ist unvollständig, ungültig oder doppelt. Bitte die markierten Einträge überprüfen.</p>}
