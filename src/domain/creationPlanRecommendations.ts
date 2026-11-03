@@ -205,7 +205,7 @@ export function distributePlayingDays<T extends DayDistributionPhase>(
   const starts = [scheduledStart.slice(11, 16),
     ...Array.from({ length: days - 1 }, (_, i) => knownTimes[i] || '09:00')];
   const budgetFor = (time: string) => {
-    const match = /^([01]\\d|2[0-3]):([0-5]\\d)$/.exec(time);
+    const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
     return match ? 1440 - Number(match[1]) * 60 - Number(match[2]) : 900;
   };
   const budgets = starts.map(budgetFor);
