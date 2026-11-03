@@ -7907,3 +7907,151 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   color: #344054;
   font-size: .74rem;
 }
+
+/* Step 3 visual hierarchy: one quiet planning row and one compact row
+   for recommendation filters instead of many competing pill outlines. */
+.wizard-workspace .format-step .format-settings-panel {
+  padding: 13px 16px 11px;
+  gap: 12px;
+  background: #f8fafc;
+  border-color: #dae3ef;
+}
+.wizard-workspace .format-step .format-settings-head h3 { font-size: .9rem; }
+.wizard-workspace .format-step .format-settings-head p {
+  margin: 2px 0 0;
+  color: #667085;
+  font-size: .72rem;
+}
+.wizard-workspace .format-step .format-settings-content {
+  gap: 12px 18px;
+}
+.wizard-workspace .format-step .format-settings-content > .tournament-mode-setting {
+  grid-template-columns: minmax(145px, .8fr) minmax(190px, 1fr) minmax(215px, 1.22fr) minmax(188px, 1.05fr);
+  gap: 12px 18px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid #dfe6f0;
+}
+.wizard-workspace .format-step .tournament-mode-setting > .field > label,
+.wizard-workspace .format-step .recommendation-target-choice legend,
+.wizard-workspace .format-step .tournament-day-count > label {
+  color: #344054;
+  font-size: .76rem;
+}
+.wizard-workspace .format-step .tournament-mode-setting .field-hint {
+  color: #758194;
+  padding-top: 6px;
+  font-size: .68rem;
+  font-weight: 400;
+}
+.wizard-workspace .format-step .recommendation-target-choice {
+  padding: 3px;
+  gap: 3px;
+  background: #eaf0f7;
+  border: 1px solid #dbe4ef;
+  border-radius: 9px;
+}
+.wizard-workspace .format-step .recommendation-target-choice legend {
+  margin: 0 0 6px -3px;
+}
+.wizard-workspace .format-step .recommendation-target-choice .tournament-mode-option span {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: #475467;
+  min-height: 31px;
+  border-radius: 6px;
+  font-weight: 650;
+}
+.wizard-workspace .format-step .recommendation-target-choice .tournament-mode-option:has(input:checked) span {
+  border-color: #c8d7ed;
+  background: #fff;
+  color: #175cd3;
+  box-shadow: 0 1px 3px rgba(31, 54, 81, .08);
+}
+.wizard-workspace .format-step .recommendation-target-choice .recommendation-target-hint {
+  position: relative;
+  grid-column: 1 / -1;
+  padding: 5px 1px 0;
+  color: #758194;
+  background: #f8fafc;
+  margin: 0 -4px -4px;
+}
+.wizard-workspace .format-step .recommendation-duration-field .recommendation-duration-stepper,
+.wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #d3deeb;
+  border-radius: 8px;
+  background: #fff;
+}
+.wizard-workspace .format-step .recommendation-duration-stepper > button,
+.wizard-workspace .format-step .recommendation-duration-field .recommendation-number-stepper-button,
+.wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper-button,
+.wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper > input {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.wizard-workspace .format-step .recommendation-duration-field .recommendation-number-stepper-button:first-child,
+.wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper-button:first-child {
+  border-right: 1px solid #e1e8f1;
+}
+.wizard-workspace .format-step .recommendation-duration-field .recommendation-number-stepper-button:last-child,
+.wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper-button:last-child {
+  border-left: 1px solid #e1e8f1;
+}
+.wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper {
+  grid-template-columns: 29px minmax(0, 1fr) 29px;
+}
+.wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper > input,
+.wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper-button {
+  min-height: 35px;
+}
+.wizard-workspace .format-step .format-settings-content > .format-setting-fields {
+  gap: 12px;
+}
+.wizard-workspace .format-step .format-toggle-group .format-toggle {
+  border-color: #dae3ef;
+  background: #fff;
+  color: #475467;
+  font-weight: 600;
+  min-height: 35px;
+}
+.wizard-workspace .format-step .format-toggle-group .format-toggle:has(input:checked) {
+  border-color: #cad9ee;
+  background: #f3f7fd;
+  color: #315986;
+}
+.wizard-workspace .format-step .format-toggle-group .format-toggle:has(input:checked)::before {
+  background: #3a73d7;
+  border-color: #3a73d7;
+}
+.wizard-workspace .format-step .format-settings-bottom {
+  padding-top: 8px;
+}
+.wizard-workspace .format-step .format-help-details summary { font-size: .72rem; }
+.wizard-workspace .format-step .format-help-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding-top: 9px;
+}
+.wizard-workspace .format-step .format-help-grid p {
+  margin: 0;
+  font-size: .71rem;
+  line-height: 1.45;
+}
+@container format-settings (max-width: 920px) {
+  .wizard-workspace .format-step .format-settings-content > .tournament-mode-setting {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wizard-workspace .format-step .format-help-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+@container format-settings (max-width: 520px) {
+  .wizard-workspace .format-step .format-settings-content > .tournament-mode-setting,
+  .wizard-workspace .format-step .format-help-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

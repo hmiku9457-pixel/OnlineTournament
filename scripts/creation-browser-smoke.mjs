@@ -912,6 +912,12 @@ try {
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '1');
   await multiPage.getByRole('button', { name: 'Geplante Anzahl an Spieltagen erhöhen' }).click();
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
+  await multiPage.getByRole('button', { name: 'Geplante Anzahl an Spieltagen verringern' }).click();
+  assert.equal(await multiPage.getByRole('alertdialog', { name: 'Turniermodus wechseln?' }).count(), 0,
+    'reducing to a single day before phase configuration never shows a confirmation dialog');
+  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '1');
+  await multiPage.getByRole('button', { name: 'Geplante Anzahl an Spieltagen erhöhen' }).click();
+  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
   // Four-day regression: changing the last-day clock must actually persist,
   // rather than closing the modal and silently retaining the old value.
   await multiPage.locator('#planned-playing-days').fill('4');
@@ -1007,29 +1013,22 @@ try {
     'the cancel button is left of the destructive replacement action');
   await daySplitReplaceDialog.getByRole('button', { name: 'Zurück zur Auswahl' }).click();
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
-  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
-  const summaryBeforeModeSwitch = await multiPage.locator('.wizard-side-summary').innerText();
+  const phasePlanBefore = await multiPage.evaluate(() =>
+    JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft.phaseDrafts
+      .filter(phase => phase.type !== 'BREAK')
+      .map(({ id, type, entrantCount, bestOf, swissRounds, groupCount, knockoutBestOf }) =>
+        ({ id, type, entrantCount, bestOf, swissRounds, groupCount, knockoutBestOf })));
   await multiPage.getByRole('button', { name: 'Geplante Anzahl an Spieltagen verringern' }).click();
-  const multiModeDialog = multiPage.getByRole('alertdialog', { name: 'Turniermodus wechseln?' });
-  await multiModeDialog.waitFor();
-  const dialogGeometry = await multiPage.evaluate(() => {
-    const backdrop = document.querySelector('.sport-change-backdrop:has([aria-label="Turniermodus wechseln?"])');
-    const dialog = backdrop?.querySelector('.sport-change-dialog');
-    const rect = dialog?.getBoundingClientRect();
-    return { position: backdrop ? getComputedStyle(backdrop).position : '',
-      zIndex: backdrop ? Number(getComputedStyle(backdrop).zIndex) : 0,
-      dialogCentered: Boolean(rect && Math.abs((rect.left + rect.width / 2) - window.innerWidth / 2) < 3) };
-  });
-  assert.equal(dialogGeometry.position, 'fixed', 'the confirmation must be a real viewport overlay');
-  assert.ok(dialogGeometry.zIndex >= 1000);
-  assert.ok(dialogGeometry.dialogCentered);
-  assert.equal(await multiPage.locator('.wizard-side-summary').innerText(), summaryBeforeModeSwitch,
-    'opening the confirmation must not overwrite the tournament summary');
-  await multiModeDialog.getByRole('button', { name: 'Abbrechen' }).click();
-  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
-  await multiPage.getByRole('button', { name: 'Geplante Anzahl an Spieltagen verringern' }).click();
-  await multiModeDialog.getByRole('button', { name: 'Als normale Pausen behalten' }).click();
+  assert.equal(await multiPage.getByRole('alertdialog', { name: 'Turniermodus wechseln?' }).count(), 0,
+    'reducing the day count after Step 4 applies immediately without a confirmation modal');
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '1');
+  const phasePlanAfter = await multiPage.evaluate(() =>
+    JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft.phaseDrafts
+      .filter(phase => phase.type !== 'BREAK')
+      .map(({ id, type, entrantCount, bestOf, swissRounds, groupCount, knockoutBestOf }) =>
+        ({ id, type, entrantCount, bestOf, swissRounds, groupCount, knockoutBestOf })));
+  assert.deepEqual(phasePlanAfter, phasePlanBefore,
+    'automatic single-day conversion preserves configured competition and best-of settings');
   await multiPage.waitForFunction(() => {
     const raw = sessionStorage.getItem('online-tournament:creation-draft:v1:new');
     if (!raw) return false;

@@ -2859,8 +2859,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                         onChange={changePlannedPlayingDays}/>
                     </div>
                     <span className="field-hint recommendation-period-hint">
-                      {tournamentMode === 'single' ? 'Max. 24 Std. · Ende auch am Folgetag'
-                        : `${plannedDays} Spieltage · Pausen zwischen Tagen zählen nicht`}
+                      {tournamentMode === 'single' ? 'Max. 24 Stunden' : 'Aktive Spielzeit ohne Nächte'}
                     </span>
                   </div>
 
@@ -2876,7 +2875,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                         onChange={() => changePreferredTimePriority('end')}/>
                       <span>Endzeit</span>
                     </label>
-                    <span className="field-hint recommendation-target-hint">Auswahl bleibt beim Planen fest</span>
+                    <span className="field-hint recommendation-target-hint">Gewählten Wert festhalten</span>
                   </fieldset>
 
                   <div className={`field recommendation-duration-field${preferredTimePriority === 'end' ? ' recommendation-derived-field' : ''}`}>
@@ -2990,14 +2989,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                   <details className="format-help-details">
                     <summary>Einstellungen erklärt</summary>
                     <div className="format-help-grid">
-                      <p><strong>Zeitvorgabe:</strong> Nur der gewählte Wert ist bearbeitbar.
-                        Der andere wird aus dem geplanten Beginn berechnet. Das Ziel bleibt auch bei laufender Startzeit fest.</p>
-                      <p><strong>Spieltage:</strong> Ein Spieltag darf maximal 24 Stunden dauern. Ab zwei Spieltagen wird die Endzeit am letzten Tag berechnet; Übernachtungen zählen nicht zur Spielzeit.</p>
-                      <p><strong>Vorschläge:</strong> Obergrenzen gelten nur für Empfehlungen.
-                        Schweizer Runden sind auf Teilnehmerzahl minus 1 begrenzt; vor einer folgenden Phase kann eine Qualifikation nötig sein.</p>
-                      <p><strong>Zeitplanung:</strong> Deine Vorgabe ist ein Richtwert.
-                        Schätzungen berücksichtigen parallele Spiele, aber keine Auswertungsverzögerungen.
-                        Die konkreten Spieltage legst du in Schritt 4 fest.</p>
+                      <p><strong>Zeit:</strong> Der ausgewählte Wert bleibt fest, der andere wird berechnet. Ein Spieltag darf maximal 24 Stunden dauern – auch über Mitternacht.</p>
+                      <p><strong>Spieltage:</strong> Bei mehreren Spieltagen gilt die Endzeit für den letzten Tag; Nächte zählen nicht zur Spielzeit. Die konkrete Aufteilung erfolgt in Schritt 4.</p>
+                      <p><strong>Empfehlungen:</strong> Die Obergrenzen wirken nur auf Vorschläge. Schweizer Runden sind auf Teilnehmerzahl minus 1 begrenzt. Dauer und Endzeit sind Richtwerte; Auswertungsverzögerungen werden nicht mitgeschätzt.</p>
                     </div>
                   </details>
 
