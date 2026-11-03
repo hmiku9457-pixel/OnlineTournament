@@ -923,7 +923,9 @@ try {
   await multiPage.reload();
   await multiPage.locator('.phase-wizard-step').waitFor();
   await multiPage.locator('.wizard-step').nth(1).click();
-  for (let index = 8; index >= 3; index--) {
+  for (let index = 1; index <= 6; index++) {
+    // Removing from the beginning keeps every next target on the visible page,
+    // regardless of the real card-height-based pagination capacity.
     await multiPage.getByRole('button', { name: `Spieler ${index} entfernen` }).click();
   }
   const orphanDialog = multiPage.getByRole('alertdialog', { name: 'Abhängige Phasenänderungen bestätigen?' });
