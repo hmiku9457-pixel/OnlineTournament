@@ -2733,21 +2733,50 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     <RecommendationNumberStepper id="planned-playing-days" label="Geplante Anzahl an Spieltagen"
                       value={plannedDays} min={2} max={14} onChange={setPlannedDays}/>
                   </div>}
-                  <div className="field recommendation-duration-field">
-                    <label htmlFor="preferred-duration" title="Zeitspanne in Stunden und Minuten, keine Uhrzeit. Mit ± in 15-Minuten-Schritten ändern.">Turnierdauer (Std. + Min.)</label>
-                    <div className="recommendation-duration-stepper" role="group" aria-label="Geplante Turnierdauer anpassen">
-                      <button type="button" className="recommendation-number-stepper-button"
-                        aria-label="Geplante Turnierdauer um 15 Minuten verringern"
-                        disabled={preferredDurationMinutes <= MIN_RECOMMENDATION_DURATION}
-                        onClick={() => adjustPreferredDuration(-15)}>−</button>
-                      <RecommendationDurationPicker value={preferredDurationMinutes} multiDay={tournamentMode === 'multi'} onChange={setPreferredDurationMinutes}/>
-                      <button type="button" className="recommendation-number-stepper-button"
-                        aria-label="Geplante Turnierdauer um 15 Minuten erhöhen"
-                        disabled={preferredDurationMinutes >= (tournamentMode === 'multi' ? MAX_RECOMMENDATION_DURATION : MAX_SINGLE_DAY_DURATION)}
-                        onClick={() => adjustPreferredDuration(15)}>+</button>
+                  <fieldset className="recommendation-time-choice">
+                    <legend>Gewünschte Zeitvorgabe</legend>
+                    <label className="tournament-mode-option">
+                      <input type="radio" name="recommendation-time-mode"
+                        checked={preferredTimeMode === 'end-time'}
+                        onChange={() => setPreferredTimeMode('end-time')}/>
+                      <span>Gewünschte Endzeit</span>
+                    </label>
+                    <label className="tournament-mode-option">
+                      <input type="radio" name="recommendation-time-mode"
+                        checked={preferredTimeMode === 'duration'}
+                        onChange={() => setPreferredTimeMode('duration')}/>
+                      <span>Gewünschte Turnierdauer</span>
+                    </label>
+                  </fieldset>
+                  {preferredTimeMode === 'end-time'
+                    ? <div className="field recommendation-end-time-field">
+                      <label htmlFor="preferred-end-time">Gewünschte Endzeit</label>
+                      <ClockTimePicker id="preferred-end-time" label="Gewünschte Endzeit"
+                        value={preferredEndTime} onChange={setPreferredEndTime}/>
+                      <span className="field-hint">
+                        {tournamentMode === 'multi'
+                          ? `Zielzeit am letzten Spieltag (${preferredEndDate.slice(8, 10)}.${preferredEndDate.slice(5, 7)}.${preferredEndDate.slice(0, 4)}).`
+                          : 'Zielzeit am Turniertag.'}
+                      </span>
+                      {!preferredEndTimeValid && <span className="field-error" role="status">
+                        Die Endzeit muss nach dem geplanten Turnierstart liegen und eine gültige Uhrzeit sein.
+                      </span>}
                     </div>
-                    <span className="field-hint">Dauer, keine Uhrzeit · z. B. 3 Std. 30 Min.</span>
-                  </div>
+                    : <div className="field recommendation-duration-field">
+                      <label htmlFor="preferred-duration" title="Zeitspanne in Stunden und Minuten, keine Uhrzeit. Mit ± in 15-Minuten-Schritten ändern.">Gewünschte Turnierdauer</label>
+                      <div className="recommendation-duration-stepper" role="group" aria-label="Geplante Turnierdauer anpassen">
+                        <button type="button" className="recommendation-number-stepper-button"
+                          aria-label="Geplante Turnierdauer um 15 Minuten verringern"
+                          disabled={preferredDurationMinutes <= MIN_RECOMMENDATION_DURATION}
+                          onClick={() => adjustPreferredDuration(-15)}>−</button>
+                        <RecommendationDurationPicker value={preferredDurationMinutes} multiDay={tournamentMode === 'multi'} onChange={setPreferredDurationMinutes}/>
+                        <button type="button" className="recommendation-number-stepper-button"
+                          aria-label="Geplante Turnierdauer um 15 Minuten erhöhen"
+                          disabled={preferredDurationMinutes >= (tournamentMode === 'multi' ? MAX_RECOMMENDATION_DURATION : MAX_SINGLE_DAY_DURATION)}
+                          onClick={() => adjustPreferredDuration(15)}>+</button>
+                      </div>
+                      <span className="field-hint">Aktive Dauer ohne Nächte · z. B. 3 Std. 30 Min.</span>
+                    </div>}
                 </div>
                 <div className="format-setting-fields">
                   <div className="field">
@@ -2790,7 +2819,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                   <details className="format-help-details">
                     <summary>Einstellungen erklärt</summary>
                     <p>Die Obergrenzen gelten nur für die Empfehlungen. Schweizer Runden haben das Limit Teilnehmerzahl minus 1; bei kombinierten Turnierformen muss vor der K.-o.-Phase mindestens eine Person ausscheiden.</p>
-                    <p>Die Dauer ist die gesamte aktive Planungszeit, maximal 23 Std. 59 Min. Nächte zählen nicht dazu. Mit ± lässt sie sich um 15 Minuten ändern; weitere Turnierformen können die gewünschte Dauer überschreiten.</p>
+                    <p>Du kannst entweder eine gewünschte Enduhrzeit festlegen oder eine aktive Turnierdauer. Bei mehrtägigen Turnieren bezieht sich die Endzeit auf den letzten Spieltag; Nächte zählen nicht zur aktiven Turnierdauer.</p>
+                    <p>Beide Vorgaben sind weiche Ziele: Eine Empfehlung darf davon abweichen. Für die Dauer kannst du ±15 Minuten und im Einstellungsdialog die Schnellbuttons nutzen.</p>
                     <p>Die Schätzungen berücksichtigen parallele Spiele, aber keine zusätzlichen Verzögerungen bei der Auswertung. Die konkreten Spieltage konfigurierst du in Schritt 4.</p>
                   </details>
                   <p className="format-settings-footnote">Nur Empfehlungen betroffen · Schätzungen ohne Auswertungsverzögerungen</p>
@@ -2858,6 +2888,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     <div className="recommendation-metrics">
                       <span className="recommendation-metric-tag">{item.estimatedMatches} Spiele</span>
                       <span className="recommendation-metric-tag">ca. {formatDuration(item.estimatedDurationMinutes)}</span>
+                      {preferredTimeMode === 'end-time' && assessment.estimatedEnd && (
+                        <span className="recommendation-metric-tag">
+                          Ende ca. {formatPlannedDateTime(assessment.estimatedEnd)}
+                        </span>
+                      )}
                       {tournamentMode === 'multi' && <span className={`recommendation-metric-tag ${!recommendationFeasible ? 'wizard-metric-warning' : ''}`}>
                         {!daySplitPossible
                           ? 'Nicht wählbar: zu wenige Runden für die gewünschten Spieltage'
