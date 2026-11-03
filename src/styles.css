@@ -7908,115 +7908,298 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   font-size: .74rem;
 }
 
-/* Step 3 visual hierarchy: one quiet planning row and one compact row
-   for recommendation filters instead of many competing pill outlines. */
+/* Step 3: four equal-height planning controls in one continuous, calm row.
+   Only the selected control is interactive; switching modes never reorders them. */
 .wizard-workspace .format-step .format-settings-panel {
-  padding: 13px 16px 11px;
   gap: 12px;
+  padding: 14px 17px 12px;
+  border-color: #dbe4ed;
   background: #f8fafc;
-  border-color: #dae3ef;
 }
-.wizard-workspace .format-step .format-settings-head h3 { font-size: .9rem; }
+.wizard-workspace .format-step .format-settings-head h3 {
+  margin: 0 0 3px;
+  font-size: .91rem;
+}
 .wizard-workspace .format-step .format-settings-head p {
-  margin: 2px 0 0;
+  margin: 0;
   color: #667085;
-  font-size: .72rem;
+  font-size: .73rem;
 }
 .wizard-workspace .format-step .format-settings-content {
-  gap: 12px 18px;
+  gap: 13px 18px;
 }
 .wizard-workspace .format-step .format-settings-content > .tournament-mode-setting {
-  grid-template-columns: minmax(145px, .8fr) minmax(190px, 1fr) minmax(215px, 1.22fr) minmax(188px, 1.05fr);
-  gap: 12px 18px;
-  padding-bottom: 13px;
-  border-bottom: 1px solid #dfe6f0;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(148px, .87fr) minmax(192px, 1.02fr)
+    minmax(232px, 1.3fr) minmax(195px, 1.08fr);
+  align-items: start;
+  gap: 10px 16px;
+  padding: 3px 0 15px;
+  border-bottom: 1px solid #e0e7f0;
+  background: transparent;
 }
-.wizard-workspace .format-step .tournament-mode-setting > .field > label,
-.wizard-workspace .format-step .recommendation-target-choice legend,
-.wizard-workspace .format-step .tournament-day-count > label {
+.wizard-workspace .format-step .recommendation-period-column,
+.wizard-workspace .format-step .recommendation-target-choice,
+.wizard-workspace .format-step .tournament-mode-setting > .field {
+  display: grid;
+  grid-template-rows: 18px 40px 24px;
+  row-gap: 6px;
+  align-items: center;
+  align-self: start;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.wizard-workspace .format-step .recommendation-period-column {
+  display: block;
+}
+.wizard-workspace .format-step .recommendation-period-column > .tournament-day-count {
+  display: grid;
+  grid-template-rows: 18px 40px;
+  row-gap: 6px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.wizard-workspace .format-step .recommendation-planning-label,
+.wizard-workspace .format-step .recommendation-target-choice .recommendation-planning-label,
+.wizard-workspace .format-step .recommendation-period-column > .tournament-day-count > label,
+.wizard-workspace .format-step .tournament-mode-setting > .field > label {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
   color: #344054;
-  font-size: .76rem;
+  font-size: .75rem;
+  font-weight: 750;
+  line-height: 18px;
+  white-space: nowrap;
 }
-.wizard-workspace .format-step .tournament-mode-setting .field-hint {
-  color: #758194;
-  padding-top: 6px;
-  font-size: .68rem;
-  font-weight: 400;
+.wizard-workspace .format-step .recommendation-period-column > .tournament-day-count .recommendation-number-stepper {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: 40px;
+  overflow: hidden;
+  border: 1px solid #ccd9e9;
+  border-radius: 9px;
+  background: #fff;
 }
-.wizard-workspace .format-step .recommendation-target-choice {
-  padding: 3px;
+.wizard-workspace .format-step .recommendation-period-column > .tournament-day-count .recommendation-number-stepper > input {
+  min-width: 0;
+  width: 100%;
+  min-height: 38px;
+  height: 38px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  font-size: .89rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.wizard-workspace .format-step .recommendation-period-column > .tournament-day-count .recommendation-number-stepper-button {
+  min-height: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #33516f;
+  font-size: 1.16rem;
+}
+.wizard-workspace .format-step .recommendation-period-column > .tournament-day-count .recommendation-number-stepper-button:first-child {
+  border-right: 1px solid #e2e9f1;
+}
+.wizard-workspace .format-step .recommendation-period-column > .tournament-day-count .recommendation-number-stepper-button:last-child {
+  border-left: 1px solid #e2e9f1;
+}
+.wizard-workspace .format-step .recommendation-period-column > .tournament-day-count .recommendation-number-stepper-button:disabled {
+  color: #9cabbc;
+  background: #f8fafc;
+}
+.wizard-workspace .format-step .recommendation-target-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 3px;
-  background: #eaf0f7;
-  border: 1px solid #dbe4ef;
+  width: 100%;
+  height: 40px;
+  padding: 3px;
+  border: 1px solid #dce5ee;
+  border-radius: 9px;
+  background: #eef2f7;
+}
+.wizard-workspace .format-step .recommendation-target-options .tournament-mode-option {
+  min-width: 0;
+  height: 32px;
+}
+.wizard-workspace .format-step .recommendation-target-options .tournament-mode-option span {
+  min-width: 0;
+  min-height: 32px;
+  height: 32px;
+  padding: 5px 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #475467;
+  font-size: .74rem;
+  font-weight: 650;
+  box-shadow: none;
+}
+.wizard-workspace .format-step .recommendation-target-options .tournament-mode-option:has(input:checked) span {
+  border-color: #ccd9eb;
+  background: #fff;
+  color: #185abc;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 9%);
+}
+.wizard-workspace .format-step .recommendation-target-choice .recommendation-target-hint,
+.wizard-workspace .format-step .tournament-mode-setting .recommendation-period-hint,
+.wizard-workspace .format-step .tournament-mode-setting > .field > .field-hint {
+  display: block;
+  min-width: 0;
+  height: 24px;
+  margin: 0;
+  padding: 2px 0 0;
+  color: #79869a;
+  background: none;
+  font-size: .69rem;
+  font-weight: 400;
+  line-height: 1.3;
+}
+.wizard-workspace .format-step .recommendation-period-column > .recommendation-period-hint {
+  display: block;
+  height: 24px;
+  padding-top: 8px;
+  font-size: .69rem;
+  line-height: 1.3;
+  color: #79869a;
+}
+.wizard-workspace .format-step .tournament-mode-setting > .field .recommendation-duration-stepper,
+.wizard-workspace .format-step .tournament-mode-setting > .field .clock-picker-trigger,
+.wizard-workspace .format-step .tournament-mode-setting > .field .recommendation-derived-value {
+  min-width: 0;
+  width: 100%;
+  min-height: 40px;
+  height: 40px;
+  margin: 0;
+  box-sizing: border-box;
   border-radius: 9px;
 }
-.wizard-workspace .format-step .recommendation-target-choice legend {
-  margin: 0 0 6px -3px;
-}
-.wizard-workspace .format-step .recommendation-target-choice .tournament-mode-option span {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  color: #475467;
-  min-height: 31px;
-  border-radius: 6px;
-  font-weight: 650;
-}
-.wizard-workspace .format-step .recommendation-target-choice .tournament-mode-option:has(input:checked) span {
-  border-color: #c8d7ed;
+.wizard-workspace .format-step .recommendation-duration-field .recommendation-duration-stepper {
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #ccd9e9;
   background: #fff;
-  color: #175cd3;
-  box-shadow: 0 1px 3px rgba(31, 54, 81, .08);
 }
-.wizard-workspace .format-step .recommendation-target-choice .recommendation-target-hint {
-  position: relative;
+.wizard-workspace .format-step .recommendation-duration-field .recommendation-duration-stepper > button {
+  min-height: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+.wizard-workspace .format-step .recommendation-duration-field .recommendation-duration-stepper .recommendation-number-stepper-button:first-child {
+  border-right: 1px solid #e2e9f1;
+}
+.wizard-workspace .format-step .recommendation-duration-field .recommendation-duration-stepper .recommendation-number-stepper-button:last-child {
+  border-left: 1px solid #e2e9f1;
+}
+.wizard-workspace .format-step .tournament-mode-setting > .field .recommendation-derived-value {
+  display: flex;
+  align-items: center;
+  padding: 0 11px;
+  border: 1px solid #e0e7f0;
+  background: #eef2f7;
+  color: #42526b;
+  font-size: .83rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.wizard-workspace .format-step .recommendation-end-subrow {
+  display: flex;
+  align-items: center;
+  justify-content: start;
+  min-width: 0;
+  width: 100%;
+  min-height: 24px;
+  height: 24px;
+  margin: 0;
+}
+.wizard-workspace .format-step .recommendation-end-subrow .field-hint {
+  margin: 0;
+  padding: 0;
+  color: #79869a;
+  font-size: .69rem;
+  line-height: 24px;
+}
+.wizard-workspace .format-step .recommendation-end-subrow > .recommendation-end-day-choice {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  min-height: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0 5px;
+  border: 0;
+  border-bottom: 1px solid #cbd8e7;
+  border-radius: 0;
+  color: #3e5f83;
+  background: transparent;
+  font-size: .72rem;
+  font-weight: 600;
+}
+.wizard-workspace .format-step .recommendation-end-subrow .recommendation-end-day-choice:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid #175cd3;
+  outline-offset: 2px;
+}
+.wizard-workspace .format-step .recommendation-linked-explanation {
   grid-column: 1 / -1;
-  padding: 5px 1px 0;
-  color: #758194;
-  background: #f8fafc;
-  margin: 0 -4px -4px;
+  margin: 0;
+  padding: 0;
+  font-size: .69rem;
 }
-.wizard-workspace .format-step .recommendation-duration-field .recommendation-duration-stepper,
+.wizard-workspace .format-step .format-settings-content > .format-setting-fields {
+  gap: 11px;
+}
 .wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper {
+  grid-template-columns: 29px minmax(0, 1fr) 29px;
   gap: 0;
   overflow: hidden;
   border: 1px solid #d3deeb;
   border-radius: 8px;
   background: #fff;
 }
-.wizard-workspace .format-step .recommendation-duration-stepper > button,
-.wizard-workspace .format-step .recommendation-duration-field .recommendation-number-stepper-button,
 .wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper-button,
 .wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper > input {
+  min-height: 35px;
   border: 0;
   border-radius: 0;
-  box-shadow: none;
   background: transparent;
 }
-.wizard-workspace .format-step .recommendation-duration-field .recommendation-number-stepper-button:first-child,
 .wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper-button:first-child {
   border-right: 1px solid #e1e8f1;
 }
-.wizard-workspace .format-step .recommendation-duration-field .recommendation-number-stepper-button:last-child,
 .wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper-button:last-child {
   border-left: 1px solid #e1e8f1;
 }
-.wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper {
-  grid-template-columns: 29px minmax(0, 1fr) 29px;
-}
-.wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper > input,
-.wizard-workspace .format-step .format-setting-fields .recommendation-number-stepper-button {
-  min-height: 35px;
-}
-.wizard-workspace .format-step .format-settings-content > .format-setting-fields {
-  gap: 12px;
-}
 .wizard-workspace .format-step .format-toggle-group .format-toggle {
+  min-height: 35px;
   border-color: #dae3ef;
   background: #fff;
   color: #475467;
   font-weight: 600;
-  min-height: 35px;
 }
 .wizard-workspace .format-step .format-toggle-group .format-toggle:has(input:checked) {
   border-color: #cad9ee;
@@ -8030,7 +8213,9 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .wizard-workspace .format-step .format-settings-bottom {
   padding-top: 8px;
 }
-.wizard-workspace .format-step .format-help-details summary { font-size: .72rem; }
+.wizard-workspace .format-step .format-help-details summary {
+  font-size: .72rem;
+}
 .wizard-workspace .format-step .format-help-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
@@ -8046,7 +8231,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .wizard-workspace .format-step .format-help-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @container format-settings (max-width: 520px) {

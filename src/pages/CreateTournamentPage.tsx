@@ -2858,24 +2858,26 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                         onChange={changePlannedPlayingDays}/>
                     </div>
                     <span className="field-hint recommendation-period-hint">
-                      {tournamentMode === 'single' ? 'Max. 24 Stunden' : 'Aktive Spielzeit ohne Nächte'}
+                      {tournamentMode === 'single' ? 'Maximal 24 Stunden' : 'Auf mehrere Tage verteilt'}
                     </span>
                   </div>
 
-                  <fieldset className="recommendation-target-choice">
-                    <legend>Zeitvorgabe</legend>
-                    <label className="tournament-mode-option">
-                      <input type="radio" name="preferred-time-priority" checked={preferredTimePriority === 'duration'}
-                        onChange={() => changePreferredTimePriority('duration')}/>
-                      <span>Turnierdauer</span>
-                    </label>
-                    <label className="tournament-mode-option">
-                      <input type="radio" name="preferred-time-priority" checked={preferredTimePriority === 'end'}
-                        onChange={() => changePreferredTimePriority('end')}/>
-                      <span>Endzeit</span>
-                    </label>
-                    <span className="field-hint recommendation-target-hint">Gewählten Wert festhalten</span>
-                  </fieldset>
+                  <div className="recommendation-target-choice" role="radiogroup" aria-label="Zeitvorgabe">
+                    <span className="recommendation-planning-label">Zeitvorgabe</span>
+                    <div className="recommendation-target-options">
+                      <label className="tournament-mode-option">
+                        <input type="radio" name="preferred-time-priority" checked={preferredTimePriority === 'duration'}
+                          onChange={() => changePreferredTimePriority('duration')}/>
+                        <span>Turnierdauer</span>
+                      </label>
+                      <label className="tournament-mode-option">
+                        <input type="radio" name="preferred-time-priority" checked={preferredTimePriority === 'end'}
+                          onChange={() => changePreferredTimePriority('end')}/>
+                        <span>Endzeit</span>
+                      </label>
+                    </div>
+                    <span className="field-hint recommendation-target-hint">Bestimmt den festen Planungswert</span>
+                  </div>
 
                   <div className={`field recommendation-duration-field${preferredTimePriority === 'end' ? ' recommendation-derived-field' : ''}`}>
                     <label htmlFor={preferredTimePriority === 'duration' ? 'preferred-duration' : undefined}>
@@ -2902,7 +2904,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                       </output>
                     )}
                     <span className="field-hint">
-                      {preferredTimePriority === 'duration' ? 'Festgelegt' : 'Berechnet'} · ohne Nächte
+                      {preferredTimePriority === 'duration' ? 'Festgelegte Spielzeit' : 'Berechnete Spielzeit'}
                     </span>
                   </div>
 
