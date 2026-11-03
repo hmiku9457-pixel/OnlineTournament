@@ -55,7 +55,7 @@ import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, 
 import { availableDayBreakRounds, convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
 import { configuredPlayingDays, followingPlayingDate, playingRounds, suggestDaySplit, type PlayingDayBreak } from '@/domain/playingDays';
-import { assessRecommendationTime, distributePlayingDays } from '@/domain/creationPlanRecommendations';
+import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays } from '@/domain/creationPlanRecommendations';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, playingDayOverflowWarnings, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
@@ -695,6 +695,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [undoRemoveError, setUndoRemoveError] = useState('');
   const [groupRecommendationNotice, setGroupRecommendationNotice] = useState<string | null>(null);
   const previousRosterCount = useRef<number>(restoredDraft?.participants.length ?? 0);
+  // Keep the preceding roster until dependent phase edits have been accepted.
+  const rosterBeforeLastChange = useRef<ParticipantDraft[]>(restoredDraft?.participants ?? []);
   const [participantForm, setParticipantForm] = useState<ParticipantFields>(restoredDraft?.participantForm ?? emptyParticipantFields());
   // Registration may change in another director tab while this editor stays
   // mounted. Reconcile the field size without discarding its unsaved plan.
@@ -721,6 +723,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     losses: PhaseBreakLoss[];
     manuallyEditedId?: string;
     source: 'manual' | 'roster';
+    previousRoster?: ParticipantDraft[];
   } | null>(null);
   const [pendingDayInsertion, setPendingDayInsertion] = useState<{
     phaseId: string;
@@ -1340,9 +1343,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     });
     const losses = phaseBreakLosses(phaseDrafts, normalized);
     if (losses.length) {
-      // Participant changes have already happened. Keep pauses untouched until
-      // the dependent edits are reviewed and confirmed.
-      setPendingPhaseChange({ next: normalized, losses, source: 'roster' });
+      // The roster is already edited; preserve an exact rollback snapshot.
+      setPendingPhaseChange({ next: normalized, losses, source: 'roster',
+        previousRoster: rosterBeforeLastChange.current });
       return;
     }
     if (needsReview.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...needsReview])]);
@@ -1350,6 +1353,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   // Die Teilnehmerzahl ist die Quelle für das Startfeld aller Phasen.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participantCount]);
+  useEffect(() => {
+    // Declared after the normalization effect so its snapshot still refers to
+    // the previous participant list when that effect detects a count change.
+    rosterBeforeLastChange.current = participants;
+  }, [participants]);
 
   // Reuse the same recommendation logic as the director's pre-start editor.
   // Existing manual group plans remain untouched after roster changes.
@@ -1403,6 +1411,27 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setPhaseLimitError('');
     setPendingPhaseChange(null);
     setPhaseInsertIndex(null);
+  }
+
+  function restoreRosterBeforeDependentChange() {
+    if (!pendingPhaseChange) return;
+    const previous = pendingPhaseChange.previousRoster;
+    if (pendingPhaseChange.source !== 'roster' || !previous) {
+      setPendingPhaseChange(null);
+      return;
+    }
+    setPendingPhaseChange(null);
+    setParticipants(previous);
+    setRecentlyRemovedParticipant(null);
+    setBulkCleanupUndo(null);
+    setUndoRemoveError('');
+  }
+
+  function dismissPhaseChange() {
+    // A roster edit already happened; do not silently dismiss its necessary
+    // normalization and strand the user with invalid hidden phase entrants.
+    if (pendingPhaseChange?.source === 'roster') return;
+    setPendingPhaseChange(null);
   }
 
   function keepDependentPausesForManualReview() {
@@ -3590,10 +3619,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       )}
       {pendingPhaseChange && (
         <div className="sport-change-backdrop" role="presentation"
-          onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingPhaseChange(null); }}>
+          onMouseDown={(event) => { if (event.target === event.currentTarget) dismissPhaseChange(); }}>
           <section className="sport-change-dialog phase-replacement-dialog" role="alertdialog" aria-modal="true"
             aria-label="Abhängige Phasenänderungen bestätigen?"
-            onKeyDown={(event) => { if (event.key === 'Escape') setPendingPhaseChange(null); }}>
+            onKeyDown={(event) => { if (event.key === 'Escape') dismissPhaseChange(); }}>
             <h2>Pausen in mehreren Phasen anpassen?</h2>
             <p>{pendingPhaseChange.source === 'roster'
               ? 'Die Teilnehmerliste wurde geändert. Der daraus folgende Phasenplan benötigt diese Anpassungen:'
@@ -3603,11 +3632,18 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 <li key={loss.id}><strong>{loss.label}</strong>
                   {loss.removedRounds.length > 0 && ` · Spieltagsende nach Runde ${loss.removedRounds.join(', ')} entfällt`}
                   {loss.removedInlineBreak && ' · Zwischenpause entfällt'}
+                  {Boolean(loss.removedKnockoutBestOf?.length) && ` · K.-o.-Runden entfallen: ${loss.removedKnockoutBestOf?.map((value) => `Best-of-${value}`).join(', ')}`}
                 </li>)}
             </ul>
-            <p className="field-hint">Weitere gültige Einstellungen bleiben erhalten. Betroffene Phasen müssen anschließend als geprüft bestätigt werden.</p>
+            <p className="field-hint">Weitere gültige Einstellungen bleiben erhalten. Betroffene Folgephasen müssen anschließend als geprüft bestätigt werden. Frühere Best-of-Werte können durch Zurücknehmen der Teilnehmeränderung wiederhergestellt werden.</p>
             <div className="sport-change-dialog-actions">
-              <button className="btn" type="button" autoFocus onClick={keepDependentPausesForManualReview}>
+              {pendingPhaseChange.source === 'roster' && (
+                <button className="btn" type="button" autoFocus onClick={restoreRosterBeforeDependentChange}>
+                  Teilnehmeränderung zurücknehmen
+                </button>
+              )}
+              <button className="btn" type="button" autoFocus={pendingPhaseChange.source !== 'roster'}
+                onClick={keepDependentPausesForManualReview}>
                 {pendingPhaseChange.source === 'roster' ? 'Pausen beibehalten und manuell korrigieren' : 'Änderung abbrechen'}
               </button>
               <button className="btn primary" type="button" onClick={approvePhaseChanges}>
