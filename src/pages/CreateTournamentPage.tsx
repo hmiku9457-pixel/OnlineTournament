@@ -735,6 +735,18 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [tournamentMode, setTournamentMode] = useState<'single' | 'multi'>(restoredDraft?.tournamentMode ?? (restoredDraft?.phaseDrafts.some((phase) => (phase.dayBreaks?.length ?? 0) > 0 || (phase.type === 'BREAK' && phase.breakKind === 'overnight')) ? 'multi' : 'single'));
   const [plannedDays, setPlannedDays] = useState(restoredDraft?.plannedDays ?? 2);
   const [pendingTournamentMode, setPendingTournamentMode] = useState<'single' | null>(null);
+  function applySingleDayConversion(treatment: 'convert' | 'remove') {
+    const adjusted = convertToSingleDay(phaseDrafts, treatment);
+    const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, adjusted, undefined, true);
+    if (!normalized) return;
+    setPhaseDrafts(normalized);
+    setReviewRequiredPhaseIds((ids) => ids.filter((id) => normalized.some((phase) => phase.id === id)));
+    setSelectedRecommendationId(null);
+    setTournamentMode('single');
+    setPhaseLimitError('');
+    setPendingTournamentMode(null);
+  }
+
   function adjustPreferredDuration(delta: number) {
     setPreferredDurationMinutes((value) => Math.min(MAX_RECOMMENDATION_DURATION,
       Math.max(MIN_RECOMMENDATION_DURATION, value + delta)));
@@ -3372,49 +3384,103 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       {pendingTournamentMode && (
         <div className="sport-change-backdrop" role="presentation"
           onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingTournamentMode(null); }}>
-          <section className="sport-change-dialog" role="alertdialog" aria-modal="true"
+          <section className="sport-change-dialog single-day-choice-dialog" role="alertdialog" aria-modal="true"
             aria-label="Turniermodus wechseln?"
             onKeyDown={(event) => { if (event.key === 'Escape') setPendingTournamentMode(null); }}>
             <h2>Auf eintägiges Turnier umstellen?</h2>
-            <p>Die Veranstaltung wird wieder für einen Spieltag geplant. Die gewünschte aktive Turnierdauer und alle anderen Einstellungen bleiben erhalten.</p>
+            <p>Alle Spieltagswechsel innerhalb der Phasen werden entfernt. Normale Pausen bleiben unverändert.</p>
+            {phaseDrafts.some((phase) => phase.type === 'BREAK' && phase.breakKind === 'overnight') && <>
+              <p className="modal-mode-warning">Folgende eigenständige Spieltagsende-Phasen enthalten eigene Namen oder Hinweise. Entscheide, ob sie als 15-Minuten-Pausen erhalten bleiben oder vollständig gelöscht werden sollen:</p>
+              <ul className="wizard-confirm-details">
+                {phaseDrafts.filter((phase) => phase.type === 'BREAK' && phase.breakKind === 'overnight').map((phase) =>
+                  <li key={phase.id}><strong>{phase.label}</strong>{phase.note && <span> · {phase.note}</span>}</li>)}
+              </ul>
+            </>}
             {countConfiguredDayTransitions(phaseDrafts) > 0 && (
-              <p className="modal-mode-warning">{countConfiguredDayTransitions(phaseDrafts)} vorhandene Spieltagswechsel werden entfernt. Normale Pausen in Minuten oder bis Uhrzeit bleiben bestehen.</p>
+              <p className="field-hint">Betroffene Spieltagswechsel: {countConfiguredDayTransitions(phaseDrafts)}.</p>
             )}
-            <div className="sport-change-dialog-actions">
-              <button type="button" className="btn" autoFocus onClick={() => setPendingTournamentMode(null)}>Mehrtägig behalten</button>
-              <button type="button" className="btn primary" onClick={() => {
-                const adjusted = convertToSingleDay(phaseDrafts);
-                setPhaseDrafts(normalizeAndTrackPhaseChanges(phaseDrafts, adjusted));
-                setReviewRequiredPhaseIds((ids) => ids.filter((id) => adjusted.some((phase) => phase.id === id)));
-                setSelectedRecommendationId(null);
-                setTournamentMode('single');
-                setPhaseLimitError('');
-                setPendingTournamentMode(null);
-              }}>Auf eintägig umstellen</button>
+            <div className="sport-change-dialog-actions single-day-choice-actions">
+              <button type="button" className="btn" autoFocus onClick={() => setPendingTournamentMode(null)}>Abbrechen</button>
+              <button type="button" className="btn primary" onClick={() => applySingleDayConversion('convert')}>
+                Als normale Pausen behalten
+              </button>
+              {phaseDrafts.some((phase) => phase.type === 'BREAK' && phase.breakKind === 'overnight') && (
+                <button type="button" className="btn danger-outline" onClick={() => applySingleDayConversion('remove')}>
+                  Spieltagsende-Phasen löschen
+                </button>)}
             </div>
           </section>
         </div>
       )}
-      {pendingRoundAdjustment && (
+      {pendingPhaseChange && (
         <div className="sport-change-backdrop" role="presentation"
-          onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingRoundAdjustment(null); }}>
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingPhaseChange(null); }}>
           <section className="sport-change-dialog phase-replacement-dialog" role="alertdialog" aria-modal="true"
-            aria-label="Rundenabhängige Pausen anpassen?"
-            onKeyDown={(event) => { if (event.key === 'Escape') setPendingRoundAdjustment(null); }}>
-            <h2>Rundenabhängige Pausen anpassen?</h2>
-            <p>Die Änderung macht {pendingRoundAdjustment.removedDays > 0
-              ? `${pendingRoundAdjustment.removedDays} Spieltagswechsel` : ''}
-              {pendingRoundAdjustment.removedDays > 0 && pendingRoundAdjustment.removedInline ? ' und ' : ''}
-              {pendingRoundAdjustment.removedInline ? 'eine Zwischenpause' : ''} ungültig. Diese Unterbrechungen werden entfernt; alle weiterhin möglichen bleiben erhalten.</p>
+            aria-label="Abhängige Phasenänderungen bestätigen?"
+            onKeyDown={(event) => { if (event.key === 'Escape') setPendingPhaseChange(null); }}>
+            <h2>Pausen in mehreren Phasen anpassen?</h2>
+            <p>{pendingPhaseChange.source === 'roster'
+              ? 'Die Teilnehmerliste wurde geändert. Der daraus folgende Phasenplan benötigt diese Anpassungen:'
+              : 'Die Änderung hat Auswirkungen auf folgende Phasen und Unterbrechungen:'}</p>
+            <ul className="wizard-confirm-details">
+              {pendingPhaseChange.losses.map((loss) =>
+                <li key={loss.id}><strong>{loss.label}</strong>
+                  {loss.removedRounds.length > 0 && ` · Spieltagsende nach Runde ${loss.removedRounds.join(', ')} entfällt`}
+                  {loss.removedInlineBreak && ' · Zwischenpause entfällt'}
+                </li>)}
+            </ul>
+            <p className="field-hint">Weitere gültige Einstellungen bleiben erhalten. Betroffene Phasen müssen anschließend als geprüft bestätigt werden.</p>
             <div className="sport-change-dialog-actions">
-              <button className="btn" type="button" autoFocus onClick={() => setPendingRoundAdjustment(null)}>Änderung abbrechen</button>
-              <button className="btn primary" type="button" onClick={() => {
-                const pending = pendingRoundAdjustment;
-                setPendingRoundAdjustment(null);
-                if (pending.kind === 'rounds') updatePhase(pending.id, pending.patch, true);
-                else if (pending.kind === 'entrants') updatePhaseEntrants(pending.index, pending.entrants, pending.custom, true);
-                else changePhaseType(pending.index, pending.type, true);
-              }}>Änderung übernehmen und Pausen anpassen</button>
+              <button className="btn" type="button" autoFocus onClick={() => setPendingPhaseChange(null)}>
+                {pendingPhaseChange.source === 'roster' ? 'Pausen beibehalten und manuell korrigieren' : 'Änderung abbrechen'}
+              </button>
+              <button className="btn primary" type="button" onClick={approvePhaseChanges}>
+                Änderung und Pausenanpassung übernehmen
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {pendingDayInsertion && (
+        <div className="sport-change-backdrop" role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingDayInsertion(null); }}>
+          <section className="sport-change-dialog" role="alertdialog" aria-modal="true"
+            aria-label="Folgetermine für Spieltage anpassen?"
+            onKeyDown={(event) => { if (event.key === 'Escape') setPendingDayInsertion(null); }}>
+            <h2>Nachfolgende Spieltage verschieben?</h2>
+            <p>Damit die neu eingefügte Unterbrechung in der richtigen Reihenfolge liegt, müssen folgende Fortsetzungstermine angepasst werden:</p>
+            <ul className="wizard-confirm-details">
+              {pendingDayInsertion.shifted.map((item) =>
+                <li key={item.afterRound}>Nach Runde {item.afterRound}: {item.previousDate} → {item.nextDate}</li>)}
+            </ul>
+            <div className="sport-change-dialog-actions">
+              <button type="button" className="btn" autoFocus onClick={() => setPendingDayInsertion(null)}>Nicht einfügen</button>
+              <button type="button" className="btn primary" onClick={() => {
+                const { phaseId, nextBreaks } = pendingDayInsertion;
+                setPendingDayInsertion(null);
+                updatePhase(phaseId, { dayBreaks: nextBreaks });
+              }}>Spieltagswechsel mit neuen Terminen einfügen</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {pendingBulkCleanup && (
+        <div className="sport-change-backdrop" role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingBulkCleanup(false); }}>
+          <section className="sport-change-dialog" role="alertdialog" aria-modal="true"
+            aria-label="Fehlerhafte Teilnehmer entfernen?"
+            onKeyDown={(event) => { if (event.key === 'Escape') setPendingBulkCleanup(false); }}>
+            <h2>{invalidRosterIndices.size} fehlerhafte Einträge entfernen?</h2>
+            <p>Diese Einträge werden aus der Teilnehmerliste entfernt. Der erste gültige Eintrag eines Duplikats bleibt bestehen.</p>
+            <ul className="wizard-confirm-details">
+              {participants.filter((_, index) => invalidRosterIndices.has(index)).slice(0, 25).map((participant) =>
+                <li key={participant.id}>{participantDisplayName(participant, discipline) || 'Unvollständiger Eintrag'}</li>)}
+            </ul>
+            {invalidRosterIndices.size > 25 && <p className="field-hint">Weitere {invalidRosterIndices.size - 25} Einträge sind ebenfalls betroffen.</p>}
+            <p className="field-hint">Nach der Bereinigung kannst du die gesamte Aktion rückgängig machen.</p>
+            <div className="sport-change-dialog-actions">
+              <button className="btn" type="button" autoFocus onClick={() => setPendingBulkCleanup(false)}>Abbrechen</button>
+              <button className="btn danger" type="button" onClick={removeInvalidParticipants}>Fehlerhafte Einträge entfernen</button>
             </div>
           </section>
         </div>
