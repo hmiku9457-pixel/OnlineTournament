@@ -7789,3 +7789,42 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 @media (max-width: 480px) {
   .recommendation-duration-quick-add { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Step 3: both linked time targets stay on screen and update together. */
+.wizard-workspace .format-step .recommendation-time-linked {
+  display: grid;
+  grid-template-columns: minmax(188px, 1.1fr) minmax(145px, .8fr);
+  gap: 12px;
+  flex: 1 1 380px;
+  min-width: 0;
+}
+.wizard-workspace .format-step .recommendation-time-linked .field {
+  min-width: 0;
+  margin: 0;
+}
+.wizard-workspace .format-step .recommendation-time-linked .field > label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: .76rem;
+  white-space: normal;
+}
+.wizard-workspace .format-step .recommendation-time-linked .recommendation-duration-stepper {
+  width: 100%;
+  min-width: 0;
+}
+.wizard-workspace .format-step .recommendation-time-linked .clock-picker-trigger {
+  width: 100%;
+  min-height: 36px;
+}
+.wizard-workspace .format-step .recommendation-time-linked .field-hint {
+  font-size: .71rem;
+}
+.wizard-workspace .format-step .recommendation-linked-explanation {
+  flex: 1 1 100%;
+  margin: 0;
+}
+@media (max-width: 480px) {
+  .wizard-workspace .format-step .recommendation-time-linked {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
