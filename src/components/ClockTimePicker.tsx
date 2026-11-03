@@ -56,7 +56,7 @@ export function ClockTimeDial({ mode, hour, minute, minTime, maxTime, onPickHour
             <button className={`clock-picker-mark${hour === value ? ' is-selected' : ''}`}
               type="button" key={value} aria-label={`${value} Uhr`} aria-pressed={hour === value}
               disabled={Boolean((minTime && parseClockTime(minTime) && value < parseClockTime(minTime)!.hour)
-                || (maxTime && parseClockTime(maxTime) && value > parseClockTime(maxTime)!.hour)}
+                || (maxTime && parseClockTime(maxTime) && value > parseClockTime(maxTime)!.hour))}
               style={{ left: `${point.left}%`, top: `${point.top}%` }}
               onClick={() => onPickHour(value)}>{value === 0 ? '00' : String(value)}</button>
           );
