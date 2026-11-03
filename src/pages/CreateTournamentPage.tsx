@@ -984,8 +984,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   );
 
   /** The editable phase plan is authoritative even when inputs change. */
+  const plannedDayMismatch = tournamentMode === 'multi' && configuredPlayingDays(phaseDrafts) !== plannedDays;
   const recommendationPlanMatches = Boolean(selectedRecommendation
-    && configuredPlayingDays(phaseDrafts) === (tournamentMode === 'multi' ? plannedDays : 1)
+    && !plannedDayMismatch && configuredPlayingDays(phaseDrafts) === (tournamentMode === 'multi' ? plannedDays : 1)
     && phaseDrafts.filter((phase) => phase.type !== 'BREAK').length === selectedRecommendation.phases.length
     && phaseDrafts.filter((phase) => phase.type !== 'BREAK').every((phase, index) => {
       const original = selectedRecommendation.phases[index];
@@ -1248,6 +1249,33 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       }
     }
     return withBreaks;
+  }
+
+  function applyAutomaticPlayingDays() {
+    if (tournamentMode !== 'multi' || !phaseDrafts.some((phase) => phase.type !== 'BREAK')) return;
+    const timing = timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes }
+      : { minutesPerSet: planningMinutesPerSet(sport) };
+    const proposal = distributePlayingDays(phaseDrafts, plannedDays, scheduledDate, tables, timing,
+      (entrants) => {
+        const pause = phaseDraftFromTemplate(
+          createPhaseTemplate('BREAK', phaseDrafts.length + 1, { entrantCount: entrants }), participantCount, sport);
+        pause.label = 'Spieltagsende';
+        pause.breakKind = 'overnight';
+        return pause;
+      });
+    setPendingAutomaticSplit(false);
+    if (!proposal.possible) {
+      setPhaseLimitError('Diese Phasen besitzen zu wenige abgeschlossene Rundengrenzen für die gewünschte Anzahl Spieltage.');
+      return;
+    }
+    if (countCreationScheduleEntries(proposal.phases, awardsEnabled) > MAX_CREATION_SCHEDULE_ENTRIES) {
+      setPhaseLimitError(`Die automatische Verteilung würde die Grenze von ${MAX_CREATION_SCHEDULE_ENTRIES} Zeitplaneinträgen überschreiten.`);
+      return;
+    }
+    const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, proposal.phases, undefined, true);
+    if (!normalized) return;
+    setPhaseDrafts(normalized);
+    setPhaseLimitError('');
   }
 
   function applyRecommendation(recommendation: FormatRecommendation) {
@@ -2471,7 +2499,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                       </h3>
                       <div className="recommendation-labels">
                         <span className="badge">{!recommendationFeasible ? 'Nicht verfügbar' : index === firstSelectableRecommendationIndex ? 'Empfohlen' : 'Alternative'}</span>
-                        {selectedRecommendationId === item.id && <span className="badge selected-badge">{recommendationPlanMatches ? 'Ausgewählt' : 'Plan weicht ab · erneut übernehmen'}</span>}
+                        {selectedRecommendationId === item.id && <span className="badge selected-badge">{recommendationPlanMatches
+                          ? 'Ausgewählt' : plannedDayMismatch ? 'Spieltage noch anzupassen' : 'Plan weicht ab · erneut übernehmen'}</span>}
                       </div>
                     </div>
                     <p>{item.description}</p>
@@ -2538,9 +2567,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               <div className="phase-step-main">
                 {selectedRecommendation && (
                   <div className="selected-format-summary">
-                    <span className="badge">{recommendationPlanMatches ? 'Vorlage' : 'Individuell angepasst'}</span>
+                    <span className="badge">{recommendationPlanMatches ? 'Vorlage' : plannedDayMismatch ? 'Spieltage noch anzupassen' : 'Individuell angepasst'}</span>
                     <strong>{selectedRecommendation.label}</strong>
-                    {!recommendationPlanMatches && <span className="wizard-review-warning">Der Phasenplan weicht von der Empfehlung ab. Deine Phasen bleiben erhalten.</span>}
+                    {!recommendationPlanMatches && <span className="wizard-review-warning">
+                      {plannedDayMismatch ? `Für ${plannedDays} Spieltage sind erst ${configuredPlayingDays(phaseDrafts)} eingerichtet. Deine Phasen bleiben erhalten.`
+                        : 'Der Phasenplan weicht von der Empfehlung ab. Deine Phasen bleiben erhalten.'}
+                    </span>}
                     <span className="muted">Alle Einstellungen unten bleiben frei änderbar.</span>
                   </div>
                 )}
