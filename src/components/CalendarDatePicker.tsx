@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { tournamentWallClock } from '@/domain/tournamentLocalTime';
 
 const months = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const weekdays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -64,7 +65,7 @@ export function CalendarDatePicker({
   const [yearInput, setYearInput] = useState('2026');
   const selected = parseCalendarDate(value);
   const minimum = minDate && parseCalendarDate(minDate) ? minDate : '';
-  const today = toCalendarDate(new Date());
+  const today = tournamentWallClock(new Date()).slice(0, 10);
   const displayDate = (date: Date) => date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const days = calendarMonthDays(viewYear, viewMonth);
   const previousMonthUnavailable = Boolean(minimum && `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}` <= minimum.slice(0, 7));
