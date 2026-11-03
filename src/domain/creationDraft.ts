@@ -84,6 +84,8 @@ export interface CreationDraft {
     source: 'manual' | 'roster';
     previousRoster?: CreationDraftParticipant[];
     previousDiscipline?: Discipline;
+    previousSport?: string;
+    previousRosterReviewRequired?: boolean;
   } | null;
   /** Values retained across a switch between two timed sports until acknowledged. */
   timeValuesReviewRequired?: boolean;
@@ -175,6 +177,8 @@ export function validDraft(value: unknown): value is CreationDraft {
         && ['manual','roster'].includes(data.pendingDependentChange.source)
         && (data.pendingDependentChange.previousDiscipline === undefined
           || ['SINGLES', 'DOUBLES', 'TEAMS'].includes(data.pendingDependentChange.previousDiscipline))
+        && (data.pendingDependentChange.previousSport === undefined || typeof data.pendingDependentChange.previousSport === 'string')
+        && (data.pendingDependentChange.previousRosterReviewRequired === undefined || typeof data.pendingDependentChange.previousRosterReviewRequired === 'boolean')
         && (data.pendingDependentChange.previousRoster === undefined
           || (Array.isArray(data.pendingDependentChange.previousRoster)
             && data.pendingDependentChange.previousRoster.length <= 10000
