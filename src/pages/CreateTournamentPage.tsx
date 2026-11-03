@@ -805,7 +805,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     confirmPrestartSave && 'prestart-save', confirmPrestartDiscard && 'prestart-discard',
     overwriteTournamentId && 'overwrite', pendingDeleteParticipantId && 'delete-participant',
     pendingUndoConflict && 'undo', pendingBulkUndoConflict && 'bulk-undo',
-    pendingPhaseRemoval && 'remove-phase', pendingPhaseTypeLoss && 'phase-type',
+    pendingPhaseRemoval && 'remove-phase', pendingConfirmPhaseRemoval && 'confirm-remove-phase', pendingPhaseTypeLoss && 'phase-type',
     pendingTournamentMode && 'single-day', pendingPhaseChange && 'dependent-phase',
     pendingAutomaticSplit && 'day-split', pendingDayInsertion && 'day-insert',
     pendingBulkCleanup && 'cleanup', pendingRecommendationId && 'recommendation',
@@ -1654,7 +1654,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setExpandedPhaseId(phase.id);
   }
 
-  function removePhase(id: string, adjacentPauseId?: string) {
+  function removePhase(id: string, adjacentPauseId?: string, confirmed = false) {
+    if (!confirmed) {
+      setPendingConfirmPhaseRemoval(id);
+      return;
+    }
+    setPendingConfirmPhaseRemoval(null);
     const candidate = phaseDrafts.filter((phase) => phase.id !== id && phase.id !== adjacentPauseId);
     if (!hasValidBreakStageOrder(candidate.map((phase) => phase.type))
       || !hasValidTerminalStageOrder(candidate.map((phase) => phase.type))) {
@@ -2632,10 +2637,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                         aria-label="Geplante Turnierdauer um 15 Minuten verringern"
                         disabled={preferredDurationMinutes <= MIN_RECOMMENDATION_DURATION}
                         onClick={() => adjustPreferredDuration(-15)}>−</button>
-                      <RecommendationDurationPicker value={preferredDurationMinutes} onChange={setPreferredDurationMinutes}/>
+                      <RecommendationDurationPicker value={preferredDurationMinutes} multiDay={tournamentMode === 'multi'} onChange={setPreferredDurationMinutes}/>
                       <button type="button" className="recommendation-number-stepper-button"
                         aria-label="Geplante Turnierdauer um 15 Minuten erhöhen"
-                        disabled={preferredDurationMinutes >= MAX_RECOMMENDATION_DURATION}
+                        disabled={preferredDurationMinutes >= (tournamentMode === 'multi' ? MAX_RECOMMENDATION_DURATION : MAX_SINGLE_DAY_DURATION)}
                         onClick={() => adjustPreferredDuration(15)}>+</button>
                     </div>
                   </div>
@@ -3885,7 +3890,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               <div className="sport-change-dialog-actions">
                 <button className="btn" type="button" autoFocus onClick={() => setPendingPhaseRemoval(null)}>Nicht löschen</button>
                 {pauses.map((phase) => <button key={phase.id} type="button" className="btn danger-outline"
-                  onClick={() => removePhase(pendingPhaseRemoval, phase.id)}>„{phase.label}“ zusätzlich entfernen</button>)}
+                  onClick={() => removePhase(pendingPhaseRemoval, phase.id, true)}>„{phase.label}“ zusätzlich entfernen</button>)}
               </div>
             </section>
           </div>
@@ -3915,6 +3920,21 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           </div>
         );
       })()}
+      {pendingConfirmPhaseRemoval && (() => {
+        const phase = phaseDrafts.find((item) => item.id === pendingConfirmPhaseRemoval);
+        if (!phase) return null;
+        return <div className="sport-change-backdrop" role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingConfirmPhaseRemoval(null); }}>
+          <section className="sport-change-dialog" role="alertdialog" aria-modal="true" aria-label="Phase entfernen bestätigen">
+            <h2>Phase „{phase.label}“ entfernen?</h2>
+            <p>Die Konfiguration dieser Phase einschließlich Best-of, Gruppeneinstellungen, Pausen und Fortsetzungsterminen wird gelöscht. Dieser Schritt kann nicht rückgängig gemacht werden.</p>
+            <div className="sport-change-dialog-actions">
+              <button className="btn" type="button" autoFocus onClick={() => setPendingConfirmPhaseRemoval(null)}>Phase behalten</button>
+              <button className="btn danger" type="button" onClick={() => removePhase(phase.id, undefined, true)}>Phase endgültig entfernen</button>
+            </div>
+          </section>
+        </div>;
+      })()}
       {pendingTournamentMode && (
         <div className="sport-change-backdrop" role="presentation"
           onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingTournamentMode(null); }}>
@@ -3922,7 +3942,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             aria-label="Turniermodus wechseln?"
             onKeyDown={(event) => { if (event.key === 'Escape') setPendingTournamentMode(null); }}>
             <h2>Auf eintägiges Turnier umstellen?</h2>
-            <p>Alle Spieltagswechsel innerhalb der Phasen werden entfernt. Normale Pausen bleiben unverändert.</p>
+            <p>Alle Spieltagswechsel innerhalb der Phasen werden entfernt. Pausen auf späteren Kalendertagen müssen ebenfalls behandelt werden.</p>
+            {singleDayFixedPauseConflicts(phaseDrafts, scheduledDate).length > 0 && <>
+              <p className="modal-mode-warning">Folgende feste Pausenziele liegen nach dem Turniertag. Sie werden bei „Behalten“ zu 15-Minuten-Pausen und bei „Löschen“ entfernt:</p>
+              <ul className="wizard-confirm-details">
+                {singleDayFixedPauseConflicts(phaseDrafts, scheduledDate).map((description, index) => <li key={index}>{description}</li>)}
+              </ul>
+            </>}
             {phaseDrafts.some((phase) => phase.type === 'BREAK' && phase.breakKind === 'overnight') && <>
               <p className="modal-mode-warning">Folgende eigenständige Spieltagsende-Phasen enthalten eigene Namen oder Hinweise. Entscheide, ob sie als 15-Minuten-Pausen erhalten bleiben oder vollständig gelöscht werden sollen:</p>
               <ul className="wizard-confirm-details">
