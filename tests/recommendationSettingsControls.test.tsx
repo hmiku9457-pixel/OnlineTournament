@@ -22,7 +22,7 @@ describe('recommendation settings numeric controls', () => {
     expect(atMin).toMatch(/<button[^>]*disabled=""[^>]*aria-label="Maximale Gruppenanzahl verringern"/);
   });
 
-  it('formats the selected time as a duration, validates hours/minutes and opens a dialog', () => {
+  it('formats the selected time span in hours and minutes and opens an explicit duration dialog', () => {
     expect(formatRecommendationDuration(210)).toBe('3 Std. 30 Min.');
     expect(formatRecommendationDuration(120)).toBe('2 Std.');
     expect(formatRecommendationDuration(45)).toBe('45 Min.');
@@ -34,9 +34,9 @@ describe('recommendation settings numeric controls', () => {
     const html = renderToStaticMarkup(createElement(RecommendationDurationPicker, {
       value: 210, onChange: () => {},
     }));
-    expect(html).toContain('03:30');
+    expect(html).toContain('3 Std. 30 Min.');
     expect(html).toContain('aria-haspopup="dialog"');
-    expect(html).toContain('Geplante Turnierdauer einstellen');
+    expect(html).toContain('Geplante Turnierdauer als Zeitspanne einstellen');
   });
 
   it('prefers the configured target and fills with longer proposals up to five', () => {
