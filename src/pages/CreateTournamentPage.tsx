@@ -51,7 +51,7 @@ import { DiscardDraftDialog } from '@/components/DiscardDraftDialog';
 import { UnsavedParticipantDialog } from '@/components/UnsavedParticipantDialog';
 import { QualificationRuleDialog } from '@/components/QualificationRuleDialog';
 import { needsGroupStreichungsregel, recommendedEqualGroupQualifiers } from '@/domain/groupQualification';
-import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, validParticipantRoster, invalidParticipantRosterIndices, MAX_PARTICIPANT_NAME_LENGTH } from '@/domain/participantNames';
+import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, invalidParticipantRosterIndices, MAX_PARTICIPANT_NAME_LENGTH } from '@/domain/participantNames';
 import { convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks } from '@/domain/creationPlanTransitions';
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
 import { configuredPlayingDays, followingPlayingDate, playingRounds, suggestDaySplit, type PlayingDayBreak } from '@/domain/playingDays';
@@ -683,6 +683,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   // Keep controls mounted at a stable height even when all entries fit.
   const showRosterNavigation = participants.length > 0;
   const [recentlyRemovedParticipant, setRecentlyRemovedParticipant] = useState<{ participant: ParticipantDraft; index: number } | null>(null);
+  const [undoRemoveError, setUndoRemoveError] = useState('');
   const [groupRecommendationNotice, setGroupRecommendationNotice] = useState<string | null>(null);
   const previousRosterCount = useRef<number>(restoredDraft?.participants.length ?? 0);
   const [participantForm, setParticipantForm] = useState<ParticipantFields>(restoredDraft?.participantForm ?? emptyParticipantFields());
@@ -893,9 +894,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
 
   const participantCount = participants.filter((participant) => participantIsComplete(participant, discipline)).length;
   const incompleteSavedParticipants = participants.length - participantCount;
-  const savedParticipantNamesValid = useMemo(
-    () => validParticipantRoster(participants, discipline), [participants, discipline]);
-  const participantsValid = participantCount >= 2 && incompleteSavedParticipants === 0 && savedParticipantNamesValid && !rosterReviewRequired;
+  const invalidRosterIndices = useMemo(
+    () => invalidParticipantRosterIndices(participants, discipline), [participants, discipline]);
+  const savedParticipantNamesValid = invalidRosterIndices.size === 0;
+  const participantsValid = participantCount >= 2 && savedParticipantNamesValid && !rosterReviewRequired;
   const participantErrorMessages = uniqueErrorMessages(participantErrors);
 
   const defaultMaxGroups = Math.max(2, Math.ceil(participantCount / (participantCount >= 20 ? 5 : 4)));
@@ -1026,6 +1028,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
         participant.id === editingParticipantId ? { ...participant, ...participantForm } : participant
       )));
     } else {
+      setRecentlyRemovedParticipant(null);
+      setUndoRemoveError('');
       setRosterBackStack([]);
       setRosterFirstIndex(Math.floor(participants.length / rosterPageSize) * rosterPageSize);
       setParticipants((current) => [...current, newParticipant(participantForm)]);
@@ -1057,6 +1061,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const index = participants.findIndex((participant) => participant.id === id);
     if (index < 0) return;
     setRecentlyRemovedParticipant({ participant: participants[index], index });
+    setUndoRemoveError('');
     setParticipants((current) => current.filter((participant) => participant.id !== id));
     if (editingParticipantId === id) resetParticipantEditor();
   }
@@ -1064,17 +1069,26 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   function undoRemoveParticipant() {
     if (!recentlyRemovedParticipant) return;
     const { participant, index } = recentlyRemovedParticipant;
-    setParticipants((current) => current.some((item) => item.id === participant.id)
-      ? current : [...current.slice(0, index), participant, ...current.slice(index)]);
+    const restored = [...participants.slice(0, index), participant, ...participants.slice(index)];
+    if (participants.some((item) => item.id === participant.id)
+      || invalidParticipantRosterIndices(restored, discipline).size > invalidRosterIndices.size) {
+      setUndoRemoveError('Wiederherstellung nicht möglich: Der Eintrag würde die Teilnehmerliste ungültig machen.');
+      setRecentlyRemovedParticipant(null);
+      return;
+    }
+    setParticipants(restored);
     setRecentlyRemovedParticipant(null);
+    setUndoRemoveError('');
   }
 
-  function removeIncompleteParticipants() {
-    setParticipants((current) => current.filter((participant) => participantIsComplete(participant, discipline)));
-    if (editingParticipantId && participants.some((participant) =>
-      participant.id === editingParticipantId && !participantIsComplete(participant, discipline))) {
-      resetParticipantEditor();
-    }
+  function removeInvalidParticipants() {
+    const invalidIds = new Set(participants.filter((_, index) => invalidRosterIndices.has(index)).map((entry) => entry.id));
+    setParticipants((current) => current.filter((entry) => !invalidIds.has(entry.id)));
+    if (editingParticipantId && invalidIds.has(editingParticipantId)) resetParticipantEditor();
+    setRecentlyRemovedParticipant(null);
+    setUndoRemoveError('');
+    setRosterBackStack([]);
+    setRosterFirstIndex(0);
   }
 
   function generateTestParticipants() {
@@ -2090,8 +2104,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                          ) : (
                            <ScrollingParticipantName name={participantDisplayName(participant, discipline)} />
                          )}
-                         {!participantIsComplete(participant, discipline) && (
-                           <span className="participant-incomplete" role="img" aria-label="Eintrag unvollständig" title="Eintrag muss ergänzt werden.">!</span>
+                         {invalidRosterIndices.has(visibleRosterStart + index) && (
+                           <span className="participant-incomplete" role="img" aria-label="Eintrag fehlerhaft" title="Unvollständiger, ungültiger oder doppelter Eintrag.">!</span>
                          )}
                        </div>
                        <div className="participant-list-actions">
@@ -2122,12 +2136,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               <span>„{participantDisplayName(recentlyRemovedParticipant.participant, discipline)}“ wurde entfernt.</span>
               <button className="btn small" type="button" onClick={undoRemoveParticipant}>Rückgängig</button>
             </div>}
-            {!savedParticipantNamesValid && <p className="field-error" role="alert">Mindestens ein gespeicherter Teilnehmereintrag ist unvollständig oder doppelt. Bitte die Teilnehmerliste überprüfen.</p>}
-            {incompleteSavedParticipants > 0 && (
+            {undoRemoveError && <p className="field-error" role="alert">{undoRemoveError}</p>
+            {!savedParticipantNamesValid && <p className="field-error" role="alert">Mindestens ein gespeicherter Teilnehmereintrag ist unvollständig, ungültig oder doppelt. Bitte die markierten Einträge überprüfen.</p>}
+            {invalidRosterIndices.size > 0 && (
               <div className="wizard-invalid-participants" role="status">
-                <span><strong>{incompleteSavedParticipants} unvollständige {incompleteSavedParticipants === 1 ? 'Eintragung' : 'Eintragungen'}</strong> · Du kannst sie ergänzen oder gesammelt entfernen.</span>
-                <button type="button" className="btn small danger-outline" onClick={removeIncompleteParticipants}>
-                  Unvollständige Einträge entfernen
+                <span><strong>{invalidRosterIndices.size} fehlerhafte {invalidRosterIndices.size === 1 ? 'Eintragung' : 'Eintragungen'}</strong> · Der erste gültige Eintrag bei einem Namensduplikat bleibt erhalten.</span>
+                <button type="button" className="btn small danger-outline" onClick={removeInvalidParticipants}>
+                  Alle fehlerhaften Einträge entfernen
                 </button>
               </div>
             )}
