@@ -726,6 +726,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     phaseId: string;
     nextBreaks: PlayingDayBreak[];
     shifted: ShiftedPlayingDate[];
+    operation: 'insert' | 'move';
   } | null>(null);
   const [phaseLimitError, setPhaseLimitError] = useState('');
   const [editingPhaseTypeId, setEditingPhaseTypeId] = useState<string | null>(null);
@@ -2562,7 +2563,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                       const inlineBreakRounds = phase.type === 'SWISS' ? phase.swissRounds
                         : phase.type === 'KNOCKOUT' ? knockoutRounds.length : 0;
                       const dayRoundCount = playingRounds(phase);
-                      const inlineBreakActive = inlineBreakRounds > 1 && phase.inlineBreakAfterRound > 0;
+                      const invalidInlineBreak = phase.inlineBreakAfterRound > 0
+                        && (inlineBreakRounds <= 1 || phase.inlineBreakAfterRound >= inlineBreakRounds);
+                      const inlineBreakActive = !invalidInlineBreak && inlineBreakRounds > 1 && phase.inlineBreakAfterRound > 0;
+                      const freeDayBreakRounds = availableDayBreakRounds(dayRoundCount, phase.dayBreaks, phase.inlineBreakAfterRound);
                       const inlineBreakExpanded = expandedInlineBreakIds.includes(phase.id);
                       const editingPhaseType = editingPhaseTypeId === phase.id;
                       const isExpanded = expandedPhaseId === phase.id;
@@ -2953,15 +2957,20 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                               <div className="playing-day-editor-heading">
                                 <div><strong>Spieltage innerhalb der Phase</strong>
                                   <p className="field-hint">Unterbrechung nach einer vollständigen Runde mit konkreter Fortsetzung am nächsten Spieltag.</p></div>
-                                <button type="button" className="btn small" disabled={dayRoundCount < 2 || phase.dayBreaks.length >= dayRoundCount - 1 || configuredPlayingDays(phaseDrafts) >= 14 || countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES}
+                                <button type="button" className="btn small"
+                                  disabled={freeDayBreakRounds.length === 0 || configuredPlayingDays(phaseDrafts) >= 14
+                                    || countCreationScheduleEntries(phaseDrafts, awardsEnabled) + 2 > MAX_CREATION_SCHEDULE_ENTRIES}
+                                  title={freeDayBreakRounds.length === 0
+                                    ? 'Keine freie Rundengrenze: Hier liegt bereits eine Zwischenpause oder ein Spieltagsende.'
+                                    : undefined}
                                   onClick={() => {
-                                    const available = Array.from({ length: dayRoundCount - 1 }, (_, i) => i + 1)
-                                      .find((round) => round !== phase.inlineBreakAfterRound && !phase.dayBreaks.some((item) => item.afterRound === round));
+                                    const available = freeDayBreakRounds[0];
                                     if (!available) return;
                                     const insertion = proposePlayingDayInsertion(phase.dayBreaks, available,
                                       (plannedPhaseStart ?? scheduledStart).slice(0, 10));
                                     if (insertion.shifted.length) {
-                                      setPendingDayInsertion({ phaseId: phase.id, nextBreaks: insertion.dayBreaks, shifted: insertion.shifted });
+                                      setPendingDayInsertion({ phaseId: phase.id, nextBreaks: insertion.dayBreaks,
+                                        shifted: insertion.shifted, operation: 'insert' });
                                     } else updatePhase(phase.id, { dayBreaks: insertion.dayBreaks });
                                   }}>+ Spieltagsende nach Runde</button>
                               </div>
@@ -2969,10 +2978,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                 const boundaryTime = plannedTimeline.items.find((item) => item.id === `day-break-${index + 1}-${boundary.afterRound}`)?.at;
                                 return <div className="playing-day-editor-row" key={position}>
                                   <label className="field">Nach Runde
-                                    <select value={boundary.afterRound} onChange={(event) => updatePhase(phase.id, {
-                                      dayBreaks: phase.dayBreaks.map((item, i) => i === position
-                                        ? { ...item, afterRound: Number(event.target.value) } : item),
-                                    })}>
+                                    <select value={boundary.afterRound} onChange={(event) => {
+                                      const moved = proposePlayingDayMove(phase.dayBreaks, boundary.afterRound,
+                                        Number(event.target.value), (plannedPhaseStart ?? scheduledStart).slice(0, 10));
+                                      if (moved.shifted.length) {
+                                        setPendingDayInsertion({ phaseId: phase.id, nextBreaks: moved.dayBreaks,
+                                          shifted: moved.shifted, operation: 'move' });
+                                      } else updatePhase(phase.id, { dayBreaks: moved.dayBreaks });
+                                    }}>
                                       {Array.from({ length: dayRoundCount - 1 }, (_, i) => i + 1)
                                         .filter((round) => round === boundary.afterRound || (round !== phase.inlineBreakAfterRound && !phase.dayBreaks.some((entry) => entry.afterRound === round)))
                                         .map((round) => <option value={round} key={round}>Runde {round}</option>)}
@@ -2993,6 +3006,16 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                 </div>;
                               })}
                             </section>
+                          )}
+                          {isExpanded && invalidInlineBreak && (
+                            <div className="phase-review-acknowledgement" role="alert">
+                              <span>Die bisherige Zwischenpause nach Runde {phase.inlineBreakAfterRound} ist nicht mehr möglich:
+                                Diese Phase hat keine entsprechende Rundengrenze mehr. Entferne die Pause, um den Plan wieder gültig zu machen.</span>
+                              <button type="button" className="btn small danger-outline"
+                                onClick={() => updatePhase(phase.id, { inlineBreakAfterRound: 0 }, true)}>
+                                Ungültige Zwischenpause entfernen
+                              </button>
+                            </div>
                           )}
                           {isExpanded && inlineBreakActive && (
                             <section
@@ -3535,8 +3558,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           <section className="sport-change-dialog" role="alertdialog" aria-modal="true"
             aria-label="Folgetermine für Spieltage anpassen?"
             onKeyDown={(event) => { if (event.key === 'Escape') setPendingDayInsertion(null); }}>
-            <h2>Nachfolgende Spieltage verschieben?</h2>
-            <p>Damit die neu eingefügte Unterbrechung in der richtigen Reihenfolge liegt, müssen folgende Fortsetzungstermine angepasst werden:</p>
+            <h2>Folgetermine der Spieltage anpassen?</h2>
+            <p>Damit die {pendingDayInsertion.operation === 'insert' ? 'neu eingefügte' : 'verschobene'} Unterbrechung in der richtigen Reihenfolge liegt, müssen folgende Fortsetzungstermine angepasst werden:</p>
             <ul className="wizard-confirm-details">
               {pendingDayInsertion.shifted.map((item) =>
                 <li key={item.afterRound}>Nach Runde {item.afterRound}: {item.previousDate} → {item.nextDate}</li>)}
@@ -3547,7 +3570,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 const { phaseId, nextBreaks } = pendingDayInsertion;
                 setPendingDayInsertion(null);
                 updatePhase(phaseId, { dayBreaks: nextBreaks });
-              }}>Spieltagswechsel mit neuen Terminen einfügen</button>
+              }}>{pendingDayInsertion.operation === 'insert' ? 'Spieltagswechsel einfügen' : 'Spieltagswechsel verschieben'} und Folgetermine übernehmen</button>
             </div>
           </section>
         </div>
