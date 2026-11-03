@@ -3132,7 +3132,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                     const minimumDate = earliestRoundContinuationDate(
                                       scheduledStart, phaseScheduleProposals, index, available);
                                     const insertion = proposePlayingDayInsertion(phase.dayBreaks, available,
-                                      followingPlayingDate(minimumDate, -1));
+                                      (plannedPhaseStart ?? scheduledStart).slice(0, 10),
+                                      '09:00', minimumDate);
                                     if (insertion.shifted.length) {
                                       setPendingDayInsertion({ phaseId: phase.id, nextBreaks: insertion.dayBreaks,
                                         shifted: insertion.shifted, operation: 'insert' });
@@ -3144,8 +3145,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                 return <div className="playing-day-editor-row" key={position}>
                                   <label className="field">Nach Runde
                                     <select value={boundary.afterRound} onChange={(event) => {
+                                      const movedRound = Number(event.target.value);
+                                      const minimum = earliestRoundContinuationDate(
+                                        scheduledStart, phaseScheduleProposals, index, movedRound);
                                       const moved = proposePlayingDayMove(phase.dayBreaks, boundary.afterRound,
-                                        Number(event.target.value), (plannedPhaseStart ?? scheduledStart).slice(0, 10));
+                                        movedRound, (plannedPhaseStart ?? scheduledStart).slice(0, 10), minimum);
                                       if (moved.shifted.length) {
                                         setPendingDayInsertion({ phaseId: phase.id, nextBreaks: moved.dayBreaks,
                                           shifted: moved.shifted, operation: 'move' });
