@@ -2829,7 +2829,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                   <div className="recommendation-period-column">
                     <div className="field tournament-day-count">
                       <label htmlFor="planned-playing-days">Spieltage</label>
-                      <RecommendationNumberStepper id="planned-playing-days" label="Geplante Anzahl an Spieltagen"
+                      <RecommendationNumberStepper key={pendingTournamentMode ? 'confirm-single-day' : 'stable-playing-days'}
+                        id="planned-playing-days" label="Geplante Anzahl an Spieltagen"
                         value={tournamentMode === 'single' ? 1 : plannedDays} min={1} max={14}
                         onChange={changePlannedPlayingDays}/>
                     </div>
