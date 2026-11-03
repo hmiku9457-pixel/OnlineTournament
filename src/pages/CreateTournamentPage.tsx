@@ -58,7 +58,7 @@ import { availableDayBreakRounds, convertToSingleDay, singleDayFixedPauseConflic
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
 import { configuredPlayingDays, followingPlayingDate, playingRounds, type PlayingDayBreak } from '@/domain/playingDays';
 import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays, recommendationEndTimePenalty } from '@/domain/creationPlanRecommendations';
-import { initialEarlierDaysMinutes, earliestLinkedEnd, linkedDuration, linkedEndTime,
+import { initialEarlierDaysMinutes, linkedDurationAt, linkedEndDateTime,
   maximumLinkedActiveDuration, rebalanceEarlierDays } from '@/domain/linkedCreationTime';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
 import { buildPlannedTimeline, formatPlannedDateTime, parseLocalDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, playingDayOverflowWarnings, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
@@ -795,6 +795,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const [maxSwissRounds, setMaxSwissRounds] = useState<number | null>(restoredDraft?.maxSwissRounds ?? null);
   const [knockoutQualifierCount, setKnockoutQualifierCount] = useState<number | null>(restoredDraft?.knockoutQualifierCount ?? null);
   const [preferredDurationMinutes, setPreferredDurationMinutes] = useState(restoredDraft?.preferredDurationMinutes ?? DEFAULT_RECOMMENDATION_DURATION);
+  const [preferredTimePriority, setPreferredTimePriority] = useState<'duration' | 'end'>(restoredDraft?.preferredTimePriority ?? 'duration');
+  const [preferredFixedEndAt, setPreferredFixedEndAt] = useState<string | null>(restoredDraft?.preferredFixedEndAt ?? null);
   const [preferredEarlierDaysMinutes, setPreferredEarlierDaysMinutes] = useState(
     restoredDraft?.preferredEarlierDaysMinutes
       ?? initialEarlierDaysMinutes(restoredDraft?.preferredDurationMinutes ?? DEFAULT_RECOMMENDATION_DURATION,
@@ -901,6 +903,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     setSelectedRecommendationId(null);
     setTournamentMode('single');
     setPreferredEarlierDaysMinutes(0);
+    setPreferredTimePriority('duration');
+    setPreferredFixedEndAt(null);
     setPhaseLimitError('');
     setPendingTournamentMode(null);
   }
@@ -908,17 +912,47 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   function changePreferredDuration(next: number) {
     const maximum = maximumLinkedActiveDuration(linkedTimeSettings);
     const bounded = Math.max(MIN_RECOMMENDATION_DURATION, Math.min(maximum, next));
-    setPreferredEarlierDaysMinutes((earlier) => rebalanceEarlierDays(bounded, {
-      scheduledStart, days: tournamentMode === 'multi' ? plannedDays : 1, earlierDaysMinutes: earlier,
-    }));
+    const earlier = rebalanceEarlierDays(bounded, linkedTimeSettings);
+    setPreferredEarlierDaysMinutes(earlier);
     setPreferredDurationMinutes(bounded);
+    if (preferredTimePriority === 'end') setPreferredFixedEndAt(
+      linkedEndDateTime(bounded, { ...linkedTimeSettings, earlierDaysMinutes: earlier }));
   }
   function adjustPreferredDuration(delta: number) {
-    changePreferredDuration(preferredDurationMinutes + delta);
+    changePreferredDuration(displayedPreferredDuration + delta);
   }
   function changePreferredEndTime(clock: string) {
-    const proposed = linkedDuration(clock, linkedTimeSettings);
-    if (proposed !== null) setPreferredDurationMinutes(proposed);
+    const at = `${preferredEndDate}T${clock}`;
+    const proposed = linkedDurationAt(at, linkedTimeSettings);
+    if (proposed !== null) {
+      setPreferredDurationMinutes(proposed);
+      setPreferredFixedEndAt(at);
+    }
+  }
+  function changePreferredEndDay(offset: 0 | 1) {
+    if (tournamentMode !== 'single') return;
+    const date = offset ? followingPlayingDate(scheduledDate, 1) : scheduledDate;
+    let at = `${date}T${preferredEndClock ?? '00:00'}`;
+    let proposed = linkedDurationAt(at, linkedTimeSettings);
+    if (proposed === null) {
+      const start = parseLocalDateTime(scheduledStart);
+      const midnight = parseLocalDateTime(`${date}T00:00`);
+      if (!start || !midnight) return;
+      const minimum = Math.max(MIN_RECOMMENDATION_DURATION,
+        offset ? Math.ceil((midnight.getTime() - start.getTime()) / 60000) : MIN_RECOMMENDATION_DURATION);
+      at = linkedEndDateTime(minimum, linkedTimeSettings) ?? '';
+      if (at.slice(0, 10) !== date) return;
+      proposed = linkedDurationAt(at, linkedTimeSettings);
+    }
+    if (proposed !== null) {
+      setPreferredDurationMinutes(proposed);
+      setPreferredFixedEndAt(at);
+    }
+  }
+  function changePreferredTimePriority(next: 'duration' | 'end') {
+    if (next === 'end') setPreferredFixedEndAt(preferredEndDateTime);
+    else setPreferredDurationMinutes(displayedPreferredDuration);
+    setPreferredTimePriority(next);
   }
 
   // Temporary recovery stays per tab. Saved, named drafts live separately.
@@ -928,7 +962,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     customTables, venueLayoutEnabled, venueLayout, venueLayoutCustomized, participants, participantForm,
     editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
-    knockoutQualifierCount, preferredDurationMinutes, preferredEarlierDaysMinutes, tournamentMode, plannedDays, awardsEnabled,
+    knockoutQualifierCount, preferredDurationMinutes, preferredEarlierDaysMinutes,
+    preferredTimePriority, preferredFixedEndAt, tournamentMode, plannedDays, awardsEnabled,
     pendingDependentChange: pendingPhaseChange, timeValuesReviewRequired,
     awardsAtOverride: prestartManualCeremony ? prestartCeremonyAt : awardsAtOverride,
   }), [
@@ -937,7 +972,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
     editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
-    knockoutQualifierCount, preferredDurationMinutes, preferredEarlierDaysMinutes, tournamentMode, plannedDays, awardsEnabled, awardsAtOverride,
+    knockoutQualifierCount, preferredDurationMinutes, preferredEarlierDaysMinutes,
+    preferredTimePriority, preferredFixedEndAt, tournamentMode, plannedDays, awardsEnabled, awardsAtOverride,
     pendingPhaseChange, timeValuesReviewRequired, prestartCeremonyAt, prestartManualCeremony?.at,
   ]);
   const latestDraftSnapshot = useRef(draftSnapshot);
@@ -1128,13 +1164,26 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     earlierDaysMinutes: tournamentMode === 'multi' ? preferredEarlierDaysMinutes : 0,
   };
   const preferredDurationMaximum = maximumLinkedActiveDuration(linkedTimeSettings);
-  const preferredEndClock = linkedEndTime(preferredDurationMinutes, linkedTimeSettings);
-  const earliestPreferredEnd = earliestLinkedEnd(linkedTimeSettings);
-
-  const preferredEndDate = tournamentMode === 'multi'
-    ? followingPlayingDate(scheduledDate, plannedDays - 1) : scheduledDate;
-  const preferredEndDateTime = `${preferredEndDate}T${preferredEndClock ?? ''}`;
-  const preferredEndTimeValid = Boolean(preferredEndClock && parseLocalDateTime(preferredEndDateTime));
+  const fixedPreferredDuration = preferredTimePriority === 'end' && preferredFixedEndAt
+    ? linkedDurationAt(preferredFixedEndAt, linkedTimeSettings) : null;
+  const displayedPreferredDuration = preferredTimePriority === 'end' && preferredFixedEndAt
+    ? fixedPreferredDuration ?? preferredDurationMinutes : preferredDurationMinutes;
+  const preferredEndDateTime = preferredTimePriority === 'end' && preferredFixedEndAt
+    ? preferredFixedEndAt : linkedEndDateTime(displayedPreferredDuration, linkedTimeSettings);
+  const preferredEndClock = preferredEndDateTime?.slice(11, 16) ?? null;
+  const preferredEndDate = preferredEndDateTime?.slice(0, 10)
+    ?? (tournamentMode === 'multi' ? followingPlayingDate(scheduledDate, plannedDays - 1) : scheduledDate);
+  const earliestEndAt = linkedEndDateTime(MIN_RECOMMENDATION_DURATION, linkedTimeSettings);
+  const latestEndAt = tournamentMode === 'single'
+    ? linkedEndDateTime(MAX_SINGLE_DAY_DURATION, linkedTimeSettings) : null;
+  const earliestPreferredEnd = earliestEndAt?.slice(0, 10) === preferredEndDate
+    ? earliestEndAt.slice(11, 16) : undefined;
+  const latestPreferredEnd = latestEndAt?.slice(0, 10) === preferredEndDate
+    ? latestEndAt.slice(11, 16) : undefined;
+  const preferredEndDayOffset = tournamentMode === 'single' && preferredEndDate !== scheduledDate ? 1 : 0;
+  const canEndOnStartDay = linkedDurationAt(`${scheduledDate}T23:59`, linkedTimeSettings) !== null;
+  const preferredEndTimeValid = Boolean(preferredEndDateTime && parseLocalDateTime(preferredEndDateTime)
+    && (preferredTimePriority !== 'end' || !preferredFixedEndAt || fixedPreferredDuration !== null));
   const allRecommendations = useMemo(
     () => recommendTournamentFormats(
       { playerCount: participantCount, tableCount: tables, minimumMatches, sport, matchDurationMinutes, venueTurnoverMinutes: breakMinutes },
@@ -1144,8 +1193,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
         maxSwissRounds: effectiveMaxSwissRounds,
         knockoutQualifierCount: effectiveKnockoutQualifierCount,
         preferredDurationMinutes: tournamentMode === 'multi'
-          ? preferredDurationMinutes : Math.min(preferredDurationMinutes, MAX_SINGLE_DAY_DURATION),
-        requireDecisiveWinner: true,
+          ? displayedPreferredDuration : Math.min(displayedPreferredDuration, MAX_SINGLE_DAY_DURATION),
         maxResults: 0,
       },
     ),
@@ -1161,7 +1209,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       effectiveMaxGroups,
       effectiveMaxSwissRounds,
       effectiveKnockoutQualifierCount,
-      preferredDurationMinutes,
+      displayedPreferredDuration,
     ],
   );
 
@@ -1185,10 +1233,16 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     participantCount, tables, timedSport, matchDurationMinutes, breakMinutes, sport,
     awardsEnabled, awardsAtOverride, preferredEndDateTime, preferredEndTimeValid]);
   // Do not discard the sixth viable suggestion before checking the first five.
-  const visibleRecommendationChoices = useMemo(() => [
-    ...assessedRecommendations.filter(({ assessment }) => assessment.feasible),
-    ...assessedRecommendations.filter(({ assessment }) => !assessment.feasible),
-  ].slice(0, 5), [assessedRecommendations]);
+  const visibleRecommendationChoices = useMemo(() => {
+    const feasible = assessedRecommendations.filter(({ assessment }) => assessment.feasible);
+    const others = assessedRecommendations.filter(({ assessment }) => !assessment.feasible);
+    const selected = [...feasible, ...others].slice(0, 5);
+    const rankingFinal = feasible.find(({ item }) => item.phases.length > 1
+      && item.phases.at(-1)?.type !== 'KNOCKOUT');
+    if (rankingFinal && selected.length && !selected.some(({ item }) => item.phases.length > 1
+      && item.phases.at(-1)?.type !== 'KNOCKOUT')) selected[selected.length - 1] = rankingFinal;
+    return selected;
+  }, [assessedRecommendations]);
   const recommendations = useMemo(() => visibleRecommendationChoices.map(({ item }) => item),
     [visibleRecommendationChoices]);
   const recommendationAssessments = useMemo(() => visibleRecommendationChoices.map(({ assessment }) => assessment),
@@ -2237,7 +2291,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const ceremonyIssue = awardsEnabled && (!isValidLocalDateTime(awardsAt)
     || (plannedTimeline.estimatedEnd && awardsAt < plannedTimeline.estimatedEnd))
     ? 'Die Siegerehrung muss am oder nach dem voraussichtlichen Turnierende liegen.' : null;
-  const scheduleIssues = [...validatePlannedSchedule(plannedSchedule), ...plannedTimelineConflicts(plannedTimeline), ...playingDayOverflowWarnings(plannedTimeline), ...(ceremonyIssue ? [ceremonyIssue] : [])];
+  const scheduleIssues = [...validatePlannedSchedule(plannedSchedule), ...plannedTimelineConflicts(plannedTimeline), ...playingDayOverflowWarnings(plannedTimeline, tournamentMode === 'single'), ...(ceremonyIssue ? [ceremonyIssue] : [])];
   const prestartIssues = prestart
     ? [...validatePrestartPhases(prestartPhaseDrafts, prestart.activeParticipants), ...validatePlannedSchedule(plannedTimeline.items), ...plannedTimelineConflicts(plannedTimeline),
       ...(prestartManualCeremony && prestartCeremonyAt < plannedTimeline.estimatedEnd
@@ -2745,7 +2799,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     <label className="tournament-mode-option">
                       <input type="radio" name="tournament-mode" checked={tournamentMode === 'multi'}
                         onChange={() => {
-                          setPreferredEarlierDaysMinutes(initialEarlierDaysMinutes(preferredDurationMinutes, plannedDays));
+                          setPreferredEarlierDaysMinutes(initialEarlierDaysMinutes(displayedPreferredDuration, plannedDays));
+                          setPreferredTimePriority('duration');
+                          setPreferredFixedEndAt(null);
+                          setPreferredDurationMinutes(displayedPreferredDuration);
                           setTournamentMode('multi');
                         }}/>
                       <span>Mehrtägig</span>
@@ -2755,7 +2812,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     <label htmlFor="planned-playing-days">Spieltage</label>
                     <RecommendationNumberStepper id="planned-playing-days" label="Geplante Anzahl an Spieltagen"
                       value={plannedDays} min={2} max={14} onChange={(next) => {
-                        setPreferredEarlierDaysMinutes(initialEarlierDaysMinutes(preferredDurationMinutes, next));
+                        setPreferredEarlierDaysMinutes(initialEarlierDaysMinutes(displayedPreferredDuration, next));
+                        setPreferredTimePriority('duration');
+                        setPreferredFixedEndAt(null);
+                        setPreferredDurationMinutes(displayedPreferredDuration);
                         setPlannedDays(next);
                       }}/>
                   </div>}
@@ -2765,14 +2825,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                       <div className="recommendation-duration-stepper" role="group" aria-label="Geplante Turnierdauer anpassen">
                         <button type="button" className="recommendation-number-stepper-button"
                           aria-label="Geplante Turnierdauer um 15 Minuten verringern"
-                          disabled={preferredDurationMinutes <= MIN_RECOMMENDATION_DURATION}
+                          disabled={displayedPreferredDuration <= MIN_RECOMMENDATION_DURATION}
                           onClick={() => adjustPreferredDuration(-15)}>−</button>
-                        <RecommendationDurationPicker value={preferredDurationMinutes}
+                        <RecommendationDurationPicker value={displayedPreferredDuration}
                           multiDay={tournamentMode === 'multi'} maximumMinutes={preferredDurationMaximum}
                           onChange={changePreferredDuration}/>
                         <button type="button" className="recommendation-number-stepper-button"
                           aria-label="Geplante Turnierdauer um 15 Minuten erhöhen"
-                          disabled={preferredDurationMinutes >= preferredDurationMaximum}
+                          disabled={displayedPreferredDuration >= preferredDurationMaximum}
                           onClick={() => adjustPreferredDuration(15)}>+</button>
                       </div>
                       <span className="field-hint">Aktive Spielzeit ohne Nächte</span>
@@ -2781,14 +2841,26 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                       <label htmlFor="preferred-end-time">Gewünschte Endzeit</label>
                       <ClockTimePicker id="preferred-end-time" label="Gewünschte Endzeit"
                         value={preferredEndClock ?? '--:--'} minTime={earliestPreferredEnd}
-                        onChange={changePreferredEndTime}/>
-                      <span className="field-hint">
-                        {tournamentMode === 'multi'
-                          ? `Letzter Spieltag (${preferredEndDate.slice(8, 10)}.${preferredEndDate.slice(5, 7)}.)`
-                          : 'Am Turniertag'}
-                      </span>
+                        maxTime={latestPreferredEnd} onChange={changePreferredEndTime}/>
+                      {tournamentMode === 'single' ? (
+                        <select className="recommendation-end-day-choice" aria-label="Tag der gewünschten Endzeit"
+                          value={preferredEndDayOffset} onChange={(event) =>
+                            changePreferredEndDay(Number(event.target.value) as 0 | 1)}>
+                          <option value={0} disabled={!canEndOnStartDay}>Am Starttag</option>
+                          <option value={1}>Am Folgetag ({followingPlayingDate(scheduledDate, 1).slice(8, 10)}.{followingPlayingDate(scheduledDate, 1).slice(5, 7)}.)</option>
+                        </select>
+                      ) : <span className="field-hint">
+                        Letzter Spieltag ({preferredEndDate.slice(8, 10)}.{preferredEndDate.slice(5, 7)}.)
+                      </span>}
                     </div>
                   </div>
+                  <fieldset className="recommendation-time-priority">
+                    <legend>Bei fortschreitender Zeit festhalten</legend>
+                    <label><input type="radio" name="preferred-time-priority" checked={preferredTimePriority === 'duration'}
+                      onChange={() => changePreferredTimePriority('duration')}/> Turnierdauer</label>
+                    <label><input type="radio" name="preferred-time-priority" checked={preferredTimePriority === 'end'}
+                      onChange={() => changePreferredTimePriority('end')}/> Endzeit</label>
+                  </fieldset>
                   {tournamentMode === 'multi' && <p className="field-hint recommendation-linked-explanation">
                     Die Spielzeit vor dem letzten Tag bleibt bei Änderungen unverändert
                     ({formatRecommendationDuration(preferredEarlierDaysMinutes)}).
@@ -2796,8 +2868,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     Die tatsächlichen Spieltage legst du in Schritt 4 fest.
                   </p>}
                   {!preferredEndTimeValid && <p className="field-error" role="status">
-                    Für diese Dauer und Startzeit ist kein Ende am angegebenen Spieltag möglich.
-                    Bitte eine kürzere Dauer oder eine frühere Startzeit wählen.
+                    Die festgehaltene Endzeit liegt nicht mehr mindestens 15 Minuten nach dem Beginn
+                    oder überschreitet den zulässigen Turnierzeitraum. Bitte das Ziel anpassen.
                   </p>}
                 </div>
                 <div className="format-setting-fields">
@@ -2931,9 +3003,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     </div>
                     {index === firstSelectableRecommendationIndex && recommendationFeasible && !item.minimumMatchShortfall && (
                       <p className="recommendation-reason">
-                        {item.estimatedDurationMinutes <= preferredDurationMinutes
-                          ? `Warum empfohlen: Erfüllt dein Mindestspielziel. Gewünschte Dauer: ${formatRecommendationDuration(preferredDurationMinutes)}, Endzeit: ${preferredEndClock ?? 'nicht möglich'} Uhr; geschätztes Ende: ${assessment.estimatedEnd ? formatPlannedDateTime(assessment.estimatedEnd) : 'noch offen'}.`
-                          : `Warum empfohlen: Erfüllt dein Mindestspielziel, überschreitet aber die gewünschte Dauer von ${formatRecommendationDuration(preferredDurationMinutes)} (Endzeit ${preferredEndClock ?? 'nicht möglich'} Uhr).`}
+                        {item.estimatedDurationMinutes <= displayedPreferredDuration
+                          ? `Warum empfohlen: Erfüllt dein Mindestspielziel. Gewünschte Dauer: ${formatRecommendationDuration(displayedPreferredDuration)}, Endzeit: ${preferredEndClock ?? 'nicht möglich'} Uhr; geschätztes Ende: ${assessment.estimatedEnd ? formatPlannedDateTime(assessment.estimatedEnd) : 'noch offen'}.`
+                          : `Warum empfohlen: Erfüllt dein Mindestspielziel, überschreitet aber die gewünschte Dauer von ${formatRecommendationDuration(displayedPreferredDuration)} (Endzeit ${preferredEndClock ?? 'nicht möglich'} Uhr).`}
                       </p>
                     )}
                   </button>;
