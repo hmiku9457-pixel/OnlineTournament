@@ -106,6 +106,19 @@ try {
       recommendationsWidth: recommendations.width } : null;
   });
   assert.ok(step3Layout, 'settings and recommendations must both be rendered');
+  const getTimeFieldPositions = () => page.evaluate(() => {
+    const duration = document.querySelector('.tournament-mode-setting .recommendation-duration-field')?.getBoundingClientRect();
+    const end = document.querySelector('.tournament-mode-setting .recommendation-end-time-field')?.getBoundingClientRect();
+    return duration && end ? { durationX: duration.x, endX: end.x,
+      durationY: duration.y, endY: end.y, durationWidth: duration.width,
+      endWidth: end.width } : null;
+  });
+  const initialPositions = await getTimeFieldPositions();
+  assert.ok(initialPositions);
+  assert.ok(initialPositions.durationX < initialPositions.endX,
+    'the duration is always positioned left of the end time');
+  assert.ok(Math.abs(initialPositions.durationY - initialPositions.endY) <= 2,
+    'duration and end-time controls share one aligned settings row');
   assert.ok(step3Layout.settingsBottom <= step3Layout.recommendationsTop,
     'settings sit above, rather than to the right of, recommendations');
   assert.ok(Math.abs(step3Layout.settingsWidth - step3Layout.recommendationsWidth) <= 2,
@@ -171,6 +184,12 @@ try {
   await page.getByRole('button', { name: 'Geplante Turnierdauer um 15 Minuten erhöhen' }).click();
   assert.equal(await page.locator('#preferred-derived-end').innerText(), '11:25 Uhr');
   await page.getByRole('radio', { name: 'Endzeit', exact: true }).check();
+  const endModePositions = await getTimeFieldPositions();
+  assert.ok(endModePositions);
+  assert.ok(Math.abs(endModePositions.durationX - initialPositions.durationX) <= 1
+    && Math.abs(endModePositions.endX - initialPositions.endX) <= 1
+    && Math.abs(endModePositions.durationY - initialPositions.durationY) <= 2,
+  'switching between time targets must not swap or move either field');
   assert.equal(await page.locator('#preferred-duration').count(), 0,
     'selecting an end time hides the editable duration control');
   assert.equal(await page.locator('#preferred-derived-duration').innerText(), '2 Std. 25 Min.',
@@ -194,6 +213,11 @@ try {
   assert.equal(await page.locator('#preferred-derived-duration').innerText(), '5 Std. 30 Min.',
     'the non-editable duration remains derived after draft recovery');
   await page.getByRole('radio', { name: 'Turnierdauer', exact: true }).check();
+  const durationModePositions = await getTimeFieldPositions();
+  assert.ok(durationModePositions);
+  assert.ok(Math.abs(durationModePositions.durationX - initialPositions.durationX) <= 1
+    && Math.abs(durationModePositions.endX - initialPositions.endX) <= 1,
+    'returning to duration mode keeps both fields at their original positions');
   assert.equal(await page.locator('#preferred-duration strong').innerText(), '5 Std. 30 Min.');
   assert.equal(await page.locator('#preferred-derived-end').innerText(), '14:30 Uhr',
     'switching back to duration retains the same derived end');
@@ -215,7 +239,7 @@ try {
   assert.equal(await page.locator('#preferred-duration strong').innerText(), '5 Std. 30 Min.',
     'the coupled duration must persist in the saved creation draft');
   assert.match(await page.locator('.format-settings-head').innerText(),
-    /Passe die Vorschläge an deine Veranstaltung an/,
+    /Diese Einstellungen steuern nur die Empfehlungen/,
     'the general recommendation policy belongs in the settings panel');
   const firstSuggestion = page.locator('.recommendation-list .recommendation').first();
   assert.doesNotMatch(await firstSuggestion.innerText(),

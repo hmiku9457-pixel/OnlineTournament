@@ -7828,6 +7828,13 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   font-weight: 750;
   font-variant-numeric: tabular-nums;
 }
+.wizard-workspace .format-step .recommendation-end-time-field > .field-hint {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  margin-top: 5px;
+  padding-top: 0;
+}
 .wizard-workspace .format-step .recommendation-linked-explanation {
   grid-column: 1 / -1;
   margin: 0;
