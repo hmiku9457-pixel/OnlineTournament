@@ -1670,6 +1670,16 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     const bestOf = phaseBestOfForSport(sport, type);
     phase.type = type;
     phase.label = stageLabel(type);
+    if (current[index].type === 'BREAK' && type !== 'BREAK') {
+      // Confirmed break conversion must not leave hidden fixed-deadline
+      // metadata or player-facing break notes in the competition stage.
+      phase.note = '';
+      phase.breakKind = 'minutes';
+      phase.breakMinutes = 15;
+      phase.breakUntilDate = '';
+      phase.nextDayDate = '';
+      phase.nextDayStart = '09:00';
+    }
     phase.bestOf = bestOf;
     if (type === 'GROUPS') {
       phase.groupCount = recommendGroupCount(phase.entrantCount, next.slice(index + 1).find((candidate) => candidate.type !== 'BREAK')?.entrantCount);
