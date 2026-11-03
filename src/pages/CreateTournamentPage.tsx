@@ -3672,7 +3672,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               {(automaticDayPlan?.changes ?? []).map((description, index) =>
                 <li key={index}>{description}</li>)}
             </ul>
-            {!automaticDayPlan?.changes?.length && <p className="field-hint">Es sind keine zusätzlichen Einstellungen zu ändern.</p>
+            {!automaticDayPlan?.changes?.length && <p className="field-hint">Es sind keine zusätzlichen Einstellungen zu ändern.</p>}
             <div className="sport-change-dialog-actions">
               <button className="btn" type="button" autoFocus onClick={() => setPendingAutomaticSplit(false)}>Bisherige Verteilung behalten</button>
               <button className="btn primary" type="button" onClick={applyAutomaticPlayingDays}>Neue Spieltage übernehmen</button>
