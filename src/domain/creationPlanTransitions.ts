@@ -77,8 +77,10 @@ export function phaseBreakLosses<T extends RoundDependentPhase & { id: string; l
   return before.flatMap((phase) => {
     const updated = afterById.get(phase.id);
     const retained = new Set(updated?.dayBreaks.map((boundary) => boundary.afterRound) ?? []);
+    // Moving a day break to another round is an edit, not a deletion.
+    const removedCount = Math.max(0, phase.dayBreaks.length - (updated?.dayBreaks.length ?? 0));
     const removedRounds = phase.dayBreaks.filter((boundary) => !retained.has(boundary.afterRound))
-      .map((boundary) => boundary.afterRound);
+      .slice(0, removedCount).map((boundary) => boundary.afterRound);
     const removedInlineBreak = phase.inlineBreakAfterRound > 0
       && (!updated || updated.inlineBreakAfterRound === 0);
     return removedRounds.length || removedInlineBreak
