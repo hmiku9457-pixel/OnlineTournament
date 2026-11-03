@@ -873,6 +873,34 @@ try {
     return draft?.tournamentMode === 'single' && draft.phaseDrafts.every((phase) =>
       !phase.dayBreaks?.length && !(phase.type === 'BREAK' && phase.breakKind === 'overnight'));
   });
+  // Re-enter multi-day mode and distribute the already configured manual plan
+  // rather than replacing participant counts, round counts or Best-of values.
+  await multiPage.getByRole('radio', { name: 'Mehrtägig' }).click();
+  await multiPage.locator('.wizard-step').nth(3).click();
+  const manualDayPlan = multiPage.locator('.phase-auto-day-plan');
+  await manualDayPlan.waitFor();
+  assert.match(await manualDayPlan.innerText(), /Spieltage verteilen/);
+  const manualPhasesBefore = await multiPage.evaluate(() =>
+    JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft.phaseDrafts
+      .filter((phase) => phase.type !== 'BREAK')
+      .map(({ id, type, entrantCount, bestOf, swissRounds, groupCount, knockoutBestOf }) =>
+        ({ id, type, entrantCount, bestOf, swissRounds, groupCount, knockoutBestOf })));
+  await manualDayPlan.getByRole('button', { name: 'Spieltage automatisch verteilen' }).click();
+  const distributeDialog = multiPage.getByRole('alertdialog', { name: 'Spieltage automatisch verteilen?' });
+  await distributeDialog.waitFor();
+  await distributeDialog.getByRole('button', { name: 'Neue Spieltage übernehmen' }).click();
+  await multiPage.waitForFunction(() => {
+    const draft = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft;
+    return draft.tournamentMode === 'multi' && draft.phaseDrafts.some((phase) =>
+      phase.dayBreaks?.length || (phase.type === 'BREAK' && phase.breakKind === 'overnight'));
+  });
+  const manualPhasesAfter = await multiPage.evaluate(() =>
+    JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft.phaseDrafts
+      .filter((phase) => phase.type !== 'BREAK')
+      .map(({ id, type, entrantCount, bestOf, swissRounds, groupCount, knockoutBestOf }) =>
+        ({ id, type, entrantCount, bestOf, swissRounds, groupCount, knockoutBestOf })));
+  assert.deepEqual(manualPhasesAfter, manualPhasesBefore,
+    'automatic day distribution preserves configured competition fields and phase identities');
   await multiContext.close();
 
   // A hidden time-only setting must not block a later set-based sport.
@@ -908,12 +936,27 @@ try {
   await validityPage.reload();
   await validityPage.locator('.participant-roster-row').first().waitFor();
   assert.equal(await validityPage.locator('.participant-roster-row').count(), 3);
+  // Exact undo restores even an originally duplicate roster entry.
+  await validityPage.getByRole('button', { name: 'Ada Lovelace entfernen' }).nth(1).click();
+  assert.equal(await validityPage.locator('.participant-roster-row').count(), 2);
+  await validityPage.getByRole('button', { name: 'Rückgängig', exact: true }).click();
+  assert.equal(await validityPage.locator('.participant-roster-row').count(), 3);
+  // A pending, uncommitted edit is protected during bulk cleanup.
+  await validityPage.getByRole('button', { name: 'Ada Lovelace bearbeiten' }).first().click();
+  await validityPage.locator('#participant-first').fill('Augusta');
   await validityPage.getByRole('button', { name: 'Alle fehlerhaften Einträge entfernen' }).click();
   const bulkDialog = validityPage.getByRole('alertdialog', { name: 'Fehlerhafte Teilnehmer entfernen?' });
   await bulkDialog.waitFor();
   assert.match(await bulkDialog.innerText(), /Ada Lovelace/);
-  await bulkDialog.getByRole('button', { name: 'Fehlerhafte Einträge entfernen' }).click();
+  assert.match(await bulkDialog.innerText(), /ungespeicherten Änderungen/);
+  await bulkDialog.getByRole('button', { name: 'Abbrechen' }).click();
+  assert.equal(await validityPage.locator('#participant-first').inputValue(), 'Augusta',
+    'canceling bulk cleanup preserves unfinished participant editing');
+  await validityPage.getByRole('button', { name: 'Alle fehlerhaften Einträge entfernen' }).click();
+  await bulkDialog.getByRole('button', { name: 'Änderungen verwerfen und Einträge entfernen' }).click();
   assert.equal(await validityPage.locator('.participant-roster-row').count(), 2);
+  assert.equal(await validityPage.locator('#participant-first').inputValue(), '',
+    'explicit bulk cleanup discards only acknowledged uncommitted changes');
   await validityPage.getByRole('button', { name: 'Gesamte Bereinigung rückgängig' }).click();
   assert.equal(await validityPage.locator('.participant-roster-row').count(), 3);
   await validityContext.close();
