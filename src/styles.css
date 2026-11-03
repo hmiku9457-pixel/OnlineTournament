@@ -8513,8 +8513,11 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   outline-offset: -2px;
 }
 
-/* Schritt 4: Eingabelabel für Pausen an die übrigen fett gesetzten Feldtitel angleichen. */
-.wizard-workspace .phase-wizard-step .break-phase-inputs > .phase-pause-name,
-.wizard-workspace .phase-wizard-step .break-phase-inputs > .phase-inline-round-select {
+/* Schritt 4: Gleiche Typografie für alle Pausenfeldtitel, unabhängig davon,
+   ob das Label selbst das Feld umschließt oder im Feldcontainer liegt. */
+.wizard-workspace .phase-wizard-step .break-phase-inputs > label.field,
+.wizard-workspace .phase-wizard-step .break-phase-inputs > .field > label {
+  font-size: .8rem;
   font-weight: 720;
+  line-height: 1.35;
 }

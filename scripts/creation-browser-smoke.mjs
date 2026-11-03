@@ -1207,6 +1207,15 @@ try {
   const inlineFinal = multiPage.locator('.phase-config').filter({ hasText: 'Finale' }).last();
   await inlineFinal.locator('.phase-config-head').click();
   await inlineFinal.locator('.phase-inline-break-card .phase-inline-break-header').click();
+  const inlineLabelStyles = await inlineFinal.locator(
+    '.phase-inline-round-select, .phase-pause-minutes > label',
+  ).evaluateAll(labels => labels.map(label => {
+    const { fontSize, fontWeight, lineHeight } = getComputedStyle(label);
+    return { fontSize, fontWeight, lineHeight };
+  }));
+  assert.equal(inlineLabelStyles.length, 2, 'both inline-break labels are present');
+  assert.deepEqual(inlineLabelStyles[0], inlineLabelStyles[1],
+    'Unterbrechung nach and Dauer in Minuten have identical font size and weight');
   const inlineMinutes = inlineFinal.getByRole('spinbutton', { name: 'Zwischenpausendauer in Minuten' });
   assert.equal(await inlineMinutes.inputValue(), '15');
   await inlineFinal.getByRole('button', { name: 'Zwischenpausendauer in Minuten erhöhen' }).click();
@@ -1299,6 +1308,15 @@ try {
   await multiPage.locator('.phase-wizard-step').waitFor();
   const pauseCard = multiPage.locator('.phase-config').filter({ hasText: 'Mittagspause' });
   await pauseCard.locator('.phase-config-head').click();
+  const pauseLabelStyles = await pauseCard.locator(
+    '.phase-pause-name, .phase-pause-minutes > label',
+  ).evaluateAll(labels => labels.map(label => {
+    const { fontSize, fontWeight, lineHeight } = getComputedStyle(label);
+    return { fontSize, fontWeight, lineHeight };
+  }));
+  assert.equal(pauseLabelStyles.length, 2, 'both standalone pause labels are present');
+  assert.deepEqual(pauseLabelStyles[0], pauseLabelStyles[1],
+    'Name der Pause and Dauer in Minuten have identical font size and weight');
   const pauseMinutes = pauseCard.getByRole('spinbutton', { name: 'Pausendauer in Minuten' });
   assert.equal(await pauseMinutes.inputValue(), '30');
   await pauseCard.getByRole('button', { name: 'Pausendauer in Minuten erhöhen' }).click();
