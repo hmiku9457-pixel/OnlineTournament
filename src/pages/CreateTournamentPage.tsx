@@ -3659,6 +3659,86 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           }}
         />
       )}
+      {pendingDeleteParticipantId && (
+        <div className="sport-change-backdrop" role="presentation">
+          <section className="sport-change-dialog" role="alertdialog" aria-modal="true"
+            aria-label="Ungespeicherte Teilnehmeränderungen verwerfen?">
+            <h2>Bearbeitung und Teilnehmer löschen?</h2>
+            <p>Die Änderungen im gerade geöffneten Teilnehmereditor sind noch nicht gespeichert. Beim Löschen würden auch diese Eingaben verloren gehen.</p>
+            <div className="sport-change-dialog-actions">
+              <button className="btn" type="button" autoFocus onClick={() => setPendingDeleteParticipantId(null)}>Bearbeitung fortsetzen</button>
+              <button className="btn danger" type="button" onClick={() => {
+                const id = pendingDeleteParticipantId;
+                setPendingDeleteParticipantId(null);
+                removeParticipant(id, true);
+              }}>Ungespeicherte Änderungen verwerfen und löschen</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {pendingUndoConflict && (
+        <div className="sport-change-backdrop" role="presentation">
+          <section className="sport-change-dialog" role="alertdialog" aria-modal="true"
+            aria-label="Geänderte Turnierplanung zurücksetzen?">
+            <h2>Turnierplanung wurde seit der Löschung geändert</h2>
+            <p>„Rückgängig“ stellt Teilnehmerliste und Phasen gemeinsam wieder her. Du hast inzwischen weitere Änderungen vorgenommen. Wenn du fortfährst, werden auch diese neueren Änderungen zurückgesetzt.</p>
+            <div className="sport-change-dialog-actions">
+              <button className="btn" type="button" autoFocus onClick={() => setPendingUndoConflict(false)}>Aktuellen Stand behalten</button>
+              <button className="btn danger" type="button" onClick={() => undoRemoveParticipant(true)}>Teilnehmer und Phasen wiederherstellen</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {pendingPhaseRemoval && (() => {
+        const index = phaseDrafts.findIndex((phase) => phase.id === pendingPhaseRemoval);
+        const before = phaseDrafts[index - 1];
+        const after = phaseDrafts[index + 1];
+        const pauses = [before, after].filter((phase): phase is PhaseDraft =>
+          Boolean(phase && phase.type === 'BREAK'));
+        return (
+          <div className="sport-change-backdrop" role="presentation">
+            <section className="sport-change-dialog phase-replacement-dialog" role="alertdialog" aria-modal="true"
+              aria-label="Benachbarte Pause beim Entfernen berücksichtigen?">
+              <h2>Welche Pause soll erhalten bleiben?</h2>
+              <p>Beim Löschen von „{phaseDrafts[index]?.label}“ würden Pausen unmittelbar aufeinanderfolgen oder am Anfang beziehungsweise Ende stehen. Wähle ausdrücklich, welche benachbarte Pause zusätzlich entfernt werden soll.</p>
+              <ul className="wizard-confirm-details">{pauses.map((phase) =>
+                <li key={phase.id}>„{phase.label}“{phase.note ? ` · ${phase.note}` : ''}
+                  {phase.breakKind === 'until' ? ` · bis ${phase.breakUntil} Uhr`
+                    : phase.breakKind === 'overnight' ? ` · Spieltagsende bis ${phase.nextDayDate} ${phase.nextDayStart}`
+                      : ` · ${phase.breakMinutes} Minuten`}</li>)}</ul>
+              <div className="sport-change-dialog-actions">
+                <button className="btn" type="button" autoFocus onClick={() => setPendingPhaseRemoval(null)}>Nicht löschen</button>
+                {pauses.map((phase) => <button key={phase.id} type="button" className="btn danger-outline"
+                  onClick={() => removePhase(pendingPhaseRemoval, phase.id)}>„{phase.label}“ zusätzlich entfernen</button>)}
+              </div>
+            </section>
+          </div>
+        );
+      })()}
+      {pendingPhaseTypeLoss && (() => {
+        const phase = phaseDrafts[pendingPhaseTypeLoss.index];
+        return (
+          <div className="sport-change-backdrop" role="presentation">
+            <section className="sport-change-dialog" role="alertdialog" aria-modal="true"
+              aria-label="Pauseneinstellungen beim Phasentypwechsel verlieren?">
+              <h2>Pause in Wettkampfphase umwandeln?</h2>
+              <p>„{phase?.label}“ wird durch die neue Wettkampfphase ersetzt. Der Pausenname, Hinweise und der bisherige Termin werden nicht übernommen.</p>
+              <p className="modal-mode-warning">{phase?.note && `Hinweis: ${phase.note}. `}
+                {phase?.breakKind === 'minutes' ? `${phase.breakMinutes} Minuten`
+                  : phase?.breakKind === 'until' ? `Pause bis ${phase.breakUntilDate || 'Tag der Pause'} ${phase.breakUntil} Uhr`
+                    : `Spieltagsende bis ${phase?.nextDayDate} ${phase?.nextDayStart} Uhr`}</p>
+              <div className="sport-change-dialog-actions">
+                <button className="btn" type="button" autoFocus onClick={() => setPendingPhaseTypeLoss(null)}>Pause beibehalten</button>
+                <button className="btn danger" type="button" onClick={() => {
+                  const choice = pendingPhaseTypeLoss;
+                  setPendingPhaseTypeLoss(null);
+                  changePhaseType(choice.index, choice.type, true);
+                }}>Pauseneinstellungen verwerfen und Typ ändern</button>
+              </div>
+            </section>
+          </div>
+        );
+      })()}
       {pendingTournamentMode && (
         <div className="sport-change-backdrop" role="presentation"
           onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingTournamentMode(null); }}>
