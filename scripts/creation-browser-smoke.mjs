@@ -967,6 +967,60 @@ try {
     const draft = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft;
     return draft.participants.length === 3 && draft.phaseDrafts.find((phase) => phase.id === 'phase-7002')?.inlineBreakAfterRound === 1;
   });
+  // Removing a competition flanked by pauses must require a choice:
+  // preserve the remaining named pause rather than silently dropping either.
+  await multiPage.evaluate(() => {
+    const key = 'online-tournament:creation-draft:v1:new';
+    const payload = JSON.parse(sessionStorage.getItem(key));
+    const basePhase = payload.draft.phaseDrafts[0];
+    payload.draft.phaseDrafts = [
+      { ...basePhase, id: 'phase-9101', label: 'Auftakt', type: 'ROUND_ROBIN',
+        entrantCount: 3, inlineBreakAfterRound: 0, dayBreaks: [], knockoutBestOf: [] },
+      { ...basePhase, id: 'phase-9102', label: 'Mittagspause', type: 'BREAK',
+        entrantCount: 3, note: 'Verpflegung', breakKind: 'minutes', breakMinutes: 30,
+        dayBreaks: [], inlineBreakAfterRound: 0, knockoutBestOf: [] },
+      { ...basePhase, id: 'phase-9103', label: 'Zwischenrunde', type: 'SWISS',
+        entrantCount: 3, swissRounds: 2, inlineBreakAfterRound: 0,
+        dayBreaks: [], knockoutBestOf: [] },
+      { ...basePhase, id: 'phase-9104', label: 'Kaffeepause', type: 'BREAK',
+        entrantCount: 3, note: 'Treffen im Foyer', breakKind: 'minutes',
+        breakMinutes: 20, dayBreaks: [], inlineBreakAfterRound: 0, knockoutBestOf: [] },
+      { ...basePhase, id: 'phase-9105', label: 'Finale', type: 'KNOCKOUT',
+        entrantCount: 2, knockoutBestOf: [3], inlineBreakAfterRound: 0, dayBreaks: [] },
+    ];
+    payload.draft.step = 4;
+    payload.draft.hasVisitedPhaseStep = true;
+    payload.draft.reviewRequiredPhaseIds = [];
+    payload.draft.pendingDependentChange = null;
+    sessionStorage.setItem(key, JSON.stringify(payload));
+  });
+  await multiPage.reload();
+  await multiPage.locator('.phase-wizard-step').waitFor();
+  const middlePhase = multiPage.locator('.phase-config').filter({ hasText: 'Zwischenrunde' });
+  await middlePhase.getByRole('button', { name: 'Entfernen', exact: true }).click();
+  const phaseDeletionChoice = multiPage.getByRole('alertdialog',
+    { name: 'Benachbarte Pause beim Entfernen berücksichtigen?' });
+  await phaseDeletionChoice.waitFor();
+  assert.match(await phaseDeletionChoice.innerText(), /Mittagspause/);
+  assert.match(await phaseDeletionChoice.innerText(), /Kaffeepause/);
+  await phaseDeletionChoice.getByRole('button', { name: /Mittagspause.*zusätzlich entfernen/ }).click();
+  assert.equal(await multiPage.locator('.phase-config').count(), 3);
+  const coffee = multiPage.locator('.phase-config').filter({ hasText: 'Kaffeepause' });
+  await coffee.getByRole('button', { name: 'Typ ändern' }).click();
+  await coffee.locator('.phase-type-options').getByRole('button', { name: /Schweizer/ }).click();
+  const conversion = multiPage.getByRole('alertdialog',
+    { name: 'Pauseneinstellungen beim Phasentypwechsel verlieren?' });
+  await conversion.waitFor();
+  assert.match(await conversion.innerText(), /Treffen im Foyer/);
+  await conversion.getByRole('button', { name: 'Pause beibehalten' }).click();
+  assert.equal(await multiPage.locator('.phase-config').filter({ hasText: 'Kaffeepause' }).count(), 1);
+  await coffee.locator('.phase-type-options').getByRole('button', { name: /Schweizer/ }).click();
+  await conversion.getByRole('button', { name: 'Pauseneinstellungen verwerfen und Typ ändern' }).click();
+  await multiPage.waitForFunction(() => {
+    const draft = JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new')).draft;
+    const converted = draft.phaseDrafts.find((phase) => phase.id === 'phase-9104');
+    return converted?.type === 'SWISS' && converted.note === '';
+  });
   await multiContext.close();
 
   // A hidden time-only setting must not block a later set-based sport.
@@ -1010,6 +1064,14 @@ try {
   assert.equal(await validityPage.locator('.participant-roster-row').count(), 3);
   // Exact undo restores even an originally duplicate roster entry.
   await validityPage.getByRole('button', { name: 'Ada Lovelace entfernen' }).nth(1).click();
+  assert.equal(await validityPage.locator('.participant-roster-row').count(), 2);
+  await validityPage.getByRole('button', { name: 'Rückgängig', exact: true }).click();
+  assert.equal(await validityPage.locator('.participant-roster-row').count(), 3);
+  // More than one individual deletion remains undoable in last-in-first-out order.
+  await validityPage.getByRole('button', { name: 'Grace Hopper entfernen' }).click();
+  await validityPage.getByRole('button', { name: 'Ada Lovelace entfernen' }).first().click();
+  assert.equal(await validityPage.locator('.participant-roster-row').count(), 1);
+  await validityPage.getByRole('button', { name: 'Rückgängig', exact: true }).click();
   assert.equal(await validityPage.locator('.participant-roster-row').count(), 2);
   await validityPage.getByRole('button', { name: 'Rückgängig', exact: true }).click();
   assert.equal(await validityPage.locator('.participant-roster-row').count(), 3);
