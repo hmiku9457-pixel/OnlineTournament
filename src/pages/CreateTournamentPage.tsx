@@ -1246,28 +1246,35 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     return proposal.possible ? proposal.phases : created;
   }
 
-  function applyAutomaticPlayingDays() {
-    if (tournamentMode !== 'multi' || !phaseDrafts.some((phase) => phase.type !== 'BREAK')) return;
+  const automaticDayPlan = useMemo(() => {
+    if (tournamentMode !== 'multi' || !phaseDrafts.some((phase) => phase.type !== 'BREAK')) return null;
     const timing = timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes }
       : { minutesPerSet: planningMinutesPerSet(sport) };
-    const proposal = distributePlayingDays(phaseDrafts, plannedDays, scheduledDate, tables, timing,
+    const source = phaseDrafts.find((phase) => phase.type !== 'BREAK')!;
+    const ids = new Set(phaseDrafts.map((phase) => phase.id));
+    let sequence = 0;
+    return distributePlayingDays(phaseDrafts, plannedDays, scheduledDate, tables, timing,
       (entrants) => {
-        const pause = phaseDraftFromTemplate(
-          createPhaseTemplate('BREAK', phaseDrafts.length + 1, { entrantCount: entrants }), participantCount, sport);
-        pause.label = 'Spieltagsende';
-        pause.breakKind = 'overnight';
-        return pause;
-      });
+        let id = '';
+        do { sequence += 1; id = `auto-daybreak-${sequence}`; } while (ids.has(id));
+        ids.add(id);
+        return { ...source, id, type: 'BREAK' as const, label: 'Spieltagsende',
+          entrantCount: entrants, note: '', dayBreaks: [], knockoutBestOf: [],
+          breakKind: 'overnight' as const, breakMinutes: 15,
+          nextDayDate: '', nextDayStart: '09:00', inlineBreakAfterRound: 0,
+          inlineBreakUntilDate: '', breakUntilDate: '' };
+      }, { scheduledStart, awardsEnabled });
+  }, [tournamentMode, phaseDrafts, plannedDays, scheduledDate, scheduledStart,
+    tables, timedSport, matchDurationMinutes, breakMinutes, sport, awardsEnabled]);
+
+  function applyAutomaticPlayingDays() {
+    if (!automaticDayPlan?.possible) {
+      setPhaseLimitError(automaticDayPlan?.reason || 'Keine gültige Verteilung der Spieltage gefunden.');
+      setPendingAutomaticSplit(false);
+      return;
+    }
+    const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, automaticDayPlan.phases, undefined, true);
     setPendingAutomaticSplit(false);
-    if (!proposal.possible) {
-      setPhaseLimitError('Diese Phasen besitzen zu wenige abgeschlossene Rundengrenzen für die gewünschte Anzahl Spieltage.');
-      return;
-    }
-    if (countCreationScheduleEntries(proposal.phases, awardsEnabled) > MAX_CREATION_SCHEDULE_ENTRIES) {
-      setPhaseLimitError(`Die automatische Verteilung würde die Grenze von ${MAX_CREATION_SCHEDULE_ENTRIES} Zeitplaneinträgen überschreiten.`);
-      return;
-    }
-    const normalized = normalizeAndTrackPhaseChanges(phaseDrafts, proposal.phases, undefined, true);
     if (!normalized) return;
     setPhaseDrafts(normalized);
     setPhaseLimitError('');
@@ -2607,10 +2614,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                       <p className="field-hint">Die Verteilung behält Teilnehmer, Gruppen, Runden und Best-of-Einstellungen bei. Bestehende Unterbrechungen werden vor einer Änderung erläutert.</p>
                     </div>
                     <button type="button" className="btn small"
-                      disabled={!suggestDaySplit(phaseDrafts.filter((phase) => phase.type !== 'BREAK'), plannedDays).possible}
-                      title={!suggestDaySplit(phaseDrafts.filter((phase) => phase.type !== 'BREAK'), plannedDays).possible
-                        ? 'Für diese Anzahl Spieltage fehlen vollständige Rundengrenzen.' : undefined}
+                      disabled={!automaticDayPlan?.possible}
+                      title={automaticDayPlan?.reason || undefined}
                       onClick={() => setPendingAutomaticSplit(true)}>Spieltage automatisch verteilen</button>
+                    {!automaticDayPlan?.possible && automaticDayPlan?.reason && (
+                      <p className="field-error" role="status">{automaticDayPlan.reason}</p>
+                    )}
                   </div>
                 )}
 
@@ -3656,7 +3665,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             {countConfiguredDayTransitions(phaseDrafts) > 0 && (
               <p className="modal-mode-warning">{countConfiguredDayTransitions(phaseDrafts)} vorhandene Spieltagswechsel werden neu angeordnet. Bereits geplante Fortsetzungsdaten können sich ändern.</p>
             )}
-            <p>Gewöhnliche Pausen behalten Namen und Hinweise. Liegt eine solche Pause an einem neuen Spieltagswechsel, wird sie als Spieltagsende genutzt. Nicht mehr benötigte Spieltagsende-Phasen werden zu normalen 15-Minuten-Pausen – sie werden nicht gelöscht.</p>
+            <p>Bestehende Pausen behalten ihre Namen und Hinweise. Pausenart, feste Endzeiten und individuell eingestellte Fortsetzungszeiten können sich jedoch ändern. Diese Änderungen stehen hier vor der Übernahme:</p>
+            <ul className="wizard-confirm-details">
+              {(automaticDayPlan?.changes ?? []).map((description, index) =>
+                <li key={index}>{description}</li>)}
+            </ul>
+            {!automaticDayPlan?.changes?.length && <p className="field-hint">Es sind keine zusätzlichen Einstellungen zu ändern.</p>
             <div className="sport-change-dialog-actions">
               <button className="btn" type="button" autoFocus onClick={() => setPendingAutomaticSplit(false)}>Bisherige Verteilung behalten</button>
               <button className="btn primary" type="button" onClick={applyAutomaticPlayingDays}>Neue Spieltage übernehmen</button>
