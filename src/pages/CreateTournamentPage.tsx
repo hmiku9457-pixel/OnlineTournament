@@ -2909,9 +2909,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     </div>
                     {index === firstSelectableRecommendationIndex && recommendationFeasible && !item.minimumMatchShortfall && (
                       <p className="recommendation-reason">
-                        {item.estimatedDurationMinutes <= preferredDurationMinutes
-                          ? `Warum empfohlen: Erfüllt dein Mindestspielziel und liegt innerhalb deiner geplanten Turnierdauer von ${formatRecommendationDuration(preferredDurationMinutes)}.`
-                          : `Warum empfohlen: Erfüllt dein Mindestspielziel; die geschätzte Dauer übersteigt deine Zielzeit von ${formatRecommendationDuration(preferredDurationMinutes)}.`}
+                        {preferredTimeMode === 'end-time'
+                          ? `Warum empfohlen: Erfüllt dein Mindestspielziel. Geschätztes Ende: ${assessment.estimatedEnd ? formatPlannedDateTime(assessment.estimatedEnd) : 'noch offen'}; gewünschte Endzeit: ${preferredEndTime} Uhr.`
+                          : item.estimatedDurationMinutes <= preferredDurationMinutes
+                            ? `Warum empfohlen: Erfüllt dein Mindestspielziel und liegt innerhalb deiner geplanten Turnierdauer von ${formatRecommendationDuration(preferredDurationMinutes)}.`
+                            : `Warum empfohlen: Erfüllt dein Mindestspielziel; die geschätzte Dauer übersteigt deine Zielzeit von ${formatRecommendationDuration(preferredDurationMinutes)}.`}
                       </p>
                     )}
                   </button>;
