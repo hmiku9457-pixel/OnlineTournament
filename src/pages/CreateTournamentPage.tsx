@@ -1224,11 +1224,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     setRemovalHistory([]);
     setParticipants((current) => {
       const next = [...current];
+      // Validate the roster once and maintain a lookup as tests are appended.
+      // Revalidating against the growing full array for each candidate is O(n²).
+      const invalid = invalidParticipantRosterIndices(next, discipline);
+      let completed = next.length - invalid.size;
+      const occupied = collectSavedPersonNames(next, discipline, null);
       let sequence = 1;
-      let completed = next.filter((entry) => participantIsComplete(entry, discipline)
-        && Object.keys(validateParticipant(entry, discipline, next, entry.id)).length === 0).length;
-      while (completed < targetCount && sequence <= 10000) {
-        // A...Z, AA...AZ, BA...: letters-only and no invalid ASCII after Z.
+      while (completed < targetCount && sequence <= 10000 && next.length < 10000) {
         let ordinal = sequence;
         let suffix = '';
         while (ordinal > 0) {
@@ -1243,8 +1245,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           partnerLastName: discipline === 'DOUBLES' ? `Partner ${suffix}` : '',
           teamName: discipline === 'TEAMS' ? `Test Mannschaft ${suffix}` : '',
         };
-        if (Object.keys(validateParticipant(candidate, discipline, next, null)).length === 0) {
+        const keys = discipline === 'TEAMS'
+          ? [participantNameKey(candidate.teamName ?? '')]
+          : [normalizePersonName(candidate.firstName, candidate.lastName),
+            ...(discipline === 'DOUBLES'
+              ? [normalizePersonName(candidate.partnerFirstName, candidate.partnerLastName)] : [])];
+        if (new Set(keys).size === keys.length && keys.every((key) => !occupied.has(key))) {
           next.push(newParticipant(candidate));
+          keys.forEach((key) => occupied.add(key));
           completed += 1;
         }
         sequence += 1;
@@ -1841,7 +1849,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       ...(awardsEnabled ? [{ id: 'award-ceremony', at: finalAwardsAt, title: 'Siegerehrung',
         type: 'other' as const, autoTime: awardsAtOverride === null }] : []),
     ];
-    if (finalTimeline.warnings.length || validatePlannedSchedule(finalSchedule).length
+    if (plannedTimelineConflicts(finalTimeline).length || validatePlannedSchedule(finalSchedule).length
       || (awardsEnabled && finalAwardsAt < finalTimeline.estimatedEnd)) {
       setCreationError('Der Zeitplan ist zum tatsächlichen Speicherzeitpunkt nicht mehr gültig. Bitte Pausen und Siegerehrung prüfen.');
       return;
@@ -2107,6 +2115,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               <div className="field full">
                 <label htmlFor="name">Turniername <span className="wizard-required-mark" aria-hidden="true">*</span></label>
                 <input id="name" required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} placeholder="Turniername eingeben" autoFocus />
+                {nameCollision && <span className="field-hint" role="status">{collisionAlreadyStarted
+                  ? 'Ein gestartetes Turnier mit diesem Namen existiert bereits. Bitte einen anderen Namen verwenden.'
+                  : 'Ein nicht gestartetes Turnier mit diesem Namen existiert bereits. Vor dem Erstellen wird eine Überschreibbestätigung angezeigt.'}</span>}
               </div>
               <div className="field">
                 <label htmlFor="tournament-date">Turnierdatum <span className="wizard-required-mark" aria-hidden="true">*</span></label>
@@ -2979,7 +2990,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                     <label className="field">Pause bis (Datum)
                                       <CalendarDatePicker id={`phase-until-date-${phase.id}`} label="Pausenzieldatum"
                                         value={phase.breakUntilDate || (plannedPhaseStart ?? scheduledStart).slice(0, 10)}
-                                        minDate={scheduledStart.slice(0, 10)}
+                                        minDate={(plannedPhaseStart ?? scheduledStart).slice(0, 10)}
                                         onChange={(date) => updatePhase(phase.id, { breakUntilDate: date })} />
                                     </label>
                                     <label className="field">Pause bis (Uhrzeit)
@@ -3259,7 +3270,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                                           <label className="field">Pause bis (Datum)
                                             <CalendarDatePicker id={`inline-break-date-${phase.id}`} label="Zwischenpausendatum"
                                               value={phase.inlineBreakUntilDate || (plannedInlinePause ?? scheduledStart).slice(0, 10)}
-                                              minDate={scheduledStart.slice(0, 10)}
+                                              minDate={(plannedInlinePause ?? scheduledStart).slice(0, 10)}
                                               onChange={(date) => updatePhase(phase.id, { inlineBreakUntilDate: date })} />
                                           </label>
                                           <label className="field">Pause bis (Uhrzeit)
@@ -3372,6 +3383,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
               </div>
             )}
             {phaseLimitError && <p className="field-error" role="alert">{phaseLimitError}</p>}
+            {nameCollision && <p className="field-hint" role="status">{collisionAlreadyStarted
+              ? 'Dieser Turniername ist bereits von einem gestarteten Turnier belegt.'
+              : 'Ein gleichnamiges Turnier ist vorhanden. Beim Erstellen wirst du vor einem möglichen Überschreiben gefragt.'}</p>}
             <div className="creation-review-overview" aria-label="Turnierdaten im Überblick">
               <div className="creation-review-identity">
                 <span>Dein Turnier</span>
