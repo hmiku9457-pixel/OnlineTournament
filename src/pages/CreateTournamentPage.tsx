@@ -994,9 +994,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       timing: timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes }
         : { minutesPerSet: planningMinutesPerSet(sport) },
       bestOfFor: (type) => phaseBestOfForSport(sport, type),
+      awardsEnabled, awardsAtOverride,
     }),
   })), [allRecommendations, tournamentMode, scheduledStart, plannedDays,
-    participantCount, tables, timedSport, matchDurationMinutes, breakMinutes, sport]);
+    participantCount, tables, timedSport, matchDurationMinutes, breakMinutes, sport,
+    awardsEnabled, awardsAtOverride]);
   // Do not discard the sixth viable suggestion before checking the first five.
   const visibleRecommendationChoices = useMemo(() => [
     ...assessedRecommendations.filter(({ assessment }) => assessment.feasible),
@@ -1283,9 +1285,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
           breakKind: 'overnight' as const, breakMinutes: 15,
           nextDayDate: '', nextDayStart: '09:00', inlineBreakAfterRound: 0,
           inlineBreakUntilDate: '', breakUntilDate: '' };
-      }, { scheduledStart, awardsEnabled });
+      }, { scheduledStart, awardsEnabled, awardsAtOverride });
   }, [tournamentMode, phaseDrafts, plannedDays, scheduledDate, scheduledStart,
-    tables, timedSport, matchDurationMinutes, breakMinutes, sport, awardsEnabled]);
+    tables, timedSport, matchDurationMinutes, breakMinutes, sport, awardsEnabled, awardsAtOverride]);
 
   function applyAutomaticPlayingDays() {
     if (!automaticDayPlan?.possible) {
@@ -2683,7 +2685,10 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                       title={automaticDayPlan?.reason || undefined}
                       onClick={() => setPendingAutomaticSplit(true)}>Spieltage automatisch verteilen</button>
                     {!automaticDayPlan?.possible && automaticDayPlan?.reason && (
-                      <p className="field-error" role="status">{automaticDayPlan.reason}</p>
+                      <p className="field-error" role="status">{automaticDayPlan.reason}
+                        {awardsEnabled && awardsAtOverride && automaticDayPlan.reason.includes('Siegerehrung')
+                          ? ' Die manuell eingestellte Siegerehrungszeit bleibt erhalten. Passe sie in der Zusammenfassung ausdrücklich an.' : ''}
+                      </p>
                     )}
                   </div>
                 )}
