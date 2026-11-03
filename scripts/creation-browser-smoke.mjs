@@ -938,10 +938,8 @@ try {
     'backdrop dismiss cannot strand dependent phase changes');
   assert.match(await orphanDialog.innerText(), /K.-o.-Runden entfallen/);
   await orphanDialog.getByRole('button', { name: 'Teilnehmeränderung zurücknehmen' }).click();
-  assert.equal(await multiPage.locator('.participant-roster-row').count(), 0,
-    'roster is not rendered on the current phase page');
-  await multiPage.locator('.wizard-step').nth(1).click();
-  assert.equal(await multiPage.locator('.participant-roster-row').count(), 3);
+  assert.equal(await multiPage.locator('.participant-roster-row').count(), 3,
+    'rollback restores the last roster entry and the associated phase configuration');
   await multiPage.getByRole('button', { name: 'Spieler 6 entfernen' }).click();
   await orphanDialog.waitFor();
   await orphanDialog.getByRole('button', { name: 'Pausen beibehalten und manuell korrigieren' }).click();
