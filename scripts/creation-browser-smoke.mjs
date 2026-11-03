@@ -901,6 +901,40 @@ try {
         ({ id, type, entrantCount, bestOf, swissRounds, groupCount, knockoutBestOf })));
   assert.deepEqual(manualPhasesAfter, manualPhasesBefore,
     'automatic day distribution preserves configured competition fields and phase identities');
+
+  // Reproduce a roster shrink that leaves a KO pause without a usable round.
+  // The "keep for manual correction" path must still expose a removal control.
+  await multiPage.evaluate(() => {
+    const key = 'online-tournament:creation-draft:v1:new';
+    const payload = JSON.parse(sessionStorage.getItem(key));
+    const base = payload.draft.phaseDrafts.find((phase) => phase.type !== 'BREAK');
+    payload.draft.phaseDrafts = [
+      { ...base, id: 'phase-7001', label: 'Vorrunde', type: 'SWISS',
+        entrantCount: 8, swissRounds: 3, inlineBreakAfterRound: 0,
+        knockoutBestOf: [], dayBreaks: [], groupCount: 2 },
+      { ...base, id: 'phase-7002', label: 'Finale', type: 'KNOCKOUT',
+        entrantCount: 4, knockoutBestOf: [3, 3], inlineBreakAfterRound: 1,
+        inlineBreakKind: 'minutes', dayBreaks: [], customEntrants: true },
+    ];
+    payload.draft.tournamentMode = 'single';
+    payload.draft.step = 4;
+    sessionStorage.setItem(key, JSON.stringify(payload));
+  });
+  await multiPage.reload();
+  await multiPage.locator('.phase-wizard-step').waitFor();
+  await multiPage.locator('.wizard-step').nth(1).click();
+  for (let index = 8; index >= 3; index--) {
+    await multiPage.getByRole('button', { name: `Spieler ${index} entfernen` }).click();
+  }
+  const orphanDialog = multiPage.getByRole('alertdialog', { name: 'Abhängige Phasenänderungen bestätigen?' });
+  await orphanDialog.waitFor();
+  await orphanDialog.getByRole('button', { name: 'Pausen beibehalten und manuell korrigieren' }).click();
+  await multiPage.locator('.wizard-step').nth(3).click();
+  const orphanFinal = multiPage.locator('.phase-config').filter({ hasText: 'Finale' }).last();
+  await orphanFinal.locator('.phase-config-head').click();
+  await orphanFinal.getByRole('button', { name: 'Ungültige Zwischenpause entfernen' }).click();
+  assert.equal(await orphanFinal.getByRole('button', { name: 'Ungültige Zwischenpause entfernen' }).count(), 0,
+    'previously orphaned break can be explicitly removed after roster changes');
   await multiContext.close();
 
   // A hidden time-only setting must not block a later set-based sport.
