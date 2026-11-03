@@ -539,8 +539,16 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [maxReachedStep, setMaxReachedStep] = useState<WizardStep>((restoredDraft?.maxReachedStep ?? 1) as WizardStep);
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(restoredDraft?.hasVisitedPhaseStep ?? false);
   const [name, setName] = useState(restoredDraft?.name ?? '');
-  const nameCollision = useMemo(() => typeof window !== 'undefined' && !prestart && name.trim()
-    ? findTournamentNameConflict(name) : null, [name, prestart]);
+  const nameCollision = useMemo(() => {
+    if (prestart || !name.trim() || typeof window === 'undefined') return null;
+    try {
+      // The wizard can be server-rendered or tested with sessionStorage only.
+      if (!window.localStorage) return null;
+      return findTournamentNameConflict(name);
+    } catch {
+      return null;
+    }
+  }, [name, prestart]);
   const collisionAlreadyStarted = Boolean(nameCollision
     && hasStartedAnyStage(nameCollision, getPhaseLifecycle(nameCollision).startedStageIds));
   // Keep the local time in sync while the wizard is open. Date and time are
