@@ -587,6 +587,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const [awardsAtOverride, setAwardsAtOverride] = useState<string | null>(restoredDraft?.awardsAtOverride ?? null);
   const [sport, setSport] = useState(restoredDraft?.sport ?? '');
   const [pendingSport, setPendingSport] = useState<string | null>(null);
+  const [timeValuesReviewRequired, setTimeValuesReviewRequired] =
+    useState(restoredDraft?.timeValuesReviewRequired ?? false);
+  const [pendingPhaseRemoval, setPendingPhaseRemoval] = useState<string | null>(null);
+  const [pendingPhaseTypeLoss, setPendingPhaseTypeLoss] = useState<{ index: number; type: StageType } | null>(null);
+  const [pendingDeleteParticipantId, setPendingDeleteParticipantId] = useState<string | null>(null);
+  const [pendingUndoConflict, setPendingUndoConflict] = useState(false);
   const [pendingDiscipline, setPendingDiscipline] = useState<Discipline | null>(null);
   const [testParticipantsDialogOpen, setTestParticipantsDialogOpen] = useState(false);
   const [discardDraftDialogOpen, setDiscardDraftDialogOpen] = useState(false);
@@ -689,7 +695,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   const visibleRoster = participants.slice(visibleRosterStart, visibleRosterStart + rosterPageSize);
   // Keep controls mounted at a stable height even when all entries fit.
   const showRosterNavigation = participants.length > 0;
-  const [recentlyRemovedParticipant, setRecentlyRemovedParticipant] = useState<{ participant: ParticipantDraft; index: number; before: ParticipantDraft[]; after: ParticipantDraft[] } | null>(null);
+  type RemovalUndo = {
+    participant: ParticipantDraft; index: number;
+    before: ParticipantDraft[]; after: ParticipantDraft[];
+    beforePhases: PhaseDraft[]; afterPhases: PhaseDraft[];
+    beforeReviews: string[]; afterReviews: string[];
+  };
+  const [removalHistory, setRemovalHistory] = useState<RemovalUndo[]>([]);
+  const recentlyRemovedParticipant = removalHistory.at(-1) ?? null;
   const [pendingBulkCleanup, setPendingBulkCleanup] = useState(false);
   const [bulkCleanupUndo, setBulkCleanupUndo] = useState<{ before: ParticipantDraft[]; after: ParticipantDraft[]; removed: number } | null>(null);
   const [undoRemoveError, setUndoRemoveError] = useState('');
@@ -724,7 +737,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     manuallyEditedId?: string;
     source: 'manual' | 'roster';
     previousRoster?: ParticipantDraft[];
-  } | null>(null);
+  } | null>(() => restoredDraft?.pendingDependentChange
+    ? { ...restoredDraft.pendingDependentChange, next: restoredDraft.pendingDependentChange.next.map((phase) => ({
+      ...phase, dayBreaks: phase.dayBreaks ?? [], breakUntilDate: phase.breakUntilDate ?? '',
+      inlineBreakUntilDate: phase.inlineBreakUntilDate ?? '',
+    })) } : null);
   const [pendingDayInsertion, setPendingDayInsertion] = useState<{
     phaseId: string;
     nextBreaks: PlayingDayBreak[];
@@ -772,6 +789,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
     knockoutQualifierCount, preferredDurationMinutes, tournamentMode, plannedDays, awardsEnabled,
+    pendingDependentChange: pendingPhaseChange, timeValuesReviewRequired,
     awardsAtOverride: prestartManualCeremony ? prestartCeremonyAt : awardsAtOverride,
   }), [
     step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
@@ -780,7 +798,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
     knockoutQualifierCount, preferredDurationMinutes, tournamentMode, plannedDays, awardsEnabled, awardsAtOverride,
-    prestartCeremonyAt, prestartManualCeremony?.at,
+    pendingPhaseChange, timeValuesReviewRequired, prestartCeremonyAt, prestartManualCeremony?.at,
   ]);
   useEffect(() => {
     if (prestart) return; // Never save a director's prestart edits as a new tournament draft.
@@ -1345,7 +1363,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   }
 
   useEffect(() => {
-    if (!phaseDrafts.length) return;
+    if (!phaseDrafts.length || pendingPhaseChange) return;
     const normalized = normalizePhaseEntrants(phaseDrafts);
     const needsReview = phaseDrafts.flatMap((oldPhase, index) => {
       const nextPhase = normalized[index];
@@ -1363,6 +1381,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     }
     if (needsReview.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...needsReview])]);
     if (JSON.stringify(normalized) !== JSON.stringify(phaseDrafts)) setPhaseDrafts(normalized);
+    if (JSON.stringify(normalized) !== JSON.stringify(phaseDrafts) || needsReview.length) {
+      updateRemovalUndoPostPhases(normalized, [...new Set([...reviewRequiredPhaseIds, ...needsReview])]);
+    }
   // Die Teilnehmerzahl ist die Quelle für das Startfeld aller Phasen.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participantCount]);
@@ -1391,6 +1412,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participantCount]);
 
+  function updateRemovalUndoPostPhases(afterPhases: PhaseDraft[], afterReviews: string[]) {
+    setRemovalHistory((history) => {
+      const previous = history.at(-1);
+      if (!previous || JSON.stringify(previous.after) !== JSON.stringify(participants)) return history;
+      return [...history.slice(0, -1), { ...previous, afterPhases, afterReviews }];
+    });
+  }
+
   /** Explicitly acknowledge every participant count changed as a consequence
    * of inserting, removing or reordering phases (not just roster changes). */
   function normalizeAndTrackPhaseChanges(previous: PhaseDraft[], proposed: PhaseDraft[],
@@ -1418,7 +1447,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     });
     const affected = [...changedIds, ...losses.map((loss) => loss.id), ...needsReview]
       .filter((id) => source === 'roster' || id !== manuallyEditedId);
-    if (affected.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...affected])]);
+    const retained = new Set(next.map((phase) => phase.id));
+    setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...affected])].filter((id) => retained.has(id)));
+    updateRemovalUndoPostPhases(next, [...new Set([...reviewRequiredPhaseIds, ...affected])].filter((id) => retained.has(id)));
     setPhaseDrafts(next);
     setSelectedRecommendationId(null);
     setPhaseLimitError('');
@@ -1435,7 +1466,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     }
     setPendingPhaseChange(null);
     setParticipants(previous);
-    setRecentlyRemovedParticipant(null);
+    setRemovalHistory([]);
     setBulkCleanupUndo(null);
     setUndoRemoveError('');
   }
@@ -1467,6 +1498,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
       ...changedPhaseEntrantIds(phaseDrafts, retained),
     ];
     if (affected.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...affected])]);
+    updateRemovalUndoPostPhases(retained, [...new Set([...reviewRequiredPhaseIds, ...affected])]);
     setPhaseDrafts(retained);
     setSelectedRecommendationId(null);
     setPendingPhaseChange(null);
