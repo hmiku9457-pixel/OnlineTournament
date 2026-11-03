@@ -8273,3 +8273,161 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   outline: 2px solid #175cd3;
   outline-offset: 2px;
 }
+
+/* Duration editor: numeric entry first, paired decrease/increase controls
+   second, and an unobtrusive live total above the confirmation actions. */
+.recommendation-duration-dialog {
+  box-sizing: border-box;
+  width: min(454px, 100%);
+  padding: 22px 24px 20px;
+  gap: 15px;
+  align-items: stretch;
+}
+.recommendation-duration-dialog .clock-picker-dialog-header h2 {
+  font-size: 1.12rem;
+  letter-spacing: -.015em;
+}
+.recommendation-duration-dialog .clock-picker-dialog-note {
+  width: 100%;
+  margin: -2px 0 0;
+  text-align: left;
+  color: #667085;
+  font-size: .79rem;
+  line-height: 1.5;
+}
+.recommendation-duration-dialog .recommendation-duration-inputs {
+  gap: 12px;
+}
+.recommendation-duration-dialog .recommendation-duration-inputs label {
+  gap: 7px;
+  min-width: 0;
+  color: #344054;
+  font-size: .78rem;
+  font-weight: 750;
+}
+.recommendation-duration-dialog .recommendation-duration-inputs input {
+  box-sizing: border-box;
+  height: 48px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #cbd6e5;
+  border-radius: 9px;
+  background: #fff;
+  color: #182230;
+  text-align: center;
+  font-size: 1.23rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.recommendation-duration-dialog .recommendation-duration-inputs input::-webkit-inner-spin-button,
+.recommendation-duration-dialog .recommendation-duration-inputs input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.recommendation-duration-dialog .recommendation-duration-inputs input:focus {
+  border-color: #7aa7f4;
+  outline: 2px solid #cfe0ff;
+  outline-offset: 0;
+}
+.recommendation-duration-adjustments {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid #e0e7ef;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.recommendation-duration-section-label {
+  color: #344054;
+  font-size: .81rem;
+  font-weight: 750;
+}
+.recommendation-duration-adjustment-group {
+  display: grid;
+  gap: 6px;
+}
+.recommendation-duration-adjustment-caption {
+  color: #667085;
+  font-size: .72rem;
+  font-weight: 650;
+}
+.recommendation-duration-quick-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+.recommendation-duration-adjust-button {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 37px;
+  padding: 6px 3px;
+  border: 1px solid #d5deeb;
+  border-radius: 8px;
+  background: #fff;
+  color: #344054;
+  font-family: inherit;
+  font-size: .78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color .13s ease, background .13s ease;
+}
+.recommendation-duration-adjust-button:hover:not(:disabled) {
+  border-color: #90b3e7;
+  background: #edf5ff;
+  color: #175cd3;
+}
+.recommendation-duration-adjust-button:focus-visible {
+  outline: 2px solid #175cd3;
+  outline-offset: 2px;
+}
+.recommendation-duration-adjust-button:disabled {
+  background: #f2f4f7;
+  border-color: #e4e7ec;
+  color: #98a2b3;
+  cursor: not-allowed;
+}
+.recommendation-duration-dialog .recommendation-duration-preview {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  margin: 0;
+  padding: 12px 0 0;
+  border-top: 1px solid #e4e7ec;
+  color: #667085;
+  font-size: .8rem;
+}
+.recommendation-duration-dialog .recommendation-duration-preview strong {
+  color: #182230;
+  font-size: 1.07rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.recommendation-duration-dialog .recommendation-duration-preview .recommendation-duration-invalid {
+  color: #b42318;
+  font-size: .72rem;
+  text-align: right;
+}
+.recommendation-duration-dialog .clock-picker-actions {
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 0;
+}
+.recommendation-duration-dialog .clock-picker-actions .btn {
+  min-height: 41px;
+}
+@media (max-width: 390px) {
+  .recommendation-duration-dialog {
+    padding: 16px 14px;
+    gap: 11px;
+  }
+  .recommendation-duration-adjustments { padding: 10px; }
+  .recommendation-duration-quick-buttons { gap: 4px; }
+  .recommendation-duration-adjust-button { font-size: .7rem; }
+  .recommendation-duration-dialog .recommendation-duration-preview strong { font-size: .93rem; }
+}
