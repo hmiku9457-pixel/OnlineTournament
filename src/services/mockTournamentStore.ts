@@ -15,6 +15,7 @@ import { disciplineLabel, getSportLabel, planningMinutesPerSet } from '@/domain/
 import { sportScoring } from '@/domain/sportScoring';
 import { estimatePhaseMetrics, estimateKnockoutRoundMinutes } from '@/domain/tournamentCreation';
 import { playingRounds } from '@/domain/playingDays';
+import { TOURNAMENT_TIME_ZONE } from '@/domain/tournamentLocalTime';
 
 import { type DemoTournament } from '@/data/demoTournaments';
 import type { Discipline, StageType, TournamentStage, TournamentStatus } from '@/domain/types';
@@ -365,6 +366,7 @@ export function createMockTournament(input: CreateMockTournamentInput): DemoTour
     minimumMatches: input.minimumMatches,
     tournamentMode: input.tournamentMode ?? 'single',
     plannedDays: input.tournamentMode === 'multi' ? input.plannedDays ?? 2 : 1,
+    timeZone: TOURNAMENT_TIME_ZONE,
     scheduledStart: input.scheduledStart,
     plannedSchedule: input.plannedSchedule?.map((entry) => ({ ...entry })) ?? [],
   };
