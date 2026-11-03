@@ -2,7 +2,7 @@ import { participantNameKey } from '@/domain/participantNames';
 import { countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES } from '@/domain/creationPlanTransitions';
 import { disciplineOptionsForSport } from '@/domain/sports';
 import { hasValidBreakStageOrder, hasValidTerminalStageOrder, isValidSwissRoundCount, knockoutRoundLabels } from '@/domain/tournamentCreation';
-import { validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { isValidLocalDateTime, isAmbiguousLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 import { validateVenueLayout, type VenueLayout } from '@/domain/venueLayout';
 import type { Discipline, StageType } from '@/domain/types';
 import { configuredPlayingDays, playingRounds, validPlayingDayBreaks, type PlayingDayBreak } from '@/domain/playingDays';
@@ -38,6 +38,7 @@ export interface CreationValidationInput {
   phases: readonly CreationValidationPhase[];
   plannedSchedule?: PlannedScheduleItem[];
   scheduledStart?: string;
+  estimatedEnd?: string;
   venueLayout?: VenueLayout;
   matchDurationMinutes?: number;
   venueTurnoverMinutes?: number;
@@ -126,6 +127,13 @@ export function validateTournamentCreation(input: CreationValidationInput): stri
     }
   });
   errors.push(...validatePlannedSchedule(input.plannedSchedule ?? []));
+  // The predicted finish is not necessarily one of the schedule entries.
+  // A DST-overlap finish cannot be serialized unambiguously as local wall time.
+  if (input.estimatedEnd && !isValidLocalDateTime(input.estimatedEnd)) {
+    errors.push(isAmbiguousLocalDateTime(input.estimatedEnd)
+      ? 'Das voraussichtliche Turnierende fällt in eine mehrdeutige Winterzeit-Uhrzeit.'
+      : 'Das voraussichtliche Turnierende ist kein gültiger lokaler Zeitpunkt.');
+  }
   if (input.scheduledStart && input.plannedSchedule?.length) {
     if (input.plannedSchedule.find((item) => item.id === 'phase-1')?.at !== input.scheduledStart) {
       errors.push('Der erste Zeitplaneintrag stimmt nicht mit dem geplanten Turnierbeginn überein.');
