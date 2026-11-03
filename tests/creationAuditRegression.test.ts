@@ -3,11 +3,20 @@ import { recommendTournamentFormats } from '@/engine/recommendations';
 import { MAX_RECOMMENDATION_DURATION, normalizeRecommendationDuration }
   from '@/components/RecommendationDurationPicker';
 import { convertToSingleDay, singleDayFixedPauseConflicts } from '@/domain/creationPlanTransitions';
+import { recommendationEndTimePenalty } from '@/domain/creationPlanRecommendations';
 import { generatedScheduleTitle, isAmbiguousLocalDateTime, parseLocalDateTime,
   toLocalDateTime, buildPlannedTimeline } from '@/domain/tournamentSchedule';
 import { TOURNAMENT_TIME_ZONE } from '@/domain/tournamentLocalTime';
 
 describe('tournament creation audit regression checks', () => {
+  it('ranks recommended finish times relative to the selected final-day clock', () => {
+    const target = '2030-11-22T11:00';
+    expect(recommendationEndTimePenalty('2030-11-22T10:00', target)).toBe(60);
+    expect(recommendationEndTimePenalty('2030-11-22T11:00', target)).toBe(0);
+    expect(recommendationEndTimePenalty('2030-11-22T12:00', target)).toBe(120);
+    expect(recommendationEndTimePenalty(undefined, target)).toBe(Number.POSITIVE_INFINITY);
+  });
+
   it('keeps shortfall knockout as a low-priority candidate and offers smaller qualifier cuts', () => {
     const candidates = recommendTournamentFormats(
       { playerCount: 12, tableCount: 4, minimumMatches: 4 },

@@ -57,9 +57,9 @@ import { isAllowedParticipantName, participantNameKey, sanitizeParticipantName, 
 import { availableDayBreakRounds, convertToSingleDay, singleDayFixedPauseConflicts, countConfiguredDayTransitions, countCreationScheduleEntries, MAX_CREATION_SCHEDULE_ENTRIES, reconcileRoundDependentBreaks, phaseBreakLosses, earliestRoundContinuationDate, proposePlayingDayInsertion, proposePlayingDayMove, type PhaseBreakLoss, type ShiftedPlayingDate } from '@/domain/creationPlanTransitions';
 import { anchorFixedPauseDates, clearInlinePauseOnTypeChange } from '@/domain/fixedPauseDates';
 import { configuredPlayingDays, followingPlayingDate, playingRounds, type PlayingDayBreak } from '@/domain/playingDays';
-import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays } from '@/domain/creationPlanRecommendations';
+import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays, recommendationEndTimePenalty } from '@/domain/creationPlanRecommendations';
 import { CalendarDatePicker, nextCalendarDate, parseCalendarDate } from '@/components/CalendarDatePicker';
-import { buildPlannedTimeline, formatPlannedDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, playingDayOverflowWarnings, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
+import { buildPlannedTimeline, formatPlannedDateTime, parseLocalDateTime, isAmbiguousLocalDateTime, isValidLocalDateTime, isStartAtOrAfterNow, plannedActiveBreakMinutes, plannedTimelineConflicts, playingDayOverflowWarnings, toLocalDateTime, validatePlannedSchedule, type PlannedScheduleItem } from '@/domain/tournamentSchedule';
 
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
@@ -793,6 +793,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const [maxSwissRounds, setMaxSwissRounds] = useState<number | null>(restoredDraft?.maxSwissRounds ?? null);
   const [knockoutQualifierCount, setKnockoutQualifierCount] = useState<number | null>(restoredDraft?.knockoutQualifierCount ?? null);
   const [preferredDurationMinutes, setPreferredDurationMinutes] = useState(restoredDraft?.preferredDurationMinutes ?? DEFAULT_RECOMMENDATION_DURATION);
+  const [preferredTimeMode, setPreferredTimeMode] = useState<'duration' | 'end-time'>(restoredDraft?.preferredTimeMode ?? 'duration');
+  const [preferredEndTime, setPreferredEndTime] = useState(restoredDraft?.preferredEndTime ?? '17:00');
   const [tournamentMode, setTournamentMode] = useState<'single' | 'multi'>(restoredDraft?.tournamentMode ?? (restoredDraft?.phaseDrafts.some((phase) => (phase.dayBreaks?.length ?? 0) > 0 || (phase.type === 'BREAK' && phase.breakKind === 'overnight')) ? 'multi' : 'single'));
   const [plannedDays, setPlannedDays] = useState(restoredDraft?.plannedDays ?? 2);
   useEffect(() => {
@@ -910,7 +912,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     customTables, venueLayoutEnabled, venueLayout, venueLayoutCustomized, participants, participantForm,
     editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
-    knockoutQualifierCount, preferredDurationMinutes, tournamentMode, plannedDays, awardsEnabled,
+    knockoutQualifierCount, preferredDurationMinutes, preferredTimeMode, preferredEndTime, tournamentMode, plannedDays, awardsEnabled,
     pendingDependentChange: pendingPhaseChange, timeValuesReviewRequired,
     awardsAtOverride: prestartManualCeremony ? prestartCeremonyAt : awardsAtOverride,
   }), [
@@ -919,7 +921,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
     editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
-    knockoutQualifierCount, preferredDurationMinutes, tournamentMode, plannedDays, awardsEnabled, awardsAtOverride,
+    knockoutQualifierCount, preferredDurationMinutes, preferredTimeMode, preferredEndTime, tournamentMode, plannedDays, awardsEnabled, awardsAtOverride,
     pendingPhaseChange, timeValuesReviewRequired, prestartCeremonyAt, prestartManualCeremony?.at,
   ]);
   const latestDraftSnapshot = useRef(draftSnapshot);
@@ -1105,6 +1107,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const effectiveMaxSwissRounds = Math.min(Math.max(2, participantCount - 1), Math.max(2, maxSwissRounds ?? defaultMaxSwissRounds));
   const effectiveKnockoutQualifierCount = Math.min(Math.max(2, participantCount), Math.max(2, knockoutQualifierCount ?? defaultKnockoutQualifierCount));
 
+  const preferredEndDate = tournamentMode === 'multi'
+    ? followingPlayingDate(scheduledDate, plannedDays - 1) : scheduledDate;
+  const preferredEndDateTime = `${preferredEndDate}T${preferredEndTime}`;
+  const preferredEndInstant = parseLocalDateTime(preferredEndDateTime);
+  const scheduledStartInstant = parseLocalDateTime(scheduledStart);
+  const preferredEndTimeValid = Boolean(preferredEndInstant && scheduledStartInstant
+    && preferredEndInstant.getTime() - scheduledStartInstant.getTime() >= MIN_RECOMMENDATION_DURATION * 60_000);
   const allRecommendations = useMemo(
     () => recommendTournamentFormats(
       { playerCount: participantCount, tableCount: tables, minimumMatches, sport, matchDurationMinutes, venueTurnoverMinutes: breakMinutes },
@@ -1113,7 +1122,9 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
         maxGroups: effectiveMaxGroups,
         maxSwissRounds: effectiveMaxSwissRounds,
         knockoutQualifierCount: effectiveKnockoutQualifierCount,
-        preferredDurationMinutes: tournamentMode === 'multi' ? preferredDurationMinutes : Math.min(preferredDurationMinutes, MAX_SINGLE_DAY_DURATION),
+        preferredDurationMinutes: preferredTimeMode === 'duration'
+          ? (tournamentMode === 'multi' ? preferredDurationMinutes : Math.min(preferredDurationMinutes, MAX_SINGLE_DAY_DURATION))
+          : undefined,
         requireDecisiveWinner: true,
         maxResults: 0,
       },
@@ -1130,12 +1141,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       effectiveMaxGroups,
       effectiveMaxSwissRounds,
       effectiveKnockoutQualifierCount,
-      preferredDurationMinutes,
+      preferredDurationMinutes, preferredTimeMode,
     ],
   );
 
-  const assessedRecommendations = useMemo(() => allRecommendations.map((item) => ({
-    item, assessment: assessRecommendationTime(item, {
+  const assessedRecommendations = useMemo(() => {
+    const entries = allRecommendations.map((item) => ({
+      item, assessment: assessRecommendationTime(item, {
       start: scheduledStart, days: tournamentMode === 'single' ? 1 : plannedDays,
       participants: participantCount, tableCount: tables,
       timing: timedSport ? { matchDurationMinutes, venueTurnoverMinutes: breakMinutes }
@@ -1143,9 +1155,15 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       bestOfFor: (type) => phaseBestOfForSport(sport, type),
       awardsEnabled, awardsAtOverride,
     }),
-  })), [allRecommendations, tournamentMode, scheduledStart, plannedDays,
+    }));
+    if (preferredTimeMode !== 'end-time' || !preferredEndTimeValid) return entries;
+    return entries.sort((a, b) =>
+      (a.item.minimumMatchShortfall ?? 0) - (b.item.minimumMatchShortfall ?? 0)
+      || recommendationEndTimePenalty(a.assessment.estimatedEnd, preferredEndDateTime)
+        - recommendationEndTimePenalty(b.assessment.estimatedEnd, preferredEndDateTime));
+  }, [allRecommendations, tournamentMode, scheduledStart, plannedDays,
     participantCount, tables, timedSport, matchDurationMinutes, breakMinutes, sport,
-    awardsEnabled, awardsAtOverride]);
+    awardsEnabled, awardsAtOverride, preferredTimeMode, preferredEndDateTime, preferredEndTimeValid]);
   // Do not discard the sixth viable suggestion before checking the first five.
   const visibleRecommendationChoices = useMemo(() => [
     ...assessedRecommendations.filter(({ assessment }) => assessment.feasible),
@@ -2715,21 +2733,50 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     <RecommendationNumberStepper id="planned-playing-days" label="Geplante Anzahl an Spieltagen"
                       value={plannedDays} min={2} max={14} onChange={setPlannedDays}/>
                   </div>}
-                  <div className="field recommendation-duration-field">
-                    <label htmlFor="preferred-duration" title="Zeitspanne in Stunden und Minuten, keine Uhrzeit. Mit ± in 15-Minuten-Schritten ändern.">Turnierdauer (Std. + Min.)</label>
-                    <div className="recommendation-duration-stepper" role="group" aria-label="Geplante Turnierdauer anpassen">
-                      <button type="button" className="recommendation-number-stepper-button"
-                        aria-label="Geplante Turnierdauer um 15 Minuten verringern"
-                        disabled={preferredDurationMinutes <= MIN_RECOMMENDATION_DURATION}
-                        onClick={() => adjustPreferredDuration(-15)}>−</button>
-                      <RecommendationDurationPicker value={preferredDurationMinutes} multiDay={tournamentMode === 'multi'} onChange={setPreferredDurationMinutes}/>
-                      <button type="button" className="recommendation-number-stepper-button"
-                        aria-label="Geplante Turnierdauer um 15 Minuten erhöhen"
-                        disabled={preferredDurationMinutes >= (tournamentMode === 'multi' ? MAX_RECOMMENDATION_DURATION : MAX_SINGLE_DAY_DURATION)}
-                        onClick={() => adjustPreferredDuration(15)}>+</button>
+                  <fieldset className="recommendation-time-choice">
+                    <legend>Gewünschte Zeitvorgabe</legend>
+                    <label className="tournament-mode-option">
+                      <input type="radio" name="recommendation-time-mode"
+                        checked={preferredTimeMode === 'end-time'}
+                        onChange={() => setPreferredTimeMode('end-time')}/>
+                      <span>Gewünschte Endzeit</span>
+                    </label>
+                    <label className="tournament-mode-option">
+                      <input type="radio" name="recommendation-time-mode"
+                        checked={preferredTimeMode === 'duration'}
+                        onChange={() => setPreferredTimeMode('duration')}/>
+                      <span>Gewünschte Turnierdauer</span>
+                    </label>
+                  </fieldset>
+                  {preferredTimeMode === 'end-time'
+                    ? <div className="field recommendation-end-time-field">
+                      <label htmlFor="preferred-end-time">Gewünschte Endzeit</label>
+                      <ClockTimePicker id="preferred-end-time" label="Gewünschte Endzeit"
+                        value={preferredEndTime} onChange={setPreferredEndTime}/>
+                      <span className="field-hint">
+                        {tournamentMode === 'multi'
+                          ? `Zielzeit am letzten Spieltag (${preferredEndDate.slice(8, 10)}.${preferredEndDate.slice(5, 7)}.${preferredEndDate.slice(0, 4)}).`
+                          : 'Zielzeit am Turniertag.'}
+                      </span>
+                      {!preferredEndTimeValid && <span className="field-error" role="status">
+                        Die Endzeit muss nach dem geplanten Turnierstart liegen und eine gültige Uhrzeit sein.
+                      </span>}
                     </div>
-                    <span className="field-hint">Dauer, keine Uhrzeit · z. B. 3 Std. 30 Min.</span>
-                  </div>
+                    : <div className="field recommendation-duration-field">
+                      <label htmlFor="preferred-duration" title="Zeitspanne in Stunden und Minuten, keine Uhrzeit. Mit ± in 15-Minuten-Schritten ändern.">Gewünschte Turnierdauer</label>
+                      <div className="recommendation-duration-stepper" role="group" aria-label="Geplante Turnierdauer anpassen">
+                        <button type="button" className="recommendation-number-stepper-button"
+                          aria-label="Geplante Turnierdauer um 15 Minuten verringern"
+                          disabled={preferredDurationMinutes <= MIN_RECOMMENDATION_DURATION}
+                          onClick={() => adjustPreferredDuration(-15)}>−</button>
+                        <RecommendationDurationPicker value={preferredDurationMinutes} multiDay={tournamentMode === 'multi'} onChange={setPreferredDurationMinutes}/>
+                        <button type="button" className="recommendation-number-stepper-button"
+                          aria-label="Geplante Turnierdauer um 15 Minuten erhöhen"
+                          disabled={preferredDurationMinutes >= (tournamentMode === 'multi' ? MAX_RECOMMENDATION_DURATION : MAX_SINGLE_DAY_DURATION)}
+                          onClick={() => adjustPreferredDuration(15)}>+</button>
+                      </div>
+                      <span className="field-hint">Aktive Dauer ohne Nächte · z. B. 3 Std. 30 Min.</span>
+                    </div>}
                 </div>
                 <div className="format-setting-fields">
                   <div className="field">
@@ -2772,7 +2819,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                   <details className="format-help-details">
                     <summary>Einstellungen erklärt</summary>
                     <p>Die Obergrenzen gelten nur für die Empfehlungen. Schweizer Runden haben das Limit Teilnehmerzahl minus 1; bei kombinierten Turnierformen muss vor der K.-o.-Phase mindestens eine Person ausscheiden.</p>
-                    <p>Die Dauer ist die gesamte aktive Planungszeit, maximal 23 Std. 59 Min. Nächte zählen nicht dazu. Mit ± lässt sie sich um 15 Minuten ändern; weitere Turnierformen können die gewünschte Dauer überschreiten.</p>
+                    <p>Du kannst entweder eine gewünschte Enduhrzeit festlegen oder eine aktive Turnierdauer. Bei mehrtägigen Turnieren bezieht sich die Endzeit auf den letzten Spieltag; Nächte zählen nicht zur aktiven Turnierdauer.</p>
+                    <p>Beide Vorgaben sind weiche Ziele: Eine Empfehlung darf davon abweichen. Für die Dauer kannst du ±15 Minuten und im Einstellungsdialog die Schnellbuttons nutzen.</p>
                     <p>Die Schätzungen berücksichtigen parallele Spiele, aber keine zusätzlichen Verzögerungen bei der Auswertung. Die konkreten Spieltage konfigurierst du in Schritt 4.</p>
                   </details>
                   <p className="format-settings-footnote">Nur Empfehlungen betroffen · Schätzungen ohne Auswertungsverzögerungen</p>
@@ -2840,6 +2888,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     <div className="recommendation-metrics">
                       <span className="recommendation-metric-tag">{item.estimatedMatches} Spiele</span>
                       <span className="recommendation-metric-tag">ca. {formatDuration(item.estimatedDurationMinutes)}</span>
+                      {preferredTimeMode === 'end-time' && assessment.estimatedEnd && (
+                        <span className="recommendation-metric-tag">
+                          Ende ca. {formatPlannedDateTime(assessment.estimatedEnd)}
+                        </span>
+                      )}
                       {tournamentMode === 'multi' && <span className={`recommendation-metric-tag ${!recommendationFeasible ? 'wizard-metric-warning' : ''}`}>
                         {!daySplitPossible
                           ? 'Nicht wählbar: zu wenige Runden für die gewünschten Spieltage'
@@ -2856,9 +2909,11 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                     </div>
                     {index === firstSelectableRecommendationIndex && recommendationFeasible && !item.minimumMatchShortfall && (
                       <p className="recommendation-reason">
-                        {item.estimatedDurationMinutes <= preferredDurationMinutes
-                          ? `Warum empfohlen: Erfüllt dein Mindestspielziel und liegt innerhalb deiner geplanten Turnierdauer von ${formatRecommendationDuration(preferredDurationMinutes)}.`
-                          : `Warum empfohlen: Erfüllt dein Mindestspielziel; die geschätzte Dauer übersteigt deine Zielzeit von ${formatRecommendationDuration(preferredDurationMinutes)}.`}
+                        {preferredTimeMode === 'end-time'
+                          ? `Warum empfohlen: Erfüllt dein Mindestspielziel. Geschätztes Ende: ${assessment.estimatedEnd ? formatPlannedDateTime(assessment.estimatedEnd) : 'noch offen'}; gewünschte Endzeit: ${preferredEndTime} Uhr.`
+                          : item.estimatedDurationMinutes <= preferredDurationMinutes
+                            ? `Warum empfohlen: Erfüllt dein Mindestspielziel und liegt innerhalb deiner geplanten Turnierdauer von ${formatRecommendationDuration(preferredDurationMinutes)}.`
+                            : `Warum empfohlen: Erfüllt dein Mindestspielziel; die geschätzte Dauer übersteigt deine Zielzeit von ${formatRecommendationDuration(preferredDurationMinutes)}.`}
                       </p>
                     )}
                   </button>;

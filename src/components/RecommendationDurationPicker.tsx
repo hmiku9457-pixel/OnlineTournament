@@ -54,6 +54,12 @@ export function RecommendationDurationPicker({ value, onChange, multiDay = false
     onChange(candidate);
     closeDialog();
   }
+  function addDurationMinutes(amount: number) {
+    const entered = hours !== null && minutes !== null ? hours * 60 + minutes : value;
+    const next = Math.min(maximum, entered + amount);
+    setHoursText(String(Math.floor(next / 60)).padStart(2, '0'));
+    setMinutesText(String(next % 60).padStart(2, '0'));
+  }
   useEffect(() => {
     if (!open) return;
     const oldOverflow = document.body.style.overflow;
@@ -108,6 +114,15 @@ export function RecommendationDurationPicker({ value, onChange, multiDay = false
                 <input type="number" min="0" max="59" inputMode="numeric" value={minutesText}
                   onChange={(event) => setMinutesText(event.target.value)} />
               </label>
+            </div>
+            <div className="recommendation-duration-quick-add" role="group" aria-label="Turnierdauer schnell erhöhen">
+              {([1, 5, 15, 60] as const).map((amount) => (
+                <button key={amount} type="button" className="btn"
+                  disabled={hours !== null && minutes !== null && hours * 60 + minutes >= maximum}
+                  onClick={() => addDurationMinutes(amount)}>
+                  +{amount === 60 ? '1 Std.' : `${amount} Min.`}
+                </button>
+              ))}
             </div>
             {candidate !== null && <p className="recommendation-duration-preview" role="status">Geplante Dauer: <strong>{formatRecommendationDuration(candidate)}</strong></p>}
             {candidate === null && <p className="clock-picker-minimum-hint" role="status">Bitte eine Dauer zwischen 15 Minuten und {formatRecommendationDuration(maximum)} eingeben.</p>}

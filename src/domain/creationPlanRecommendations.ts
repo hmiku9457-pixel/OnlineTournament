@@ -71,7 +71,22 @@ export function creationPlanTimeIssues(
       return [`„${phase.label}“: Zwischenpause und Spieltagsende dürfen nicht auf dieselbe Runde fallen.`];
     }
   }
-  const timeline = buildPlannedTimeline(scheduledStart, phases.map((phase) => ({
+  const timeline = buildRecommendationTimeline(phases, scheduledStart, tables, timing);
+  if (!timeline.estimatedEnd) return ['Das gewählte Turnierdatum oder die Startuhrzeit ist ungültig.'];
+  return [
+    ...(awardsEnabled && awardsAtOverride && awardsAtOverride < timeline.estimatedEnd
+      ? [`Die fest geplante Siegerehrung um ${awardsAtOverride.replace('T', ' ')} liegt vor dem geschätzten Turnierende ${timeline.estimatedEnd.replace('T', ' ')}.`] : []),
+    ...plannedTimelineConflicts(timeline),
+    ...playingDayOverflowWarnings(timeline),
+    ...validatePlannedSchedule(timeline.items),
+  ];
+}
+
+/** The same round-accurate estimate is used for validity and for a preferred end clock. */
+function buildRecommendationTimeline(
+  phases: readonly DayDistributionPhase[], scheduledStart: string, tables: number, timing: TimedMatchSettings,
+) {
+  return buildPlannedTimeline(scheduledStart, phases.map((phase) => ({
     label: phase.label, type: phase.type,
     estimatedMinutes: estimatePhaseMetrics(phase, tables, timing).estimatedDurationMinutes,
     breakKind: phase.breakKind, breakMinutes: phase.breakMinutes,
@@ -88,14 +103,6 @@ export function creationPlanTimeIssues(
     inlineBreakUntil: phase.inlineBreakUntil, inlineBreakUntilDate: phase.inlineBreakUntilDate || undefined,
     dayBreaks: phase.dayBreaks,
   })));
-  if (!timeline.estimatedEnd) return ['Das gewählte Turnierdatum oder die Startuhrzeit ist ungültig.'];
-  return [
-    ...(awardsEnabled && awardsAtOverride && awardsAtOverride < timeline.estimatedEnd
-      ? [`Die fest geplante Siegerehrung um ${awardsAtOverride.replace('T', ' ')} liegt vor dem geschätzten Turnierende ${timeline.estimatedEnd.replace('T', ' ')}.`] : []),
-    ...plannedTimelineConflicts(timeline),
-    ...playingDayOverflowWarnings(timeline),
-    ...validatePlannedSchedule(timeline.items),
-  ];
 }
 
 function distributeAtBoundaries<T extends DayDistributionPhase>(
@@ -457,6 +464,18 @@ export interface RecommendationTimeAssessment {
   daySplitPossible: boolean;
   reason: string | null;
   scheduleSignature?: string;
+  /** Estimated local date/time after distributing rounds across playing days. */
+  estimatedEnd?: string;
+}
+
+/** Compare a proposal's end with a desired final-day clock. Late endings cost
+ * more than earlier ones, without treating the requested time as a hard limit. */
+export function recommendationEndTimePenalty(actualEnd: string | undefined, desiredEnd: string): number {
+  const actual = actualEnd ? parseLocalDateTime(actualEnd) : null;
+  const desired = parseLocalDateTime(desiredEnd);
+  if (!actual || !desired) return Number.POSITIVE_INFINITY;
+  const minutesLate = (actual.getTime() - desired.getTime()) / 60000;
+  return minutesLate > 0 ? minutesLate * 2 : Math.abs(minutesLate);
 }
 
 /** Simulate the exact planning model used by Step 4. Enough rounds are
@@ -501,5 +520,7 @@ export function assessRecommendationTime(
     daySplitPossible: days === 1 || phases.reduce((count, phase) => count + playingRounds(phase), 0) >= days,
     reason: distribution.reason ?? null,
     scheduleSignature: distribution.possible ? creationPlanScheduleSignature(distribution.phases) : undefined,
+    estimatedEnd: distribution.possible
+      ? buildRecommendationTimeline(distribution.phases, start, tableCount, timing).estimatedEnd : undefined,
   };
 }
