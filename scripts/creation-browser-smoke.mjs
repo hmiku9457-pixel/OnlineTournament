@@ -1001,6 +1001,10 @@ try {
   await multiPage.locator('.phase-wizard-step').waitFor();
   const middlePhase = multiPage.locator('.phase-config').filter({ hasText: 'Zwischenrunde' });
   await middlePhase.getByRole('button', { name: 'Entfernen', exact: true }).click();
+  const firstConfirm = multiPage.getByRole('alertdialog', { name: 'Phase entfernen bestätigen' });
+  await firstConfirm.waitFor();
+  assert.match(await firstConfirm.innerText(), /Zwischenrunde/);
+  await firstConfirm.getByRole('button', { name: 'Phase endgültig entfernen' }).click();
   const phaseDeletionChoice = multiPage.getByRole('alertdialog',
     { name: 'Benachbarte Pause beim Entfernen berücksichtigen?' });
   await phaseDeletionChoice.waitFor();
