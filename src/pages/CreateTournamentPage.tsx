@@ -623,7 +623,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const [discardDraftDialogOpen, setDiscardDraftDialogOpen] = useState(false);
   const [pendingStepNavigation, setPendingStepNavigation] = useState<{ target: WizardStep; focusDate: boolean; advance: boolean } | null>(null);
   const [pendingParticipantAction, setPendingParticipantAction] = useState<{ kind: 'edit'; id: string } | { kind: 'test-players' } | null>(null);
-  const [pendingRecommendationId, setPendingRecommendationId] = useState<string | null>(null);
   const [qualificationRulePhaseId, setQualificationRulePhaseId] = useState<string | null>(null);
   const [focusStartSettings, setFocusStartSettings] = useState(false);
   const discardDraftButtonRef = useRef<HTMLButtonElement>(null);
@@ -822,7 +821,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     pendingPhaseRemoval && 'remove-phase', pendingConfirmPhaseRemoval && 'confirm-remove-phase', pendingPhaseTypeLoss && 'phase-type',
     pendingPhaseChange && 'dependent-phase',
     pendingAutomaticSplit && 'day-split', pendingDayInsertion && 'day-insert',
-    pendingBulkCleanup && 'cleanup', pendingRecommendationId && 'recommendation',
+    pendingBulkCleanup && 'cleanup',
     draftConflictOpen && 'draft-conflict', recoveryChoiceOpen && 'recovery',
   ].filter(Boolean).join(':');
   // Remember the actual wizard control before a dialog's autoFocus runs.
@@ -870,7 +869,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
           case 'day-split': setPendingAutomaticSplit(false); break;
           case 'day-insert': setPendingDayInsertion(null); break;
           case 'cleanup': setPendingBulkCleanup(false); break;
-          case 'recommendation': setPendingRecommendationId(null); break;
           case 'draft-conflict': setDraftConflictOpen(false); break;
           case 'recovery': setRecoveryChoiceOpen(false); break;
         }
@@ -1310,9 +1308,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     [visibleRecommendationChoices]);
   const firstSelectableRecommendationIndex = recommendationAssessments.findIndex((assessment) => assessment.feasible);
 
+  // Selection is only valid while the exact suggestion is still visible and selectable.
+  // A filtered, replaced or time-infeasible card must never survive as a hidden selection.
   const selectedRecommendation = useMemo(
-    () => allRecommendations.find((recommendation) => recommendation.id === selectedRecommendationId) ?? null,
-    [allRecommendations, selectedRecommendationId],
+    () => visibleRecommendationChoices.find(({ item, assessment }) =>
+      item.id === selectedRecommendationId && assessment.feasible)?.item ?? null,
+    [visibleRecommendationChoices, selectedRecommendationId],
   );
 
   /** The editable phase plan is authoritative even when inputs change. */
@@ -1332,8 +1333,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const recommendationTimeMatches = Boolean(recommendationStructureMatches && currentRecommendationAssessment?.feasible
     && currentRecommendationAssessment.scheduleSignature === creationPlanScheduleSignature(phaseDrafts));
   const recommendationPlanMatches = Boolean(recommendationStructureMatches && recommendationTimeMatches);
-  // Frühere Einstellungen dürfen vorhandene manuell angepasste Phasen nicht
-  // unbemerkt löschen oder eine Empfehlung erneut über die Änderungen legen.
+  // Changing recommendation settings may remove the chosen card from the top five
+  // or make it infeasible. Immediately deselect it without touching manual phases.
   useEffect(() => {
     if (selectedRecommendationId && !selectedRecommendation) setSelectedRecommendationId(null);
   }, [selectedRecommendationId, selectedRecommendation]);
@@ -2098,15 +2099,14 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       setPendingStepNavigation({ target, focusDate, advance });
       return;
     }
-    // Do not check or overwrite while browsing cards. Check on EVERY Step 3 → 4
-    // transition, including the very first one and direct wizard navigation.
-    if (step === 3 && target === 4 && selectedRecommendation) {
-      if (!currentRecommendationAssessment?.feasible) {
+    if (step === 3 && target === 4 && selectedRecommendationId) {
+      // Explicitly selecting a still-offered recommendation is sufficient consent
+      // to use it as the Phase 4 template; the extra confirmation was redundant.
+      // Never import a stale/hidden recommendation, even before its effect has run.
+      if (selectedRecommendation) {
+        if (!recommendationPlanMatches) applyRecommendation(selectedRecommendation);
+      } else {
         setSelectedRecommendationId(null);
-      } else if (!recommendationPlanMatches) {
-        // Confirm once, on navigation – including the first time Step 4 is entered.
-        setPendingRecommendationId(selectedRecommendation.id);
-        return;
       }
     }
     applyStepNavigation(target, focusDate, advance);
@@ -4362,31 +4362,6 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
               <button className="btn danger" type="button" onClick={removeInvalidParticipants}>
                 {participantEditorDirty ? 'Änderungen verwerfen und Einträge entfernen' : 'Fehlerhafte Einträge entfernen'}
               </button>
-            </div>
-          </section>
-        </div>
-      )}
-      {pendingRecommendationId && (
-        <div className="sport-change-backdrop" role="presentation"
-          onMouseDown={(event) => { if (event.target === event.currentTarget) setPendingRecommendationId(null); }}>
-          <section className="sport-change-dialog phase-replacement-dialog" role="alertdialog" aria-modal="true" aria-label="Übernahme der Empfehlung bestätigen?"
-            onKeyDown={(event) => { if (event.key === 'Escape') setPendingRecommendationId(null); }}>
-            <h2>{phaseDrafts.length ? 'Bestehende Phasenplanung ersetzen?' : 'Empfehlung als Phasenplan übernehmen?'}</h2>
-            {phaseDrafts.length
-              ? <p>Beim Wechsel zu Schritt 4 ersetzt die ausgewählte Empfehlung alle bereits konfigurierten Phasen. Individuelle Best-of-Werte, Qualifikationsplätze und Pausen gehen verloren.</p>
-              : <p>Die ausgewählte Empfehlung wird jetzt als Grundlage für Schritt 4 übernommen. Dort kannst du jede Phase noch anpassen.</p>}
-            <p className="field-hint">Du kannst die Empfehlung auch abwählen und ohne Vorlage zu Schritt 4 wechseln.</p>
-            <div className="sport-change-dialog-actions">
-              <button type="button" className="btn" autoFocus onClick={() => setPendingRecommendationId(null)}>Zurück zur Auswahl</button>
-              <button type="button" className={`btn ${phaseDrafts.length ? 'danger' : 'primary'}`} onClick={() => {
-                const recommendation = assessedRecommendations.find(({ item, assessment }) =>
-                  item.id === pendingRecommendationId && assessment.feasible)?.item;
-                setPendingRecommendationId(null);
-                if (recommendation) {
-                  applyRecommendation(recommendation);
-                  applyStepNavigation(4, false, true);
-                }
-              }}>{phaseDrafts.length ? 'Phasen ersetzen und weiter' : 'Empfehlung übernehmen und weiter'}</button>
             </div>
           </section>
         </div>
