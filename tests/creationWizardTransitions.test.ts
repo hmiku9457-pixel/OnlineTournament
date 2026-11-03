@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { availableDayBreakRounds, convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, reconcileRoundDependentBreaks, phaseBreakLosses, proposePlayingDayInsertion, proposePlayingDayMove } from '@/domain/creationPlanTransitions';
-import { assessRecommendationTime, distributePlayingDays, type DayDistributionPhase } from '@/domain/creationPlanRecommendations';
+import { availableDayBreakRounds, convertToSingleDay, countConfiguredDayTransitions, countCreationScheduleEntries, reconcileRoundDependentBreaks, phaseBreakLosses, earliestRoundContinuationDate, proposePlayingDayInsertion, proposePlayingDayMove } from '@/domain/creationPlanTransitions';
+import { assessRecommendationTime, creationPlanScheduleSignature, distributePlayingDays, type DayDistributionPhase } from '@/domain/creationPlanRecommendations';
 import type { FormatRecommendation } from '@/engine/recommendations';
 import { invalidParticipantRosterIndices } from '@/domain/participantNames';
 import { suggestDaySplit, validPlayingDayBreaks } from '@/domain/playingDays';
@@ -141,6 +141,109 @@ describe('creation wizard transitions', () => {
     expect(overrun.daySplitPossible).toBe(true);
     expect(overrun.feasible).toBe(false);
     expect(overrun.reason).toMatch(/Mitternacht|Spieltagswechsel|Fortsetzung/);
+  });
+
+  it('avoids a configured Swiss inline pause when distributing days', () => {
+    const swiss: DayDistributionPhase = {
+      type: 'SWISS', label: 'Schweizer Runde', entrantCount: 8, bestOf: 3,
+      groupCount: 2, swissRounds: 4, knockoutBestOf: [],
+      dayBreaks: [], inlineBreakAfterRound: 2, inlineBreakKind: 'minutes',
+      inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '',
+      breakKind: 'minutes', breakMinutes: 15, breakUntil: '12:00', breakUntilDate: '',
+      nextDayDate: '', nextDayStart: '09:00',
+    };
+    const result = distributePlayingDays([swiss], 2, '2030-11-10', 4,
+      { minutesPerSet: 15 }, (entrants) => ({ ...swiss, type: 'BREAK', entrantCount: entrants }));
+    expect(result.possible).toBe(true);
+    expect(result.phases[0].dayBreaks).toHaveLength(1);
+    expect(result.phases[0].dayBreaks[0].afterRound).not.toBe(2);
+  });
+
+  it('searches alternative round cutoffs instead of rejecting a feasible late-start plan', () => {
+    const swiss: DayDistributionPhase = {
+      type: 'SWISS', label: 'Späte Schweizer Runde', entrantCount: 8, bestOf: 1,
+      groupCount: 2, swissRounds: 6, knockoutBestOf: [], dayBreaks: [],
+      inlineBreakAfterRound: 0, inlineBreakKind: 'minutes', inlineBreakMinutes: 15,
+      inlineBreakUntil: '13:00', inlineBreakUntilDate: '',
+      breakKind: 'minutes', breakMinutes: 15, breakUntil: '12:00',
+      breakUntilDate: '', nextDayStart: '09:00', nextDayDate: '',
+    };
+    const result = distributePlayingDays([swiss], 2, '2030-11-10', 4,
+      { matchDurationMinutes: 120, venueTurnoverMinutes: 0 },
+      (entrants) => ({ ...swiss, type: 'BREAK', entrantCount: entrants }),
+      { scheduledStart: '2030-11-10T19:00' });
+    expect(result.possible).toBe(true);
+    expect(result.phases[0].dayBreaks).toEqual([
+      { afterRound: 2, date: '2030-11-11', time: '09:00' },
+    ]);
+  });
+
+  it('reports conversion of fixed clock pauses before accepting an automatic split', () => {
+    const base: DayDistributionPhase = {
+      type: 'ROUND_ROBIN', label: 'Vorrunde', entrantCount: 2, bestOf: 3,
+      groupCount: 2, swissRounds: 2, knockoutBestOf: [],
+      dayBreaks: [], inlineBreakAfterRound: 0, inlineBreakKind: 'minutes',
+      inlineBreakMinutes: 15, inlineBreakUntil: '13:00', inlineBreakUntilDate: '',
+      breakKind: 'minutes', breakMinutes: 15, breakUntil: '12:00', breakUntilDate: '',
+      nextDayDate: '', nextDayStart: '09:00',
+    };
+    const stages = [
+      { ...base, id: 'first', label: 'Vorrunde' },
+      { ...base, id: 'pause', type: 'BREAK' as const, label: 'Essen',
+        breakKind: 'until' as const, breakUntil: '13:00', breakUntilDate: '2030-11-10',
+        note: 'Verpflegung im Vereinsheim' },
+      { ...base, id: 'last', type: 'KNOCKOUT' as const, label: 'Finale', knockoutBestOf: [3] },
+    ];
+    const result = distributePlayingDays(stages, 2, '2030-11-10', 2,
+      { minutesPerSet: 15 }, (entrants) => ({ ...base, id: 'new', type: 'BREAK',
+        entrantCount: entrants }), { scheduledStart: '2030-11-10T09:00' });
+    expect(result.possible).toBe(true);
+    expect(result.phases[1]).toMatchObject({
+      id: 'pause', label: 'Essen', note: 'Verpflegung im Vereinsheim',
+      breakKind: 'overnight',
+    });
+    expect(result.changes?.join(' ')).toContain('Pause bis 2030-11-10 13:00');
+  });
+
+  it('detects lost individual KO settings before reducing entrants', () => {
+    const original = {
+      ...phase(4), id: 'ko', label: 'Finale', type: 'KNOCKOUT' as const,
+      entrantCount: 16, knockoutBestOf: [1, 3, 5, 7],
+      dayBreaks: [], inlineBreakAfterRound: 0,
+    };
+    const after = { ...original, entrantCount: 8, knockoutBestOf: [3, 5, 7] };
+    expect(phaseBreakLosses([original], [after])).toMatchObject([
+      { id: 'ko', removedKnockoutBestOf: [1] },
+    ]);
+  });
+
+  it('uses predicted round finish to avoid an already elapsed continuation date', () => {
+    const proposed = [{
+      type: 'SWISS', label: 'Späte Runde', estimatedMinutes: 240,
+      roundCount: 2, dayBreaks: [], inlineBreakAfterRound: 0,
+    }];
+    expect(earliestRoundContinuationDate('2030-11-10T23:30', proposed, 0, 1))
+      .toBe('2030-11-12');
+  });
+
+  it('checks one-day recommendations and separates structure from schedule agreement', () => {
+    const rec: FormatRecommendation = {
+      id: 'rr', label: 'Jeder gegen jeden', description: '',
+      estimatedMatches: 6, estimatedDurationMinutes: 90,
+      minimumGuaranteedMatches: 3, score: 1, requiredSystems: ['round-robin'],
+      phases: [{ key: 'rr', label: 'Jeder gegen jeden',
+        type: 'ROUND_ROBIN', defaultBestOf: 1, entrantCount: 4 }],
+    };
+    const assessment = assessRecommendationTime(rec, {
+      start: '2030-11-10T23:00', days: 1, participants: 4, tableCount: 1,
+      timing: { matchDurationMinutes: 60 }, bestOfFor: () => 1,
+    });
+    expect(assessment.feasible).toBe(false);
+    const base = phase();
+    const old = creationPlanScheduleSignature([{ ...base, dayBreaks: [] }]);
+    const changed = creationPlanScheduleSignature([{ ...base, dayBreaks: [{ afterRound: 1,
+      date: '2030-11-11', time: '09:00' }] }]);
+    expect(old).not.toBe(changed);
   });
 
   it('rejects chronologically inverted playing days', () => {
