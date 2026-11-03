@@ -1,4 +1,4 @@
-import { playingRounds, type PlayingDayBreak } from './playingDays';
+import { followingPlayingDate, playingRounds, type PlayingDayBreak } from './playingDays';
 import type { StageType } from './types';
 
 export const MAX_CREATION_SCHEDULE_ENTRIES = 80;
@@ -48,11 +48,73 @@ export function countCreationScheduleEntries(
 }
 
 /** A single-day plan has no overnight phase or round-level day boundaries. */
-export function convertToSingleDay<T extends RoundDependentPhase & { breakKind: string }>(
+export function convertToSingleDay<T extends RoundDependentPhase & { breakKind: string; breakMinutes: number }>(
   phases: readonly T[],
+  overnightTreatment: 'remove' | 'convert' = 'remove',
 ): T[] {
-  return phases.filter((phase) => phase.type !== 'BREAK' || phase.breakKind !== 'overnight')
-    .map((phase) => phase.dayBreaks.length ? { ...phase, dayBreaks: [] } : phase);
+  return phases
+    .filter((phase) => overnightTreatment === 'convert' || phase.type !== 'BREAK' || phase.breakKind !== 'overnight')
+    .map((phase) => ({
+      ...phase,
+      dayBreaks: [],
+      ...(overnightTreatment === 'convert' && phase.type === 'BREAK' && phase.breakKind === 'overnight'
+        ? { breakKind: 'minutes', breakMinutes: 15 } : {}),
+    } as T));
+}
+
+export interface PhaseBreakLoss {
+  id: string;
+  label: string;
+  removedRounds: number[];
+  removedInlineBreak: boolean;
+}
+
+/** Compare complete plans, including later phases altered by entrant normalization. */
+export function phaseBreakLosses<T extends RoundDependentPhase & { id: string; label: string }>(
+  before: readonly T[], after: readonly T[],
+): PhaseBreakLoss[] {
+  const afterById = new Map(after.map((phase) => [phase.id, phase]));
+  return before.flatMap((phase) => {
+    const updated = afterById.get(phase.id);
+    const retained = new Set(updated?.dayBreaks.map((boundary) => boundary.afterRound) ?? []);
+    const removedRounds = phase.dayBreaks.filter((boundary) => !retained.has(boundary.afterRound))
+      .map((boundary) => boundary.afterRound);
+    const removedInlineBreak = phase.inlineBreakAfterRound > 0
+      && (!updated || updated.inlineBreakAfterRound === 0);
+    return removedRounds.length || removedInlineBreak
+      ? [{ id: phase.id, label: phase.label, removedRounds, removedInlineBreak }] : [];
+  });
+}
+
+export interface ShiftedPlayingDate {
+  afterRound: number;
+  previousDate: string;
+  nextDate: string;
+}
+
+/** Insert at the actual round position; offer dependent date shifts before applying. */
+export function proposePlayingDayInsertion(
+  current: readonly PlayingDayBreak[], afterRound: number,
+  phaseStartDate: string, time = '09:00',
+): { dayBreaks: PlayingDayBreak[]; shifted: ShiftedPlayingDate[] } {
+  if (current.some((item) => item.afterRound === afterRound)) {
+    return { dayBreaks: [...current].sort((a, b) => a.afterRound - b.afterRound), shifted: [] };
+  }
+  const sorted = [...current].sort((a, b) => a.afterRound - b.afterRound);
+  const previous = [...sorted].reverse().find((entry) => entry.afterRound < afterRound);
+  const insertedDate = followingPlayingDate(previous?.date || phaseStartDate, 1);
+  const next = [...sorted, { afterRound, date: insertedDate, time }].sort((a, b) => a.afterRound - b.afterRound);
+  const shifted: ShiftedPlayingDate[] = [];
+  let latest = phaseStartDate;
+  const dayBreaks = next.map((entry) => {
+    const date = entry.date <= latest ? followingPlayingDate(latest, 1) : entry.date;
+    if (date !== entry.date && entry.afterRound !== afterRound) {
+      shifted.push({ afterRound: entry.afterRound, previousDate: entry.date, nextDate: date });
+    }
+    latest = date;
+    return date === entry.date ? entry : { ...entry, date };
+  });
+  return { dayBreaks, shifted };
 }
 
 export function countConfiguredDayTransitions<T extends { type: string; breakKind: string; dayBreaks: readonly PlayingDayBreak[] }>(
