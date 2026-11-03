@@ -82,11 +82,14 @@ export function configuredPlayingDays(phases: readonly {
 export function validPlayingDayBreaks(breaks: readonly PlayingDayBreak[] | undefined, rounds: number): boolean {
   if (!breaks) return true;
   const seen = new Set<number>();
-  return breaks.every((entry) => {
+  let previousDate = '';
+  return [...breaks].sort((a, b) => a.afterRound - b.afterRound).every((entry) => {
     if (!Number.isInteger(entry.afterRound) || entry.afterRound < 1 || entry.afterRound >= rounds
       || seen.has(entry.afterRound) || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)
-      || !/^([01]\d|2[0-3]):[0-5]\d$/.test(entry.time)) return false;
+      || !/^([01]\d|2[0-3]):[0-5]\d$/.test(entry.time)
+      || (previousDate !== '' && entry.date <= previousDate)) return false;
     seen.add(entry.afterRound);
+    previousDate = entry.date;
     return true;
   });
 }
