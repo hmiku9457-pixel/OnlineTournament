@@ -7748,6 +7748,20 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .recommendation-duration-quick-add { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* Keep both time modes' input rows identical in height and avoid shifting
+   the secondary settings section when the end-day selector is activated. */
+.wizard-workspace .format-step .recommendation-duration-field .recommendation-duration-stepper,
+.wizard-workspace .format-step .recommendation-duration-field .recommendation-duration-trigger,
+.wizard-workspace .format-step .recommendation-end-time-field .clock-picker-trigger,
+.wizard-workspace .format-step .recommendation-derived-value {
+  height: 40px;
+  min-height: 40px;
+  box-sizing: border-box;
+}
+.wizard-workspace .format-step .recommendation-end-time-field .recommendation-end-subrow {
+  height: 34px;
+  flex: 0 0 34px;
+}
 /* Compact, consistent Step 3 settings grid. Duration always precedes the
    end clock, even when the editable target changes. */
 .wizard-workspace .format-step .recommendation-period-column,

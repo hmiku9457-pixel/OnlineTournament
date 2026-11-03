@@ -183,7 +183,13 @@ try {
     'the derived end must not offer a competing editable clock picker');
   await page.getByRole('button', { name: 'Geplante Turnierdauer um 15 Minuten erhöhen' }).click();
   assert.equal(await page.locator('#preferred-derived-end').innerText(), '11:25 Uhr');
+  const lowerSettingsBeforeToggle = await page.locator('.format-setting-fields')
+    .evaluate(node => node.getBoundingClientRect().top);
   await page.getByRole('radio', { name: 'Endzeit', exact: true }).check();
+  const lowerSettingsAfterToggle = await page.locator('.format-setting-fields')
+    .evaluate(node => node.getBoundingClientRect().top);
+  assert.ok(Math.abs(lowerSettingsAfterToggle - lowerSettingsBeforeToggle) <= 2,
+    'the end-day dropdown must not push the lower settings down when switching targets');
   const endModePositions = await getTimeFieldPositions();
   assert.ok(endModePositions);
   assert.ok(Math.abs(endModePositions.durationX - initialPositions.durationX) <= 1
@@ -903,7 +909,38 @@ try {
     await multiPage.getByRole('button', { name: 'Spieler hinzufügen' }).click();
   }
   await next(multiPage);
-  await multiPage.getByRole('radio', { name: 'Mehrtägig' }).check();
+  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '1');
+  await multiPage.getByRole('button', { name: 'Geplante Anzahl an Spieltagen erhöhen' }).click();
+  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
+  // Four-day regression: changing the last-day clock must actually persist,
+  // rather than closing the modal and silently retaining the old value.
+  await multiPage.locator('#planned-playing-days').fill('4');
+  await multiPage.locator('#planned-playing-days').blur();
+  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '4');
+  await multiPage.getByRole('radio', { name: 'Endzeit', exact: true }).check();
+  const beforeFourDayEnd = await multiPage.locator('#preferred-end-time .clock-picker-trigger-value').innerText();
+  await multiPage.locator('#preferred-end-time').click();
+  const fourDayDialog = multiPage.getByRole('dialog', { name: 'Gewünschte Endzeit einstellen' });
+  await fourDayDialog.getByLabel('Stunde (0–23)').fill('18');
+  await fourDayDialog.getByLabel('Minute (0–59)').fill('20');
+  await fourDayDialog.getByRole('button', { name: 'Übernehmen', exact: true }).click();
+  assert.notEqual(beforeFourDayEnd, '18:20');
+  assert.equal(await multiPage.locator('#preferred-end-time .clock-picker-trigger-value').innerText(), '18:20',
+    'selecting 18:20 on the fourth day must update the clock');
+  assert.equal(await multiPage.locator('.recommendation-end-time-field [role="alert"]').count(), 0);
+  await multiPage.reload();
+  await multiPage.locator('#preferred-end-time').waitFor();
+  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '4');
+  assert.equal(await multiPage.locator('#preferred-end-time .clock-picker-trigger-value').innerText(), '18:20',
+    'the four-day end time survives draft recovery');
+  await multiPage.getByRole('radio', { name: 'Turnierdauer', exact: true }).check();
+  await multiPage.locator('#preferred-duration').click();
+  const resetDurationDialog = multiPage.getByRole('dialog', { name: 'Geplante Turnierdauer' });
+  await resetDurationDialog.getByLabel(/^Stunden \\(0–\\d+\\)$/).fill('3');
+  await resetDurationDialog.getByLabel('Minuten (0–59)').fill('30');
+  await resetDurationDialog.getByRole('button', { name: 'Dauer übernehmen' }).click();
+  await multiPage.locator('#planned-playing-days').fill('2');
+  await multiPage.locator('#planned-playing-days').blur();
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
   assert.match(await multiPage.locator('.recommendation-derived-field .field-hint').innerText(),
     /Letzter Spieltag/, 'a multi-day calculated end applies to the last playing day');
@@ -969,10 +1006,10 @@ try {
   assert.ok(replacementActionPositions[0].right <= replacementActionPositions[1].left,
     'the cancel button is left of the destructive replacement action');
   await daySplitReplaceDialog.getByRole('button', { name: 'Zurück zur Auswahl' }).click();
-  assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägig' }).isChecked(), true);
+  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
   assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
   const summaryBeforeModeSwitch = await multiPage.locator('.wizard-side-summary').innerText();
-  await multiPage.getByRole('radio', { name: 'Eintägig' }).click();
+  await multiPage.getByRole('button', { name: 'Geplante Anzahl an Spieltagen verringern' }).click();
   const multiModeDialog = multiPage.getByRole('alertdialog', { name: 'Turniermodus wechseln?' });
   await multiModeDialog.waitFor();
   const dialogGeometry = await multiPage.evaluate(() => {
@@ -989,10 +1026,10 @@ try {
   assert.equal(await multiPage.locator('.wizard-side-summary').innerText(), summaryBeforeModeSwitch,
     'opening the confirmation must not overwrite the tournament summary');
   await multiModeDialog.getByRole('button', { name: 'Abbrechen' }).click();
-  assert.equal(await multiPage.getByRole('radio', { name: 'Mehrtägig' }).isChecked(), true);
-  await multiPage.getByRole('radio', { name: 'Eintägig' }).click();
+  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '2');
+  await multiPage.getByRole('button', { name: 'Geplante Anzahl an Spieltagen verringern' }).click();
   await multiModeDialog.getByRole('button', { name: 'Als normale Pausen behalten' }).click();
-  assert.equal(await multiPage.getByRole('radio', { name: 'Eintägig' }).isChecked(), true);
+  assert.equal(await multiPage.locator('#planned-playing-days').inputValue(), '1');
   await multiPage.waitForFunction(() => {
     const raw = sessionStorage.getItem('online-tournament:creation-draft:v1:new');
     if (!raw) return false;
@@ -1002,7 +1039,7 @@ try {
   });
   // Re-enter multi-day mode and distribute the already configured manual plan
   // rather than replacing participant counts, round counts or Best-of values.
-  await multiPage.getByRole('radio', { name: 'Mehrtägig' }).click();
+  await multiPage.getByRole('button', { name: 'Geplante Anzahl an Spieltagen erhöhen' }).click();
   await multiPage.locator('.wizard-step').nth(3).click();
   const manualDayPlan = multiPage.locator('.phase-auto-day-plan');
   await manualDayPlan.waitFor();

@@ -75,6 +75,7 @@ describe('tournament creation draft recovery', () => {
     expect(restored?.plannedDays).toBe(3);
     expect(restored?.phaseDrafts[0].dayBreaks).toEqual(original.phaseDrafts[0].dayBreaks);
     expect(validDraft({ ...original, plannedDays: 15 })).toBe(false);
+    expect(validDraft({ ...makeDraft(), tournamentMode: 'single', plannedDays: 1 })).toBe(true);
     expect(validDraft({ ...original, tournamentMode: 'invalid' })).toBe(false);
   });
 
