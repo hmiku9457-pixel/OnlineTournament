@@ -2998,7 +2998,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
                 </div>
               </div>
             )}
-            {phaseLimitError && <p className="field-error" role="alert">{phaseLimitError}</p>
+            {phaseLimitError && <p className="field-error" role="alert">{phaseLimitError}</p>}
             <div className="creation-review-overview" aria-label="Turnierdaten im Überblick">
               <div className="creation-review-identity">
                 <span>Dein Turnier</span>
