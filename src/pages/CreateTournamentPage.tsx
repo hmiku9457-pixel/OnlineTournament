@@ -1313,13 +1313,42 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
     if (!pendingPhaseChange) return;
     const { next, losses, manuallyEditedId } = pendingPhaseChange;
     const changedIds = changedPhaseEntrantIds(phaseDrafts, next, manuallyEditedId);
-    const affected = [...changedIds, ...losses.map((loss) => loss.id)];
+    const needsReview = phaseDrafts.flatMap((original) => {
+      const index = next.findIndex((phase) => phase.id === original.id);
+      return index >= 0 && needsRosterPhaseReview(original, next[index], index) ? [original.id] : [];
+    });
+    const affected = [...changedIds, ...losses.map((loss) => loss.id), ...needsReview];
     if (affected.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...affected])]);
     setPhaseDrafts(next);
     setSelectedRecommendationId(null);
     setPhaseLimitError('');
     setPendingPhaseChange(null);
     setPhaseInsertIndex(null);
+  }
+
+  function keepDependentPausesForManualReview() {
+    if (!pendingPhaseChange) return;
+    if (pendingPhaseChange.source !== 'roster') {
+      setPendingPhaseChange(null);
+      return;
+    }
+    // Participant changes have already happened. Normalize entrants but keep
+    // every existing pause so the director can remove or reposition it explicitly.
+    const oldById = new Map(phaseDrafts.map((phase) => [phase.id, phase]));
+    const retained = pendingPhaseChange.next.map((phase) => {
+      const before = oldById.get(phase.id);
+      return before ? {
+        ...phase, dayBreaks: [...before.dayBreaks], inlineBreakAfterRound: before.inlineBreakAfterRound,
+      } : phase;
+    });
+    const affected = [
+      ...pendingPhaseChange.losses.map((loss) => loss.id),
+      ...changedPhaseEntrantIds(phaseDrafts, retained),
+    ];
+    if (affected.length) setReviewRequiredPhaseIds((ids) => [...new Set([...ids, ...affected])]);
+    setPhaseDrafts(retained);
+    setSelectedRecommendationId(null);
+    setPendingPhaseChange(null);
   }
 
   function insertPhase(insertIndex: number, type: StageType) {
@@ -3452,7 +3481,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft }: { prestart
             </ul>
             <p className="field-hint">Weitere gültige Einstellungen bleiben erhalten. Betroffene Phasen müssen anschließend als geprüft bestätigt werden.</p>
             <div className="sport-change-dialog-actions">
-              <button className="btn" type="button" autoFocus onClick={() => setPendingPhaseChange(null)}>
+              <button className="btn" type="button" autoFocus onClick={keepDependentPausesForManualReview}>
                 {pendingPhaseChange.source === 'roster' ? 'Pausen beibehalten und manuell korrigieren' : 'Änderung abbrechen'}
               </button>
               <button className="btn primary" type="button" onClick={approvePhaseChanges}>
