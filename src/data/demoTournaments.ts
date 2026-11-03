@@ -40,6 +40,8 @@ export interface DemoTournament {
   minimumMatches?: number;
   tournamentMode?: 'single' | 'multi';
   plannedDays?: number;
+  /** Planned timestamps use this IANA zone, independent of the director's browser. */
+  timeZone?: 'Europe/Berlin';
   /** Local wall-clock date/time, YYYY-MM-DDTHH:mm (not a UTC instant). */
   scheduledStart?: string;
   /** Optional, non-binding public itinerary; never controls stage starts. */
