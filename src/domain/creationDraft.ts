@@ -75,6 +75,9 @@ export interface CreationDraft {
   preferredTimeMode?: 'duration' | 'end-time';
   /** HH:mm on the final playing day, using the tournament timezone. */
   preferredEndTime?: string;
+  /** Frozen active-time allocation for all but the final playing day.
+   * Both duration and end clock are derived from the same editable target. */
+  preferredEarlierDaysMinutes?: number;
   tournamentMode?: 'single' | 'multi';
   plannedDays?: number;
   awardsEnabled: boolean;
@@ -164,6 +167,9 @@ export function validDraft(value: unknown): value is CreationDraft {
     && typeof data.preferredDurationMinutes === 'number'
     && Number.isInteger(data.preferredDurationMinutes) && data.preferredDurationMinutes >= 15
     && data.preferredDurationMinutes <= (data.tournamentMode === 'multi' ? 14 * 24 * 60 - 1 : 1439)
+    && (data.preferredEarlierDaysMinutes === undefined
+      || (Number.isInteger(data.preferredEarlierDaysMinutes) && data.preferredEarlierDaysMinutes >= 0
+        && data.preferredEarlierDaysMinutes < Number.MAX_SAFE_INTEGER))
     && (data.preferredTimeMode === undefined || ['duration', 'end-time'].includes(data.preferredTimeMode))
     && (data.preferredEndTime === undefined
       || (typeof data.preferredEndTime === 'string'
