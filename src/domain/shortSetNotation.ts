@@ -34,3 +34,15 @@ export function applySetCorrections(playedSets: MatchSet[], corrections: string[
   return updated.filter((set): set is MatchSet => set !== null && set !== undefined);
 }
 
+
+/** Tischtennis-Kurznotation aus Sicht von Seite A.
+ *  Auch ein verlorener Satz zu null muss sein Vorzeichen behalten (-0). */
+export function formatShortSet(set: MatchSet): string {
+  const a = set.sideAScore;
+  const b = set.sideBScore;
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0 || a === b) return `${a}:${b}`;
+  const winner = Math.max(a, b);
+  const loser = Math.min(a, b);
+  if (winner !== Math.max(11, loser + 2)) return `${a}:${b}`;
+  return a > b ? String(loser) : `-${loser}`;
+}
