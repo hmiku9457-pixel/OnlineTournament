@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { applySetCorrections, parseShortSet } from '@/domain/shortSetNotation';
+import { applySetCorrections, formatShortSet, parseShortSet } from '@/domain/shortSetNotation';
 
 describe('Kurznotation der Sätze', () => {
+  it('formatiert reguläre und verlängerte Sätze inklusive -0 aus Sicht von Seite A', () => {
+    const sample = (sideAScore: number, sideBScore: number) => formatShortSet({ number: 1, sideAScore, sideBScore });
+    expect([sample(11, 7), sample(7, 11), sample(12, 10), sample(10, 12), sample(11, 0), sample(0, 11)])
+      .toEqual(['7', '-7', '10', '-10', '0', '-0']);
+    expect(sample(11, 10)).toBe('11:10');
+  });
+
   it('interpretiert -0 als 0:11 und +0 bzw. 0 als 11:0', () => {
     expect(parseShortSet('-0', 1)).toEqual({ number: 1, sideAScore: 0, sideBScore: 11 });
     expect(parseShortSet('0', 2)).toEqual({ number: 2, sideAScore: 11, sideBScore: 0 });
