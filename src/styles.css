@@ -2929,28 +2929,54 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 }
 .control-review-alert p { margin: 0.3rem 0 0; }
 .control-review-alert .btn { flex-shrink: 0; }
-.control-approval-modal { width: min(650px, 96vw); }
+.control-approval-modal { width: min(880px, 96vw); }
 .control-approval-results {
   max-height: min(40vh, 360px);
   overflow-y: auto;
-  margin: 0.75rem 0 1rem;
+  margin: 0.75rem 0 0.5rem;
   border: 1px solid var(--border, #b9c5d4);
   border-radius: 0.55rem;
 }
 .control-approval-result {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.55rem 0.8rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.25rem minmax(9rem, 0.8fr) 6.75rem;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.5rem 0.8rem;
   border-bottom: 1px solid var(--border, #b9c5d4);
 }
 .control-approval-result:last-child { border-bottom: 0; }
-.control-approval-result strong { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.control-approval-result-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface, #f8fafc);
+  color: var(--muted, #64748b);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.control-approval-name { min-width: 0; overflow-wrap: anywhere; }
+.control-approval-score { font-variant-numeric: tabular-nums; }
+.control-approval-sets { min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; color: var(--muted, #64748b); }
+.control-approval-edit .btn { white-space: nowrap; width: 100%; }
+.control-approval-notation-hint { margin: 0 0 0.85rem; }
 .control-abort-modal textarea { display: block; width: 100%; margin: 0.5rem 0 1rem; }
 @media (max-width: 700px) {
   .control-review-alert { flex-direction: column; align-items: stretch; }
   .control-review-alert .btn { width: 100%; }
-  .control-approval-result { font-size: 0.9rem; }
+  .control-approval-result {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.25rem 0.75rem;
+    font-size: 0.9rem;
+    padding: 0.65rem 0.8rem;
+  }
+  .control-approval-result-head { display: none; }
+  .control-approval-name { grid-column: 1 / -1; font-weight: 600; }
+  .control-approval-score { grid-column: 1; }
+  .control-approval-sets { grid-column: 1; }
+  .control-approval-score::before { content: 'Ergebnis: '; font-weight: 400; color: var(--muted, #64748b); }
+  .control-approval-sets::before { content: attr(data-label) ': '; }
+  .control-approval-edit { grid-column: 2; grid-row: 2 / span 2; }
 }
 
 /* Teilnehmerübersicht: Suche + Statusfilter bleiben über den zweispaltigen Karten. */
