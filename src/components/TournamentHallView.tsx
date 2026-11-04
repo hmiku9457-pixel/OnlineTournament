@@ -1,3 +1,4 @@
+import { useState, type CSSProperties } from 'react';
 import type { VenueLayout } from '@/domain/venueLayout';
 import { displayVenueName, getVenueTerminology } from '@/domain/venueTerminology';
 import type { MockRuntimeMatch } from '@/services/mockRuntime';
@@ -24,20 +25,45 @@ export function TableStateLegend({ sport }: { sport: string }) {
   );
 }
 
+/** The hall changes its actual grid dimensions instead of using a CSS transform,
+ * keeping button hitboxes and native drag-and-drop coordinates aligned. */
+export const HALL_ZOOM_MIN = 70;
+export const HALL_ZOOM_MAX = 150;
+export const HALL_ZOOM_STEP = 10;
+
+export function clampHallZoom(zoom: number) {
+  return Math.max(HALL_ZOOM_MIN, Math.min(HALL_ZOOM_MAX,
+    Math.round(zoom / HALL_ZOOM_STEP) * HALL_ZOOM_STEP));
+}
+
 /** The plan uses fixed-width, readable tiles; large halls scroll rather than shrink. */
 export function TournamentHallView({
   layout, matchesByTable, blockedTables, selectedTable, canAssign, sport, onSelectTable, onAssignToTable,
 }: TournamentHallViewProps) {
   const venue = getVenueTerminology(sport);
+  const [zoom, setZoom] = useState(100);
   return (
-    <div className="tournament-hall">
-      <p className="muted tournament-hall-hint">{venue.singular} auswählen, um Ergebnis und Zuweisung zu bearbeiten. Wartende Spiele können per Drag & Drop auf freie Spielflächen gezogen werden. Bei breiten Plänen horizontal scrollen.</p>
+    <div className="tournament-hall" style={{ '--hall-zoom': zoom / 100 } as CSSProperties}>
+      <div className="tournament-hall-toolbar">
+        <p className="muted tournament-hall-hint">{venue.singular} auswählen, um Ergebnis und Zuweisung zu bearbeiten. Wartende Spiele können per Drag & Drop auf freie Spielflächen gezogen werden. Bei breiten Plänen horizontal scrollen.</p>
+        <div className="tournament-hall-zoom" role="group" aria-label="Zoom der Planansicht">
+          <button type="button" className="btn small" disabled={zoom <= HALL_ZOOM_MIN}
+            title="Plan verkleinern" aria-label="Plan verkleinern"
+            onClick={() => setZoom((value) => clampHallZoom(value - HALL_ZOOM_STEP))}>−</button>
+          <button type="button" className="btn small tournament-hall-zoom-reset"
+            title="Auf 100 Prozent zurücksetzen" aria-label={`Zoom ${zoom} Prozent, auf 100 Prozent zurücksetzen`}
+            disabled={zoom === 100} onClick={() => setZoom(100)}>{zoom} %</button>
+          <button type="button" className="btn small" disabled={zoom >= HALL_ZOOM_MAX}
+            title="Plan vergrößern" aria-label="Plan vergrößern"
+            onClick={() => setZoom((value) => clampHallZoom(value + HALL_ZOOM_STEP))}>+</button>
+        </div>
+      </div>
       <div className="tournament-hall-scroller" role="region" aria-label="Spielflächenplan" tabIndex={0}>
         <div className="tournament-hall-plan">
           {layout.deskDock === 'top' && <div className="tournament-hall-desk outside">Turnierleitung</div>}
           <div className="tournament-hall-row">
             {layout.deskDock === 'left' && <div className="tournament-hall-desk outside side">TL</div>}
-            <div className="tournament-hall-grid" style={{ gridTemplateColumns: `repeat(${layout.columns}, 162px)` }}>
+            <div className="tournament-hall-grid" style={{ gridTemplateColumns: `repeat(${layout.columns}, var(--hall-tile-width))` }}>
               {layout.cells.map((cell, index) => {
                 if (cell.startsWith('table:')) {
                   const table = `Tisch ${cell.slice(6)}`;
