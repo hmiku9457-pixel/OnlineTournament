@@ -1571,6 +1571,11 @@ try {
   const dayPlanContext = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
   const dayPlanPage = await dayPlanContext.newPage();
   await dayPlanPage.goto(base + '/#/tournaments/new');
+  // Wait until the recovery loader AND the initial draft save have finished
+  // before injecting a test state. Otherwise React's initial Step 1 effect
+  // can still overwrite the test fixture before a reload.
+  await dayPlanPage.locator('.creation-page-container').waitFor();
+  await dayPlanPage.waitForTimeout(250);
   await dayPlanPage.waitForFunction(() =>
     Boolean(sessionStorage.getItem('online-tournament:creation-draft:v1:new')));
   await dayPlanPage.evaluate(() => {
@@ -1613,12 +1618,13 @@ try {
   assert.equal(validatedSeed.valid, true,
     `seeded multi-day draft must be valid before reload: ${JSON.stringify(validatedSeed)}`);
   await dayPlanPage.reload();
-  await dayPlanPage.waitForTimeout(150);
+  await dayPlanPage.locator('.creation-page-container').waitFor();
   const reopenedDayPlan = await dayPlanPage.evaluate(() => ({
     step: JSON.parse(sessionStorage.getItem('online-tournament:creation-draft:v1:new') ?? '{}').draft?.step,
     view: document.querySelector('.phase-wizard-step') ? 'phase'
       : document.querySelector('.participant-step') ? 'participants'
         : document.querySelector('.format-step') ? 'format' : 'other',
+    heading: document.querySelector('.creation-page-container')?.innerText.slice(0, 260),
   }));
   assert.equal(reopenedDayPlan.view, 'phase',
     `the seeded multi-day draft should reopen in Step 4: ${JSON.stringify(reopenedDayPlan)}`);
