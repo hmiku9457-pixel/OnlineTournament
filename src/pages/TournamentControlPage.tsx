@@ -9,6 +9,7 @@ import { CreateTournamentPage } from '@/pages/CreateTournamentPage';
 import { getFirstPhaseRecommendationWarning } from '@/domain/prestartPhasePlanning';
 import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
+import { formatShortSet } from '@/domain/shortSetNotation';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { disciplineLabel } from '@/domain/sports';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
@@ -56,6 +57,16 @@ import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableL
 import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration } from '@/services/mockDuration';
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
 import type { MockAuditEntry } from '@/services/mockAudit';
+
+/** Kurznotation in der Abschlusskontrolle aus Sicht des zuerst genannten Teilnehmers. */
+function approvalSetText(match: ReturnType<typeof getMockStageMatches>[number]): string {
+  if (!match.sets?.length) return match.score === 'W.O.' ? 'Kampflos' : '–';
+  const scoring = sportScoring(match.sport);
+  if (scoring.mode === 'score') return scoreDecisionSuffix(match.decision) || '–';
+  return match.sets.map((set) => scoring.shortSetEntry
+    ? formatShortSet(set)
+    : `${set.sideAScore}:${set.sideBScore}`).join(' · ');
+}
 
 /** Block sidebar links, browser Back and programmatic route changes while a
  * director has uncommitted changes. Unlike an anchor-only guard this also
@@ -642,6 +653,7 @@ export function TournamentControlPage() {
   const [pauseClockTick, setPauseClockTick] = useState(0);
   const [confirmEarlyBreak, setConfirmEarlyBreak] = useState(false);
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
+  const [returnToApprovalAfterEdit, setReturnToApprovalAfterEdit] = useState(false);
   const [groupCutoffModalOpen, setGroupCutoffModalOpen] = useState(false);
   const [editingGroupCutoffSignature, setEditingGroupCutoffSignature] = useState<string | null>(null);
   const [abortModalOpen, setAbortModalOpen] = useState(false);
@@ -852,6 +864,22 @@ export function TournamentControlPage() {
 
   function setStatus(status: TournamentStatus) {
     setTournament(updateMockTournamentStatus(tournament.id, status));
+  }
+
+  function openApprovalMatchCorrection(matchId: string) {
+    if (!canEditMockMatch(tournament, matchId)) return;
+    setReturnToApprovalAfterEdit(true);
+    setApprovalModalOpen(false);
+    setAdminEditMatchId(matchId);
+  }
+
+  function closeAdminMatchEditor() {
+    setAdminEditMatchId(null);
+    if (returnToApprovalAfterEdit) {
+      setReturnToApprovalAfterEdit(false);
+      // A correction can invalidate the approval. Reopen only when it is still pending.
+      setApprovalModalOpen(Boolean(getPendingMockApproval(tournament)));
+    }
   }
 
   function confirmPendingApproval() {
@@ -1949,7 +1977,7 @@ export function TournamentControlPage() {
             <section className="prototype-modal admin-result-modal" role="dialog" aria-modal="true">
               <div className="player-games-modal-head">
                 <div><span className="badge">TURNIERLEITUNG</span><h2>{found.match.status === 'FINISHED' && !canEditMockMatch(tournament, found.match.id) ? 'Ergebnis anzeigen' : 'Spiel bearbeiten / Ergebnis anzeigen'}</h2></div>
-                <button className="btn small" type="button" onClick={() => setAdminEditMatchId(null)}>Schließen</button>
+                <button className="btn small" type="button" onClick={closeAdminMatchEditor}>Schließen</button>
               </div>
               <p className="muted">{found.match.sideA} gegen {found.match.sideB} · {found.match.round}{sportScoring(found.match.sport).mode === 'sets' ? ` · Best-of-${found.match.bestOf}` : ''}</p>
               <SportResultEntry
@@ -1990,14 +2018,38 @@ export function TournamentControlPage() {
             <p>{reviewMatches.length > 0
               ? `Bitte kontrolliere die folgenden ${reviewMatches.length} Begegnungen. Mit der Freigabe bestätigt die Turnierleitung deren Ergebnisse verbindlich.`
               : 'In dieser Runde gibt es keine regulären Begegnungen (nur Freilose). Die Turnierleitung muss auch diese Runde ausdrücklich freigeben.'}</p>
-            <div className="control-approval-results">
-              {reviewMatches.map((match) => (
-                <div className="control-approval-result" key={match.id}>
-                  <span>{match.sideA} – {match.sideB}</span>
-                  <strong>{match.score}</strong>
+            <div className="control-approval-results" role="table" aria-label="Zu prüfende Begegnungen">
+              <div role="rowgroup">
+                <div className="control-approval-result control-approval-result-head" role="row">
+                  <span role="columnheader">Begegnung</span>
+                  <span role="columnheader">Ergebnis</span>
+                  <span role="columnheader">{sportScoring(tournament.sport).mode === 'sets' ? 'Sätze' : 'Details'}</span>
+                  <span role="columnheader">Aktion</span>
                 </div>
-              ))}
+              </div>
+              <div role="rowgroup">
+                {reviewMatches.map((match) => (
+                  <div className="control-approval-result" role="row" key={match.id}>
+                    <span role="cell" className="control-approval-name">{match.sideA} – {match.sideB}</span>
+                    <strong role="cell" className="control-approval-score">{match.score}</strong>
+                    <span role="cell" className="control-approval-sets"
+                      data-label={sportScoring(tournament.sport).mode === 'sets' ? 'Sätze' : 'Details'}
+                      title={match.sets?.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ')}>
+                      {approvalSetText(match)}
+                    </span>
+                    <span role="cell" className="control-approval-edit">
+                      <button className="btn small" type="button" disabled={!canEditMockMatch(tournament, match.id)}
+                        title={canEditMockMatch(tournament, match.id) ? 'Ergebnis direkt korrigieren' : 'Dieses Ergebnis ist gesperrt'}
+                        aria-label={`Ergebnis von ${match.sideA} gegen ${match.sideB} korrigieren`}
+                        onClick={() => openApprovalMatchCorrection(match.id)}>Korrigieren</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
+            {sportScoring(tournament.sport).shortSetEntry && reviewMatches.some((match) => match.sets?.length) && (
+              <p className="field-hint control-approval-notation-hint">Kurznotation aus Sicht des zuerst genannten Spielers: 7 = 11:7, −7 = 7:11.</p>
+            )}
             {pendingApproval.kind === 'STAGE' && <p className="muted">
               {pendingApproval.isLastStage
                 ? 'Nach der Bestätigung wird das gesamte Turnier regulär beendet und die Endplatzierung verbindlich.'
