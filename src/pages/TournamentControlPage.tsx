@@ -9,7 +9,6 @@ import { CreateTournamentPage } from '@/pages/CreateTournamentPage';
 import { getFirstPhaseRecommendationWarning } from '@/domain/prestartPhasePlanning';
 import { SportResultEntry } from '@/components/SportResultEntry';
 import { requiresFinalApproval } from '@/domain/matchFinalization';
-import { formatShortSet } from '@/domain/shortSetNotation';
 import { scoreDecisionSuffix, sportScoring } from '@/domain/sportScoring';
 import { disciplineLabel } from '@/domain/sports';
 import { MatchResultDetails } from '@/components/MatchResultDetails';
@@ -36,7 +35,7 @@ import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
 import { getActiveSwissRecordLookup } from '@/services/activeSwissRecords';
-import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, getPendingGroupCutoff, getEditableGroupCutoffs, resolveGroupCutoff, getPendingMockApproval, approveMockProgress, abortMockTournament, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
+import { assignMockMatchToTable, unassignMockMatch, moveMockMatchToTable, getSwissRecordBeforeRound, getSwissCurrentRecord, formatMockMatchRest, restoreMockCorrectedResult, findMockRuntimeMatch, getMockAssignmentBlockReason, getMockParticipantTableConflicts, getMockQueueAssignableTables, formatPlayerRest, getMockRuntimeMatches, getMockStageBaseMatches, getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getRuntimeParticipantNames, getTotalSwissRoundCount, getSwissCutoffHistory, refreshCompletedStageQualifiers, canEditMockMatch, reconcileWithdrawalsForTournament, getPendingSwissCutoff, getPendingGroupCutoff, getEditableGroupCutoffs, resolveGroupCutoff, getPendingMockApproval, getMockApprovalReviewMatches, getMockStoredResult, confirmMockApprovalReviewMatch, approveMockProgress, abortMockTournament, beginSwissCutoffSetMatch, recordSwissCutoffLot, beginSwissCutoffPlayoff, resetSwissCutoffSets } from '@/services/mockRuntime';
 import { canWithdrawMockParticipant, withdrawMockParticipant, canRestoreMockParticipant, restoreMockParticipant, isMockThirdPlaceMatch, skipMockThirdPlaceMatch } from '@/services/mockRuntime';
 import { getStageWithdrawalLabel, getWithdrawalLabel, isParticipantWithdrawn } from '@/services/mockWithdrawals';
 import { getMockConfirmedFinalStandings, getMockParticipantProgress } from '@/services/mockParticipantProgress';
@@ -58,14 +57,11 @@ import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration }
 import { getMockAudit, recordMockAudit } from '@/services/mockAudit';
 import type { MockAuditEntry } from '@/services/mockAudit';
 
-/** Kurznotation in der Abschlusskontrolle aus Sicht des zuerst genannten Teilnehmers. */
+/** Vollständige Satzergebnisse aus Sicht der zuerst genannten Seite. */
 function approvalSetText(match: ReturnType<typeof getMockStageMatches>[number]): string {
   if (!match.sets?.length) return match.score === 'W.O.' ? 'Kampflos' : '–';
-  const scoring = sportScoring(match.sport);
-  if (scoring.mode === 'score') return scoreDecisionSuffix(match.decision) || '–';
-  return match.sets.map((set) => scoring.shortSetEntry
-    ? formatShortSet(set)
-    : `${set.sideAScore}:${set.sideBScore}`).join(' · ');
+  if (sportScoring(match.sport).mode === 'score') return scoreDecisionSuffix(match.decision) || '–';
+  return match.sets.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ');
 }
 
 /** Block sidebar links, browser Back and programmatic route changes while a
@@ -760,10 +756,9 @@ export function TournamentControlPage() {
     const timer = window.setInterval(() => setPauseClockTick((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, [activeBreak?.id, inlineBreakRunning?.resumeAt?.getTime(), tournament.status]);
-  const reviewMatches = pendingApproval && activeStage
-    ? getMockStageMatches(tournament, activeStage).filter((match) => pendingApproval.kind === 'STAGE'
-      || Number(match.id.match(/-sw-r(\d+)-m\d+$/)?.[1] ?? 0) === pendingApproval.round)
-    : [];
+  const reviewMatches = pendingApproval ? getMockApprovalReviewMatches(tournament) : [];
+  // These checkmarks are independent from normal table-side result confirmation.
+  const unreviewedMatches = reviewMatches.filter((match) => !getMockStoredResult(match.id)?.reviewConfirmed);
   const pendingSwissCutoff = useMemo(() => getPendingSwissCutoff(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
   // Intermediate round-robin fixtures run on the ordinary tournament tables;
   // the choice dialog only reappears if all playoff games remain deadlocked.
@@ -880,6 +875,23 @@ export function TournamentControlPage() {
       // A correction can invalidate the approval. Reopen only when it is still pending.
       setApprovalModalOpen(Boolean(getPendingMockApproval(tournament)));
     }
+  }
+
+  function confirmApprovalReviewMatch(matchId: string) {
+    const outcome = confirmMockApprovalReviewMatch(tournament, matchId);
+    if (!outcome) {
+      setAssignmentMessage('Diese Begegnung konnte nicht bestätigt werden. Bitte den aktuellen Ergebnisstand prüfen.');
+      refreshRuntime();
+      return;
+    }
+    if (outcome.advanced) {
+      setApprovalModalOpen(false);
+      if (outcome.advanced.kind === 'ROUND') setSelectedStageId(outcome.advanced.stageId);
+    } else if (getPendingMockApproval(tournament) && getMockApprovalReviewMatches(tournament)
+      .every((match) => getMockStoredResult(match.id)?.reviewConfirmed)) {
+      setAssignmentMessage('Die automatische Freigabe war nicht möglich. Bitte die Runde erneut prüfen.');
+    }
+    refreshRuntime();
   }
 
   function confirmPendingApproval() {
@@ -2016,40 +2028,49 @@ export function TournamentControlPage() {
               ? `Schweizer Runde ${pendingApproval.round} freigeben?`
               : `${pendingApproval.stageName} abschließen?`}</h2>
             <p>{reviewMatches.length > 0
-              ? `Bitte kontrolliere die folgenden ${reviewMatches.length} Begegnungen. Mit der Freigabe bestätigt die Turnierleitung deren Ergebnisse verbindlich.`
+              ? `${unreviewedMatches.length} von ${reviewMatches.length} Begegnungen noch zu prüfen. Jede Bestätigung entfernt die Begegnung aus der Liste. Nach dem letzten Haken wird die ${pendingApproval.kind === 'ROUND' ? 'nächste Schweizer Runde automatisch freigegeben' : 'Phase automatisch abgeschlossen'}.`
               : 'In dieser Runde gibt es keine regulären Begegnungen (nur Freilose). Die Turnierleitung muss auch diese Runde ausdrücklich freigeben.'}</p>
-            <div className="control-approval-results" role="table" aria-label="Zu prüfende Begegnungen">
+            <div className="control-approval-results" role="table" aria-label="Noch zu prüfende Begegnungen">
               <div role="rowgroup">
                 <div className="control-approval-result control-approval-result-head" role="row">
                   <span role="columnheader">Begegnung</span>
-                  <span role="columnheader">Ergebnis</span>
+                  <span role="columnheader" className="control-approval-score-heading">Ergebnis</span>
                   <span role="columnheader">{sportScoring(tournament.sport).mode === 'sets' ? 'Sätze' : 'Details'}</span>
-                  <span role="columnheader">Aktion</span>
+                  <span role="columnheader">Aktionen</span>
                 </div>
               </div>
               <div role="rowgroup">
-                {reviewMatches.map((match) => (
-                  <div className="control-approval-result" role="row" key={match.id}>
-                    <span role="cell" className="control-approval-name">{match.sideA} – {match.sideB}</span>
-                    <strong role="cell" className="control-approval-score">{match.score}</strong>
-                    <span role="cell" className="control-approval-sets"
-                      data-label={sportScoring(tournament.sport).mode === 'sets' ? 'Sätze' : 'Details'}
-                      title={match.sets?.map((set) => `${set.sideAScore}:${set.sideBScore}`).join(' · ')}>
-                      {approvalSetText(match)}
-                    </span>
-                    <span role="cell" className="control-approval-edit">
-                      <button className="btn small" type="button" disabled={!canEditMockMatch(tournament, match.id)}
-                        title={canEditMockMatch(tournament, match.id) ? 'Ergebnis direkt korrigieren' : 'Dieses Ergebnis ist gesperrt'}
-                        aria-label={`Ergebnis von ${match.sideA} gegen ${match.sideB} korrigieren`}
-                        onClick={() => openApprovalMatchCorrection(match.id)}>Korrigieren</button>
-                    </span>
-                  </div>
-                ))}
+                {unreviewedMatches.map((match) => {
+                  const scoreParts = match.score.match(/^(\d+):(\d+)$/);
+                  return (
+                    <div className="control-approval-result" role="row" key={match.id}>
+                      <span role="cell" className="control-approval-name">{match.sideA} – {match.sideB}</span>
+                      <strong role="cell" className="control-approval-score">
+                        <span className="control-approval-mobile-label">Ergebnis:</span>
+                        <span className="control-approval-score-digits">
+                          {scoreParts
+                            ? <><span>{scoreParts[1]}</span><span>:</span><span>{scoreParts[2]}</span></>
+                            : <span className="control-approval-score-other">{match.score}</span>}
+                        </span>
+                      </strong>
+                      <span role="cell" className="control-approval-sets" data-label={sportScoring(tournament.sport).mode === 'sets' ? 'Sätze' : 'Details'}>
+                        {approvalSetText(match)}
+                      </span>
+                      <span role="cell" className="control-approval-edit">
+                        <button className="btn small" type="button" disabled={!canEditMockMatch(tournament, match.id)}
+                          title={canEditMockMatch(tournament, match.id) ? 'Ergebnis direkt korrigieren' : 'Dieses Ergebnis ist gesperrt'}
+                          aria-label={`Ergebnis von ${match.sideA} gegen ${match.sideB} korrigieren`}
+                          onClick={() => openApprovalMatchCorrection(match.id)}>Korrigieren</button>
+                        <button className="btn small control-approval-check" type="button"
+                          title="Ergebnis geprüft und bestätigt"
+                          aria-label={`Ergebnis von ${match.sideA} gegen ${match.sideB} bestätigen`}
+                          onClick={() => confirmApprovalReviewMatch(match.id)}>✓</button>
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            {sportScoring(tournament.sport).shortSetEntry && reviewMatches.some((match) => match.sets?.length) && (
-              <p className="field-hint control-approval-notation-hint">Kurznotation aus Sicht des zuerst genannten Spielers: 7 = 11:7, −7 = 7:11.</p>
-            )}
             {pendingApproval.kind === 'STAGE' && <p className="muted">
               {pendingApproval.isLastStage
                 ? 'Nach der Bestätigung wird das gesamte Turnier regulär beendet und die Endplatzierung verbindlich.'
@@ -2057,7 +2078,7 @@ export function TournamentControlPage() {
             </p>}
             {pendingApproval.kind === 'ROUND' && <p className="muted">Anschließend werden die Paarungen der nächsten Schweizer Runde erstellt. Bei einer Korrektur vor deren Spielbeginn muss diese Runde erneut freigegeben werden.</p>}
             <div className="actions">
-              <button className="btn primary" type="button" onClick={confirmPendingApproval}>
+              <button className="btn primary control-approval-bulk" type="button" onClick={confirmPendingApproval}>
                 {pendingApproval.kind === 'ROUND' ? 'Runde verbindlich freigeben' : pendingApproval.isLastStage ? 'Phase bestätigen und Turnier beenden' : 'Phase verbindlich freigeben'}
               </button>
               <button className="btn" type="button" onClick={() => { setSelectedStageId(pendingApproval.stageId); setTab('flow'); setApprovalModalOpen(false); }}>Im Turnierverlauf prüfen</button>
