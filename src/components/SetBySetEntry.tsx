@@ -171,7 +171,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
     <div className={compact ? 'set-by-set-entry compact' : 'set-by-set-entry'}>
       <div className="set-entry-scoreline">
         <span>{match.sideA}{sideARecord && <em className="swiss-record">{sideARecord}</em>}</span>
-        <strong>{wins.a}:{wins.b}</strong>
+        <strong>{alreadyFinished && match.score === 'W.O.' ? 'W.O.' : `${wins.a}:${wins.b}`}</strong>
         <span>{match.sideB}{sideBRecord && <em className="swiss-record">{sideBRecord}</em>}</span>
       </div>
 
@@ -271,7 +271,7 @@ export function SetBySetEntry({ match, onSaved, onCompleted, compact = false, si
         </div>
       )}
 
-      {allowEditFinished && !editingFinished && match.status === 'FINISHED' && (match.sets?.length ?? 0) > 0 && (
+      {allowEditFinished && !editingFinished && match.status === 'FINISHED' && (
         <div className="finished-result-actions">
           <button
             className="btn small"
