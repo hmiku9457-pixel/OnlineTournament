@@ -1773,7 +1773,9 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .hall-legend-item.locked::before { background: #d0d5dd; border-color: #667085; }
 .tournament-hall-hint { margin: 6px 0 10px; font-size: .75rem; }
 .tournament-hall-scroller {
-  overflow-x: auto;
+  /* Keep a magnified venue inside its own scroll region, not page-wide. */
+  overflow: auto;
+  max-height: min(72dvh, 720px);
   max-width: 100%;
   border: 1px solid #e4e7ec;
   border-radius: 12px;
