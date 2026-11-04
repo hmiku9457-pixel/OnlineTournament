@@ -61,6 +61,8 @@ interface StoredMatchResult {
   confirmedA?: boolean;
   confirmedB?: boolean;
   adminConfirmed?: boolean;
+  /** Separate, explicit checkmark in the round/stage approval review. */
+  reviewConfirmed?: boolean;
   forcedWinner?: string;
   decisionSide?: WinnerSide;
   decision?: ScoreDecision;
@@ -847,7 +849,7 @@ export function saveMockMatchSets(matchId: string, sets: MatchSet[], status: Moc
   const tournament = getAllMockTournaments().find((item) => item.stages.some((stage) => matchId.startsWith(`${stage.id}-`)));
   if (previous?.adminConfirmed) throw new Error('Dieses Ergebnis wurde durch die Turnierleitung bestätigt und kann nur dort korrigiert werden.');
   if (tournament && !canEditMockMatch(tournament, matchId)) throw new Error('Dieses Ergebnis ist gesperrt und wurde nicht gespeichert.');
-  const next: StoredMatchResult = { ...previous, matchId, sets, status, decisionSide: undefined, decision: undefined, extraTimeProgress, forcedWinner: undefined, thirdPlaceSkipped: undefined, confirmedA: previous?.confirmedA, confirmedB: previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
+  const next: StoredMatchResult = { ...previous, matchId, sets, status, decisionSide: undefined, decision: undefined, extraTimeProgress, forcedWinner: undefined, thirdPlaceSkipped: undefined, reviewConfirmed: false, confirmedA: previous?.confirmedA, confirmedB: previous?.confirmedB, finishedAt: status === 'FINISHED' ? (previous?.finishedAt ?? Date.now()) : previous?.finishedAt };
   writeResults([next, ...current.filter((item) => item.matchId !== matchId)]);
   if (tournament && JSON.stringify(sets) !== JSON.stringify(previous?.sets ?? [])) {
     recordMockAudit({ tournamentId: tournament.id, matchId, actor: 'Ergebniseingabe (lokal)',
@@ -1665,15 +1667,51 @@ export function getPendingMockApproval(tournament: DemoTournament): MockProgress
     isLastStage: index === tournament.stages.length - 1 };
 }
 
+/** The exact fixtures that must be checked before a Swiss round or stage can advance. */
+export function getMockApprovalReviewMatches(tournament: DemoTournament): MockRuntimeMatch[] {
+  const pending = getPendingMockApproval(tournament);
+  if (!pending) return [];
+  const stage = tournament.stages.find((item) => item.id === pending.stageId);
+  if (!stage) return [];
+  return getMockStageMatches(tournament, stage).filter((match) => pending.kind === 'STAGE'
+    || Number(match.id.match(/-sw-r(\\d+)-m\\d+$/)?.[1] ?? 0) === pending.round);
+}
+
+/** Persistent individual review checks. The last check automatically triggers
+ * the same audited/validated progress approval as the bulk approval button. */
+export function confirmMockApprovalReviewMatch(tournament: DemoTournament, matchId: string): {
+  advanced: MockProgressApproval | null;
+} | null {
+  const latest = getAllMockTournaments().find((entry) => entry.id === tournament.id) ?? tournament;
+  const pending = getPendingMockApproval(latest);
+  if (!pending) return null;
+  const reviewMatches = getMockApprovalReviewMatches(latest);
+  const match = reviewMatches.find((entry) => entry.id === matchId);
+  if (!match || match.status !== 'FINISHED') return null;
+  const results = readResults();
+  const previous = results.find((entry) => entry.matchId === matchId);
+  // This also permits stored walkovers: they have a valid finished result,
+  // even when they contain no played sets.
+  if (!previous || previous.status !== 'FINISHED') return null;
+  if (!previous.reviewConfirmed) {
+    writeResults(results.map((entry) => entry.matchId === matchId
+      ? { ...entry, reviewConfirmed: true } : entry));
+    recordMockAudit({ tournamentId: latest.id, matchId,
+      actor: 'Turnierleitung (Abschlusskontrolle)', action: 'RESULT_CONFIRMED',
+      description: `Begegnung ${match.sideA} – ${match.sideB} bei der Abschlusskontrolle geprüft` });
+  }
+  const checked = new Set(readResults().filter((entry) => entry.reviewConfirmed && entry.status === 'FINISHED')
+    .map((entry) => entry.matchId));
+  if (reviewMatches.some((entry) => !checked.has(entry.id))) return { advanced: null };
+  return { advanced: approveMockProgress(latest) };
+}
+
 export function approveMockProgress(tournament: DemoTournament): MockProgressApproval | null {
   const latest = getAllMockTournaments().find((entry) => entry.id === tournament.id) ?? tournament;
   const pending = getPendingMockApproval(latest);
   if (!pending) return null;
   const stage = latest.stages.find((entry) => entry.id === pending.stageId)!;
-  const ids = new Set(getMockStageMatches(latest, stage)
-    .filter((match) => pending.kind === 'STAGE'
-      || Number(match.id.match(/-sw-r(\d+)-m\d+$/)?.[1] ?? 0) === pending.round)
-    .map((match) => match.id));
+  const ids = new Set(getMockApprovalReviewMatches(latest).map((match) => match.id));
   if (pending.kind === 'STAGE' && stage.type === 'SWISS') {
     const decision = swissCutoffStatus(latest, stage, readResults())?.decision;
     if (decision?.mode === 'SET') {
@@ -1686,7 +1724,7 @@ export function approveMockProgress(tournament: DemoTournament): MockProgressApp
   const newlyApproved = readResults().filter((entry) => ids.has(entry.matchId)
     && entry.status === 'FINISHED' && !entry.adminConfirmed);
   writeResults(readResults().map((entry) => ids.has(entry.matchId) && entry.status === 'FINISHED'
-    ? { ...entry, adminConfirmed: true } : entry));
+    ? { ...entry, adminConfirmed: true, reviewConfirmed: true } : entry));
   newlyApproved.filter((entry) => entry.matchId.includes('-sw-cutoff-set-') || entry.matchId.includes('-sw-playoff-'))
     .forEach((entry) => recordMockAudit({ tournamentId: latest.id, matchId: entry.matchId,
       actor: 'Turnierleitung (lokal)', action: 'RESULT_CONFIRMED',
@@ -1796,6 +1834,7 @@ export function completeMockMatch(matchId: string, sets: MatchSet[], status: Moc
   const adminPhaseConfirmation = status === 'FINISHED' && confirmedByAdmin;
   const next: StoredMatchResult = {
     ...previous, matchId, sets, status, decisionSide, decision, extraTimeProgress: undefined, forcedWinner: undefined, thirdPlaceSkipped: undefined,
+    reviewConfirmed: false,
     confirmedA: previousFinal ? false : previous?.confirmedA,
     confirmedB: previousFinal ? false : previous?.confirmedB,
     adminConfirmed: adminPhaseConfirmation,
@@ -1880,7 +1919,7 @@ export function restoreMockCorrectedResult(tournament: DemoTournament, auditId: 
   const current = readResults();
   const previous = current.find((item) => item.matchId === event.matchId);
   if (!previous || previous.status !== 'FINISHED' || JSON.stringify(previous.sets) !== JSON.stringify(event.afterSets)) return false;
-  const restored: StoredMatchResult = { ...previous, sets: event.beforeSets, decisionSide: event.beforeDecisionSide, decision: event.beforeDecision, confirmedA: false, confirmedB: false, adminConfirmed: false };
+  const restored: StoredMatchResult = { ...previous, sets: event.beforeSets, decisionSide: event.beforeDecisionSide, decision: event.beforeDecision, confirmedA: false, confirmedB: false, adminConfirmed: false, reviewConfirmed: false };
   writeResults([restored, ...current.filter((item) => item.matchId !== event.matchId)]);
   const stage = tournament.stages.find((item) => event.matchId!.startsWith(`${item.id}-`));
   if (stage) {
