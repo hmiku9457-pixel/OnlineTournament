@@ -1752,7 +1752,19 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 }
 .table-view-switch button.active { background: #fff; color: #101828; box-shadow: 0 1px 3px rgb(16 24 40 / 13%); }
 .table-view-switch button:focus-visible { outline: 2px solid #2563eb; outline-offset: 1px; }
-.tournament-hall { margin-top: 10px; min-width: 0; }
+.tournament-hall {
+  margin-top: 10px;
+  min-width: 0;
+  --hall-tile-width: calc(162px * var(--hall-zoom, 1));
+  --hall-tile-height: calc(116px * var(--hall-zoom, 1));
+}
+.tournament-hall-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.tournament-hall-toolbar .tournament-hall-hint { flex: 1 1 280px; }
+.tournament-hall-zoom { display: inline-flex; gap: 4px; flex: none; align-items: center; }
+.tournament-hall-zoom .btn { min-width: 35px; padding: 6px 9px; font-size: .9rem; line-height: 1.2; }
+.tournament-hall-zoom .tournament-hall-zoom-reset { min-width: 65px; font-size: .77rem; font-variant-numeric: tabular-nums; }
+.tournament-hall-zoom .btn:disabled { opacity: .5; cursor: not-allowed; }
+.tournament-hall-zoom .btn:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 .tournament-hall-legend { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: .75rem; color: #475467; }
 .hall-legend-item { display: inline-flex; align-items: center; gap: 5px; }
 .hall-legend-item::before { content: ''; width: 9px; height: 9px; border-radius: 50%; border: 1px solid; }
@@ -1773,16 +1785,16 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .tournament-hall-scroller:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
 .tournament-hall-plan { width: max-content; }
 .tournament-hall-row { display: flex; align-items: stretch; gap: 6px; }
-.tournament-hall-grid { display: grid; gap: 7px; }
+.tournament-hall-grid { display: grid; gap: calc(7px * var(--hall-zoom, 1)); }
 .tournament-hall-table {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  width: 162px;
+  width: var(--hall-tile-width);
   min-width: 0;
-  min-height: 116px;
-  padding: 9px;
-  gap: 8px;
+  min-height: var(--hall-tile-height);
+  padding: calc(9px * var(--hall-zoom, 1));
+  gap: calc(8px * var(--hall-zoom, 1));
   border: 1px solid #93c5fd;
   border-radius: 9px;
   background: #eff6ff;
@@ -1796,18 +1808,18 @@ body:has(.score-grid) .score-grid { padding: 24px 16px 40px; }
 .tournament-hall-table.selected { outline: 3px solid #2563eb; outline-offset: 1px; }
 .tournament-hall-table:hover { border-color: #1d4ed8; }
 .tournament-hall-table:focus-visible { outline: 3px solid #2563eb; outline-offset: 1px; }
-.tournament-hall-table-head { display: flex; justify-content: space-between; align-items: center; gap: 5px; font-size: .78rem; }
-.tournament-hall-table-head > span { font-size: .63rem; color: #475467; }
-.tournament-hall-match { display: grid; gap: 3px; min-width: 0; font-size: .76rem; font-weight: 600; }
+.tournament-hall-table-head { display: flex; justify-content: space-between; align-items: center; gap: 5px; font-size: clamp(.68rem, calc(.78rem * var(--hall-zoom, 1)), 1.17rem); }
+.tournament-hall-table-head > span { font-size: clamp(.60rem, calc(.63rem * var(--hall-zoom, 1)), .95rem); color: #475467; }
+.tournament-hall-match { display: grid; gap: calc(3px * var(--hall-zoom, 1)); min-width: 0; font-size: clamp(.67rem, calc(.76rem * var(--hall-zoom, 1)), 1.14rem); font-weight: 600; }
 .tournament-hall-match > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tournament-hall-score { font-size: .94rem; text-align: center; font-variant-numeric: tabular-nums; }
-.tournament-hall-empty { margin-top: auto; font-size: .73rem; color: #667085; }
-.tournament-hall-space { min-height: 116px; border-radius: 7px; }
+.tournament-hall-score { font-size: clamp(.76rem, calc(.94rem * var(--hall-zoom, 1)), 1.41rem); text-align: center; font-variant-numeric: tabular-nums; }
+.tournament-hall-empty { margin-top: auto; font-size: clamp(.65rem, calc(.73rem * var(--hall-zoom, 1)), 1.10rem); color: #667085; }
+.tournament-hall-space { min-height: var(--hall-tile-height); border-radius: 7px; }
 .tournament-hall-space.walkway { background: #e4e7ec; }
 .tournament-hall-space.desk, .tournament-hall-desk { display: grid; place-items: center; background: #fef3c7; border: 1px solid #fbbf24; color: #92400e; font-weight: 800; font-size: .75rem; }
 .tournament-hall-desk { min-height: 30px; padding: 6px; border-radius: 7px; }
 .tournament-hall-desk.outside { margin: 5px 0; }
-.tournament-hall-desk.side { min-width: 33px; }
+.tournament-hall-desk.side { min-width: calc(33px * var(--hall-zoom, 1)); }
 .overview-table-grid.hall-table-detail { display: block; max-width: 440px; margin-top: 0; }
 .overview-table-grid.hall-table-detail .overview-table-card { width: 100%; }
 
