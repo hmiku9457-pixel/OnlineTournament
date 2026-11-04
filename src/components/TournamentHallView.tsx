@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import type { VenueLayout } from '@/domain/venueLayout';
 import { displayVenueName, getVenueTerminology } from '@/domain/venueTerminology';
 import type { MockRuntimeMatch } from '@/services/mockRuntime';
@@ -36,12 +36,40 @@ export function clampHallZoom(zoom: number) {
     Math.round(zoom / HALL_ZOOM_STEP) * HALL_ZOOM_STEP));
 }
 
+// Deliberately not prefixed with "online-tournament:": the canonical tournament
+// storage migration clears that namespace in window.localStorage. This is only
+// a browser-profile display preference, independent of tournament data.
+export const HALL_ZOOM_PREFERENCE_KEY = 'turnierseite:hall-zoom:v1';
+
+export function readHallZoomPreference(): number {
+  if (typeof window === 'undefined') return 100;
+  try {
+    const raw = window.localStorage.getItem(HALL_ZOOM_PREFERENCE_KEY);
+    if (raw === null || raw.trim() === '') return 100;
+    const value = Number(raw);
+    return Number.isFinite(value) ? clampHallZoom(value) : 100;
+  } catch {
+    // Browser settings may disallow persistent storage.
+    return 100;
+  }
+}
+
+export function saveHallZoomPreference(zoom: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(HALL_ZOOM_PREFERENCE_KEY, String(clampHallZoom(zoom)));
+  } catch {
+    // The current view stays usable even if the preference cannot be stored.
+  }
+}
+
 /** The plan uses fixed-width, readable tiles; large halls scroll rather than shrink. */
 export function TournamentHallView({
   layout, matchesByTable, blockedTables, selectedTable, canAssign, sport, onSelectTable, onAssignToTable,
 }: TournamentHallViewProps) {
   const venue = getVenueTerminology(sport);
-  const [zoom, setZoom] = useState(100);
+  const [zoom, setZoom] = useState(readHallZoomPreference);
+  useEffect(() => { saveHallZoomPreference(zoom); }, [zoom]);
   return (
     <div className="tournament-hall" style={{ '--hall-zoom': zoom / 100 } as CSSProperties}>
       <div className="tournament-hall-toolbar">
