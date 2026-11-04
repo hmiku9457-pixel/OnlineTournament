@@ -1674,7 +1674,7 @@ export function getMockApprovalReviewMatches(tournament: DemoTournament): MockRu
   const stage = tournament.stages.find((item) => item.id === pending.stageId);
   if (!stage) return [];
   return getMockStageMatches(tournament, stage).filter((match) => pending.kind === 'STAGE'
-    || Number(match.id.match(/-sw-r(\\d+)-m\\d+$/)?.[1] ?? 0) === pending.round);
+    || Number(match.id.match(/-sw-r(\d+)-m\d+$/)?.[1] ?? 0) === pending.round);
 }
 
 /** Persistent individual review checks. The last check automatically triggers
