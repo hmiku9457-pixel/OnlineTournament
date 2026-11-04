@@ -3,8 +3,8 @@ import { compareRankingRows } from '@/domain/sportScoring';
 import { createMockTournament, getMockTournament, updateMockTournamentStatus } from '@/services/mockTournamentStore';
 import { isStageCompleted, startFirstStage } from '@/services/mockPhaseLifecycle';
 import {
-  abortMockTournament, adminConfirmMockMatch, approveMockProgress,
-  completeMockMatch, getMockStageMatches, getMockStoredResult, getPendingMockApproval,
+  abortMockTournament, adminConfirmMockMatch, approveMockProgress, confirmMockApprovalReviewMatch,
+  completeMockMatch, getMockStageMatches, getMockStoredResult, getPendingMockApproval, getMockApprovalReviewMatches, withdrawMockParticipant,
   getMockAssignmentBlockReason,
 } from '@/services/mockRuntime';
 import type { MockPhaseInput } from '@/services/mockTournamentStore';
@@ -54,6 +54,52 @@ describe('Verbindliche Kontrollen der Turnierleitung', () => {
     expect(approveMockProgress(t)?.kind).toBe('ROUND');
     expect(getMockStageMatches(t, t.stages[0]).filter((m) => m.round === 'Runde 2')).toHaveLength(2);
     expect(isStageCompleted(t, t.stages[0])).toBe(false);
+  });
+
+  it('merkt sich einzelne Abschlusskontrollen und gibt die nächste Runde automatisch nach dem letzten Haken frei', () => {
+    const t = create();
+    const first = getMockStageMatches(t, t.stages[0]);
+    first.forEach((match) => completeMockMatch(match.id, set, 'FINISHED', true));
+    expect(getMockApprovalReviewMatches(t).map((match) => match.id)).toEqual(first.map((match) => match.id));
+    // Die normale administrative Ergebniseingabe ist KEINE Abschlusskontrolle.
+    expect(getMockStoredResult(first[0].id)?.adminConfirmed).toBe(true);
+    expect(getMockStoredResult(first[0].id)?.reviewConfirmed).not.toBe(true);
+    expect(confirmMockApprovalReviewMatch(t, first[0].id)).toEqual({ advanced: null });
+    expect(getMockStoredResult(first[0].id)?.reviewConfirmed).toBe(true);
+    expect(getPendingMockApproval(t)).toMatchObject({ kind: 'ROUND', round: 1 });
+    expect(getMockStageMatches(t, t.stages[0]).some((match) => match.round === 'Runde 2')).toBe(false);
+    expect(confirmMockApprovalReviewMatch(t, first[1].id)?.advanced).toMatchObject({ kind: 'ROUND', round: 1 });
+    expect(getMockStageMatches(t, t.stages[0]).filter((match) => match.round === 'Runde 2')).toHaveLength(2);
+    expect(getPendingMockApproval(t)).toBeNull();
+  });
+
+  it('setzt einen individuellen Prüfhaken nach einer Ergebniskorrektur zurück', () => {
+    const t = create();
+    const first = getMockStageMatches(t, t.stages[0]);
+    first.forEach((match) => completeMockMatch(match.id, set));
+    expect(confirmMockApprovalReviewMatch(t, first[0].id)).toEqual({ advanced: null });
+    completeMockMatch(first[0].id, [{ number: 1, sideAScore: 7, sideBScore: 11 }], 'FINISHED', true);
+    expect(getMockStoredResult(first[0].id)?.reviewConfirmed).toBe(false);
+    expect(getPendingMockApproval(t)).toMatchObject({ kind: 'ROUND', round: 1 });
+    expect(confirmMockApprovalReviewMatch(t, first[1].id)).toEqual({ advanced: null });
+    expect(confirmMockApprovalReviewMatch(t, first[0].id)?.advanced).toMatchObject({ kind: 'ROUND', round: 1 });
+  });
+
+  it('lässt auch kampflos gewertete Spiele ohne Sätze abhaken', () => {
+    const t = create();
+    const first = getMockStageMatches(t, t.stages[0]);
+    expect(withdrawMockParticipant(t, first[0].sideA)).toBe(true);
+    const afterWithdrawal = getMockStageMatches(t, t.stages[0]);
+    const walkover = afterWithdrawal.find((match) => match.score === 'W.O.');
+    expect(walkover?.status).toBe('FINISHED');
+    expect(walkover?.sets).toEqual([]);
+    afterWithdrawal.filter((match) => match.status !== 'FINISHED')
+      .forEach((match) => completeMockMatch(match.id, set));
+    expect(getPendingMockApproval(t)).toMatchObject({ kind: 'ROUND', round: 1 });
+    expect(confirmMockApprovalReviewMatch(t, walkover!.id)).toEqual({ advanced: null });
+    expect(getMockStoredResult(walkover!.id)?.reviewConfirmed).toBe(true);
+    const other = getMockApprovalReviewMatches(t).find((match) => match.id !== walkover!.id)!;
+    expect(confirmMockApprovalReviewMatch(t, other.id)?.advanced?.kind).toBe('ROUND');
   });
 
   it('zieht nach einer Korrektur die Rundenfreigabe vor Beginn der Folgerunde zurueck', () => {
