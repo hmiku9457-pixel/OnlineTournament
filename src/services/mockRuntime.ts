@@ -1695,7 +1695,7 @@ export function confirmMockApprovalReviewMatch(tournament: DemoTournament, match
   if (!previous || previous.status !== 'FINISHED') return null;
   if (!previous.reviewConfirmed) {
     writeResults(results.map((entry) => entry.matchId === matchId
-      ? { ...entry, reviewConfirmed: true } : entry));
+      ? { ...entry, adminConfirmed: true, reviewConfirmed: true } : entry));
     recordMockAudit({ tournamentId: latest.id, matchId,
       actor: 'Turnierleitung (Abschlusskontrolle)', action: 'RESULT_CONFIRMED',
       description: `Begegnung ${match.sideA} – ${match.sideB} bei der Abschlusskontrolle geprüft` });
