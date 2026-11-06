@@ -2154,7 +2154,7 @@ export function TournamentControlPage() {
             <h2 id="phase-start-confirm-title">{pendingStartStage?.type === 'BREAK' ? 'Pause starten?'
               : startModal.kind === 'tournament' ? 'Turnier starten?' : 'Nächste Phase starten?'}</h2>
             {pendingStartStage?.type === 'BREAK' ? (
-              <p>„{startModal.stageName}“ beginnt mit deiner Bestätigung. Wähle, wie lange die Pause dauern oder wann der nächste Spieltag fortgesetzt werden soll.</p>
+              <p>„{startModal.stageName}“ beginnt mit deiner Bestätigung. Wähle eine Pausendauer oder einen festen Zeitpunkt, zu dem das Turnier fortgesetzt wird.</p>
             ) : (
               <>
                 <p>„{startModal.stageName}“ wird gestartet. Die aktuelle Auslosung bzw. Setzung dieser Phase wird damit eingefroren.</p>
