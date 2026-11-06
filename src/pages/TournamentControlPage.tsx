@@ -51,6 +51,7 @@ import { generateUniquePlayerCode } from '@/services/mockPlayerCodes';
 import { toLocalDateTime } from '@/domain/tournamentSchedule';
 import { computeBreakResumeAt, getStageEntrants, getStageStartIssue, getActiveStage, getNextStartableStage, isStageCompleted, isStageEditable, isStageLockedWaiting, isStageStarted, startFirstStage, startStage, completeStage, canFinishBreak, getBreakResumeAt, formatBreakCountdown, type BreakStartOptions } from '@/services/mockPhaseLifecycle';
 import { TournamentPauseBanner } from '@/components/TournamentPauseBanner';
+import { BreakStartSettings } from '@/components/BreakStartSettings';
 import { getInlineBreakStatus, startInlineBreak, finishInlineBreak, canFinishInlineBreak } from '@/services/mockInlineBreak';
 import { getBlockedMockTables, setMockTableBlocked } from '@/services/mockTableLocks';
 import { estimateRemainingTournamentMinutes, formatRemainingTournamentDuration } from '@/services/mockDuration';
@@ -2125,21 +2126,21 @@ export function TournamentControlPage() {
       )}
       {inlineBreakDecisionOpen && inlineBreakReady && (
         <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setInlineBreakDecisionOpen(false)}>
-          <section className="prototype-modal start-phase-modal" role="dialog" aria-modal="true" aria-label="Zwischenpause neu festlegen"
+          <section className="prototype-modal start-phase-modal break-start-modal" role="dialog" aria-modal="true" aria-labelledby="inline-break-start-title"
             onMouseDown={(event) => event.stopPropagation()}>
-            <h2>Zwischenpause neu festlegen</h2>
-            <p role="alert" className="break-prestart-warning">Die ursprünglich geplante Fortsetzung am {inlineBreakReady.config.untilDate ?? 'Turniertag'} um {inlineBreakReady.config.until} Uhr ist bereits verstrichen. Eine Verschiebung auf morgen erfolgt nicht automatisch.</p>
-            <div className="actions" role="group" aria-label="Neue Pausenplanung">
-              <button className={pauseMode === 'minutes' ? 'btn small primary' : 'btn small'} type="button" onClick={() => setPauseMode('minutes')}>Dauer in Minuten</button>
-              <button className={pauseMode === 'clock' ? 'btn small primary' : 'btn small'} type="button" onClick={() => setPauseMode('clock')}>Pause bis Datum und Uhrzeit</button>
-            </div>
-            {pauseMode === 'minutes'
-              ? <label>Dauer (1–1440 Minuten)<input type="number" min={1} max={1440} value={pauseMinutes} onChange={(event) => setPauseMinutes(Number(event.target.value))}/></label>
-              : <div className="actions"><label>Datum<input type="date" value={pauseDate} onChange={(event) => setPauseDate(event.target.value)}/></label>
-                  <label>Uhrzeit<input type="time" value={pauseTime} onChange={(event) => setPauseTime(event.target.value)}/></label></div>}
-            {pauseDecisionError && <p role="alert" className="field-error">{pauseDecisionError}</p>}
-            <div className="actions">
-              <button type="button" className="btn primary" disabled={Boolean(pauseDecisionError)} onClick={() => beginCurrentInlineBreak(chosenPauseOptions)}>Zwischenpause starten</button>
+            <span className="badge ready">ZWISCHENPAUSE</span>
+            <h2 id="inline-break-start-title">Pausenende neu festlegen</h2>
+            <p>Der ursprünglich geplante Zeitpunkt ist verstrichen. Lege eine neue Dauer oder eine gültige Fortsetzungszeit fest.</p>
+            <p role="alert" className="break-prestart-warning">Geplante Fortsetzung: {inlineBreakReady.config.untilDate ?? 'Turniertag'} um {inlineBreakReady.config.until} Uhr. Es erfolgt keine automatische Verschiebung auf den nächsten Tag.</p>
+            <BreakStartSettings
+              mode={pauseMode} minutes={pauseMinutes} date={pauseDate} time={pauseTime}
+              onModeChange={setPauseMode} onMinutesChange={setPauseMinutes}
+              onDateChange={setPauseDate} onTimeChange={setPauseTime}
+              error={pauseDecisionError}
+            />
+            <div className="actions break-start-modal-actions">
+              <button type="button" className="btn primary" disabled={Boolean(pauseDecisionError)}
+                onClick={() => beginCurrentInlineBreak(chosenPauseOptions)}>Zwischenpause starten</button>
               <button type="button" className="btn" onClick={() => setInlineBreakDecisionOpen(false)}>Abbrechen</button>
             </div>
           </section>
@@ -2147,34 +2148,42 @@ export function TournamentControlPage() {
       )}
       {startModal && (
         <div className="prototype-modal-backdrop" role="presentation" onMouseDown={() => setStartModal(null)}>
-          <section className="prototype-modal start-phase-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+          <section className={`prototype-modal start-phase-modal${pendingStartStage?.type === 'BREAK' ? ' break-start-modal' : ''}`}
+            role="dialog" aria-modal="true" aria-labelledby="phase-start-confirm-title" onMouseDown={(event) => event.stopPropagation()}>
             <span className="badge ready">START BESTÄTIGEN</span>
-            <h2>{startModal.kind === 'tournament' ? 'Turnier starten?' : 'Nächste Phase starten?'}</h2>
-            <p>„{startModal.stageName}“ wird gestartet. Die aktuelle Auslosung bzw. Setzung dieser Phase wird damit eingefroren.</p>
-            <p className="muted">Nach dem Start können die Platzierungen dieser Phase nicht mehr per Drag & Drop verändert werden.</p>
+            <h2 id="phase-start-confirm-title">{pendingStartStage?.type === 'BREAK' ? 'Pause starten?'
+              : startModal.kind === 'tournament' ? 'Turnier starten?' : 'Nächste Phase starten?'}</h2>
+            {pendingStartStage?.type === 'BREAK' ? (
+              <p>„{startModal.stageName}“ beginnt mit deiner Bestätigung. Wähle, wie lange die Pause dauern oder wann der nächste Spieltag fortgesetzt werden soll.</p>
+            ) : (
+              <>
+                <p>„{startModal.stageName}“ wird gestartet. Die aktuelle Auslosung bzw. Setzung dieser Phase wird damit eingefroren.</p>
+                <p className="muted">Nach dem Start können die Platzierungen dieser Phase nicht mehr per Drag & Drop verändert werden.</p>
+              </>
+            )}
             {pendingStartStage?.type === 'BREAK' && (
-              <div className="break-start-settings">
-                <strong>Wann soll die Pause enden?</strong>
-                {pendingStartStage.settings.breakKind === 'until' && <p className="muted">Vorgabe aus der Turnierplanung: Pause bis {String(pendingStartStage.settings.breakUntilDate ?? 'geplanter Turniertag')} um {String(pendingStartStage.settings.breakUntil ?? '12:00')} Uhr.</p>}
-                {pendingStartStage.settings.breakKind === 'overnight' && <p className="muted">Vorgabe für den nächsten Spieltag: {String(pendingStartStage.settings.nextDayDate ?? 'Folgetag')} um {String(pendingStartStage.settings.nextDayStart ?? '09:00')} Uhr. Ist dieses Datum bereits verstrichen, bitte bewusst neu festlegen.</p>}
-                <div className="actions" role="group" aria-label="Pausenplanung">
-                  <button className={pauseMode === 'minutes' ? 'btn small primary' : 'btn small'} type="button" aria-pressed={pauseMode === 'minutes'} onClick={() => setPauseMode('minutes')}>Dauer in Minuten</button>
-                  <button className={pauseMode === 'clock' ? 'btn small primary' : 'btn small'} type="button" aria-pressed={pauseMode === 'clock'} onClick={() => setPauseMode('clock')}>Uhrzeit wählen</button>
-                </div>
-                {pauseMode === 'minutes'
-                  ? <label>Dauer (1–1440 Minuten)<input type="number" min={1} max={1440} step={1} value={pauseMinutes} onChange={(event) => setPauseMinutes(Number(event.target.value))}/></label>
-                  : <div className="actions"><label>Datum<input type="date" value={pauseDate} onChange={(event) => setPauseDate(event.target.value)}/></label><label>Fortsetzung um<input type="time" value={pauseTime} onChange={(event) => setPauseTime(event.target.value)}/></label></div>}
-                <p className="muted">{pauseMode === 'clock' ? 'Datum und Uhrzeit werden gemeinsam geprüft. Verstrichene Termine werden nicht automatisch auf morgen verschoben.' : 'Die Zeit läuft ab dem tatsächlichen Start der Pause.'}</p>
-              </div>
+              <BreakStartSettings
+                mode={pauseMode} minutes={pauseMinutes} date={pauseDate} time={pauseTime}
+                onModeChange={setPauseMode} onMinutesChange={setPauseMinutes}
+                onDateChange={setPauseDate} onTimeChange={setPauseTime}
+                plannedHint={
+                  pendingStartStage.settings.breakKind === 'until'
+                    ? `Bis ${String(pendingStartStage.settings.breakUntilDate ?? 'geplanter Turniertag')} um ${String(pendingStartStage.settings.breakUntil ?? '12:00')} Uhr`
+                    : pendingStartStage.settings.breakKind === 'overnight'
+                      ? `Nächster Spieltag: ${String(pendingStartStage.settings.nextDayDate ?? 'Folgetag')} um ${String(pendingStartStage.settings.nextDayStart ?? '09:00')} Uhr`
+                      : `${Number(pendingStartStage.settings.breakMinutes) || 15} Minuten Pause`
+                }
+                error={pendingPauseIssue}
+              />
             )}
             {prestartScheduleIssues.length > 0 && startModal.kind === 'tournament'
               && <p className="break-prestart-warning" role="alert">Zeitplanung prüfen: {prestartScheduleIssues.join(' ')}
                 {unconfirmedSchedule?.estimatedEnd && <span> Neue Prognose (nicht bestätigt): Turnierende ca. {unconfirmedSchedule.estimatedEnd.replace('T', ' ')} Uhr. Der bisherige Zeitplan bleibt bis zur Korrektur unverändert.</span>}</p>}
             {firstPhaseRecommendationWarning && startModal.kind === 'tournament' && <p className="break-prestart-warning" role="status">Hinweis zur ersten Phase: {firstPhaseRecommendationWarning} Bitte prüfe vor dem Start die Phaseneinstellungen. Ein erneutes Bestätigen der Phasenplanung ist für gültige Konstellationen nicht erforderlich.</p>}
-            {pendingPauseIssue && <p className="field-error" role="alert">{pendingPauseIssue}</p>}
             {pendingStartIssue && <p className="field-error" role="alert">{pendingStartIssue}</p>}
-            <div className="actions">
-              <button className="btn primary" type="button" disabled={Boolean(pendingStartIssue || pendingPauseIssue)} onClick={startModal.kind === 'tournament' ? performStartTournament : performStartNextPhase}>Jetzt starten</button>
+            <div className={pendingStartStage?.type === 'BREAK' ? 'actions break-start-modal-actions' : 'actions'}>
+              <button className="btn primary" type="button" disabled={Boolean(pendingStartIssue || pendingPauseIssue)}
+                onClick={startModal.kind === 'tournament' ? performStartTournament : performStartNextPhase}>{pendingStartStage?.type === 'BREAK' ? 'Pause starten' : 'Jetzt starten'}</button>
               <button className="btn" type="button" onClick={() => setStartModal(null)}>Abbrechen</button>
             </div>
           </section>
