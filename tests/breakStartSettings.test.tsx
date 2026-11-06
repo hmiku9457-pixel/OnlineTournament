@@ -19,7 +19,7 @@ const props = {
 
 describe('Pausenstart: kompakte Einstellungen', () => {
   it('bietet die bekannten vier Schnellschritte und einen manuell änderbaren Minutenwert', () => {
-    const html = renderToStaticMarkup(<BreakStartSettings {...props} plannedHint="15 Minuten Pause" />);
+    const html = renderToStaticMarkup(<BreakStartSettings {...props} plannedHint="Bis 2030-11-20 um 13:00 Uhr" />);
     expect(BREAK_MINUTE_STEPS).toEqual([1, 5, 15, 60]);
     expect(html).toContain('Pausendauer');
     expect(html).toContain('value="15"');
@@ -28,6 +28,7 @@ describe('Pausenstart: kompakte Einstellungen', () => {
     expect(html).toContain('+15 Min.');
     expect(html).toContain('+1 Std.');
     expect(html).toContain('Aus der Turnierplanung');
+    expect(html).toContain('20.11.2030');
     expect(html).toContain('aria-pressed="true"');
   });
 
