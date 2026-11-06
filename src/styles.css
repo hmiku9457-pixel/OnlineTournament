@@ -3249,7 +3249,7 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 }
 
 /* Pausenstart: kompakter Dialog mit zwei gleichwertigen Eingabemodi. */
-.start-phase-modal.break-start-modal { width: min(570px, calc(100vw - 24px)); }
+.start-phase-modal.break-start-modal { width: min(570px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
 .break-start-modal > h2 { margin-bottom: 8px; }
 .break-start-modal > p { margin-top: 0; line-height: 1.5; }
 .break-start-settings {
@@ -3264,6 +3264,9 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .break-start-settings-heading { display: grid; gap: 3px; }
 .break-start-settings-heading > strong { color: #182230; font-size: .95rem; }
 .break-start-settings-heading > span { color: #667085; font-size: .76rem; line-height: 1.4; }
+.break-start-modal .break-start-planned-hint,
+.break-start-modal .break-start-field-hint,
+.break-start-modal .break-start-error { margin: 0; }
 .break-start-planned-hint {
   display: flex;
   flex-wrap: wrap;
