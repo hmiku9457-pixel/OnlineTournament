@@ -27,6 +27,10 @@ describe('Pausenstart: kompakte Einstellungen', () => {
     expect(html).toContain('+5 Min.');
     expect(html).toContain('+15 Min.');
     expect(html).toContain('+1 Std.');
+    expect(html).toContain('−1 Min.');
+    expect(html).toContain('−5 Min.');
+    expect(html).toContain('−15 Min.');
+    expect(html).toContain('−1 Std.');
     expect(html).toContain('Aus der Turnierplanung');
     expect(html).toContain('20.11.2030');
     expect(html).toContain('aria-pressed="true"');
@@ -34,12 +38,17 @@ describe('Pausenstart: kompakte Einstellungen', () => {
 
   it('hält die Dauer zwischen 1 und 1440 Minuten und sperrt nicht mehr passende Schnellschritte', () => {
     expect(addBreakMinutes(15, 60)).toBe(75);
+    expect(addBreakMinutes(15, -5)).toBe(10);
+    expect(addBreakMinutes(15, -60)).toBe(1);
     expect(addBreakMinutes(1435, 15)).toBe(1440);
     expect(addBreakMinutes(1440, 60)).toBe(1440);
     expect(addBreakMinutes(0, 5)).toBe(5);
     const html = renderToStaticMarkup(<BreakStartSettings {...props} minutes={1435} />);
     expect(html).toContain('disabled=""');
     expect(html).toContain('+15 Min.');
+    const atMinimum = renderToStaticMarkup(<BreakStartSettings {...props} minutes={1} />);
+    expect(atMinimum).toContain('aria-label="Pausendauer verkürzen"');
+    expect(atMinimum).toContain('disabled=""');
   });
 
   it('zeigt für feste Pausenenden die vorhandenen Kalender- und Uhrzeitdialoge', () => {
