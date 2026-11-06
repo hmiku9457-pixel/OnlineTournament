@@ -37,7 +37,7 @@ export function BreakStartSettings({
         <strong>Wann soll die Pause enden?</strong>
         <span>Die Einstellung kann vor dem Start noch geändert werden.</span>
       </div>
-      {plannedHint && <p className="break-start-planned-hint"><span>Aus der Turnierplanung</span>{plannedHint.replace(/\\b(\\d{4})-(\\d{2})-(\\d{2})\\b/g, '$3.$2.$1')}</p>}
+      {plannedHint && <p className="break-start-planned-hint"><span>Aus der Turnierplanung</span>{plannedHint.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, '$3.$2.$1')}</p>}
       <div className="break-start-mode-switch" role="group" aria-label="Art des Pausenendes">
         <button type="button" className={mode === 'minutes' ? 'is-active' : ''}
           aria-pressed={mode === 'minutes'} onClick={() => onModeChange('minutes')}>Dauer in Minuten</button>
