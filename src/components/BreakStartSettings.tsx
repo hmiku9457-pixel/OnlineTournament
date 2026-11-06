@@ -52,14 +52,31 @@ export function BreakStartSettings({
               inputMode="numeric" value={minutes} onChange={(event) => onMinutesChange(Number(event.target.value))}/>
             <span>Minuten</span>
           </div>
-          <div className="break-start-duration-quick-buttons" role="group" aria-label="Pausendauer verlängern">
-            {BREAK_MINUTE_STEPS.map((delta) => (
-              <button key={delta} type="button" className="recommendation-duration-adjust-button"
-                disabled={Number.isInteger(minutes) && minutes >= MIN_BREAK_MINUTES && minutes + delta > MAX_BREAK_MINUTES}
-                onClick={() => onMinutesChange(addBreakMinutes(minutes, delta))}>
-                +{delta === 60 ? '1 Std.' : `${delta} Min.`}
-              </button>
-            ))}
+          <div className="break-start-duration-adjustments">
+            <div className="break-start-duration-adjustment">
+              <span>Verkürzen</span>
+              <div className="break-start-duration-quick-buttons" role="group" aria-label="Pausendauer verkürzen">
+                {BREAK_MINUTE_STEPS.map((delta) => (
+                  <button key={delta} type="button" className="recommendation-duration-adjust-button"
+                    disabled={Number.isInteger(minutes) && minutes <= MIN_BREAK_MINUTES}
+                    onClick={() => onMinutesChange(addBreakMinutes(minutes, -delta))}>
+                    −{delta === 60 ? '1 Std.' : `${delta} Min.`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="break-start-duration-adjustment">
+              <span>Verlängern</span>
+              <div className="break-start-duration-quick-buttons" role="group" aria-label="Pausendauer verlängern">
+                {BREAK_MINUTE_STEPS.map((delta) => (
+                  <button key={delta} type="button" className="recommendation-duration-adjust-button"
+                    disabled={Number.isInteger(minutes) && minutes >= MIN_BREAK_MINUTES && minutes + delta > MAX_BREAK_MINUTES}
+                    onClick={() => onMinutesChange(addBreakMinutes(minutes, delta))}>
+                    +{delta === 60 ? '1 Std.' : `${delta} Min.`}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           <p className="break-start-field-hint">Der Countdown beginnt erst beim tatsächlichen Start der Pause.</p>
         </div>
