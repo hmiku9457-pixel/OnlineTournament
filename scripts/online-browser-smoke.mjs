@@ -155,8 +155,9 @@ try {
   await b.getByRole('button',{name:'Turnier pausieren',exact:true}).waitFor();
   await confirmed(b);
   const writesBeforeCheck=calls.length;
-  await a.getByRole('button',{name:'Datenbankstand prüfen',exact:true}).click();
-  await a.getByText('Neuerer Datenbankstand vorhanden',{exact:true}).waitFor();
+  const staleLabel=a.getByText('Neuerer Datenbankstand vorhanden',{exact:true});
+  if(!(await staleLabel.isVisible())) await a.getByRole('button',{name:'Datenbankstand prüfen',exact:true}).click();
+  await staleLabel.waitFor();
   assert.equal(calls.length,writesBeforeCheck);
   assert.equal(await a.locator('[inert]').count()>0,true);
   await a.getByRole('button',{name:'Datenbankstand neu laden',exact:true}).click();

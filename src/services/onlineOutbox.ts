@@ -34,7 +34,31 @@ async function transact<T>(mode: IDBTransactionMode, action: (store: IDBObjectSt
   } finally { db.close(); }
 }
 export async function persistOnlineOperation(op: PendingOnlineOperation): Promise<void> {
-  await transact('readwrite',store => store.put(op));
+  if (op.expectedRevision!==0) {
+    await transact('readwrite',store => store.put(op));
+    return;
+  }
+  // Read and write in the same IndexedDB transaction, so concurrent tabs
+  // cannot both reserve an unconfirmed creation for this account.
+  const db=await open();
+  try {
+    await new Promise<void>((resolve,reject)=>{
+      const tx=db.transaction(STORE,'readwrite');
+      const store=tx.objectStore(STORE);
+      let conflict=false;
+      tx.oncomplete=()=>resolve();
+      tx.onabort=tx.onerror=()=>reject(conflict
+        ? new Error('Eine frühere Online-Erstellung ist ungeklärt. Bitte zuerst in der Online-Übersicht wiederherstellen.')
+        : tx.error ?? new Error('Wiederherstellungsspeicher nicht verfügbar.'));
+      const req=store.index('ownerTournament').getAll(IDBKeyRange.bound([op.ownerId],[op.ownerId,[]],false,true));
+      req.onsuccess=()=>{
+        if((req.result as PendingOnlineOperation[]).some(entry=>entry.expectedRevision===0 && entry.operationId!==op.operationId)){
+          conflict=true;tx.abort();return;
+        }
+        store.put(op);
+      };
+    });
+  } finally {db.close();}
 }
 export async function removeOnlineOperation(operationId: string): Promise<void> {
   await transact('readwrite',store => store.delete(operationId));
