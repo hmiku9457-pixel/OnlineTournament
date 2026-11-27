@@ -1,4 +1,5 @@
-import { buildMockGroups, buildRoundRobinStandings, buildSwissStandings, type MockStanding } from '@/services/mockCompetitionViews';
+import { decodeMatchSlot } from '@/domain/matchSlots';
+import { buildMockBracket, buildMockGroups, buildRoundRobinStandings, buildSwissStandings, type MockStanding } from '@/services/mockCompetitionViews';
 import { getMockConfirmedFinalStandings } from '@/services/mockParticipantProgress';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
 import { getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches } from '@/services/mockRuntime';
@@ -281,5 +282,15 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
     const result=await supabase.rpc('publish_online_spectator_rankings',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_rankings:rankings}).abortSignal(AbortSignal.timeout(8000));
     if(result.error)throw new Error(result.error.message);
+    if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+    const brackets=tournament.stages.filter(s=>isStageStarted(tournament,s)&&['KNOCKOUT','DOUBLE_ELIMINATION','PLACEMENT'].includes(s.type)).map(stage=>({
+      phase:stage.name,rounds:buildMockBracket(tournament,stage).map(round=>({label:round.label,matches:round.matches.map(m=>({
+        a:decodeMatchSlot(m.sideA),b:decodeMatchSlot(m.sideB),score:m.score??'–',
+        winner:m.winner&&roster.has(m.winner)?m.winner===m.sideA?'A':m.winner===m.sideB?'B':'NONE':'NONE',
+        status:m.status??'WAITING',sets:(m.sets??[]).map(s=>({sideAScore:s.sideAScore,sideBScore:s.sideBScore}))
+      }))}))
+    }));
+    const bracketResult=await supabase.rpc('publish_online_spectator_brackets',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_brackets:brackets}).abortSignal(AbortSignal.timeout(8000));
+    if(bracketResult.error)throw new Error(bracketResult.error.message);
   } finally {publishing=false;}
 }

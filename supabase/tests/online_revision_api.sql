@@ -13,6 +13,7 @@ declare
   v_corrected jsonb;
   v_later jsonb;
   v_match jsonb;
+  bracket_fixture jsonb := '[{"phase":"KO","rounds":[{"label":"Halbfinale","matches":[{"a":{"kind":"participant","name":"A"},"b":{"kind":"bye"},"score":"Freilos","winner":"A","status":"FINISHED","sets":[]}]},{"label":"Finale","matches":[{"a":{"kind":"participant","name":"A"},"b":{"kind":"pending"},"score":"–","winner":"NONE","status":"WAITING","sets":[]}]}]}]';
   ranking_fixture jsonb := '[{"phase":"Liga","label":"Tabelle","kind":"ROUND_ROBIN","rows":[{"rank":1,"name":"A","played":1,"wins":1,"losses":0,"draws":0,"points":3,"buchholz":0.5,"sets":"1:0","setDifference":1,"balls":"11:8","ballDifference":3}]}]';
   detail_match jsonb := '[{"sideA":"A","sideB":"B","phase":"Liga","round":"Runde 1","status":"FINISHED","table":"Noch offen","score":"1:0","sets":[{"sideAScore":11,"sideBScore":8}]}]';
   spectator uuid;
@@ -67,6 +68,11 @@ begin
  if public.read_online_spectator_details(spectator)->'matches' is distinct from detail_match then raise exception 'projection differs'; end if;
  if not public.publish_online_spectator_rankings(v_id,lease1,1,ranking_fixture) then raise exception 'ranking publication failed'; end if;
  if public.read_online_spectator_rankings(spectator)->'rankings' is distinct from ranking_fixture then raise exception 'rankings differ'; end if;
+ if not public.publish_online_spectator_brackets(v_id,lease1,1,bracket_fixture) then raise exception 'bracket publication failed'; end if;
+ if public.read_online_spectator_brackets(spectator)->'brackets' is distinct from bracket_fixture then raise exception 'brackets differ'; end if;
+ begin perform public.publish_online_spectator_brackets(v_id,lease2,1,bracket_fixture); raise exception 'wrong bracket lease accepted'; exception when lock_not_available then null; end;
+ begin perform public.publish_online_spectator_brackets(v_id,lease1,1,jsonb_set(bracket_fixture,'{0,rounds,0,matches,0,a,name}','"Other"')); raise exception 'foreign bracket name accepted'; exception when invalid_parameter_value then null; end;
+ begin perform public.publish_online_spectator_brackets(v_id,lease1,1,jsonb_set(bracket_fixture,'{0,rounds,0,matches,0,b,name}','"private"')); raise exception 'technical slot leaked name'; exception when invalid_parameter_value then null; end;
  begin perform public.publish_online_spectator_rankings(v_id,lease2,1,ranking_fixture); raise exception 'wrong ranking lease accepted'; exception when lock_not_available then null; end;
  begin perform public.publish_online_spectator_rankings(v_id,lease1,1,jsonb_set(ranking_fixture,'{0,rows,0,name}','"Other"')); raise exception 'foreign ranking name accepted'; exception when invalid_parameter_value then null; end;
  begin perform public.publish_online_spectator_rankings(v_id,lease1,1,jsonb_set(ranking_fixture,'{0,rows,0,code}','"1234"')); raise exception 'private ranking field accepted'; exception when invalid_parameter_value then null; end;
@@ -79,8 +85,10 @@ begin
  begin perform public.commit_leased_online_tournament(v_id,'Test',1,op2,v_payload,lease2); raise exception 'wrong lease write'; exception when lock_not_available then null; end;
  if public.commit_leased_online_tournament(v_id,'Test',1,op2,v_payload,lease1) <> 2 then raise exception 'update'; end if;
  if public.read_online_spectator_details(spectator)->'matches' is distinct from 'null'::jsonb then raise exception 'stale projection exposed'; end if;
+ if public.read_online_spectator_brackets(spectator)->'brackets' is distinct from 'null'::jsonb then raise exception 'stale bracket exposed'; end if;
  if public.read_online_spectator_rankings(spectator)->'rankings' is distinct from 'null'::jsonb then raise exception 'stale ranking exposed'; end if;
  perform public.online_spectator_detail_setting(v_id,false);
+ if public.read_online_spectator_brackets(spectator) is not null then raise exception 'disabled bracket exposed'; end if;
  if public.read_online_spectator_rankings(spectator) is not null then raise exception 'disabled ranking exposed'; end if;
  if public.read_online_spectator_details(spectator) is not null then raise exception 'disabled details visible'; end if;
  if public.commit_online_tournament(v_id,'Test',0,op1,v_payload) <> 1 then raise exception 'late retry'; end if;

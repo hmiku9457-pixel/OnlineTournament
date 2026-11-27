@@ -44,3 +44,6 @@ Separate default-off consent per link. Link rotation resets detail consent. The 
 
 ### Spectator rankings
 The same explicit detail consent enables group, round-robin, Swiss and confirmed overall placements. Existing tournament ranking functions produce the rows; no separate public recalculation. The server validates allowed fields, roster membership, unique names per table, size, current revision and lease. Disable/rotate/archive remove the projection. At most 200 tables and 5,000 rows (1 MiB), no silent truncation; oversized publication fails. Like match projections, ranks are presentation data, not an independent server-side verification of sporting calculations.
+
+### Spectator brackets and personal filter
+Started knockout phases publish round-ordered brackets, structured participant/bye/pending slots, scores, sets and winner side only, with the same lease and revision checks. Maximum 2,000 bracket matches and 1 MiB. A public participant selector filters already released matches by exact name; it is not a private player login. Hash-only spectator link navigation reloads the isolated boot and cannot retain the previous token.

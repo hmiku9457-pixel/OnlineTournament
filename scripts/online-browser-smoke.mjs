@@ -13,7 +13,7 @@ const exp = Math.floor(Date.now()/1000)+3600;
 const segment = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 const accessToken = segment({alg:'HS256',typ:'JWT'})+'.'+segment({sub:user.id,role:'authenticated',exp})+'.smoke';
 const session = { access_token: accessToken, refresh_token:'smoke-refresh', token_type:'bearer', expires_in:3600, expires_at:exp, user };
-const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), spectatorLinks = new Map(), detailSettings = new Set(), detailRows = new Map(), rankingRows = new Map(), calls = [];
+const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), spectatorLinks = new Map(), detailSettings = new Set(), detailRows = new Map(), rankingRows = new Map(), bracketRows = new Map(), calls = [];
 let loseResponses = 0;
 async function install(context) {
   await context.route(api+'/**', async route => {
@@ -28,14 +28,14 @@ async function install(context) {
     const body = req.method()==='POST' ? req.postDataJSON() : {};
     if(path.endsWith('/manage_online_spectator')) {
       assert.equal(req.headers()['authorization'],'Bearer '+accessToken,'only authenticated owner manages links');
-      if(body.p_action==='disable'||body.p_action==='rotate'){spectatorLinks.delete(body.p_id);detailSettings.delete(body.p_id);detailRows.delete(body.p_id);rankingRows.delete(body.p_id);}
+      if(body.p_action==='disable'||body.p_action==='rotate'){spectatorLinks.delete(body.p_id);detailSettings.delete(body.p_id);detailRows.delete(body.p_id);rankingRows.delete(body.p_id);bracketRows.delete(body.p_id);}
       if(body.p_action==='enable'&&!spectatorLinks.has(body.p_id)||body.p_action==='rotate') spectatorLinks.set(body.p_id,crypto.randomUUID());
       return send(spectatorLinks.get(body.p_id)??null);
     }
     if(path.endsWith('/online_spectator_detail_setting')) {
       assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
       if(body.p_enabled===true)detailSettings.add(body.p_id);
-      if(body.p_enabled===false){detailSettings.delete(body.p_id);detailRows.delete(body.p_id);rankingRows.delete(body.p_id);}
+      if(body.p_enabled===false){detailSettings.delete(body.p_id);detailRows.delete(body.p_id);rankingRows.delete(body.p_id);bracketRows.delete(body.p_id);}
       return send(detailSettings.has(body.p_id));
     }
     if(path.endsWith('/publish_online_spectator_matches')) {
@@ -45,6 +45,19 @@ async function install(context) {
       for(const m of body.p_matches)assert.deepEqual(Object.keys(m).sort(),['phase','round','score','sets','sideA','sideB','status','table']);
       detailRows.set(body.p_id,{revision:body.p_revision,matches:body.p_matches,total:body.p_total});
       return send(true);
+    }
+    if(path.endsWith('/publish_online_spectator_brackets')) {
+      if(!detailSettings.has(body.p_id))return send(false);
+      assert.equal(leases.get(body.p_id),body.p_token);
+      if(rows.get(body.p_id).revision!==body.p_revision)return send({code:'40001',message:'revision conflict'},409);
+      bracketRows.set(body.p_id,{revision:body.p_revision,brackets:body.p_brackets});
+      return send(true);
+    }
+    if(path.endsWith('/read_online_spectator_brackets')) {
+      const id=[...spectatorLinks].find(([,token])=>token===body.p_token)?.[0];
+      if(!id||!detailSettings.has(id)||archives.has(id))return send(null);
+      const revision=rows.get(id).revision;
+      return send(bracketRows.get(id)?.revision===revision?bracketRows.get(id):{revision,brackets:null});
     }
     if(path.endsWith('/publish_online_spectator_rankings')) {
       if(!detailSettings.has(body.p_id))return send(false);
@@ -195,6 +208,9 @@ try {
   await viewer.getByRole('heading',{name:'Ranglisten und Platzierungen'}).waitFor();
   await viewer.getByRole('cell',{name:'Anna',exact:true}).waitFor({timeout:45000});
   assert.equal(rankingRows.get(id).revision,rows.get(id).revision);
+  await viewer.getByLabel('Teilnehmer auswählen',{exact:true}).selectOption('Anna');
+  await viewer.getByText(/Aktuelle und kommende Spiele von/).waitFor();
+  assert.equal(await viewer.locator('article.online-catalog-row').filter({hasNotText:'Anna'}).count(),0);
   await spectator.close();
   // The server commits, but both automatic HTTP responses are lost.
   loseResponses=2;
