@@ -187,7 +187,7 @@ update tournament_private.online_workspace_leases set expires_at=clock_timestamp
 set local role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-0000000000a1',true);
 do $$
-declare v_id text:='local-rpc-test'; old_token uuid:='20000000-0000-4000-8000-000000000002'; new_token uuid:='20000000-0000-4000-8000-000000000003'; snapshot jsonb;
+declare v_id text:='local-rpc-test'; old_token uuid:='20000000-0000-4000-8000-000000000002'; new_token uuid:='20000000-0000-4000-8000-000000000003'; snapshot jsonb; pa uuid; pb uuid; pc uuid; fixture jsonb; score jsonb:='[{"number":1,"sideAScore":11,"sideBScore":8}]'; different jsonb:='[{"number":1,"sideAScore":11,"sideBScore":9}]';
 begin
   snapshot:=public.load_online_tournament(v_id)->'payload';
   if public.claim_online_workspace(v_id,old_token,true) then raise exception 'expired lease renewed'; end if;
@@ -195,8 +195,27 @@ begin
   if not public.claim_online_workspace(v_id,new_token,false) then raise exception 'expired lease takeover failed'; end if;
   if public.release_online_workspace(v_id,old_token) then raise exception 'old token released new lease'; end if;
   if public.commit_leased_online_tournament(v_id,'Test',29,gen_random_uuid(),snapshot,new_token)<>30 then raise exception 'new owner write failed'; end if;
+  snapshot:=jsonb_set(snapshot,'{entries}',(snapshot->'entries')||jsonb_build_object('online-tournament:mock-match-runtime:v1','[{"matchId":"local-rpc-test-phase-1-sw-r2-m1","table":"Tisch 1","status":"LIVE","startedAt":12345}]'));
+  if public.commit_leased_online_tournament(v_id,'Test',30,gen_random_uuid(),snapshot,new_token)<>31 then raise exception 'report fixture setup'; end if;
+  fixture:='[{"matchId":"local-rpc-test-phase-1-sw-r2-m1","aId":"p-a","bId":"p-b","startedAt":12345,"bestOf":1,"requiresWinner":true}]';
+  pa:=public.manage_online_player_access(v_id,'p-a','enable');pb:=public.manage_online_player_access(v_id,'p-b','enable');pc:=public.manage_online_player_access(v_id,'p-c','enable');
+  if not public.publish_online_report_fixtures(v_id,new_token,31,fixture) then raise exception 'publish report fixtures'; end if;
+  if public.read_online_player_reports(pc) is distinct from '[]'::jsonb then raise exception 'foreign report list'; end if;
+  begin perform public.submit_online_player_report(pc,'local-rpc-test-phase-1-sw-r2-m1',31,score); raise exception 'foreign report'; exception when insufficient_privilege then null; end;
+  begin perform public.submit_online_player_report(pa,'local-rpc-test-phase-1-sw-r2-m1',30,score); raise exception 'stale report'; exception when serialization_failure then null; end;
+  begin perform public.submit_online_player_report(pa,'local-rpc-test-phase-1-sw-r2-m1',31,'[{"number":1,"sideAScore":9,"sideBScore":8}]'); raise exception 'invalid report'; exception when invalid_parameter_value then null; end;
+  if not public.submit_online_player_report(pa,'local-rpc-test-phase-1-sw-r2-m1',31,score) or not public.submit_online_player_report(pa,'local-rpc-test-phase-1-sw-r2-m1',31,score) then raise exception 'report retry'; end if;
+  begin perform public.submit_online_player_report(pa,'local-rpc-test-phase-1-sw-r2-m1',31,different); raise exception 'report overwritten'; exception when invalid_parameter_value then null; end;
+  perform public.submit_online_player_report(pb,'local-rpc-test-phase-1-sw-r2-m1',31,different);
+  if public.list_online_result_reports(v_id)->0->'aSets' is distinct from score or public.list_online_result_reports(v_id)->0->'bSets' is distinct from different then raise exception 'conflict not preserved'; end if;
+  if not public.reset_online_result_reports(v_id,new_token,'local-rpc-test-phase-1-sw-r2-m1',31) then raise exception 'reset failed'; end if;
+  perform public.submit_online_player_report(pa,'local-rpc-test-phase-1-sw-r2-m1',31,score);
+  perform public.submit_online_player_report(pb,'local-rpc-test-phase-1-sw-r2-m1',31,score);
+  if public.list_online_result_reports(v_id)->0->'aSets' is distinct from public.list_online_result_reports(v_id)->0->'bSets' then raise exception 'matching reports lost'; end if;
+  if (public.load_online_tournament(v_id)->>'revision')::int<>31 then raise exception 'player changed canonical revision'; end if;
+  perform set_config('test.report_token',pa::text,true);
   perform public.release_online_workspace(v_id,new_token);
-  begin perform public.set_online_tournament_archive(v_id,30,true); raise exception 'running event archived'; exception when invalid_parameter_value then null; end;
+  begin perform public.set_online_tournament_archive(v_id,31,true); raise exception 'running event archived'; exception when invalid_parameter_value then null; end;
   begin insert into public.tournament_backups(tournament_id,tournament_name,payload) values(v_id,'Broken','{}'); raise exception 'invalid backup accepted'; exception when check_violation then null; end;
 end $$;
 select set_config('test.player_token',public.manage_online_player_access('local-rpc-test','p-a','enable')::text,true);
@@ -207,8 +226,10 @@ do $$
 declare token uuid:=current_setting('test.spectator_token')::uuid; projection jsonb;
 begin
  projection:=public.read_online_spectator(token);
- if projection is null or (projection->>'revision')::integer<>30 or (projection->>'recordedResults')::integer<>1 then raise exception 'anonymous public read failed'; end if;
+ if projection is null or (projection->>'revision')::integer<>31 or (projection->>'recordedResults')::integer<>1 then raise exception 'anonymous public read failed'; end if;
  if public.read_online_player_access(current_setting('test.player_token')::uuid)->>'participant'<>'A' then raise exception 'anonymous player access failed'; end if;
+ if public.read_online_player_reports(current_setting('test.report_token')::uuid)->0->'aSets' is null then raise exception 'anon report read failed'; end if;
+ if has_function_privilege('anon','public.list_online_result_reports(text)','EXECUTE') or has_function_privilege('anon','public.reset_online_result_reports(text,uuid,text,integer)','EXECUTE') or has_table_privilege('anon','tournament_private.online_result_reports','SELECT') then raise exception 'anonymous report privilege'; end if;
  if public.read_online_player_access(gen_random_uuid()) is not null then raise exception 'unknown player token accepted'; end if;
  if has_function_privilege('anon','public.manage_online_player_access(text,text,text)','EXECUTE') or has_function_privilege('anon','public.publish_online_player_projection(text,uuid,integer,jsonb,integer)','EXECUTE') or has_table_privilege('anon','tournament_private.online_player_links','SELECT') or has_table_privilege('anon','tournament_private.online_player_projection','SELECT') then raise exception 'anon player write access'; end if;
  if public.read_online_spectator(gen_random_uuid()) is not null then raise exception 'unknown token readable'; end if;
