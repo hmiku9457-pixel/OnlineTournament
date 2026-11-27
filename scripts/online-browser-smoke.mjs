@@ -128,6 +128,25 @@ try {
   await confirmed(a);
   await a.getByRole('button',{name:'Turnier fortsetzen',exact:true}).waitFor();
   assert.equal(rows.get(id).revision,crashRevision+1,'recovery must not commit twice');
+  // Initial creation can be recovered after a lost response and page reload.
+  await a.goto(base+'/#/online');
+  loseResponses=2;
+  const created=await a.evaluate(async()=>{
+    const {prepareOnlineCreation,commitOnlineCreation}=await import('/src/services/onlineTournaments.ts');
+    const attempt=await prepareOnlineCreation({name:'Erstellung Wiederaufnahme',sport:'table_tennis',discipline:'SINGLES',
+      tables:2,minimumMatches:1,estimatedDurationMinutes:60,participantNames:['A','B','C','D'],
+      phases:[{type:'ROUND_ROBIN',label:'Liga',bestOf:1,entrantCount:4,groupCount:1,swissRounds:1,knockoutBestOf:[]}]});
+    try {await commitOnlineCreation(attempt);throw new Error('Expected lost response');} catch(e) {
+      if(!String(e).includes('Speicherbestätigung')) throw e;
+    }
+    return attempt.tournament.id;
+  });
+  await a.reload();
+  await a.getByRole('link',{name:'Erstellung wiederherstellen'}).click();
+  await a.getByRole('heading',{name:'Unbestätigte Online-Speicherung'}).waitFor();
+  await a.getByRole('button',{name:'Ursprüngliche Anfrage erneut senden'}).click();
+  await confirmed(a);
+  assert.equal(rows.get(created).revision,1);
   await first.close(); await second.close();
   process.stdout.write('Online browser smoke passed: login, cloud creation, start, lost response, retry, second browser and stale revision.\n');
 } finally { await browser.close(); }
