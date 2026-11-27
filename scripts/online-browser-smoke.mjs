@@ -14,6 +14,7 @@ const segment = (value) => Buffer.from(JSON.stringify(value)).toString('base64ur
 const accessToken = segment({alg:'HS256',typ:'JWT'})+'.'+segment({sub:user.id,role:'authenticated',exp})+'.smoke';
 const session = { access_token: accessToken, refresh_token:'smoke-refresh', token_type:'bearer', expires_in:3600, expires_at:exp, user };
 const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), spectatorLinks = new Map(), detailSettings = new Set(), detailRows = new Map(), rankingRows = new Map(), bracketRows = new Map(), playerLinks = new Map(), playerRows = new Map(), reportFixtures = new Map(), reports = new Map(), reportGenerations=new Map(), calls = [];
+const matchCalls=new Map();
 let loseResponses = 0;
 async function install(context) {
   await context.route(api+'/**', async route => {
@@ -38,6 +39,33 @@ async function install(context) {
         if(pid&&!archives.has(id))return {id,pid};
       }
       return null;
+    }
+    function currentMatchCalls(id) {
+      const list=currentReportRows(id);
+      const runtime=JSON.parse(rows.get(id).payload.entries['online-tournament:mock-match-runtime:v1']);
+      const names=Object.fromEntries(Object.entries(record(id).participantIds).map(([name,pid])=>[pid,name]));
+      return list.flatMap(f=>{
+        const r=runtime.find(r=>r.matchId===f.matchId);
+        if(!r)return [];
+        const key=id+'|'+f.matchId;
+        let c=matchCalls.get(key);
+        if(!c||c.table!==r.table||c.startedAt!==f.startedAt){c={callId:crypto.randomUUID(),matchId:f.matchId,table:r.table,startedAt:f.startedAt,calledAt:new Date().toISOString(),aId:f.aId,bId:f.bId,ackA:false,ackB:false};matchCalls.set(key,c);}
+        return [{...c,sideA:names[f.aId],sideB:names[f.bId],revision:f.revision}];
+      });
+    }
+    if(path.endsWith('/list_online_match_calls')) {assert.equal(req.headers()['authorization'],'Bearer '+accessToken);return send(currentMatchCalls(body.p_id));}
+    if(path.endsWith('/ack_online_match_call')) {
+      const access=resolvePlayer(body.p_token);
+      if(!access)return send(false,403);
+      const c=currentMatchCalls(access.id).find(c=>c.callId===body.p_call_id&&[c.aId,c.bId].includes(access.pid));
+      if(!c)return send(false,403);
+      matchCalls.get(access.id+'|'+c.matchId)[c.aId===access.pid?'ackA':'ackB']=true;return send(true);
+    }
+    if(path.endsWith('/recall_online_match_call')) {
+      assert.equal(leases.get(body.p_id),body.p_token);
+      const c=currentMatchCalls(body.p_id).find(c=>c.callId===body.p_call_id&&c.revision===body.p_revision);
+      if(!c)return send(false,409);
+      Object.assign(matchCalls.get(body.p_id+'|'+c.matchId),{callId:crypto.randomUUID(),calledAt:new Date().toISOString(),ackA:false,ackB:false});return send(true);
     }
     if(path.endsWith('/publish_online_report_fixtures')) {
       assert.equal(leases.get(body.p_id),body.p_token);
@@ -86,7 +114,7 @@ async function install(context) {
       const participant=names[pid];
       if(!participant)return send({view:null,reports:[]});
       const projection=playerRows.get(id),current=projection?.revision===row.revision;
-      return send({view:{name:row.name,participant,sport:t.sport,status:t.status,revision:row.revision,updatedAt:row.updated_at,complete:current?projection.total===projection.matches.length:null,matches:current?projection.matches.filter(m=>m.sideA===participant||m.sideB===participant):null},reports:currentReportRows(id).filter(r=>[r.aId,r.bId].includes(pid)).map(r=>({matchId:r.matchId,side:r.aId===pid?'A':'B',sideA:names[r.aId],sideB:names[r.bId],startedAt:r.startedAt,generation:r.generation,bestOf:r.bestOf,requiresWinner:r.requiresWinner,revision:r.revision,aSets:r.aSets,bSets:r.bSets}))});
+      return send({calls:currentMatchCalls(id).filter(c=>[c.aId,c.bId].includes(pid)).map(c=>({callId:c.callId,matchId:c.matchId,table:c.table,calledAt:c.calledAt,sideA:c.sideA,sideB:c.sideB,revision:c.revision,acknowledged:c.aId===pid?c.ackA:c.ackB})),view:{name:row.name,participant,sport:t.sport,status:t.status,revision:row.revision,updatedAt:row.updated_at,complete:current?projection.total===projection.matches.length:null,matches:current?projection.matches.filter(m=>m.sideA===participant||m.sideB===participant):null},reports:currentReportRows(id).filter(r=>[r.aId,r.bId].includes(pid)).map(r=>({matchId:r.matchId,side:r.aId===pid?'A':'B',sideA:names[r.aId],sideB:names[r.bId],startedAt:r.startedAt,generation:r.generation,bestOf:r.bestOf,requiresWinner:r.requiresWinner,revision:r.revision,aSets:r.aSets,bSets:r.bSets}))});
     }
     if(path.endsWith('/list_online_player_access')) {
       assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
@@ -393,6 +421,15 @@ try {
   await player.reload();
   await player.getByRole('heading',{name:'Ergebnis melden',exact:true}).waitFor({timeout:45000});
   await player.locator('.player-call-card').getByText('Tisch 1',{exact:true}).waitFor({timeout:45000});
+  await player.getByRole('button',{name:'Aufruf gesehen',exact:true}).click();
+  await player.getByRole('button',{name:'Gesehen',exact:true}).waitFor();
+  await player.reload();
+  await player.getByRole('button',{name:'Gesehen',exact:true}).waitFor({timeout:45000});
+  const directorCalls=a.getByRole('region',{name:'Spielaufrufe der Turnierleitung'});
+  await directorCalls.getByRole('button',{name:'Aufrufe anzeigen'}).click({timeout:45000});
+  await directorCalls.getByText(/Anna: Bestätigt/).waitFor({timeout:45000});
+  await directorCalls.locator('article').filter({hasText:'Anna'}).getByRole('button',{name:'Erneut aufrufen'}).click();
+  await player.getByRole('button',{name:'Aufruf gesehen',exact:true}).waitFor({timeout:45000});
   await player.getByRole('button',{name:'Aufruf gesehen',exact:true}).click();
   await player.getByRole('button',{name:'Gesehen',exact:true}).waitFor();
   await player.getByLabel('Eigene Punkte 1',{exact:true}).fill('11');

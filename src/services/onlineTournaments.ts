@@ -1,3 +1,4 @@
+import type { DirectorMatchCall } from '@/domain/onlineMatchCalls';
 import type { MatchSet } from '@/domain/types';
 import { validateCompleteResult } from '@/domain/sportScoring';
 import { decodeMatchSlot } from '@/domain/matchSlots';
@@ -417,4 +418,18 @@ export async function batchOnlinePlayerAccess(id:string, ids:string[], action:'e
   if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
   if(data!==ids.length)throw new Error('Änderung der Spielerzugänge nicht vollständig bestätigt.');
   return data;
+}
+
+export async function listOnlineMatchCalls(id:string):Promise<DirectorMatchCall[]> {
+ const {client,userId}=await account();
+ const {data,error}=await client.rpc('list_online_match_calls',{p_id:id}).abortSignal(AbortSignal.timeout(8000));
+ if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
+ if(error)throw new Error(error.message);
+ return (data??[]) as DirectorMatchCall[];
+}
+export async function recallOnlineMatchCall(call:DirectorMatchCall):Promise<void> {
+ const start=workspaceRevision;
+ if(!start||start.revision!==call.revision||hasPendingRemoteWrites()||getTournamentStorageError()||!supabase)throw new Error('Bitte aktuellen Datenbankstand prüfen.');
+ const {data,error}=await supabase.rpc('recall_online_match_call',{p_id:start.id,p_token:start.token,p_call_id:call.callId,p_revision:start.revision}).abortSignal(AbortSignal.timeout(8000));
+ if(error||data!==true)throw new Error(error?.message??'Aufruf nicht bestätigt.');
 }

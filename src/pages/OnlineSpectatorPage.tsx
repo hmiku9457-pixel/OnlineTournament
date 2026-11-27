@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { startOnlinePolling } from '@/domain/onlinePolling';
 import { publicHallAssignments, onlinePage, type OnlineMatchView } from '@/domain/onlineMatchViews';
+import { loadHallPreferences,saveHallPreferences } from '@/domain/hallPreferences';
 import { displayVenueName, getVenueTerminology } from '@/domain/venueTerminology';
 
 interface Progress {
@@ -30,14 +31,17 @@ export function OnlineSpectatorPage({token}:{token:string}) {
   const [rankings,setRankings]=useState<Rankings|null>(null);
   const [brackets,setBrackets]=useState<Brackets|null>(null);
   const [participant,setParticipant]=useState('');
+  const [phaseFilter,setPhaseFilter]=useState('');
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState('all');
   const [pageIndex,setPageIndex]=useState(0);
   const [message,setMessage]=useState('Turnier wird geladen …');
   const [hallOnly,setHallOnly]=useState(false);
   const [hallPage,setHallPage]=useState(0);
-  const [hallSize,setHallSize]=useState(8);
-  const [rotate,setRotate]=useState(false);
+  const [preferences]=useState(loadHallPreferences);
+  const [hallSize,setHallSize]=useState(preferences.size);
+  const [rotate,setRotate]=useState(preferences.rotate);
+  useEffect(()=>saveHallPreferences({size:hallSize,rotate}),[hallSize,rotate]);
   const [fullScreen,setFullScreen]=useState(false);
   const [screenError,setScreenError]=useState('');
   useEffect(()=>{const changed=()=>setFullScreen(!!document.fullscreenElement);document.addEventListener('fullscreenchange',changed);return()=>document.removeEventListener('fullscreenchange',changed);},[]);
@@ -69,7 +73,7 @@ export function OnlineSpectatorPage({token}:{token:string}) {
   },[token]);
   const names=[...new Set([...(details?.matches??[]).flatMap(m=>[m.sideA,m.sideB]),...(rankings?.rankings??[]).flatMap(t=>t.rows.map(r=>r.name))])].sort((a,b)=>a.localeCompare(b,'de'));
   const selected=names.includes(participant)?participant:'';
-  const matches=(details?.matches??[]).filter(m=>(!selected||m.sideA===selected||m.sideB===selected)&&(filter==='all'||(filter==='live'?['LIVE','READY','CONFIRMATION'].includes(m.status):m.status===filter))&&[m.sideA,m.sideB,m.phase,m.round].some(v=>v.toLocaleLowerCase('de-DE').includes(search.trim().toLocaleLowerCase('de-DE'))));
+  const matches=(details?.matches??[]).filter(m=>(!phaseFilter||m.phase===phaseFilter)&&(!selected||m.sideA===selected||m.sideB===selected)&&(filter==='all'||(filter==='live'?['LIVE','READY','CONFIRMATION'].includes(m.status):m.status===filter))&&[m.sideA,m.sideB,m.phase,m.round].some(v=>v.toLocaleLowerCase('de-DE').includes(search.trim().toLocaleLowerCase('de-DE'))));
   const maxPage=Math.max(0,Math.ceil(matches.length/25)-1);
   const currentPage=Math.min(pageIndex,maxPage);
   const hall=publicHallAssignments(details?.matches??[],data?.tables??0);
@@ -107,7 +111,7 @@ export function OnlineSpectatorPage({token}:{token:string}) {
       {names.length>0&&<section className="card"><h2>Persönliche Spielübersicht</h2><p className="muted">Filtert die bereits freigegebenen Spiele nach einem Teilnehmer. Keine Anmeldung oder private Spielerberechtigung.</p><label>Teilnehmer auswählen<select aria-label="Teilnehmer auswählen" value={selected} onChange={e=>{setParticipant(e.target.value);setSearch('');setFilter('all');setPageIndex(0);}}><option value="">Alle Teilnehmer</option>{names.map(n=><option key={n} value={n}>{n}</option>)}</select></label>{selected&&<p>Aktuelle und kommende Spiele von <strong>{selected}</strong> findest du unten in der gefilterten Spielübersicht.</p>}</section>}
       {details&&<section className="card"><h2>Spielpaarungen und Ergebnisse</h2>
         {details.matches===null?<p role="status">Die Detailansicht wird für die aktuelle Revision aktualisiert. Bitte die Turnierleitung geöffnet lassen.</p>:<>
-          <div className="control-match-filter-fields"><label>Teilnehmer suchen<input type="search" value={search} onChange={e=>{setSearch(e.target.value);setPageIndex(0);}} placeholder="Name oder Phase"/></label><label>Status<select aria-label="Spielstatus" value={filter} onChange={e=>{setFilter(e.target.value);setPageIndex(0);}}><option value="all">Alle</option><option value="live">Laufend</option><option value="FINISHED">Beendet</option><option value="WAITING">Wartend</option></select></label></div>
+          <div className="control-match-filter-fields"><label>Teilnehmer suchen<input type="search" value={search} onChange={e=>{setSearch(e.target.value);setPageIndex(0);}} placeholder="Name oder Phase"/></label><label>Phase<select aria-label="Turnierphase" value={phaseFilter} onChange={e=>{setPhaseFilter(e.target.value);setPageIndex(0);}}><option value="">Alle Phasen</option>{[...new Set((details.matches??[]).map(m=>m.phase))].map(p=><option key={p}>{p}</option>)}</select></label><label>Status<select aria-label="Spielstatus" value={filter} onChange={e=>{setFilter(e.target.value);setPageIndex(0);}}><option value="all">Alle</option><option value="live">Laufend</option><option value="FINISHED">Beendet</option><option value="WAITING">Wartend</option></select></label></div>
           {(details.total??0)>details.matches.length&&<p className="muted">Auszug: {details.matches.length} von {details.total} Partien.</p>}
           {!matches.length&&<p>Keine passenden Spiele.</p>}
           {matches.slice(currentPage*25,(currentPage+1)*25).map((m,i)=><article className="online-catalog-row" key={currentPage*25+i}>

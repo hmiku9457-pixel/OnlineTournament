@@ -2,10 +2,11 @@ import { sportScoring,validateCompleteResult } from '@/domain/sportScoring';
 import type { MatchSet } from '@/domain/types';
 import { useEffect,useRef,useState } from 'react';
 import { reportDraftKey,retainReportDrafts,type ReportDraft,type ReportDrafts } from '@/domain/playerReportDrafts';
-import { getPlayerCalls,newPlayerCalls,playerRefreshDelay } from '@/domain/playerCalls';
+import { playerRefreshDelay } from '@/domain/playerCalls';
 import { supabase } from '@/lib/supabase';
 import { startOnlinePolling } from '@/domain/onlinePolling';
 import { onlinePlayerSummary, orientOnlineScore, onlineMatchOutcome, filterPlayerMatches, type OnlineMatchView } from '@/domain/onlineMatchViews';
+import { callAgeMinutes,callLabel,type PlayerMatchCall } from '@/domain/onlineMatchCalls';
 import { displayVenueMessage } from '@/domain/venueTerminology';
 type Match=OnlineMatchView;
 interface Report {matchId:string;startedAt:number;generation:number;side:'A'|'B';sideA:string;sideB:string;bestOf:number;requiresWinner:boolean;revision:number;aSets:MatchSet[]|null;bSets:MatchSet[]|null}
@@ -27,7 +28,9 @@ export function OnlinePlayerPage({token}:{token:string}) {
  const [vibration,setVibration]=useState(false);
  const vibrationRef=useRef(false);
  const previousCalls=useRef<string[]|null>(null);
- const [acknowledged,setAcknowledged]=useState<string[]>([]);
+ const [calls,setCalls]=useState<PlayerMatchCall[]>([]);
+ const [ackBusy,setAckBusy]=useState(false);
+ const [ackError,setAckError]=useState('');
  const [newCallText,setNewCallText]=useState('');
  useEffect(()=>{
   let alive=true,failures=0;
@@ -47,19 +50,19 @@ export function OnlinePlayerPage({token}:{token:string}) {
     setDrafts(old=>!view?{}:retainReportDrafts(old,currentReports,view.matches!==null&&Array.isArray(raw)));
     setData(view);setLastChecked(Date.now());failures=0;
     setMessage(view?'':'Dieser Spielerlink ist nicht mehr verfügbar.');
-    if(!view){previousCalls.current=null;setAcknowledged([]);setNewCallText('');}
+    const currentCalls:PlayerMatchCall[]=view&&Array.isArray(result.data?.calls)?result.data.calls.filter((c:PlayerMatchCall)=>c.revision===view.revision):[];
+    setCalls(currentCalls);
+    if(!view){previousCalls.current=null;setNewCallText('');setAckError('');}
     else if(view.matches===null){setNewCallText('');}
     else {
-      const calls=getPlayerCalls(view.matches,view.participant);
-      const added=newPlayerCalls(previousCalls.current,calls);
-      previousCalls.current=calls.map(c=>c.key);
-      setAcknowledged(old=>old.filter(k=>calls.some(c=>c.key===k)));
+      const added=previousCalls.current===null?[]:currentCalls.filter(c=>!previousCalls.current!.includes(c.callId)&&!c.acknowledged);
+      previousCalls.current=currentCalls.map(c=>c.callId);
       if(added.length){
-        setNewCallText('Neuer Spielaufruf: '+added.map(c=>displayVenueMessage(view.sport,c.table)+' gegen '+c.opponent).join(' · '));
+        setNewCallText('Neuer Spielaufruf: '+added.map(c=>displayVenueMessage(view.sport,c.table)+' gegen '+(c.sideA===view.participant?c.sideB:c.sideA)).join(' · '));
         if(vibrationRef.current&&document.visibilityState==='visible'&&typeof navigator.vibrate==='function')navigator.vibrate([180,100,180]);
-      } else if(!calls.length)setNewCallText('');
+      } else if(!currentCalls.some(c=>!c.acknowledged))setNewCallText('');
     }
-   }catch{if(alive){failures++;setData(null);setReports([]);setNewCallText('');setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
+   }catch{if(alive){failures++;setData(null);setReports([]);setCalls([]);setNewCallText('');setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
    finally{if(alive)setRefreshing(false);}
   }
   const polling=startOnlinePolling(refresh,()=>playerRefreshDelay(document.visibilityState==='visible',failures));
@@ -67,7 +70,14 @@ export function OnlinePlayerPage({token}:{token:string}) {
   window.addEventListener('focus',focus);window.addEventListener('online',focus);document.addEventListener('visibilitychange',focus);
   return()=>{alive=false;polling.stop();window.removeEventListener('focus',focus);window.removeEventListener('online',focus);document.removeEventListener('visibilitychange',focus);};
  },[token,refreshVersion]);
- const calls=data&&data.matches?getPlayerCalls(data.matches,data.participant):[];
+ async function acknowledge(call:PlayerMatchCall){
+  if(ackBusy||!supabase)return;setAckBusy(true);setAckError('');
+  try{const {data:ok,error}=await supabase.rpc('ack_online_match_call',{p_token:token,p_call_id:call.callId}).abortSignal(AbortSignal.timeout(8000));
+   if(error||ok!==true)throw new Error('Aufruf konnte nicht bestätigt werden. Bitte aktualisieren.');
+   setCalls(old=>old.map(c=>c.callId===call.callId?{...c,acknowledged:true}:c));setNewCallText('');setRefreshVersion(v=>v+1);
+  }catch(e){setAckError(e instanceof Error?e.message:'Bestätigung fehlgeschlagen.');}
+  finally{setAckBusy(false);}
+ }
  const summary=data?.matches?onlinePlayerSummary(data.matches,data.participant):null;
  const phases=[...new Set((data?.matches??[]).map(m=>m.phase))];
  const rows=filterPlayerMatches(data?.matches??[],data?.participant??'',phase,query,filter);
@@ -75,18 +85,20 @@ export function OnlinePlayerPage({token}:{token:string}) {
  return <main className="main online-spectator">
  {!data?<section className="card"><h1>Persönliche Spielübersicht</h1><p role="status">{message}</p></section>:<>
  <header className="dashboard-page-hero"><div><h1>{data.participant}</h1><p>{data.name} · {data.sport}</p></div><span className="badge">Spieleransicht</span></header>
- <section className="card player-call-panel"><div className="actions"><h2>Meine Spielaufrufe</h2><button className="btn small" disabled={refreshing} onClick={()=>setRefreshVersion(v=>v+1)}>{refreshing?'Aktualisiere …':'Jetzt aktualisieren'}</button></div>
+ <nav className="actions online-player-nav" aria-label="Spieler-Navigation"><a href="#" onClick={e=>{e.preventDefault();document.getElementById('my-calls')?.scrollIntoView();}}>Aufrufe</a><a href="#" onClick={e=>{e.preventDefault();document.getElementById('my-results')?.scrollIntoView();}}>Statistik</a><a href="#" onClick={e=>{e.preventDefault();document.getElementById('my-games')?.scrollIntoView();}}>Spiele</a></nav>
+ <section className="card player-call-panel" id="my-calls"><div className="actions"><h2>Meine Spielaufrufe</h2><button className="btn small" disabled={refreshing} onClick={()=>setRefreshVersion(v=>v+1)}>{refreshing?'Aktualisiere …':'Jetzt aktualisieren'}</button></div>
  {newCallText&&<p role="status" className="player-call-notice">{newCallText}</p>}
- {data.matches===null?<p className="muted">Spielaufrufe werden für den aktuellen Stand aktualisiert.</p>:calls.length===0?<p>Momentan kein zugewiesenes Spiel.</p>:calls.map(call=><article className="player-call-card" key={call.key}><span className="muted">Bitte zur Spielfläche</span><strong className="player-call-table">{displayVenueMessage(data.sport,call.table)}</strong><strong>gegen {call.opponent}</strong><span>{call.phase} · {call.round}</span><button className="btn small" disabled={acknowledged.includes(call.key)} onClick={()=>{setAcknowledged(old=>[...old,call.key]);setNewCallText('');}}>{acknowledged.includes(call.key)?'Gesehen':'Aufruf gesehen'}</button><small className="muted">Bestätigung nur auf diesem Gerät.</small></article>)}
+ {ackError&&<p role="alert">{ackError}</p>}
+ {data.matches===null?<p className="muted">Spielaufrufe werden für den aktuellen Stand aktualisiert.</p>:calls.length===0?<p>Momentan kein offener Spielaufruf. Laufende Spiele findest du unter Meine Spiele.</p>:calls.map(call=><article className="player-call-card" key={call.callId}><span className="muted">Bitte zur Spielfläche · Aufruf: {callLabel(callAgeMinutes(call.calledAt,lastChecked??Date.now()))}</span><strong className="player-call-table">{displayVenueMessage(data.sport,call.table)}</strong><strong>gegen {call.sideA===data.participant?call.sideB:call.sideA}</strong><button className="btn small" disabled={ackBusy||call.acknowledged} onClick={()=>void acknowledge(call)}>{call.acknowledged?'Gesehen':'Aufruf gesehen'}</button><small className="muted">{call.acknowledged?'In der Datenbank bestätigt.':'Bestätigung wird an die Turnierleitung übermittelt.'}</small></article>)}
  {typeof navigator.vibrate==='function'&&<label><input type="checkbox" checked={vibration} onChange={e=>{vibrationRef.current=e.target.checked;setVibration(e.target.checked);if(e.target.checked)navigator.vibrate(80);}}/> Vibration bei neuen Spielaufrufen (geöffnete Ansicht)</label>}
  <p className="muted">{lastChecked?'Zuletzt geprüft: '+new Date(lastChecked).toLocaleTimeString('de-DE'):'Noch nicht geprüft'}. Bitte halte die Ansicht geöffnet. Keine Hintergrund-Push-Nachrichten.</p></section>
  {reports.length>0&&<section className="card"><h2>Ergebnis melden</h2><p>Beide Seiten müssen denselben Endstand melden. Erst die Turnierleitung übernimmt das verbindliche Ergebnis.</p>{reports.map(r=>{const key=reportDraftKey(r);return <ReportForm key={key} report={r} sport={data.sport} token={token} values={drafts[key]??[['','']]} setValues={update=>setDrafts(old=>({...old,[key]:update(old[key]??[['','']])}))} onSaved={()=>setRefreshVersion(v=>v+1)}/>;})}</section>}
  {summary&&<section className="card" aria-label="Weitere geplante Begegnungen"><h2>Weitere geplante Begegnungen</h2>
  {summary.upcoming.length?<><p className="muted">Auszug aus den bereits feststehenden Paarungen, keine verbindliche Aufrufreihenfolge.</p>{summary.upcoming.map((m,i)=><article className="online-catalog-row" key={i}><strong>gegen {m.sideA===data.participant?m.sideB:m.sideA}</strong><p>{m.phase} · {m.round}</p></article>)}</>:<p>Keine weiteren wartenden Paarungen im veröffentlichten Spielplan.</p>}
  </section>}
- {summary&&<section className="card"><h2>Meine Ergebnisübersicht</h2><p className="muted">Aus den veröffentlichten Endständen; Sonderwertungen ohne eindeutigen Sieger werden separat ausgewiesen.{data.complete===false?' Unvollständiger Auszug.':''}</p>
+ {summary&&<section className="card" id="my-results"><h2>Meine Ergebnisübersicht</h2><p className="muted">Aus den veröffentlichten Endständen; Sonderwertungen ohne eindeutigen Sieger werden separat ausgewiesen.{data.complete===false?' Unvollständiger Auszug.':''}</p>
  <div className="online-summary-grid"><div><span>Siege</span><strong>{summary.wins}</strong></div><div><span>Niederlagen</span><strong>{summary.losses}</strong></div><div><span>Unentschieden</span><strong>{summary.draws}</strong></div><div><span>Sonderwertungen / unklar</span><strong>{summary.other}</strong></div></div></section>}
- <section className="card" aria-label="Meine Spiele"><h2>Meine Spiele</h2>
+ <section className="card" aria-label="Meine Spiele" id="my-games"><h2>Meine Spiele</h2>
  {data.matches===null?<p role="status">Die Spielübersicht wird für die aktuelle Revision aktualisiert. Bitte warte auf die Turnierleitung.</p>:<>
  <div className="control-metrics-grid"><div><span>Laufend / zugewiesen</span><strong>{data.matches.filter(m=>active(m.status)).length}</strong></div><div><span>Wartend</span><strong>{data.matches.filter(m=>m.status==='WAITING').length}</strong></div><div><span>Beendet</span><strong>{data.matches.filter(m=>m.status==='FINISHED').length}</strong></div></div>
  {data.complete===false&&<p role="status">Die Übersicht enthält einen begrenzten Auszug des Spielplans.</p>}
