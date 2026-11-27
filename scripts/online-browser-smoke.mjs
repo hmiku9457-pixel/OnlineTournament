@@ -171,6 +171,18 @@ async function install(context) {
       const revision=rows.get(id).revision;
       return send(detailRows.get(id)?.revision===revision?detailRows.get(id):{revision,matches:null,total:null});
     }
+    if(path.endsWith('/online_projection_plan')) {
+      const id=body.p_id,revision=rows.get(id)?.revision;
+      if(revision!==body.p_revision)return send({code:'40001',message:'revision conflict'},409);
+      const spectator=detailSettings.has(id)&&spectatorLinks.has(id);
+      return send({player:!!playerLinks.get(id)?.size&&playerRows.get(id)?.revision!==revision,matches:spectator&&detailRows.get(id)?.revision!==revision,rankings:spectator&&rankingRows.get(id)?.revision!==revision,brackets:spectator&&bracketRows.get(id)?.revision!==revision});
+    }
+    if(path.endsWith('/read_online_spectator_bundle')) {
+      const id=[...spectatorLinks].find(([,token])=>token===body.p_token)?.[0];
+      if(!id||archives.has(id))return send({progress:null,details:null,rankings:null,brackets:null});
+      const row=rows.get(id),t=record(id),revision=row.revision,enabled=detailSettings.has(id);
+      return send({progress:{name:row.name,sport:t.sport,status:t.status,revision,updatedAt:row.updated_at,participantCount:t.participantNames.length,tables:t.tables,recordedResults:0,occupiedTables:0,phases:t.stages.map(p=>({name:p.name,type:p.type,started:false,completed:false}))},details:enabled?(detailRows.get(id)?.revision===revision?detailRows.get(id):{revision,matches:null,total:null}):null,rankings:enabled?(rankingRows.get(id)?.revision===revision?rankingRows.get(id):{revision,rankings:null}):null,brackets:enabled?(bracketRows.get(id)?.revision===revision?bracketRows.get(id):{revision,brackets:null}):null});
+    }
     if(path.endsWith('/read_online_spectator')) {
       const id=[...spectatorLinks].find(([,token])=>token===body.p_token)?.[0];
       if(!id || archives.has(id))return send(null);

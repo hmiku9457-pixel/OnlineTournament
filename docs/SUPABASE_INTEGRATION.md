@@ -65,3 +65,6 @@ Runtime journal discard requires acquiring the same exclusive workspace lease as
 
 ## Report reset generation and ephemeral drafts
 Every explicit report reset increments a per-fixture generation. The v2 submission RPC checks it under the same advisory lock as reset, so a stale browser cannot re-submit an old confirmation. The legacy RPC is restricted to generation zero; browsers with the older build must refresh after a reset. The director compares generation on adoption. The player retains an in-memory draft across temporary projection gaps and unrelated revisions only for the same match ID, start timestamp, sides, rules and generation. No sensitive draft is persisted to local storage; revoked links and changed fixtures discard drafts.
+
+## Projection refresh efficiency
+A single owner-only revision plan checks which detail projections are missing for the current confirmed revision. The director computes and publishes only missing projections, retries failed publications, and still discovers new access grants/rotations on the heartbeat. The anonymous spectator bundle reads all allowlisted sections in a single statement, replacing four RPC calls per poll. Visible polling remains 10s, hidden 30s and failures back off to 60s. No public realtime channel.

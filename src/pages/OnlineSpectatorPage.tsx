@@ -2,6 +2,7 @@ import { BracketRoundViewport } from '@/components/BracketRoundViewport';
 import type { MatchSlot } from '@/domain/matchSlots';
 import { sportScoring } from '@/domain/sportScoring';
 import type { MockStanding } from '@/services/mockCompetitionViews';
+import { playerRefreshDelay } from '@/domain/playerCalls';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -31,28 +32,31 @@ export function OnlineSpectatorPage({token}:{token:string}) {
   const [pageIndex,setPageIndex]=useState(0);
   const [message,setMessage]=useState('Turnier wird geladen …');
   useEffect(()=>{
-    let active=true, running=false;
+    let active=true, running=false, failures=0, timer:number|undefined;
+    function schedule(){if(active){window.clearTimeout(timer);timer=window.setTimeout(()=>void refresh(),failures?playerRefreshDelay(true,failures):document.visibilityState==='visible'?10000:30000);}}
     async function refresh() {
       if(running||!active)return;
       if(!supabase||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){setData(null);setDetails(null);setRankings(null);setBrackets(null);setMessage('Zuschauerlink ungültig oder nicht verfügbar.');return;}
       running=true;
       try {
-        const [result,detailResult,rankingResult,bracketResult]=await Promise.all([supabase.rpc('read_online_spectator',{p_token:token}).abortSignal(AbortSignal.timeout(8000)),supabase.rpc('read_online_spectator_details',{p_token:token}).abortSignal(AbortSignal.timeout(8000)),supabase.rpc('read_online_spectator_rankings',{p_token:token}).abortSignal(AbortSignal.timeout(8000)),supabase.rpc('read_online_spectator_brackets',{p_token:token}).abortSignal(AbortSignal.timeout(8000))]);
+        const result=await supabase.rpc('read_online_spectator_bundle',{p_token:token}).abortSignal(AbortSignal.timeout(8000));
         if(!active)return;
         if(result.error)throw new Error(result.error.message);
-        setData(result.data as Progress|null);
-        setDetails(!detailResult.error&&result.data&&detailResult.data?.revision===result.data.revision?detailResult.data as Details:null);
-        setRankings(!rankingResult.error&&result.data&&rankingResult.data?.revision===result.data.revision?rankingResult.data as Rankings:null);
-        setBrackets(!bracketResult.error&&result.data&&bracketResult.data?.revision===result.data.revision?bracketResult.data as Brackets:null);
-        setMessage(result.data?'':'Dieser Zuschauerlink ist nicht mehr verfügbar.');
-      } catch {if(active){setData(null);setDetails(null);setRankings(null);setBrackets(null);setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
-      finally{running=false;}
+        const progress=result.data?.progress as Progress|null;
+        const current=<T extends {revision:number}>(value:T|null|undefined):T|null=>progress&&value?.revision===progress.revision?value:null;
+        failures=0;
+        setData(progress);
+        setDetails(current<Details>(result.data?.details));
+        setRankings(current<Rankings>(result.data?.rankings));
+        setBrackets(current<Brackets>(result.data?.brackets));
+        setMessage(progress?'':'Dieser Zuschauerlink ist nicht mehr verfügbar.');
+      } catch {if(active){failures++;setData(null);setDetails(null);setRankings(null);setBrackets(null);setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
+      finally{running=false;schedule();}
     }
     void refresh();
-    const timer=window.setInterval(()=>void refresh(),10000);
-    const focus=()=>void refresh();
-    window.addEventListener('focus',focus);window.addEventListener('online',focus);
-    return()=>{active=false;window.clearInterval(timer);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);};
+    const focus=()=>{window.clearTimeout(timer);if(!running)void refresh();};
+    window.addEventListener('focus',focus);window.addEventListener('online',focus);document.addEventListener('visibilitychange',focus);
+    return()=>{active=false;window.clearTimeout(timer);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);document.removeEventListener('visibilitychange',focus);};
   },[token]);
   const names=[...new Set([...(details?.matches??[]).flatMap(m=>[m.sideA,m.sideB]),...(rankings?.rankings??[]).flatMap(t=>t.rows.map(r=>r.name))])].sort((a,b)=>a.localeCompare(b,'de'));
   const selected=names.includes(participant)?participant:'';

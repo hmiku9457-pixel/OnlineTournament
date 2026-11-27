@@ -93,6 +93,8 @@ begin
  if public.read_online_spectator_details(spectator)->'matches' is distinct from detail_match then raise exception 'projection differs'; end if;
  if not public.publish_online_spectator_rankings(v_id,lease1,1,ranking_fixture) then raise exception 'ranking publication failed'; end if;
  if public.read_online_spectator_rankings(spectator)->'rankings' is distinct from ranking_fixture then raise exception 'rankings differ'; end if;
+ if (public.online_projection_plan(v_id,1)->>'rankings')::boolean then raise exception 'current ranking republish planned'; end if;
+ if public.read_online_spectator_bundle(spectator)->'rankings' is distinct from public.read_online_spectator_rankings(spectator) then raise exception 'bundle ranking mismatch'; end if;
  if not public.publish_online_spectator_brackets(v_id,lease1,1,bracket_fixture) then raise exception 'bracket publication failed'; end if;
  if public.read_online_spectator_brackets(spectator)->'brackets' is distinct from bracket_fixture then raise exception 'brackets differ'; end if;
  begin perform public.publish_online_spectator_brackets(v_id,lease2,1,bracket_fixture); raise exception 'wrong bracket lease accepted'; exception when lock_not_available then null; end;
@@ -111,6 +113,7 @@ begin
  if public.commit_leased_online_tournament(v_id,'Test',1,op2,v_payload,lease1) <> 2 then raise exception 'update'; end if;
  if public.read_online_player_access(player_new)->'matches' is distinct from 'null'::jsonb then raise exception 'stale player projection exposed'; end if;
  if public.read_online_spectator_details(spectator)->'matches' is distinct from 'null'::jsonb then raise exception 'stale projection exposed'; end if;
+ if not (public.online_projection_plan(v_id,2)->>'rankings')::boolean then raise exception 'stale ranking not planned'; end if;
  if public.read_online_spectator_brackets(spectator)->'brackets' is distinct from 'null'::jsonb then raise exception 'stale bracket exposed'; end if;
  if public.read_online_spectator_rankings(spectator)->'rankings' is distinct from 'null'::jsonb then raise exception 'stale ranking exposed'; end if;
  perform public.online_spectator_detail_setting(v_id,false);
@@ -249,6 +252,8 @@ begin
  if has_function_privilege('anon','public.batch_online_player_access(text,jsonb,text)','EXECUTE') or has_function_privilege('anon','public.list_online_result_reports(text)','EXECUTE') or has_function_privilege('anon','public.reset_online_result_reports(text,uuid,text,integer)','EXECUTE') or has_table_privilege('anon','tournament_private.online_result_reports','SELECT') then raise exception 'anonymous report privilege'; end if;
  if public.read_online_player_access(gen_random_uuid()) is not null then raise exception 'unknown player token accepted'; end if;
  if has_function_privilege('anon','public.manage_online_player_access(text,text,text)','EXECUTE') or has_function_privilege('anon','public.publish_online_player_projection(text,uuid,integer,jsonb,integer)','EXECUTE') or has_table_privilege('anon','tournament_private.online_player_links','SELECT') or has_table_privilege('anon','tournament_private.online_player_projection','SELECT') then raise exception 'anon player write access'; end if;
+ if public.read_online_spectator_bundle(gen_random_uuid())->'progress' is distinct from 'null'::jsonb then raise exception 'unknown bundled token'; end if;
+ if has_function_privilege('anon','public.online_projection_plan(text,integer)','EXECUTE') then raise exception 'anon projection plan'; end if;
  if public.read_online_spectator(gen_random_uuid()) is not null then raise exception 'unknown token readable'; end if;
  if has_function_privilege('anon','public.publish_online_spectator_rankings(text,uuid,integer,jsonb)','EXECUTE') or has_table_privilege('anon','tournament_private.online_spectator_rankings','SELECT') or has_function_privilege('anon','public.publish_online_spectator_matches(text,uuid,integer,jsonb,integer)','EXECUTE') or has_function_privilege('anon','public.online_spectator_detail_setting(text,boolean)','EXECUTE') or has_table_privilege('anon','tournament_private.online_spectator_details','SELECT') or has_function_privilege('anon','public.manage_online_spectator(text,text)','EXECUTE') or has_function_privilege('anon','public.load_online_tournament(text)','EXECUTE') or has_table_privilege('anon','tournament_private.online_tournaments','SELECT') then raise exception 'anon private access'; end if;
 end $$;

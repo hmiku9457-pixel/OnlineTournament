@@ -277,12 +277,14 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
   if(publishing){queuedProjection=start;return;}
   publishing=true;
   try {
-    const [spectatorEnabled,playerActive]=await Promise.all([spectatorDetailSetting(start.id),supabase.rpc('online_player_access_active',{p_id:start.id})]);
-    if(!spectatorEnabled&&playerActive.data!==true)return;
+    const {data:plan,error:planError}=await supabase.rpc('online_projection_plan',{p_id:start.id,p_revision:start.revision}).abortSignal(AbortSignal.timeout(8000));
+    if(planError)throw new Error(planError.message);
+    if(!plan||!['player','matches','rankings','brackets'].some(key=>plan[key]===true))return;
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
     const tournament=getAllMockTournaments().find(t=>t.id===start.id);
     if(!tournament)return;
     const roster=new Set(tournament.participantNames);
+    if(plan.player||plan.matches) {
     const rows=tournament.stages.filter(s=>isStageStarted(tournament,s)).flatMap(s=>[
       ...getMockStageMatches(tournament,s),
       ...(s.type==='SWISS'?[...getSwissRoundRobinMatches(tournament,s),...getSwissCutoffSetMatches(tournament,s)]:[])
@@ -292,17 +294,22 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
     const matches=rows.slice(0,5000).map(m=>({sideA:m.sideA,sideB:m.sideB,phase:m.phase,round:m.round,status:m.status,
       table:m.table,score:m.score,sets:(m.sets??[]).map(s=>({sideAScore:s.sideAScore,sideBScore:s.sideBScore}))}));
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
-    if(playerActive.data===true) {
+    if(plan.player===true) {
       const fixtures=getMockRuntimeMatches(tournament).filter(m=>['LIVE','READY'].includes(m.status)&&m.startedAt&&m.table.startsWith('Tisch ')&&!m.sets?.length&&!m.extraTimeProgress&&canEditMockMatch(tournament,m.id)&&roster.has(m.sideA)&&roster.has(m.sideB)&&tournament.participantIds?.[m.sideA]&&tournament.participantIds?.[m.sideB]).map(m=>({matchId:m.id,aId:tournament.participantIds![m.sideA],bId:tournament.participantIds![m.sideB],startedAt:m.startedAt,bestOf:m.bestOf,requiresWinner:m.requiresWinner}));
       const reportResult=await supabase.rpc('publish_online_report_fixtures',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_fixtures:fixtures}).abortSignal(AbortSignal.timeout(8000));
       if(reportResult.error)throw new Error(reportResult.error.message);
       // The server filters the projection by the capability's stable roster identity.
-      await supabase.rpc('publish_online_player_projection',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches,p_total:rows.length}).abortSignal(AbortSignal.timeout(8000));
+      const playerResult=await supabase.rpc('publish_online_player_projection',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches,p_total:rows.length}).abortSignal(AbortSignal.timeout(8000));
+      if(playerResult.error)throw new Error(playerResult.error.message);
     }
-    if(!spectatorEnabled||workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+    if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+    if(plan.matches===true){
     const {error}=await supabase.rpc('publish_online_spectator_matches',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches.slice(0,1000),p_total:rows.length}).abortSignal(AbortSignal.timeout(8000));
     if(error)throw new Error(error.message);
+    }
+    }
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+    if(plan.rankings===true){
     const rankings:Array<{phase:string;label:string;kind:string;rows:Array<MockStanding|{rank:number;name:string;placement:string;status:string}>}>=[];
     for(const stage of tournament.stages.filter(s=>isStageStarted(tournament,s))) {
       if(stage.type==='GROUPS') for(const group of buildMockGroups(tournament,stage)) rankings.push({phase:stage.name,label:group.label,kind:'GROUPS',rows:group.standings.filter(r=>roster.has(r.name))});
@@ -314,7 +321,9 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
     const result=await supabase.rpc('publish_online_spectator_rankings',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_rankings:rankings}).abortSignal(AbortSignal.timeout(8000));
     if(result.error)throw new Error(result.error.message);
+    }
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+    if(plan.brackets===true){
     const brackets=tournament.stages.filter(s=>isStageStarted(tournament,s)&&['KNOCKOUT','DOUBLE_ELIMINATION','PLACEMENT'].includes(s.type)).map(stage=>({
       phase:stage.name,rounds:buildMockBracket(tournament,stage).map(round=>({label:round.label,matches:round.matches.map(m=>({
         a:decodeMatchSlot(m.sideA),b:decodeMatchSlot(m.sideB),score:m.score??'–',
@@ -324,6 +333,7 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
     }));
     const bracketResult=await supabase.rpc('publish_online_spectator_brackets',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_brackets:brackets}).abortSignal(AbortSignal.timeout(8000));
     if(bracketResult.error)throw new Error(bracketResult.error.message);
+    }
   } finally {
     publishing=false;
     const queued=queuedProjection;queuedProjection=undefined;
