@@ -17,7 +17,7 @@ for(const snapshot of snapshots){
 }
 assert.ok(ids.size>=3,'Expected round-robin, Swiss and group/KO fixtures');
 assert.ok(snapshots.length>=20,'Expected complete runtime sequences');
-for(const [id,revision] of ids)sql+="do $ begin if (public.load_online_tournament("+q(id)+")->>'revision')::int is distinct from "+revision+" then raise exception 'unexpected final revision'; end if; end $;\n";
+for(const [id,revision] of ids)sql+="do $check$ begin if (public.load_online_tournament("+q(id)+")->>'revision')::int is distinct from "+revision+" then raise exception 'unexpected final revision'; end if; end $check$;\n";
 sql+="rollback;\n";
 const result=spawnSync('psql',[process.env.DATABASE_URL,'-X','-v','ON_ERROR_STOP=1'],{input:sql,encoding:'utf8',maxBuffer:4*1024*1024});
 if(result.status!==0){console.error(result.stderr);process.exit(result.status??1);}
