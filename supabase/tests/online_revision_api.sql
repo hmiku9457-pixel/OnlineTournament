@@ -222,6 +222,23 @@ begin
   if (select token from public.list_online_player_access(v_id) where participant_id='p-a') is distinct from pa then raise exception 'bulk enable rotated existing link'; end if;
   begin perform public.publish_online_report_fixtures(v_id,new_token,31,jsonb_set(fixture,'{0,bId}','"p-c"')); raise exception 'wrong Swiss opponent published'; exception when invalid_parameter_value then null; end;
   if not public.publish_online_report_fixtures(v_id,new_token,31,fixture) then raise exception 'publish report fixtures'; end if;
+  -- The capability may acknowledge only its own current call; recall revokes old IDs.
+  declare call_uuid uuid; replacement_uuid uuid;
+  begin
+    call_uuid:=(public.list_online_match_calls(v_id)->0->>'callId')::uuid;
+    if call_uuid is null then raise exception 'missing match call'; end if;
+    if jsonb_array_length(public.read_online_player_bundle(pc)->'calls')<>0 then raise exception 'foreign call exposed'; end if;
+    begin perform public.ack_online_match_call(pc,call_uuid); raise exception 'foreign call accepted'; exception when insufficient_privilege then null; end;
+    if not public.ack_online_match_call(pa,call_uuid) or not public.ack_online_match_call(pa,call_uuid) then raise exception 'ack retry'; end if;
+    if public.list_online_match_calls(v_id)->0->'ackA' is distinct from 'true'::jsonb then raise exception 'ack missing'; end if;
+    if public.read_online_player_bundle(pa)->'calls'->0->'acknowledged' is distinct from 'true'::jsonb then raise exception 'private ack missing'; end if;
+    if not public.recall_online_match_call(v_id,new_token,call_uuid,31) then raise exception 'recall rejected'; end if;
+    replacement_uuid:=(public.list_online_match_calls(v_id)->0->>'callId')::uuid;
+    if replacement_uuid=call_uuid or public.list_online_match_calls(v_id)->0->'ackA' is distinct from 'false'::jsonb then raise exception 'recall failed'; end if;
+    begin perform public.ack_online_match_call(pa,call_uuid); raise exception 'old call accepted'; exception when insufficient_privilege then null; end;
+    if not public.ack_online_match_call(pb,replacement_uuid) then raise exception 'second participant ack'; end if;
+  end;
+
   if public.read_online_player_reports(pc) is distinct from '[]'::jsonb then raise exception 'foreign report list'; end if;
   begin perform public.submit_online_player_report(pc,'local-rpc-test-phase-1-sw-r2-m1',31,score); raise exception 'foreign report'; exception when insufficient_privilege then null; end;
   begin perform public.submit_online_player_report(pa,'local-rpc-test-phase-1-sw-r2-m1',30,score); raise exception 'stale report'; exception when serialization_failure then null; end;
