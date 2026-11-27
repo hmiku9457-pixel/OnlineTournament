@@ -9307,3 +9307,12 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .player-call-notice { font-weight: 700; margin: 0; }
 .player-call-card .btn { justify-self: start; }
 @media (max-width: 600px) { .online-report-score { display: grid; grid-template-columns: 1fr minmax(55px, 75px) auto minmax(55px, 75px); align-items: center; } .online-report-score input { width: 100%; min-width: 0; } .player-call-card .btn { min-height: 40px; } }
+
+/* Keep controls reachable even with many access links or a short viewport. */
+.prototype-modal.online-player-access-modal { width: min(720px, 100%); max-height: calc(100dvh - 40px); min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; }
+.online-player-access-modal > :not(.online-player-access-list) { flex-shrink: 0; }
+.online-player-access-list { flex: 1 1 auto; min-height: 100px; overflow-y: auto; overscroll-behavior: contain; }
+.online-player-access-modal p { margin: 0 0 6px; }
+.online-player-access-footer { position: sticky; bottom: -1px; background: white; padding: 8px 0 0; }
+.online-player-access-list input[readonly] { min-width: 0; width: 100%; }
+@media (max-width: 600px) { .prototype-modal.online-player-access-modal { max-height: calc(100dvh - 24px); padding: 14px; } }

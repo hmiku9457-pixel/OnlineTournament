@@ -291,7 +291,10 @@ try {
   await playerC.goto(claraLink);await playerD.goto(dieterLink);
   await playerC.getByRole('heading',{name:'Clara',exact:true}).waitFor();
   await playerD.getByRole('heading',{name:'Dieter',exact:true}).waitFor();
+  // Check the footer remains usable on short laptop/mobile viewports.
+  await a.setViewportSize({width: 768,height: 560});
   await playerModal.getByRole('button',{name:'Schließen'}).click();
+  await a.setViewportSize({width: 1280,height: 900});
   // A fresh anonymous browser sees only the allowlisted progress projection.
   const spectator=await browser.newContext();
   await install(spectator);
