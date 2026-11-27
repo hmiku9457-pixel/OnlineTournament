@@ -48,7 +48,9 @@ let outstandingCommits = 0;
 let flushScheduled = false;
 let writeTail: Promise<void> = Promise.resolve();
 let channel: BroadcastChannel | null = null;
-let remote: { id: string; save: (snapshot: TournamentBackup) => Promise<void>; confirmed: Map<string, string> } | null = null;
+export class RemoteWriteUnavailableError extends Error {}
+interface RemoteRecovery { snapshot: TournamentBackup; values: Map<string, string>; retryable: boolean }
+let remote: { id: string; save: (snapshot: TournamentBackup) => Promise<void>; confirmed: Map<string, string>; recovery?: RemoteRecovery; invalidated?: boolean } | null = null;
 
 function nativeStorage(): Storage { return window.localStorage; }
 function allLocalKeys(): string[] {
@@ -342,14 +344,18 @@ export function flushPendingLocalTournamentWrites(): Promise<void> {
   writeTail = writeTail.then(async () => {
     if (!target || !captured) return commitChanges(snapshot);
     if (currentError) throw new Error(currentError);
+    let attempted: TournamentBackup | undefined;
     try {
       const ids: unknown = JSON.parse(captured.get(INDEX) ?? '[]');
       if (!Array.isArray(ids) || ids.length !== 1 || ids[0] !== target.id)
         throw new Error('Online-Turniere können hier nicht gelöscht oder ersetzt werden.');
-      await target.save(captureFromStorage(target.id, (key) => captured.get(key) ?? null));
+      attempted = captureFromStorage(target.id, (key) => captured.get(key) ?? null);
+      await target.save(attempted);
       if (!currentError) target.confirmed = captured;
     } catch (error) {
       if (!currentError) workingValues = new Map(target.confirmed);
+      if (!target.invalidated && attempted) target.recovery = { snapshot: attempted, values: captured,
+        retryable: error instanceof RemoteWriteUnavailableError && outstandingCommits === 1 && pendingChanges.size === 0 };
       pendingChanges.clear();
       signalError('Online-Speicherung nicht bestätigt. Bitte neu laden und den Datenbankstand prüfen. ' +
         (error instanceof Error ? error.message : ''));
@@ -513,7 +519,7 @@ export function initializeRemoteTournamentStorage(input: unknown, save: (snapsho
   remote = { id: backup.tournamentId, save, confirmed: new Map(workingValues) };
   ready = true;
   window.addEventListener('beforeunload', (event) => {
-    if (hasPendingRemoteWrites()) { event.preventDefault(); event.returnValue = ''; }
+    if (hasPendingRemoteWrites() || remote?.recovery) { event.preventDefault(); event.returnValue = ''; }
   });
 }
 export function prestartRecoveryStorageKey(id: string): string {
@@ -522,11 +528,47 @@ export function prestartRecoveryStorageKey(id: string): string {
 export function hasPendingRemoteWrites(): boolean {
   return remote !== null && (pendingChanges.size > 0 || outstandingCommits > 0);
 }
+export function getRemoteRecovery(): { retryable: boolean; snapshot: TournamentBackup } | null {
+  const recovery = remote?.recovery;
+  return recovery ? { retryable: recovery.retryable, snapshot: recovery.snapshot } : null;
+}
+/** Re-send only the exact failed operation, never merge or overwrite newer data. */
+export async function retryRemoteTournamentWrite(): Promise<void> {
+  const target = remote;
+  const recovery = target?.recovery;
+  if (!target || !recovery?.retryable || target.invalidated || hasPendingRemoteWrites())
+    throw new Error('Diese Speicherung kann nicht automatisch wiederholt werden.');
+  outstandingCommits += 1;
+  window.dispatchEvent(new Event('tournament-storage-integrity-change'));
+  try {
+    await target.save(recovery.snapshot);
+    if (target.invalidated) throw new Error('Die Anmeldung hat sich geändert.');
+    target.confirmed = new Map(recovery.values);
+    workingValues = new Map(recovery.values);
+    target.recovery = undefined;
+    writeTail = Promise.resolve();
+    signalError('');
+    window.dispatchEvent(new Event('tournament-canonical-refresh'));
+    window.dispatchEvent(new Event('mock-runtime-change'));
+    window.dispatchEvent(new Event('mock-phase-change'));
+  } catch (error) {
+    if (!target.invalidated) {
+      recovery.retryable = error instanceof RemoteWriteUnavailableError;
+      signalError('Online-Speicherung nicht bestätigt. ' + (error instanceof Error ? error.message : ''));
+    }
+    throw error;
+  } finally {
+    outstandingCommits -= 1;
+    window.dispatchEvent(new Event('tournament-storage-integrity-change'));
+  }
+}
 export function invalidateRemoteTournamentStorage(): void {
   if (!remote) return;
   workingValues.clear();
   pendingChanges.clear();
   remote.confirmed.clear();
+  remote.invalidated = true;
+  remote.recovery = undefined;
   signalError('Die Anmeldung hat sich geändert. Bitte den Online-Arbeitsbereich schließen und erneut anmelden.');
 }
 /** Restore only into an empty tournament ID. No existing tournament is overwritten. */

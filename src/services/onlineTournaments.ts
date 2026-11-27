@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { backupTournamentName, captureTournamentBackup, validateTournamentBackup,
-  initializeRemoteTournamentStorage, invalidateRemoteTournamentStorage, initialTournamentBackup, type TournamentBackup } from '@/services/localTournamentStorage';
+  initializeRemoteTournamentStorage, invalidateRemoteTournamentStorage, initialTournamentBackup, RemoteWriteUnavailableError, type TournamentBackup } from '@/services/localTournamentStorage';
 
 import { buildNewTournament, type CreateMockTournamentInput } from '@/services/mockTournamentStore';
 import type { DemoTournament } from '@/data/demoTournaments';
@@ -10,6 +10,7 @@ interface OnlineTournament extends OnlineTournamentSummary { payload: Tournament
 async function account() {
   if (!supabase) throw new Error('Supabase ist nicht eingerichtet.');
   const { data, error } = await supabase.auth.getUser();
+  if (error && (error.name === 'AuthRetryableFetchError' || error.status === 0 || (error.status ?? 0) >= 500)) throw new RemoteWriteUnavailableError('Verbindung zur Anmeldung unterbrochen.');
   if (error || !data.user || data.user.is_anonymous) throw new Error('Bitte zuerst anmelden.');
   return { client: supabase, userId: data.user.id };
 }
@@ -33,13 +34,16 @@ async function commit(backup: TournamentBackup, expected: number, ownerId: strin
   for (let attempt = 0; attempt < 2; attempt++) {
     const { client, userId } = await account();
     if (userId !== ownerId) throw new Error('Die Anmeldung hat sich geändert.');
-    const { data, error } = await client.rpc('commit_online_tournament', args);
+    const { data, error, status } = await client.rpc('commit_online_tournament', args).abortSignal(AbortSignal.timeout(12000));
     if (!error) {
       if (data !== expected + 1) throw new Error('Unerwartete Datenbankrevision.');
       return data as number;
     }
     if (error.code === '40001') throw new Error('Ein anderer Arbeitsbereich hat das Turnier geändert.');
-    if (attempt === 0 && !error.code) continue;
+    if (status === 0 || status >= 500 || !error.code) {
+      if (attempt === 0) continue;
+      throw new RemoteWriteUnavailableError('Keine eindeutige Speicherbestätigung erhalten.');
+    }
     throw new Error(error.message || 'Verbindungsfehler.');
   }
   throw new Error('Speicherung nicht bestätigt.');
@@ -86,7 +90,13 @@ export async function initializeOnlineWorkspace(id: string): Promise<void> {
   const loaded = await load(id);
   let revision = loaded.revision;
   if ((await account()).userId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
-  initializeRemoteTournamentStorage(loaded.payload, async (snapshot) => { revision = await commit(snapshot, revision, userId); });
+  let pending: { snapshot: TournamentBackup; operationId: string } | undefined;
+  initializeRemoteTournamentStorage(loaded.payload, async (snapshot) => {
+    if (pending && pending.snapshot !== snapshot) throw new Error('Eine frühere Speicheranfrage ist noch ungeklärt.');
+    pending ??= { snapshot, operationId: crypto.randomUUID() };
+    revision = await commit(snapshot, revision, userId, pending.operationId);
+    pending = undefined;
+  });
   client.auth.onAuthStateChange((_event, session) => {
     if (!session || session.user.id !== userId) invalidateRemoteTournamentStorage();
   });

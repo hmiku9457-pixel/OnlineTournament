@@ -41,3 +41,27 @@ jobs:
             sleep 1
           done
           node scripts/creation-browser-smoke.mjs
+
+  online-browser-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Install Chromium test runtime
+        run: |
+          npm install --no-save --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium
+      - name: Test online client with simulated Supabase HTTP responses
+        env:
+          VITE_SUPABASE_URL: https://online-smoke.supabase.co
+          VITE_SUPABASE_ANON_KEY: smoke-public-key
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4174 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4174/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/online-browser-smoke.mjs
