@@ -12,7 +12,7 @@ import { readWithdrawnParticipants } from '@/services/mockWithdrawals';
  * The database validates the allowlist and returns only the capability's row. */
 export function buildOnlinePersonalContexts(t:DemoTournament,matches:readonly MockRuntimeMatch[]):Record<string,OnlinePersonalContext>{
  const state=getPhaseLifecycle(t);
- const roster=t.participantNames;
+ const roster=t.participantNames??[];
  const withdrawn=new Set(readWithdrawnParticipants()[t.id]??[]);
  const times=getMockPlayedFinishTimes(matches);
  const final=new Map(getMockConfirmedFinalStandings(t).map(row=>[row.name,row]));
