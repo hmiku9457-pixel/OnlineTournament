@@ -35,3 +35,6 @@ Every update now requires a private event-scoped token and a live 90-second leas
 
 ## Online catalog and archive
 Owner-only catalog exposes status, archive timestamp and lease state (not lease tokens). Archiving is reversible metadata and does not increment sporting revisions or discard checkpoints. The event lock serializes archive with claims/commits, and active leases and running/paused events cannot be archived. Archived events cannot acquire an editor lease. Confirmed JSON export is read-only. The backup envelope now rejects missing required fields on new inserts. Existing backup rows are preserved.
+
+## Unlisted spectator preview
+Explicit opt-in in the online catalog creates a random UUID capability. The public read RPC constructs a fixed projection from the current confirmed database revision; it never exposes the snapshot, participants, credentials, lease tokens, or operation journal. It shows tournament/phase names and aggregate progress only. Revoking, rotating or archiving invalidates the link. Previously observed information cannot be recalled. The public page polls every 15 seconds and clears the last view on failure/revocation. No player login, standings, per-match public data or public writes yet. Links use a hash fragment; no public directory.

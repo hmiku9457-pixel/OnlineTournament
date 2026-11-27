@@ -218,3 +218,17 @@ export async function initializeOnlineWorkspace(id: string): Promise<PendingOnli
   });
   return [];
 }
+
+export async function manageOnlineSpectator(id:string, action:'read'|'enable'|'disable'|'rotate'):Promise<string|null> {
+  const {client,userId}=await account();
+  const {data,error}=await client.rpc('manage_online_spectator',{p_id:id,p_action:action});
+  if(error)throw new Error(error.message);
+  if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
+  if(data!==null && typeof data!=='string')throw new Error('Ungültige Zuschauerfreigabe.');
+  return data as string|null;
+}
+export function onlineSpectatorUrl(token:string):string {
+  const url=new URL(window.location.href);
+  url.search='';url.hash='/watch/'+token;
+  return url.href;
+}

@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createHashRouter, RouterProvider } from 'react-router-dom';
 import App from './App';
+import { OnlineSpectatorPage } from './pages/OnlineSpectatorPage';
 import { OnlineRecoveryPage } from './pages/OnlineRecoveryPage';
 import { OnlineWorkspaceApp } from './pages/OnlineWorkspaceApp';
 import { initializeOnlineWorkspace, localOverviewUrl, WorkspaceBusyError } from './services/onlineTournaments';
@@ -21,6 +22,8 @@ const onlineId = new URLSearchParams(window.location.search).get('online');
 const root = createRoot(document.getElementById('root')!);
 const router = createHashRouter([{ path: '*', element: onlineId ? <OnlineWorkspaceApp id={onlineId} /> : <App /> }]);
 async function boot() {
+  const spectator=window.location.hash.match(/^#\/watch\/([^/?#]+)$/);
+  if(spectator){root.render(<StrictMode><OnlineSpectatorPage token={spectator[1]}/></StrictMode>);return;}
   if (onlineId !== null) {
     root.render(<main className="main"><p role="status">Online-Turnier wird geladen …</p></main>);
     try {

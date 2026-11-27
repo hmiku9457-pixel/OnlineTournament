@@ -13,6 +13,9 @@ declare
   v_corrected jsonb;
   v_later jsonb;
   v_match jsonb;
+  spectator uuid;
+  rotated uuid;
+  projection jsonb;
   lease1 uuid := '20000000-0000-4000-8000-000000000001';
   lease2 uuid := '20000000-0000-4000-8000-000000000002';
   op1 uuid := '10000000-0000-4000-8000-000000000001';
@@ -34,10 +37,18 @@ begin
  perform set_config('request.jwt.claim.sub','00000000-0000-4000-8000-0000000000a1',true);
  if public.commit_online_tournament(v_id,'Test',0,op1,v_payload) <> 1 then raise exception 'create'; end if;
  if public.commit_online_tournament(v_id,'Test',0,op1,v_payload) <> 1 then raise exception 'retry'; end if;
+ if public.manage_online_spectator(v_id,'read') is not null then raise exception 'spectator enabled by default'; end if;
+ spectator:=public.manage_online_spectator(v_id,'enable');
+ if spectator is null or public.manage_online_spectator(v_id,'enable') is distinct from spectator then raise exception 'spectator enable not idempotent'; end if;
+ projection:=public.read_online_spectator(spectator);
+ if projection->>'name'<>'Test' or (projection->>'participantCount')::int<>2 or projection ?| array['payload','entries','participantNames','participantCodes','id','owner_id'] then raise exception 'invalid spectator projection'; end if;
+ rotated:=public.manage_online_spectator(v_id,'rotate');
+ if rotated=spectator or public.read_online_spectator(spectator) is not null then raise exception 'old link valid'; end if;
  if not public.set_online_tournament_archive(v_id,1,true) then raise exception 'archive failed'; end if;
  if not exists(select 1 from public.catalog_online_tournaments() c where c.id=v_id and c.archived_at is not null and c.status='READY') then raise exception 'archive catalog'; end if;
  if public.load_online_tournament(v_id)->'payload' is distinct from v_payload then raise exception 'archived backup unavailable'; end if;
  begin perform public.claim_online_workspace(v_id,lease1,false); raise exception 'archived event claimed'; exception when object_not_in_prerequisite_state then null; end;
+ if public.read_online_spectator(rotated) is not null then raise exception 'archive did not revoke spectator'; end if;
  if not public.set_online_tournament_archive(v_id,1,false) then raise exception 'unarchive failed'; end if;
  begin perform public.set_online_tournament_archive(v_id,0,true); raise exception 'stale archive accepted'; exception when serialization_failure then null; end;
  if not public.claim_online_workspace(v_id,lease1,false) then raise exception 'claim failed'; end if;
@@ -95,6 +106,7 @@ begin
  if not public.claim_online_workspace(v_id,lease2,false) then raise exception 'takeover after release failed'; end if;
  begin perform public.commit_leased_online_tournament(v_id,'Test',29,gen_random_uuid(),v_later,lease1); raise exception 'old token accepted'; exception when lock_not_available then null; end;
  perform set_config('request.jwt.claim.sub','00000000-0000-4000-8000-0000000000b2',true);
+ begin perform public.manage_online_spectator(v_id,'enable'); raise exception 'foreign spectator enabled'; exception when insufficient_privilege then null; end;
  begin perform public.set_online_tournament_archive(v_id,29,true); raise exception 'foreign archive accepted'; exception when insufficient_privilege then null; end;
  if exists(select 1 from public.catalog_online_tournaments() c where c.id=v_id) then raise exception 'foreign catalog visible'; end if;
  begin perform public.claim_online_workspace(v_id,lease2,false); raise exception 'foreign lease claimed'; exception when insufficient_privilege then null; end;
@@ -126,5 +138,19 @@ begin
   begin perform public.set_online_tournament_archive(v_id,30,true); raise exception 'running event archived'; exception when invalid_parameter_value then null; end;
   begin insert into public.tournament_backups(tournament_id,tournament_name,payload) values(v_id,'Broken','{}'); raise exception 'invalid backup accepted'; exception when check_violation then null; end;
 end $$;
+select set_config('test.spectator_token',public.manage_online_spectator('local-rpc-test','enable')::text,true);
+reset role;
+set local role anon;
+do $$
+declare token uuid:=current_setting('test.spectator_token')::uuid; projection jsonb;
+begin
+ projection:=public.read_online_spectator(token);
+ if projection is null or (projection->>'revision')::integer<>30 or (projection->>'recordedResults')::integer<>1 then raise exception 'anonymous public read failed'; end if;
+ if public.read_online_spectator(gen_random_uuid()) is not null then raise exception 'unknown token readable'; end if;
+ if has_function_privilege('anon','public.manage_online_spectator(text,text)','EXECUTE') or has_function_privilege('anon','public.load_online_tournament(text)','EXECUTE') or has_table_privilege('anon','tournament_private.online_tournaments','SELECT') then raise exception 'anon private access'; end if;
+end $$;
+reset role;
+set local role authenticated;
+select public.manage_online_spectator('local-rpc-test','disable');
 rollback;
 select 'create, retry, update, conflict, owner isolation passed' as result;
