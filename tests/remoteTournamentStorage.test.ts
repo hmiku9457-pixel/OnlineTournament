@@ -188,6 +188,89 @@ describe('isolated remote tournament persistence', () => {
     expect(JSON.parse(persisted.entries['online-tournament:mock-match-results:v2'])).toHaveLength(6);
     expect(data.get('online-tournament:mock-match-results:v2') ?? '').not.toContain(t.id);
   });
+  it('continues a multi-day Swiss event across reloads and round approvals', async () => {
+    const { adapter } = await setup();
+    const store = await import('@/services/mockTournamentStore');
+    const lifecycle = await import('@/services/mockPhaseLifecycle');
+    const runtime = await import('@/services/mockRuntime');
+    const breaks = await import('@/services/mockInlineBreak');
+    const t=store.buildNewTournament({name:'Schweizer Online',sport:'table_tennis',discipline:'SINGLES',tables:2,minimumMatches:1,estimatedDurationMinutes:120,
+      tournamentMode:'multi',plannedDays:2,participantNames:['Anna','Bernd','Clara','Dieter'],
+      phases:[{type:'SWISS',label:'Schweizer',entrantCount:4,groupCount:1,bestOf:1,swissRounds:2,knockoutBestOf:[],dayBreaks:[{afterRound:1,date:'2031-11-21',time:'09:00'}]}]});
+    let saved=adapter.initialTournamentBackup(t);
+    adapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);});
+    expect(lifecycle.startFirstStage(t)).toBe(true);
+    store.updateMockTournamentStatus(t.id,'RUNNING');
+    await adapter.flushPendingLocalTournamentWrites();
+    const score=[{number:1,sideAScore:11,sideBScore:6}];
+    for(const match of runtime.getMockStageMatches(t,t.stages[0])) {
+      runtime.completeMockMatch(match.id,score); await adapter.flushPendingLocalTournamentWrites();
+    }
+    expect(runtime.approveMockProgress(t)?.kind).toBe('ROUND');
+    await adapter.flushPendingLocalTournamentWrites();
+    expect(runtime.getMockStageMatches(t,t.stages[0]).some(m=>m.round==='Runde 2')).toBe(false);
+    expect(breaks.startInlineBreak(t,t.stages[0],[],{kind:'minutes',minutes:15})).toBe(true);
+    store.updateMockTournamentStatus(t.id,'PAUSED');
+    await adapter.flushPendingLocalTournamentWrites();
+    vi.resetModules();
+    const nextAdapter=await import('@/services/localTournamentStorage');
+    const nextRuntime=await import('@/services/mockRuntime');
+    const nextStore=await import('@/services/mockTournamentStore');
+    const nextBreaks=await import('@/services/mockInlineBreak');
+    nextAdapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);});
+    const paused=nextStore.getMockTournament(t.id);
+    expect(paused.status).toBe('PAUSED');
+    expect(nextBreaks.getInlineBreakStatus(paused,paused.stages[0])?.state).toBe('running');
+    expect(nextBreaks.finishInlineBreak(paused,paused.stages[0],true)).toBe(true);
+    nextStore.updateMockTournamentStatus(t.id,'RUNNING');
+    await nextAdapter.flushPendingLocalTournamentWrites();
+    const active=nextStore.getMockTournament(t.id);
+    const second=nextRuntime.getMockStageMatches(active,active.stages[0]).filter(m=>m.round==='Runde 2');
+    expect(second).toHaveLength(2);
+    for(const match of second){nextRuntime.completeMockMatch(match.id,score);await nextAdapter.flushPendingLocalTournamentWrites();}
+    expect(nextRuntime.approveMockProgress(active)?.kind).toBe('STAGE');
+    await nextAdapter.flushPendingLocalTournamentWrites();
+    expect(nextStore.getMockTournament(t.id).status).toBe('FINISHED');
+  });
+  it('preserves group qualifiers and runs a knockout after a new workspace is opened', async () => {
+    const { adapter }=await setup();
+    const store=await import('@/services/mockTournamentStore');
+    const lifecycle=await import('@/services/mockPhaseLifecycle');
+    const runtime=await import('@/services/mockRuntime');
+    const t=store.buildNewTournament({name:'Gruppen und Finale',sport:'table_tennis',discipline:'SINGLES',tables:2,minimumMatches:1,estimatedDurationMinutes:60,participantNames:['Anna','Bernd','Clara','Dieter'],
+      phases:[{type:'GROUPS',label:'Gruppen',entrantCount:4,groupCount:2,swissRounds:1,bestOf:1,knockoutBestOf:[]},
+        {type:'KNOCKOUT',label:'Finale',entrantCount:2,groupCount:1,swissRounds:1,bestOf:1,knockoutBestOf:[1]}]});
+    let saved=adapter.initialTournamentBackup(t);
+    adapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);});
+    expect(lifecycle.startFirstStage(t)).toBe(true);
+    store.updateMockTournamentStatus(t.id,'RUNNING');
+    await adapter.flushPendingLocalTournamentWrites();
+    const score=[{number:1,sideAScore:11,sideBScore:7}];
+    for(const match of runtime.getMockStageMatches(t,t.stages[0])) {
+      runtime.completeMockMatch(match.id,score);await adapter.flushPendingLocalTournamentWrites();
+    }
+    expect(runtime.approveMockProgress(t)?.kind).toBe('STAGE');
+    await adapter.flushPendingLocalTournamentWrites();
+    vi.resetModules();
+    const nextAdapter=await import('@/services/localTournamentStorage');
+    const nextRuntime=await import('@/services/mockRuntime');
+    const nextStore=await import('@/services/mockTournamentStore');
+    const nextLifecycle=await import('@/services/mockPhaseLifecycle');
+    nextAdapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);});
+    const paused=nextStore.getMockTournament(t.id);
+    expect(paused.status).toBe('PAUSED');
+    expect(nextLifecycle.startStage(paused,paused.stages[1])).toBe(true);
+    nextStore.updateMockTournamentStatus(t.id,'RUNNING');
+    await nextAdapter.flushPendingLocalTournamentWrites();
+    const active=nextStore.getMockTournament(t.id);
+    const final=nextRuntime.getMockStageMatches(active,active.stages[1]);
+    expect(final).toHaveLength(1);
+    nextRuntime.completeMockMatch(final[0].id,score);
+    await nextAdapter.flushPendingLocalTournamentWrites();
+    expect(nextRuntime.approveMockProgress(active)?.isLastStage).toBe(true);
+    await nextAdapter.flushPendingLocalTournamentWrites();
+    expect(nextStore.getMockTournament(t.id).status).toBe('FINISHED');
+  });
   it('does not persist a replacement or deletion of the online event', async () => {
     const { adapter, backup } = await setup();
     const save = vi.fn(async () => {});
