@@ -1,6 +1,7 @@
 import { sportScoring,validateCompleteResult } from '@/domain/sportScoring';
 import type { MatchSet } from '@/domain/types';
-import { useEffect,useState } from 'react';
+import { useEffect,useRef,useState } from 'react';
+import { getPlayerCalls,newPlayerCalls,playerRefreshDelay } from '@/domain/playerCalls';
 import { supabase } from '@/lib/supabase';
 import { displayVenueMessage } from '@/domain/venueTerminology';
 interface Match {sideA:string;sideB:string;phase:string;round:string;status:string;table:string;score:string;sets:Array<{sideAScore:number;sideBScore:number}>}
@@ -15,31 +16,59 @@ export function OnlinePlayerPage({token}:{token:string}) {
  const [refreshVersion,setRefreshVersion]=useState(0);
  const [filter,setFilter]=useState('all');
  const [page,setPage]=useState(0);
+ const [lastChecked,setLastChecked]=useState<number|null>(null);
+ const [refreshing,setRefreshing]=useState(false);
+ const [vibration,setVibration]=useState(false);
+ const vibrationRef=useRef(false);
+ const previousCalls=useRef<string[]|null>(null);
+ const [acknowledged,setAcknowledged]=useState<string[]>([]);
+ const [newCallText,setNewCallText]=useState('');
  useEffect(()=>{
-  let alive=true,running=false;
+  let alive=true,running=false,failures=0,timer:number|undefined;
+  function schedule(){if(alive){window.clearTimeout(timer);timer=window.setTimeout(()=>void refresh(),playerRefreshDelay(document.visibilityState==='visible',failures));}}
   async function refresh(){
    if(!alive||running)return;
    if(!supabase||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){setData(null);setReports([]);setMessage('Spielerlink ungültig.');return;}
-   running=true;
+   running=true;setRefreshing(true);
    try{
-    const [result,reportResult]=await Promise.all([supabase.rpc('read_online_player_access',{p_token:token}).abortSignal(AbortSignal.timeout(8000)),supabase.rpc('read_online_player_reports',{p_token:token}).abortSignal(AbortSignal.timeout(8000))]);
+    const result=await supabase.rpc('read_online_player_bundle',{p_token:token}).abortSignal(AbortSignal.timeout(8000));
     if(!alive)return;
     if(result.error)throw new Error(result.error.message);
-    setReports(result.data&&!reportResult.error&&Array.isArray(reportResult.data)?reportResult.data.filter((r:Report)=>r.revision===result.data.revision):[]);
-    setData(result.data as PlayerView|null);setMessage(result.data?'':'Dieser Spielerlink ist nicht mehr verfügbar.');
-   }catch{if(alive){setData(null);setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
-   finally{running=false;}
+    const view=result.data?.view as PlayerView|null;
+    const raw=result.data?.reports;
+    setReports(view&&Array.isArray(raw)?raw.filter((r:Report)=>r.revision===view.revision):[]);
+    setData(view);setLastChecked(Date.now());failures=0;
+    setMessage(view?'':'Dieser Spielerlink ist nicht mehr verfügbar.');
+    if(!view){previousCalls.current=null;setAcknowledged([]);setNewCallText('');}
+    else if(view.matches!==null){
+      const calls=getPlayerCalls(view.matches,view.participant);
+      const added=newPlayerCalls(previousCalls.current,calls);
+      previousCalls.current=calls.map(c=>c.key);
+      setAcknowledged(old=>old.filter(k=>calls.some(c=>c.key===k)));
+      if(added.length){
+        setNewCallText('Neuer Spielaufruf: '+added.map(c=>displayVenueMessage(view.sport,c.table)+' gegen '+c.opponent).join(' · '));
+        if(vibrationRef.current&&document.visibilityState==='visible'&&typeof navigator.vibrate==='function')navigator.vibrate([180,100,180]);
+      } else if(!calls.length)setNewCallText('');
+    }
+   }catch{if(alive){failures++;setData(null);setReports([]);setNewCallText('');setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
+   finally{running=false;if(alive){setRefreshing(false);schedule();}}
   }
-  void refresh();const timer=window.setInterval(()=>void refresh(),10000);
-  const focus=()=>void refresh();
-  window.addEventListener('focus',focus);window.addEventListener('online',focus);
-  return()=>{alive=false;window.clearInterval(timer);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);};
+  const focus=()=>{window.clearTimeout(timer);if(!running)void refresh();};
+  void refresh();
+  window.addEventListener('focus',focus);window.addEventListener('online',focus);document.addEventListener('visibilitychange',focus);
+  return()=>{alive=false;window.clearTimeout(timer);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);document.removeEventListener('visibilitychange',focus);};
  },[token,refreshVersion]);
+ const calls=data&&data.matches?getPlayerCalls(data.matches,data.participant):[];
  const rows=(data?.matches??[]).filter(m=>filter==='all'||(filter==='active'?active(m.status):m.status===filter));
  const lastPage=Math.max(0,Math.ceil(rows.length/25)-1),currentPage=Math.min(lastPage,page);
  return <main className="main online-spectator">
  {!data?<section className="card"><h1>Persönliche Spielübersicht</h1><p role="status">{message}</p></section>:<>
  <header className="dashboard-page-hero"><div><h1>{data.participant}</h1><p>{data.name} · {data.sport}</p></div><span className="badge">Spieleransicht</span></header>
+ <section className="card player-call-panel"><div className="actions"><h2>Meine Spielaufrufe</h2><button className="btn small" disabled={refreshing} onClick={()=>setRefreshVersion(v=>v+1)}>{refreshing?'Aktualisiere …':'Jetzt aktualisieren'}</button></div>
+ {newCallText&&<p role="status" className="player-call-notice">{newCallText}</p>}
+ {data.matches===null?<p className="muted">Spielaufrufe werden für den aktuellen Stand aktualisiert.</p>:calls.length===0?<p>Momentan kein zugewiesenes Spiel.</p>:calls.map(call=><article className="player-call-card" key={call.key}><span className="muted">Bitte zur Spielfläche</span><strong className="player-call-table">{displayVenueMessage(data.sport,call.table)}</strong><strong>gegen {call.opponent}</strong><span>{call.phase} · {call.round}</span><button className="btn small" disabled={acknowledged.includes(call.key)} onClick={()=>{setAcknowledged(old=>[...old,call.key]);setNewCallText('');}}>{acknowledged.includes(call.key)?'Gesehen':'Aufruf gesehen'}</button></article>)}
+ {typeof navigator.vibrate==='function'&&<label><input type="checkbox" checked={vibration} onChange={e=>{vibrationRef.current=e.target.checked;setVibration(e.target.checked);if(e.target.checked)navigator.vibrate(80);}}/> Vibration bei neuen Spielaufrufen (geöffnete Ansicht)</label>}
+ <p className="muted">{lastChecked?'Zuletzt geprüft: '+new Date(lastChecked).toLocaleTimeString('de-DE'):'Noch nicht geprüft'}. Bitte halte die Ansicht geöffnet. Keine Hintergrund-Push-Nachrichten.</p></section>
  {reports.length>0&&<section className="card"><h2>Ergebnis melden</h2><p>Beide Seiten müssen denselben Endstand melden. Erst die Turnierleitung übernimmt das verbindliche Ergebnis.</p>{reports.map(r=><ReportForm key={r.matchId+'-'+r.revision} report={r} sport={data.sport} token={token} onSaved={()=>setRefreshVersion(v=>v+1)}/>)}</section>}
  <section className="card"><h2>Meine Spiele</h2>
  {data.matches===null?<p role="status">Die Spielübersicht wird für die aktuelle Revision aktualisiert. Bitte warte auf die Turnierleitung.</p>:<>
@@ -57,7 +86,7 @@ export function OnlinePlayerPage({token}:{token:string}) {
  {lastPage>0&&<div className="actions"><button className="btn" disabled={!currentPage} onClick={()=>setPage(currentPage-1)}>Zurück</button><span>Seite {currentPage+1}/{lastPage+1}</span><button className="btn" disabled={currentPage===lastPage} onClick={()=>setPage(currentPage+1)}>Weiter</button></div>}
  </>}
  </section>
- <p className="muted">Bestätigter Stand: {new Date(data.updatedAt).toLocaleString('de-DE')} · Revision {data.revision} · Aktualisierung alle 10 Sekunden. Gib diesen persönlichen Link nicht weiter.</p>
+ <p className="muted">Bestätigter Stand: {new Date(data.updatedAt).toLocaleString('de-DE')} · Revision {data.revision} · Aktualisierung bei sichtbarer Ansicht etwa alle 4 Sekunden. Gib diesen persönlichen Link nicht weiter.</p>
  </>}
  </main>;
 }

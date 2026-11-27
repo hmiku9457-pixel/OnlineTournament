@@ -69,6 +69,23 @@ async function install(context) {
       for(const key of reports.keys())if(key.startsWith(body.p_id+'|'+body.p_match_id+'|'))reports.delete(key);
       return send(true);
     }
+    if(path.endsWith('/batch_online_player_access')) {
+      assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
+      if(!playerLinks.has(body.p_id))playerLinks.set(body.p_id,new Map());
+      const links=playerLinks.get(body.p_id);
+      for(const pid of body.p_ids){if(body.p_action==='disable')links.delete(pid);else if(!links.has(pid))links.set(pid,crypto.randomUUID());}
+      return send(body.p_ids.length);
+    }
+    if(path.endsWith('/read_online_player_bundle')) {
+      const access=resolvePlayer(body.p_token);
+      if(!access)return send({view:null,reports:[]});
+      const {id,pid}=access,row=rows.get(id),t=record(id);
+      const names=Object.fromEntries(Object.entries(t.participantIds).map(([name,id])=>[id,name]));
+      const participant=names[pid];
+      if(!participant)return send({view:null,reports:[]});
+      const projection=playerRows.get(id),current=projection?.revision===row.revision;
+      return send({view:{name:row.name,participant,sport:t.sport,status:t.status,revision:row.revision,updatedAt:row.updated_at,complete:current?projection.total===projection.matches.length:null,matches:current?projection.matches.filter(m=>m.sideA===participant||m.sideB===participant):null},reports:currentReportRows(id).filter(r=>[r.aId,r.bId].includes(pid)).map(r=>({matchId:r.matchId,side:r.aId===pid?'A':'B',sideA:names[r.aId],sideB:names[r.bId],bestOf:r.bestOf,requiresWinner:r.requiresWinner,revision:r.revision,aSets:r.aSets,bSets:r.bSets}))});
+    }
     if(path.endsWith('/list_online_player_access')) {
       assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
       return send(Object.entries(record(body.p_id).participantIds).map(([name,participant_id])=>({name,participant_id,token:playerLinks.get(body.p_id)?.get(participant_id)??null})));
@@ -263,9 +280,11 @@ try {
   // Prepare a second pair for the bulk adoption scenario.
   const clara=playerModal.locator('article').filter({hasText:'Clara'});
   const dieter=playerModal.locator('article').filter({hasText:'Dieter'});
-  await clara.getByRole('button',{name:'Zugang erstellen'}).click();
+  await playerModal.getByRole('button',{name:'Alle fehlenden Zugänge erstellen'}).click();
+  await playerModal.getByRole('dialog',{name:'Sammeländerung Spielerzugänge'}).getByRole('button',{name:'Sammeländerung bestätigen'}).click();
+  await playerModal.getByRole('dialog',{name:'Sammeländerung Spielerzugänge'}).waitFor({state:'hidden'});
+  assert.equal(await anna.getByRole('link',{name:'Öffnen'}).getAttribute('href'),personalLink);
   const claraLink=await clara.getByRole('link',{name:'Öffnen'}).getAttribute('href');
-  await dieter.getByRole('button',{name:'Zugang erstellen'}).click();
   const dieterLink=await dieter.getByRole('link',{name:'Öffnen'}).getAttribute('href');
   assert.ok(claraLink&&dieterLink);
   const playerC=await personal.newPage(),playerD=await personal.newPage();
@@ -341,6 +360,9 @@ try {
   if(await checkButton.isEnabled())await checkButton.click();
   await player.reload();
   await player.getByRole('heading',{name:'Ergebnis melden',exact:true}).waitFor({timeout:45000});
+  await player.locator('.player-call-card').getByText('Tisch 1',{exact:true}).waitFor({timeout:45000});
+  await player.getByRole('button',{name:'Aufruf gesehen',exact:true}).click();
+  await player.getByRole('button',{name:'Gesehen',exact:true}).waitFor();
   await player.getByLabel('Eigene Punkte 1',{exact:true}).fill('11');
   await player.getByLabel('Gegnerpunkte 1',{exact:true}).fill('8');
   await player.getByRole('button',{name:'Ergebnis prüfen'}).click();

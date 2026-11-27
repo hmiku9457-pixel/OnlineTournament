@@ -9299,3 +9299,11 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .online-spectator .dashboard-page-hero { margin-bottom: 0; }
 
 .online-report-score input { width: 76px; min-width: 0; text-align: center; }
+
+.player-call-panel { display: grid; gap: 10px; }
+.player-call-panel h2 { margin: 0; }
+.player-call-card { display: grid; gap: 5px; border: 2px solid #23885d; border-radius: 10px; padding: 14px; }
+.player-call-table { font-size: clamp(1.8rem, 7vw, 2.5rem); color: #23885d; }
+.player-call-notice { font-weight: 700; margin: 0; }
+.player-call-card .btn { justify-self: start; }
+@media (max-width: 600px) { .online-report-score { display: grid; grid-template-columns: 1fr minmax(55px, 75px) auto minmax(55px, 75px); align-items: center; } .online-report-score input { width: 100%; min-width: 0; } .player-call-card .btn { min-height: 40px; } }
