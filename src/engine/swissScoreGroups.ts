@@ -119,14 +119,24 @@ export function generateScoreGroupedSwissPairings(players: SwissScorePlayer[], b
 
   if (carry) {
     const carryState = state.get(carry)!;
-    if (carryState.byes === 0) {
+    const minimumByes = players.reduce((minimum, player) => Math.min(minimum, player.byes), carryState.byes);
+    if (carryState.byes === minimumByes) {
       pairings.push([carry, byeToken]);
     } else {
-      const swapIndex = pairings.findIndex(([, b]) => b !== byeToken && state.get(b)?.byes === 0);
-      if (swapIndex >= 0) {
-        const [a, b] = pairings[swapIndex];
-        pairings[swapIndex] = [a, carry];
-        pairings.push([b, byeToken]);
+      // A player on side A is just as eligible as one on side B.
+      // Prefer low-ranked eligible players and avoid introducing a rematch
+      // when moving the leftover player into their pairing.
+      const candidates: Array<{ index: number; side: 0 | 1; name: string; opponent: string }> = [];
+      for (let index = pairings.length - 1; index >= 0; index -= 1) {
+        const [a, b] = pairings[index];
+        if (state.get(b)?.byes === minimumByes) candidates.push({ index, side: 1, name: b, opponent: a });
+        if (state.get(a)?.byes === minimumByes) candidates.push({ index, side: 0, name: a, opponent: b });
+      }
+      const swap = candidates.find((candidate) => !carryState.opponents.has(candidate.opponent)) ?? candidates[0];
+      if (swap) {
+        const pair = pairings[swap.index];
+        pair[swap.side] = carry;
+        pairings.push([swap.name, byeToken]);
       } else {
         pairings.push([carry, byeToken]);
       }

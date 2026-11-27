@@ -43,4 +43,27 @@ describe('score grouped Swiss pairing', () => {
     expect(new Set(pairings.flat())).toEqual(new Set(['A', 'B', 'C', 'D']));
   });
 
+
+  it('does not repeat a bye when only side-A players are still eligible', () => {
+    const players = [
+      player('A', 2, 0, 0),
+      { ...player('B', 2, 0, 1), byes: 1 },
+      player('C', 2, 0, 2),
+      { ...player('D', 2, 0, 3), byes: 1 },
+      { ...player('E', 2, 0, 4), byes: 1 },
+    ];
+    const pairs = generateScoreGroupedSwissPairings(players);
+    const bye = pairs.find(([, b]) => b === 'Freilos');
+    expect(['A', 'C']).toContain(bye?.[0]);
+    expect(pairs.flat().filter(name => name !== 'Freilos').sort()).toEqual(['A', 'B', 'C', 'D', 'E']);
+  });
+
+  it('balances additional byes after every participant has received one', () => {
+    const players = [
+      { ...player('A', 2, 0, 0), byes: 1 },
+      { ...player('B', 2, 0, 1), byes: 2 },
+      { ...player('C', 2, 0, 2), byes: 2 },
+    ];
+    expect(generateScoreGroupedSwissPairings(players)).toContainEqual(['A', 'Freilos']);
+  });
 });
