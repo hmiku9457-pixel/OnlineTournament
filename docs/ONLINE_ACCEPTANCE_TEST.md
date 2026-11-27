@@ -37,3 +37,6 @@ Kein Datenverlust, keine fremden Daten, keine Doppelbuchung, keine unbemerkte Ko
 
 ## Noch nicht freigegeben
 Der Online-Modus ist ein privater Testbetrieb mit versionierten Snapshots. Keine vollständige serverseitige Neuberechnung aller Paarungen, Qualifikationen oder Sonderentscheidungen, kein verteiltes Bearbeitungslease, keine öffentlichen Spieler-/Zuschaueransichten. Die IndexedDB-Wiederherstellung schützt vor normalen Browserneustarts, nicht vor Löschung des Browserprofils oder Verlust des Geräts.
+
+## Erste Kurzabnahme
+Für den Einstieg reicht Block 1 und ein kleiner Ausschnitt von Block 2: ein Online-Turnier mit vier fiktiven Spielern erstellen, starten, ein Ergebnis speichern, Browser neu laden, Ergebnis und Tabelle prüfen. Die Anmeldung muss erstmals mit dem echten Supabase-Konto durch den Anwender bestätigt werden. Erst danach die übrigen Testblöcke durchführen. Vor dem Test prüfen, dass die GitHub-Pages-Auslieferung den gewünschten Commit enthält.

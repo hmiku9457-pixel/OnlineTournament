@@ -70,11 +70,11 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
       <p className="muted">Nur für Entwicklungstests. Spieler- und Zuschauerzugriff ist noch nicht öffentlich.</p>
     </section>
     {!error && <div inert={pending || !connected || revisionState==='stale'} aria-busy={pending}>
-      <Routes>
+      {revisionState!=='stale' && <Routes>
         <Route path="/tournaments/:tournamentId/control" element={<OnlineControl id={id} />} />
         <Route path="/score/:matchId" element={<ScoringPage />} />
         <Route path="*" element={<Navigate to={route} replace />} />
-      </Routes>
+      </Routes>}
     </div>}
   </main>;
 }
