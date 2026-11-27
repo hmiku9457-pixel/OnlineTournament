@@ -13,7 +13,7 @@ const exp = Math.floor(Date.now()/1000)+3600;
 const segment = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 const accessToken = segment({alg:'HS256',typ:'JWT'})+'.'+segment({sub:user.id,role:'authenticated',exp})+'.smoke';
 const session = { access_token: accessToken, refresh_token:'smoke-refresh', token_type:'bearer', expires_in:3600, expires_at:exp, user };
-const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), spectatorLinks = new Map(), detailSettings = new Set(), detailRows = new Map(), rankingRows = new Map(), bracketRows = new Map(), calls = [];
+const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), spectatorLinks = new Map(), detailSettings = new Set(), detailRows = new Map(), rankingRows = new Map(), bracketRows = new Map(), playerLinks = new Map(), playerRows = new Map(), calls = [];
 let loseResponses = 0;
 async function install(context) {
   await context.route(api+'/**', async route => {
@@ -26,6 +26,38 @@ async function install(context) {
     if(path==='/auth/v1/token') return send(session);
     if(path==='/auth/v1/user') return send(user);
     const body = req.method()==='POST' ? req.postDataJSON() : {};
+    const record=id=>JSON.parse(rows.get(id).payload.entries['online-tournament:local-prototype-tournaments:v1:record:'+id]).tournament;
+    if(path.endsWith('/list_online_player_access')) {
+      assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
+      return send(Object.entries(record(body.p_id).participantIds).map(([name,participant_id])=>({name,participant_id,token:playerLinks.get(body.p_id)?.get(participant_id)??null})));
+    }
+    if(path.endsWith('/manage_online_player_access')) {
+      assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
+      if(!playerLinks.has(body.p_id))playerLinks.set(body.p_id,new Map());
+      const links=playerLinks.get(body.p_id);
+      if(body.p_action==='disable')links.delete(body.p_participant_id);
+      else if(body.p_action==='rotate'||!links.has(body.p_participant_id))links.set(body.p_participant_id,crypto.randomUUID());
+      return send(links.get(body.p_participant_id)??null);
+    }
+    if(path.endsWith('/online_player_access_active'))return send((playerLinks.get(body.p_id)?.size??0)>0);
+    if(path.endsWith('/publish_online_player_projection')) {
+      if(!playerLinks.get(body.p_id)?.size)return send(false);
+      assert.equal(leases.get(body.p_id),body.p_token);
+      if(rows.get(body.p_id).revision!==body.p_revision)return send({code:'40001',message:'revision conflict'},409);
+      playerRows.set(body.p_id,{revision:body.p_revision,matches:body.p_matches,total:body.p_total});
+      return send(true);
+    }
+    if(path.endsWith('/read_online_player_access')) {
+      for(const [id,links] of playerLinks){
+        const pid=[...links].find(([,token])=>token===body.p_token)?.[0];
+        if(!pid||archives.has(id))continue;
+        const row=rows.get(id),t=record(id),participant=Object.entries(t.participantIds).find(([,value])=>value===pid)?.[0];
+        if(!participant)continue;
+        const projection=playerRows.get(id),current=projection?.revision===row.revision;
+        return send({name:row.name,participant,sport:t.sport,status:t.status,revision:row.revision,updatedAt:row.updated_at,complete:current?projection.total===projection.matches.length:null,matches:current?projection.matches.filter(m=>m.sideA===participant||m.sideB===participant):null});
+      }
+      return send(null);
+    }
     if(path.endsWith('/manage_online_spectator')) {
       assert.equal(req.headers()['authorization'],'Bearer '+accessToken,'only authenticated owner manages links');
       if(body.p_action==='disable'||body.p_action==='rotate'){spectatorLinks.delete(body.p_id);detailSettings.delete(body.p_id);detailRows.delete(body.p_id);rankingRows.delete(body.p_id);bracketRows.delete(body.p_id);}
@@ -165,6 +197,21 @@ try {
   await a.getByText('Keine passenden Online-Turniere vorhanden.').waitFor();
   await a.getByLabel('Anzeige',{exact:true}).selectOption('active');
   assert.equal(rows.get(id).revision,1);
+  // Player access is independent of the spectator link and contains only own matches.
+  const personal=await browser.newContext();
+  await install(personal);
+  const player=await personal.newPage();
+  await a.getByRole('button',{name:'Spielerzugänge',exact:true}).click();
+  const playerModal=a.getByRole('dialog',{name:/Spielerzugänge/});
+  const anna=playerModal.locator('article').filter({hasText:'Anna'});
+  await anna.getByRole('button',{name:'Zugang erstellen'}).click();
+  const personalLink=await anna.getByRole('link',{name:'Öffnen'}).getAttribute('href');
+  assert.ok(personalLink);
+  await player.goto(personalLink);
+  await player.getByRole('heading',{name:'Anna',exact:true}).waitFor();
+  await player.getByText(/Die Spielübersicht wird für die aktuelle Revision aktualisiert/).waitFor();
+  assert.equal(spectatorLinks.has(id),false);
+  await playerModal.getByRole('button',{name:'Schließen'}).click();
   // A fresh anonymous browser sees only the allowlisted progress projection.
   const spectator=await browser.newContext();
   await install(spectator);
@@ -208,6 +255,12 @@ try {
   await viewer.getByRole('heading',{name:'Ranglisten und Platzierungen'}).waitFor();
   await viewer.getByRole('cell',{name:'Anna',exact:true}).waitFor({timeout:45000});
   assert.equal(rankingRows.get(id).revision,rows.get(id).revision);
+  await player.reload();
+  await player.getByRole('heading',{name:'Meine Spiele'}).waitFor();
+  await player.getByText('gegen Bernd',{exact:true}).waitFor({timeout:45000});
+  assert.equal(await player.locator('article.online-catalog-row').count(),3);
+  assert.ok(playerRows.get(id).matches.length>3);
+  await personal.close();
   await viewer.getByLabel('Teilnehmer auswählen',{exact:true}).selectOption('Anna');
   await viewer.getByText(/Aktuelle und kommende Spiele von/).waitFor();
   assert.equal(await viewer.locator('article.online-catalog-row').filter({hasNotText:'Anna'}).count(),0);
