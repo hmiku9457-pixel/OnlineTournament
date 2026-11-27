@@ -31,7 +31,7 @@ import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
 import { getGroupQualificationHints } from '@/domain/groupQualification';
-import { filterControlMatches, filterControlQueueMatches, summarizeControlProgress, type ControlMatchFilters, type ControlMatchFilter, type ControlQueueFilters, type ControlQueueStatusFilter } from '@/domain/controlOverview';
+import { filterControlMatches, filterControlQueueMatches, orderControlQueue, summarizeControlQueue, summarizeControlProgress, type ControlQueueOrder, type ControlMatchFilters, type ControlMatchFilter, type ControlQueueFilters, type ControlQueueStatusFilter } from '@/domain/controlOverview';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
@@ -660,6 +660,7 @@ export function TournamentControlPage() {
   const [adminEditMatchId, setAdminEditMatchId] = useState<string | null>(null);
   const [matchFilters, setMatchFilters] = useState<ControlMatchFilters>({ status: 'all', phase: '', table: '', search: '' });
   const [queueFilters, setQueueFilters] = useState<ControlQueueFilters>(emptyQueueFilters);
+  const [queueOrder, setQueueOrder] = useState<ControlQueueOrder>('scheduled');
   const [correctionNotice, setCorrectionNotice] = useState<CorrectionNotice | null>(null);
   // Die Mock-Services lesen mutable localStorage-Daten. Diese Snapshots
   // halten die bisherigen Cache-Invalidierungen durch Versionsänderungen bei,
@@ -674,7 +675,7 @@ export function TournamentControlPage() {
   const standingsSource = useMemo(() => ({ ...phaseRuntimeSource, participantVersion }), [phaseRuntimeSource, participantVersion]);
 
   const matches = useMemo(() => getMockRuntimeMatches(clockSource.tournament), [clockSource]);
-  const queueAssignableTables = useMemo(() => getMockQueueAssignableTables(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
+  const queueAssignableTables = useMemo(() => getMockQueueAssignableTables(phaseClockSource.tournament), [phaseClockSource]);
   const blockedTables = useMemo(() => new Set(getBlockedMockTables(runtimeSource.tournament)), [runtimeSource]);
   const restTimeLabel = useMemo(
     () => formatRemainingTournamentDuration(estimateRemainingTournamentMinutes(phaseRuntimeSource.tournament), getVenueTerminology(phaseRuntimeSource.tournament.sport).plural),
@@ -713,7 +714,9 @@ export function TournamentControlPage() {
   const nextMatches = matches.filter((match) => match.status === 'WAITING');
   const assignableWaitingMatches = nextMatches.filter((match) => (queueAssignableTables.get(match.id)?.length ?? 0) > 0);
   const assignableWaitingIds = new Set(assignableWaitingMatches.map((match) => match.id));
-  const filteredNextMatches = filterControlQueueMatches(nextMatches, queueFilters, assignableWaitingIds);
+  const orderedNextMatches = orderControlQueue(nextMatches, queueOrder);
+  const filteredNextMatches = filterControlQueueMatches(orderedNextMatches, queueFilters, assignableWaitingIds);
+  const queueSummary = summarizeControlQueue(nextMatches, assignableWaitingIds);
   const queuePositions = new Map(nextMatches.map((match, index) => [match.id, index + 1]));
   const queueGroups = useMemo(() => [...new Set(matches.filter((match) => match.status === 'WAITING' && match.round.startsWith('Gruppe ')).map((match) => match.round))].sort((a, b) => a.localeCompare(b, 'de', { numeric: true })), [matches]);
   const queueMatchDays = useMemo(() => [...new Set(matches.filter((match) => match.status === 'WAITING').map((match) => match.matchDay).filter((day): day is number => typeof day === 'number'))].sort((a, b) => a - b), [matches]);
@@ -1122,7 +1125,7 @@ export function TournamentControlPage() {
   }
 
   function autoAssignWaitingMatches() {
-    const waitingMatches = nextMatches.filter((match) => match.status === 'WAITING');
+    const waitingMatches = orderedNextMatches.filter((match) => match.status === 'WAITING');
     let assigned = 0;
 
     for (const match of waitingMatches) {
@@ -1530,12 +1533,15 @@ export function TournamentControlPage() {
                   <div className="control-match-filter-fields">
                     <label>Spieler suchen<input type="search" value={queueFilters.search} placeholder="Name eingeben …" onChange={(event) => setQueueFilters((current) => ({ ...current, search: event.target.value }))} /></label>
                     <label>Gruppe<select value={queueFilters.group} disabled={queueGroups.length === 0} onChange={(event) => setQueueFilters((current) => ({ ...current, group: event.target.value }))}><option value="">Alle Gruppen</option>{queueGroups.map((group) => <option key={group} value={group}>{group}</option>)}</select></label>
+                    <label>Reihenfolge<select value={queueOrder} onChange={(event) => setQueueOrder(event.target.value as ControlQueueOrder)}><option value="scheduled">Spielplan</option><option value="rest">Längste gemeinsame Pause</option></select></label>
                     <label>Spieltag<select value={queueFilters.matchDay} disabled={queueMatchDays.length === 0} onChange={(event) => setQueueFilters((current) => ({ ...current, matchDay: event.target.value }))}><option value="">Alle Spieltage</option>{queueMatchDays.map((day) => <option key={day} value={String(day)}>Spieltag {day}</option>)}</select></label>
                   </div>
                   <div className="control-match-filter-summary" aria-live="polite">
                     <span>{filteredNextMatches.length} von {nextMatches.length} wartenden Spielen</span>
+                    <span title="Kürzere der beiden gemessenen Pausenzeiten; nur aktuell zuweisbare, noch nicht gestartete Spiele">Längste gemeinsame Pause: <strong>{queueSummary.longestSharedRest === null ? '–' : queueSummary.longestSharedRest + ' min'}</strong></span>
                     {(queueFilters.status !== 'all' || queueFilters.group || queueFilters.matchDay || queueFilters.search) && <button className="btn small" type="button" onClick={() => setQueueFilters(emptyQueueFilters)}>Filter zurücksetzen</button>}
                   </div>
+                  {queueOrder === 'rest' && <p className="muted queue-order-note">Bereits begonnene Partien zuerst, danach längste gemeinsame gemessene Pause. Unbekannte Pausenzeiten werden nicht geschätzt. Die automatische Sammelzuweisung berücksichtigt diese Reihenfolge für alle wartenden Spiele, unabhängig von den Filtern.</p>}
                 </div>
               )}
               <div className="match-queue">
@@ -1566,6 +1572,8 @@ export function TournamentControlPage() {
                       <strong>{match.sideB}{swissRecordFor(match, match.sideB) && <span className="swiss-record">{swissRecordFor(match, match.sideB)}</span>} <em className="pause-time">{formatPlayerRest(match.pauseB)}</em>{busyB && <span className="queue-player-table-flag">Bereits an {venueName(busyB.table)}</span>}</strong>
                       <span className="muted">{match.phase} · {match.round}{match.matchDay ? ` · Spieltag ${match.matchDay}` : ''}{match.note ? ` · ${venueMessage(match.note)}` : ''}</span>
                       {isBusy && <span className="queue-conflict-hint">Zuweisung möglich, sobald {busyPlayers.length === 1 ? 'dieser Teilnehmer wieder frei ist.' : 'beide Teilnehmer wieder frei sind.'}</span>}
+                      {!isBusy && !canAssign && tournament.status === 'RUNNING' && freeTables.length === 0 && <span className="queue-conflict-hint">Aktuell kein freier, ungesperrter {venue.singular} verfügbar.</span>}
+                      {!canAssign && tournament.status === 'PAUSED' && <span className="queue-conflict-hint">Neue Zuweisungen während der Turnierpause gesperrt.</span>}
                       {otherBlockReason && <span className="queue-conflict-hint">Derzeit nicht zuweisbar: {venueMessage(otherBlockReason)}</span>}
                       {assigningMatchId === match.id && canAssign && (
                         <div className="table-assignment-picker">

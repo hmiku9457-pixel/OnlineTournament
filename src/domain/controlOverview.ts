@@ -91,3 +91,31 @@ export function summarizeControlProgress(
 
   return { percent, totalPhases, completedPhases, currentPhaseIndex, currentPhaseName: current?.name ?? '', matchesInPhase, completedMatches };
 }
+
+export type ControlQueueOrder = 'scheduled' | 'rest';
+interface RestQueueMatch {
+  id: string;
+  pauseA: number | null;
+  pauseB: number | null;
+  startedAt?: number;
+}
+
+/** Prioritize the shorter of the two measured rest times, then the longer.
+ * No measured rest (first match or missing timestamp) is not a fabricated time.
+ * Already started, unassigned matches come first for continuation. Stable
+ * original order breaks ties. Only current WAITING fixtures may be supplied. */
+export function orderControlQueue<T extends RestQueueMatch>(matches: readonly T[], order: ControlQueueOrder): T[] {
+  if (order === 'scheduled') return [...matches];
+  const rest = (value: number | null) => value !== null && Number.isFinite(value) && value >= 0 ? value : -1;
+  return [...matches].sort((a, b) =>
+    Number(Boolean(b.startedAt)) - Number(Boolean(a.startedAt))
+    || Math.min(rest(b.pauseA), rest(b.pauseB)) - Math.min(rest(a.pauseA), rest(a.pauseB))
+    || Math.max(rest(b.pauseA), rest(b.pauseB)) - Math.max(rest(a.pauseA), rest(a.pauseB)));
+}
+export function summarizeControlQueue<T extends RestQueueMatch>(matches: readonly T[], assignableIds: ReadonlySet<string>) {
+  const assignable = matches.filter(match => assignableIds.has(match.id));
+  const measured = assignable.filter(match => !match.startedAt && match.pauseA !== null && match.pauseB !== null
+    && Number.isFinite(match.pauseA) && Number.isFinite(match.pauseB) && match.pauseA >= 0 && match.pauseB >= 0);
+  return { total: matches.length, assignable: assignable.length, blocked: matches.length - assignable.length,
+    longestSharedRest: measured.length ? Math.max(...measured.map(match => Math.min(match.pauseA!, match.pauseB!))) : null };
+}
