@@ -13,7 +13,7 @@ const exp = Math.floor(Date.now()/1000)+3600;
 const segment = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 const accessToken = segment({alg:'HS256',typ:'JWT'})+'.'+segment({sub:user.id,role:'authenticated',exp})+'.smoke';
 const session = { access_token: accessToken, refresh_token:'smoke-refresh', token_type:'bearer', expires_in:3600, expires_at:exp, user };
-const rows = new Map(), operations = new Map(), calls = [];
+const rows = new Map(), operations = new Map(), leases = new Map(), calls = [];
 let loseResponses = 0;
 async function install(context) {
   await context.route(api+'/**', async route => {
@@ -28,13 +28,28 @@ async function install(context) {
     const body = req.method()==='POST' ? req.postDataJSON() : {};
     if(path.endsWith('/list_online_tournaments')) return send([...rows.values()].map(({payload,...row})=>row));
     if(path.endsWith('/load_online_tournament')) return send(rows.get(body.p_id) ?? {message:'Not found',code:'42501'},rows.has(body.p_id)?200:403);
-    if(path.endsWith('/commit_online_tournament')) {
+    if(path.endsWith('/claim_online_workspace')) {
+      const token=leases.get(body.p_id);
+      if(body.p_renew && token!==body.p_token) return send(false);
+      if(token && token!==body.p_token) return send(false);
+      leases.set(body.p_id,body.p_token);
+      return send(true);
+    }
+    if(path.endsWith('/release_online_workspace')) {
+      if(leases.get(body.p_id)!==body.p_token) return send(false);
+      leases.delete(body.p_id);return send(true);
+    }
+    if(path.endsWith('/commit_online_tournament') || path.endsWith('/commit_leased_online_tournament')) {
+      if(body.p_expected_revision>0 && (!body.p_token || leases.get(body.p_id)!==body.p_token))
+        return send({code:'55P03',message:'workspace lease missing or expired'},409);
       calls.push(structuredClone(body));
       const key=body.p_id+':'+body.p_operation_id;
       let rev;
       if(operations.has(key)) {
         const previous=operations.get(key);
-        assert.deepEqual(body,previous.body,'retry must send identical RPC arguments');
+        const {p_token: _currentToken,...request}=body;
+        const {p_token: _previousToken,...original}=previous.body;
+        assert.deepEqual(request,original,'retry must send identical sporting operation');
         rev=previous.rev;
       } else {
         const current=rows.get(body.p_id)?.revision ?? 0;
@@ -95,27 +110,21 @@ try {
   await confirmed(a);
   await a.getByRole('button',{name:'Turnier fortsetzen',exact:true}).waitFor();
   assert.equal(rows.get(id).revision,before+1);
-  // A separate browser context logs in and opens the stored event.
+  // A second browser cannot edit until the first explicitly releases.
   await login(b);
   await b.goto(base+'/#/online');
   await b.getByRole('link',{name:'Online-Turnierleitung öffnen'}).click();
+  await b.getByRole('heading',{name:'Turnier wird bereits bearbeitet'}).waitFor();
+  await a.getByRole('button',{name:'Bearbeitung freigeben und zurück'}).click();
+  await a.getByRole('heading',{name:'Online-Turniere',exact:true}).waitFor();
+  await b.getByRole('button',{name:'Erneut versuchen'}).click();
   await confirmed(b);
-  await b.getByRole('button',{name:'Turnier fortsetzen',exact:true}).waitFor();
   await b.getByRole('button',{name:'Turnier fortsetzen',exact:true}).click();
   await b.getByRole('button',{name:'Turnier pausieren',exact:true}).waitFor();
   await confirmed(b);
-  // The stale first browser is not allowed to overwrite the newer revision.
-  await a.getByRole('button',{name:'Turnier fortsetzen',exact:true}).click();
-  await a.getByText(/Ein anderer Arbeitsbereich hat das Turnier geändert/).waitFor();
-  assert.equal(await a.getByRole('button',{name:'Speicherung erneut versuchen'}).count(),0);
-  assert.equal(await a.getByRole('button',{name:'Unbestätigten Stand als JSON sichern'}).count(),1);
-  // A previously rejected write survives page reload in its own IndexedDB journal.
-  await a.reload();
-  await a.getByRole('heading',{name:'Unbestätigte Online-Speicherung'}).waitFor();
-  await a.getByRole('button',{name:'Ursprüngliche Anfrage erneut senden'}).click();
-  await a.getByText(/Ein anderer Arbeitsbereich hat das Turnier geändert/).waitFor();
-  await a.getByRole('button',{name:'Verwerfen …'}).click();
-  await a.getByRole('button',{name:'Unbestätigten Eintrag verwerfen'}).click();
+  await b.getByRole('button',{name:'Bearbeitung freigeben und zurück'}).click();
+  await b.getByRole('heading',{name:'Online-Turniere',exact:true}).waitFor();
+  await a.getByRole('link',{name:'Online-Turnierleitung öffnen'}).click();
   await confirmed(a);
   await a.getByRole('button',{name:'Turnier pausieren',exact:true}).waitFor();
   // Lost response followed by reload: the original UUID must survive in IndexedDB.
@@ -123,6 +132,8 @@ try {
   loseResponses=2;
   await a.getByRole('button',{name:'Turnier pausieren',exact:true}).click();
   await a.getByRole('button',{name:'Speicherung erneut versuchen'}).waitFor({timeout:45000});
+  // Simulate the server lease expiring after a crashed browser.
+  leases.delete(id);
   await a.reload();
   await a.getByRole('heading',{name:'Unbestätigte Online-Speicherung'}).waitFor();
   await a.getByRole('button',{name:'Ursprüngliche Anfrage erneut senden'}).click();
@@ -148,7 +159,8 @@ try {
   await a.getByRole('button',{name:'Ursprüngliche Anfrage erneut senden'}).click();
   await confirmed(a);
   assert.equal(rows.get(created).revision,1);
-  // Explicit freshness check must block stale editing before any write.
+  // Simulate lease expiry and takeover; the old workspace must freeze.
+  leases.delete(created);
   await b.goto(base+'/?online='+encodeURIComponent(created)+'#/tournaments/'+created+'/control');
   await confirmed(b);
   await b.getByRole('button',{name:'Turnier starten',exact:true}).click();
@@ -156,11 +168,13 @@ try {
   await b.getByRole('button',{name:'Turnier pausieren',exact:true}).waitFor();
   await confirmed(b);
   const writesBeforeCheck=calls.length;
-  const staleLabel=a.getByText('Neuerer Datenbankstand vorhanden',{exact:true});
+  const staleLabel=a.getByText('Bearbeitungssperre verloren oder neuer Datenbankstand',{exact:true});
   if(!(await staleLabel.isVisible())) await a.getByRole('button',{name:'Datenbankstand prüfen',exact:true}).click();
   await staleLabel.waitFor();
   assert.equal(calls.length,writesBeforeCheck);
   assert.equal(await a.locator('[inert]').count()>0,true);
+  await b.getByRole('button',{name:'Bearbeitung freigeben und zurück'}).click();
+  await b.getByRole('heading',{name:'Online-Turniere',exact:true}).waitFor();
   await a.getByRole('button',{name:'Datenbankstand neu laden',exact:true}).click();
   await confirmed(a);
   await a.getByRole('button',{name:'Turnier pausieren',exact:true}).waitFor();

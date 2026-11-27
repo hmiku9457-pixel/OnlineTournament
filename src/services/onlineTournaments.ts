@@ -29,17 +29,19 @@ async function load(id: string): Promise<OnlineTournament> {
   if (payload.tournamentId !== id) throw new Error('Falsche Turnierkennung.');
   return { ...data, payload } as OnlineTournament;
 }
-async function commit(backup: TournamentBackup, expected: number, ownerId: string, operationId: string = crypto.randomUUID()): Promise<number> {
+async function commit(backup: TournamentBackup, expected: number, ownerId: string, operationId: string = crypto.randomUUID(), token?: string): Promise<number> {
   const args = { p_id: backup.tournamentId, p_name: backupTournamentName(backup),
     p_expected_revision: expected, p_operation_id: operationId, p_payload: backup };
   for (let attempt = 0; attempt < 2; attempt++) {
     const { client, userId } = await account();
     if (userId !== ownerId) throw new Error('Die Anmeldung hat sich geändert.');
-    const { data, error, status } = await client.rpc('commit_online_tournament', args).abortSignal(AbortSignal.timeout(12000));
+    const request = expected===0 ? client.rpc('commit_online_tournament', args) : client.rpc('commit_leased_online_tournament', {...args,p_token:token});
+    const { data, error, status } = await request.abortSignal(AbortSignal.timeout(12000));
     if (!error) {
       if (data !== expected + 1) throw new Error('Unerwartete Datenbankrevision.');
       return data as number;
     }
+    if (error.code === '55P03') throw new Error('Bearbeitungssperre abgelaufen oder von einem anderen Arbeitsbereich belegt.');
     if (error.code === '40001') throw new Error('Ein anderer Arbeitsbereich hat das Turnier geändert.');
     if (status === 0 || status >= 500 || !error.code) {
       if (attempt === 0) continue;
@@ -117,17 +119,47 @@ export async function loadOnlineCheckpoint(id: string, revision: number): Promis
   if(backup.tournamentId !== id) throw new Error('Falsche Turnierkennung.');
   return backup;
 }
+export class WorkspaceBusyError extends Error {}
+async function claimWorkspace(id: string, token: string, renew: boolean): Promise<boolean> {
+  if (!supabase) throw new Error('Supabase ist nicht eingerichtet.');
+  const {data,error}=await supabase.rpc('claim_online_workspace',{p_id:id,p_token:token,p_renew:renew}).abortSignal(AbortSignal.timeout(8000));
+  if(error) throw new Error(error.message);
+  return data===true;
+}
+async function releaseWorkspace(id:string,token:string): Promise<void> {
+  if(!supabase) return;
+  const {error}=await supabase.rpc('release_online_workspace',{p_id:id,p_token:token}).abortSignal(AbortSignal.timeout(8000));
+  if(error) throw new Error(error.message);
+}
+export async function releaseCurrentOnlineWorkspace(): Promise<void> {
+  const workspace=workspaceRevision;
+  if(!workspace || hasPendingRemoteWrites()) throw new Error('Eine Speicherung läuft noch.');
+  markRemoteWorkspaceStale();
+  workspaceRevision=undefined;
+  await releaseWorkspace(workspace.id,workspace.token);
+}
 export async function resolvePendingOnlineOperation(op: PendingOnlineOperation, discard = false): Promise<void> {
   const { userId } = await account();
   if (op.ownerId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
-  if (!discard) await commit(op.snapshot,op.expectedRevision,userId,op.operationId);
+  if (!discard) {
+    if(op.expectedRevision===0) await commit(op.snapshot,0,userId,op.operationId);
+    else {
+      const token=crypto.randomUUID();
+      if(!await claimWorkspace(op.tournamentId,token,false)) throw new WorkspaceBusyError('Ein anderer Arbeitsbereich besitzt noch die Bearbeitungssperre. Bitte zuerst freigeben oder Ablauf abwarten.');
+      try {await commit(op.snapshot,op.expectedRevision,userId,op.operationId,token);}
+      finally {await releaseWorkspace(op.tournamentId,token).catch(()=>{});}
+    }
+  }
   await removeOnlineOperation(op.operationId);
 }
-let workspaceRevision: {id: string; revision: number; ownerId: string} | undefined;
+let workspaceRevision: {id: string; revision: number; ownerId: string; token: string} | undefined;
 /** Only metadata is loaded. Never replace the director state automatically. */
 export async function checkOnlineWorkspaceRevision(id: string): Promise<'current' | 'stale' | 'unknown'> {
   const start = workspaceRevision;
   if (!start || start.id !== id || hasPendingRemoteWrites() || getTournamentStorageError() || !supabase) return 'unknown';
+  const renewed=await claimWorkspace(id,start.token,true);
+  if(workspaceRevision!==start || hasPendingRemoteWrites() || getTournamentStorageError()) return 'unknown';
+  if(!renewed) return markRemoteWorkspaceStale() ? 'stale' : 'unknown';
   const { data, error } = await supabase.rpc('list_online_tournaments').abortSignal(AbortSignal.timeout(8000));
   if (error || workspaceRevision !== start || hasPendingRemoteWrites() || getTournamentStorageError()) return 'unknown';
   const row = (data as OnlineTournamentSummary[] | null)?.find(t => t.id === id);
@@ -139,10 +171,15 @@ export async function initializeOnlineWorkspace(id: string): Promise<PendingOnli
   const unresolved = await listPendingOnlineOperations(userId,id);
   if ((await account()).userId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
   if (unresolved.length) return unresolved;
-  const loaded = await load(id);
+  const token=crypto.randomUUID();
+  if(!await claimWorkspace(id,token,false)) throw new WorkspaceBusyError('Dieses Turnier wird bereits in einem anderen Arbeitsbereich bearbeitet.');
+  let loaded: OnlineTournament;
+  try {
+    loaded=await load(id);
+    if ((await account()).userId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
+  } catch(error) {await releaseWorkspace(id,token).catch(()=>{});throw error;}
   let revision = loaded.revision;
-  workspaceRevision = {id,revision,ownerId:userId};
-  if ((await account()).userId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
+  workspaceRevision = {id,revision,ownerId:userId,token};
   let pending: PendingOnlineOperation | undefined;
   initializeRemoteTournamentStorage(loaded.payload, async (snapshot) => {
     if (pending && pending.snapshot !== snapshot) throw new Error('Eine frühere Speicheranfrage ist noch ungeklärt.');
@@ -150,11 +187,11 @@ export async function initializeOnlineWorkspace(id: string): Promise<PendingOnli
       expectedRevision: revision, createdAt: new Date().toISOString() };
     // Durable journal must be committed BEFORE the network request.
     await persistOnlineOperation(pending);
-    const confirmedRevision = await commit(snapshot, pending.expectedRevision, userId, pending.operationId);
+    const confirmedRevision = await commit(snapshot, pending.expectedRevision, userId, pending.operationId,token);
     try { await removeOnlineOperation(pending.operationId); }
     catch { throw new RemoteWriteUnavailableError('Datenbankstand bestätigt, aber Wiederherstellungseintrag konnte nicht entfernt werden.'); }
     revision = confirmedRevision;
-    if (workspaceRevision?.ownerId === userId) workspaceRevision = {id,revision,ownerId:userId};
+    if (workspaceRevision?.ownerId === userId) workspaceRevision = {id,revision,ownerId:userId,token};
     pending = undefined;
   });
   client.auth.onAuthStateChange((_event, session) => {
