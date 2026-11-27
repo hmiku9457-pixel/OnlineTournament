@@ -395,7 +395,7 @@ try {
   assert.equal(adopted.length,2,'both results must be present in the confirmed snapshot');
   assert.ok(adopted.every(r=>r.status==='FINISHED'&&r.adminConfirmed));
   assert.equal(rows.get(id).revision,beforeReports+1,'bulk result adoption must commit exactly one revision');
-  await personal.close();
+  // Keep the anonymous contexts until the bulk revocation check.
   // The server commits, but both automatic HTTP responses are lost.
   loseResponses=2;
   const before=rows.get(id).revision;
@@ -416,6 +416,18 @@ try {
   await b.getByRole('heading',{name:'Turnier wird bereits bearbeitet'}).waitFor();
   await a.getByRole('button',{name:'Bearbeitung freigeben und zurück'}).click();
   await a.getByRole('heading',{name:'Online-Turniere',exact:true}).waitFor();
+  await a.getByRole('button',{name:'Spielerzugänge',exact:true}).click();
+  const revokeModal=a.getByRole('dialog',{name:/Spielerzugänge/});
+  await revokeModal.getByRole('button',{name:'Alle Zugänge widerrufen'}).click();
+  await revokeModal.getByRole('dialog',{name:'Sammeländerung Spielerzugänge'}).getByRole('button',{name:'Sammeländerung bestätigen'}).click();
+  await revokeModal.getByRole('dialog',{name:'Sammeländerung Spielerzugänge'}).waitFor({state:'hidden'});
+  assert.equal(playerLinks.get(id).size,0);
+  await player.reload();
+  await player.getByText('Dieser Spielerlink ist nicht mehr verfügbar.',{exact:true}).waitFor();
+  await opponent.reload();
+  await opponent.getByText('Dieser Spielerlink ist nicht mehr verfügbar.',{exact:true}).waitFor();
+  await personal.close();
+  await revokeModal.getByRole('button',{name:'Schließen'}).click();
   await b.getByRole('button',{name:'Erneut versuchen'}).click();
   await confirmed(b);
   await b.getByRole('button',{name:'Turnier fortsetzen',exact:true}).click();

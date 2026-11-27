@@ -40,7 +40,8 @@ export function OnlinePlayerPage({token}:{token:string}) {
     setData(view);setLastChecked(Date.now());failures=0;
     setMessage(view?'':'Dieser Spielerlink ist nicht mehr verfügbar.');
     if(!view){previousCalls.current=null;setAcknowledged([]);setNewCallText('');}
-    else if(view.matches!==null){
+    else if(view.matches===null){setNewCallText('');}
+    else {
       const calls=getPlayerCalls(view.matches,view.participant);
       const added=newPlayerCalls(previousCalls.current,calls);
       previousCalls.current=calls.map(c=>c.key);
