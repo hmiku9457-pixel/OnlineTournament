@@ -1289,8 +1289,10 @@ export function TournamentControlPage() {
             <div className="control-utility-bar">
               <button className="btn small control-back-button" type="button" onClick={() => navigate(-1)}>← Zurück</button>
               <div className="control-utility-links">
-                <Link className="btn small" to={`/player/${tournament.id}`}>Spieleransicht</Link>
-                <Link className="btn small" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
+                {!new URLSearchParams(window.location.search).has('online') && <>
+                  <Link className="btn small" to={`/player/${tournament.id}`}>Spieleransicht</Link>
+                  <Link className="btn small" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
+                </>}
                 <button className="btn small control-help-main-button" type="button" onClick={() => setHelpTopic('start')}>Anleitung & Hilfe</button>
               </div>
             </div>

@@ -8,6 +8,7 @@ import { TournamentControlPage } from '@/pages/TournamentControlPage';
 import { PlayerTournamentPage } from '@/pages/PlayerTournamentPage';
 import { ScoringPage } from '@/pages/ScoringPage';
 import { SpectatorPage } from '@/pages/SpectatorPage';
+import { OnlineTournamentsPage } from '@/pages/OnlineTournamentsPage';
 import { BackupsPage } from '@/pages/BackupsPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -83,6 +84,7 @@ export default function App() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/backups" element={<BackupsPage />} />
+        <Route path="/online" element={<OnlineTournamentsPage />} />
         <Route path="/tournaments/new" element={<CreateTournamentRoute />} />
         <Route path="/tournaments/:tournamentId" element={<TournamentPage />} />
         <Route path="/tournaments/:tournamentId/control" element={<TournamentControlRoute />} />
