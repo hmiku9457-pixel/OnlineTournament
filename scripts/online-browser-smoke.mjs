@@ -346,6 +346,11 @@ try {
   // The director's heartbeat retries automatically if a publication was busy.
   await viewer.reload();
   await viewer.getByRole('heading',{name:'Spielpaarungen und Ergebnisse'}).waitFor();
+  await viewer.getByRole('heading',{name:'Aktuelle Hallenbelegung'}).waitFor();
+  await viewer.getByRole('button',{name:'Hallenanzeige',exact:true}).click();
+  await viewer.getByRole('heading',{name:'Spielpaarungen und Ergebnisse'}).waitFor({state:'hidden'});
+  await viewer.getByRole('button',{name:'Gesamtübersicht',exact:true}).click();
+  await viewer.getByRole('heading',{name:'Spielpaarungen und Ergebnisse'}).waitFor();
   await viewer.getByText(/Anna – | – Anna/).first().waitFor({timeout:45000});
   assert.ok(detailRows.get(id)?.matches.length>0);
   assert.equal(detailRows.get(id).revision,rows.get(id).revision);
@@ -354,6 +359,8 @@ try {
   assert.equal(rankingRows.get(id).revision,rows.get(id).revision);
   await player.reload();
   await player.getByRole('heading',{name:'Meine Spiele'}).waitFor();
+  await player.getByRole('heading',{name:'Meine Ergebnisübersicht'}).waitFor();
+  await player.getByRole('heading',{name:'Weitere geplante Begegnungen'}).waitFor();
   await player.getByText('gegen Bernd',{exact:true}).waitFor({timeout:45000});
   assert.equal(await player.locator('article.online-catalog-row').count(),3);
   assert.ok(playerRows.get(id).matches.length>3);

@@ -369,10 +369,12 @@ export async function listOnlineResultReports(id:string):Promise<OnlineResultRep
   if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
   if(error)throw new Error(error.message);return (data??[]) as OnlineResultReport[];
 }
-export function reportMatchNames(row:OnlineResultReport):{a:string;b:string}|null {
+export function reportMatchNamesById(): Map<string,{a:string;b:string}> {
   const tournament=getAllMockTournaments().find(t=>t.id===workspaceRevision?.id);
-  const match=tournament&&getMockRuntimeMatches(tournament).find(m=>m.id===row.matchId);
-  return match?{a:match.sideA,b:match.sideB}:null;
+  return new Map(tournament?getMockRuntimeMatches(tournament).map(m=>[m.id,{a:m.sideA,b:m.sideB}]):[]);
+}
+export function reportMatchNames(row:OnlineResultReport):{a:string;b:string}|null {
+  return reportMatchNamesById().get(row.matchId)??null;
 }
 export async function adoptOnlineResultReport(row:OnlineResultReport):Promise<void> {
   await adoptOnlineResultReports([row]);

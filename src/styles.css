@@ -9316,3 +9316,19 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .online-player-access-footer { position: sticky; bottom: -1px; background: white; padding: 8px 0 0; }
 .online-player-access-list input[readonly] { min-width: 0; width: 100%; }
 @media (max-width: 600px) { .prototype-modal.online-player-access-modal { max-height: calc(100dvh - 24px); padding: 14px; } }
+
+/* Online views: compact mobile overview and a readable public hall display. */
+.online-summary-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+.online-summary-grid > div { display:grid; gap:3px; padding:10px; border:1px solid #e4e7ec; border-radius:8px; overflow-wrap:anywhere; }
+.online-summary-grid strong { font-size:1.35rem; font-variant-numeric:tabular-nums; }
+.online-summary-grid span { font-size:.78rem; }
+.online-hall-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:12px; }
+.online-hall-tile { border:1px solid #a6cdb9; border-radius:10px; padding:14px; display:grid; gap:10px; min-width:0; }
+.online-hall-venue { color:#176b49; font-size:1.35rem; }
+.online-hall-match { display:grid; gap:6px; overflow-wrap:anywhere; }
+.online-hall-match .badge { justify-self:start; }
+.online-hall-score { font-size:1.7rem; font-weight:750; font-variant-numeric:tabular-nums; }
+.online-hall-mode { max-width:1600px; }
+.online-hall-mode .online-hall-venue { font-size:clamp(1.5rem,3vw,2.4rem); }
+.online-hall-mode .online-hall-score { font-size:clamp(1.9rem,4vw,3rem); }
+@media(max-width:600px){.online-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}

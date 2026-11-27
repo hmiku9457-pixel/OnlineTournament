@@ -6,13 +6,15 @@ import { playerRefreshDelay } from '@/domain/playerCalls';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { startOnlinePolling } from '@/domain/onlinePolling';
+import { publicHallAssignments, type OnlineMatchView } from '@/domain/onlineMatchViews';
+import { displayVenueName, getVenueTerminology } from '@/domain/venueTerminology';
 
 interface Progress {
   name:string; sport:string; status:string; revision:number; updatedAt:string;
   participantCount:number; tables:number; recordedResults:number; occupiedTables:number;
   phases:Array<{name:string|null;type:string;started:boolean;completed:boolean}>;
 }
-interface MatchDetail {sideA:string;sideB:string;phase:string;round:string;status:string;table:string;score:string;sets:Array<{sideAScore:number;sideBScore:number}>}
+type MatchDetail=OnlineMatchView;
 interface Details {revision:number;matches:MatchDetail[]|null;total:number|null}
 type RankingRow=MockStanding|{rank:number;name:string;placement:string;status:string};
 interface RankingTable {phase:string;label:string;kind:string;rows:RankingRow[]}
@@ -32,6 +34,7 @@ export function OnlineSpectatorPage({token}:{token:string}) {
   const [filter,setFilter]=useState('all');
   const [pageIndex,setPageIndex]=useState(0);
   const [message,setMessage]=useState('Turnier wird geladen …');
+  const [hallOnly,setHallOnly]=useState(false);
   useEffect(()=>{
     let active=true, failures=0;
     const client=supabase;
@@ -62,15 +65,29 @@ export function OnlineSpectatorPage({token}:{token:string}) {
   const matches=(details?.matches??[]).filter(m=>(!selected||m.sideA===selected||m.sideB===selected)&&(filter==='all'||(filter==='live'?['LIVE','READY','CONFIRMATION'].includes(m.status):m.status===filter))&&[m.sideA,m.sideB,m.phase,m.round].some(v=>v.toLocaleLowerCase('de-DE').includes(search.trim().toLocaleLowerCase('de-DE'))));
   const maxPage=Math.max(0,Math.ceil(matches.length/25)-1);
   const currentPage=Math.min(pageIndex,maxPage);
-  return <main className="main online-spectator">
+  const hall=publicHallAssignments(details?.matches??[],data?.tables??0);
+  const venue=getVenueTerminology(data?.sport??'');
+  return <main className={`main online-spectator${hallOnly?' online-hall-mode':''}`}>
     {!data?<section className="card"><h1>Zuschaueransicht</h1><p role="status">{message}</p></section>:<>
-      <header className="dashboard-page-hero"><div><h1>{data.name}</h1><p className="muted">{data.sport} · Zuschaueransicht</p></div><span className="badge">{statuses[data.status]??data.status}</span></header>
+      <header className="dashboard-page-hero"><div><h1>{data.name}</h1><p className="muted">{data.sport} · Zuschaueransicht</p></div><div className="actions"><span className="badge">{statuses[data.status]??data.status}</span>{details&&<button className="btn small" onClick={()=>setHallOnly(v=>!v)}>{hallOnly?'Gesamtübersicht':'Hallenanzeige'}</button>}</div></header>
       <section className="card"><h2>Turnier auf einen Blick</h2><div className="control-metrics-grid">
         <div><span className="muted">Teilnehmer</span><strong>{data.participantCount}</strong></div>
         <div><span className="muted">Belegte Spielflächen</span><strong>{data.occupiedTables}/{data.tables}</strong></div>
         <div><span className="muted">Erfasste Endergebnisse</span><strong>{data.recordedResults}</strong></div>
         <div><span className="muted">Abgeschlossene Phasen</span><strong>{data.phases.filter(p=>p.completed).length}/{data.phases.length}</strong></div>
       </div></section>
+      {details&&<section className="card online-hall"><h2>Aktuelle Hallenbelegung</h2>
+        {details.matches===null?<p role="status">Belegung wird aktualisiert.</p>:<>
+          <p className="muted">{hall.length} veröffentlichte belegte {venue.plural} · {data.tables} insgesamt. Nicht aufgeführte {venue.plural} sind nicht zwingend frei.</p>
+          {!hall.length&&<p>Keine laufenden oder zugewiesenen Spiele veröffentlicht.</p>}
+          <div className="online-hall-grid">{hall.map(item=><article className="online-hall-tile" key={item.number}>
+            <strong className="online-hall-venue">{displayVenueName(data.sport,'Tisch '+item.number)}</strong>
+            {item.matches.length>1&&<p role="status">Mehrere Zuordnungen veröffentlicht</p>}
+            {item.matches.map((m,i)=><div className="online-hall-match" key={i}><strong>{m.sideA} – {m.sideB}</strong><span className="online-hall-score">{m.score}</span><span className="badge">{matchStatuses[m.status]??m.status}</span><small>{m.phase} · {m.round}</small></div>)}
+          </article>)}</div>
+        </>}
+      </section>}
+      {(!hallOnly||!details)&&<>
       <section className="card"><h2>Turnierverlauf</h2>{data.phases.map((phase,index)=><div className="online-catalog-row actions" key={index}><strong>{phase.name||'Phase '+(index+1)}</strong><span className="badge">{phase.completed?'Abgeschlossen':phase.started?'Gestartet':'Ausstehend'}</span></div>)}</section>
       {names.length>0&&<section className="card"><h2>Persönliche Spielübersicht</h2><p className="muted">Filtert die bereits freigegebenen Spiele nach einem Teilnehmer. Keine Anmeldung oder private Spielerberechtigung.</p><label>Teilnehmer auswählen<select aria-label="Teilnehmer auswählen" value={selected} onChange={e=>{setParticipant(e.target.value);setSearch('');setFilter('all');setPageIndex(0);}}><option value="">Alle Teilnehmer</option>{names.map(n=><option key={n} value={n}>{n}</option>)}</select></label>{selected&&<p>Aktuelle und kommende Spiele von <strong>{selected}</strong> findest du unten in der gefilterten Spielübersicht.</p>}</section>}
       {details&&<section className="card"><h2>Spielpaarungen und Ergebnisse</h2>
@@ -80,7 +97,7 @@ export function OnlineSpectatorPage({token}:{token:string}) {
           {!matches.length&&<p>Keine passenden Spiele.</p>}
           {matches.slice(currentPage*25,(currentPage+1)*25).map((m,i)=><article className="online-catalog-row" key={currentPage*25+i}>
             <div className="actions"><strong>{m.sideA} – {m.sideB}</strong><strong>{m.score}</strong><span className="badge">{matchStatuses[m.status]??m.status}</span></div>
-            <p className="muted">{m.phase} · {m.round}{m.table!=='Noch offen'?' · '+m.table:''}{m.sets.length?' · '+m.sets.map(s=>s.sideAScore+':'+s.sideBScore).join(', '):''}</p>
+            <p className="muted">{m.phase} · {m.round}{m.table!=='Noch offen'?' · '+displayVenueName(data.sport,m.table):''}{m.sets.length?' · '+m.sets.map(s=>s.sideAScore+':'+s.sideBScore).join(', '):''}</p>
           </article>)}
           {maxPage>0&&<div className="actions"><button className="btn small" disabled={!currentPage} onClick={()=>setPageIndex(currentPage-1)}>Zurück</button><span>Seite {currentPage+1} / {maxPage+1}</span><button className="btn small" disabled={currentPage===maxPage} onClick={()=>setPageIndex(currentPage+1)}>Weiter</button></div>}
         </>}
@@ -106,6 +123,7 @@ export function OnlineSpectatorPage({token}:{token:string}) {
             {m.sets.length>0&&<small>{m.sets.map(s=>s.sideAScore+':'+s.sideBScore).join(', ')}</small>}
           </article>)}</div></div>}/>
       </section>)}
+      </>}
       <p className="muted">Bestätigter Stand: {new Date(data.updatedAt).toLocaleString('de-DE')} · Revision {data.revision} · Aktualisierung alle 10 Sekunden. Nur Lesezugriff.</p>
     </>}
   </main>;

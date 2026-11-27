@@ -5,8 +5,9 @@ import { reportDraftKey,retainReportDrafts,type ReportDraft,type ReportDrafts } 
 import { getPlayerCalls,newPlayerCalls,playerRefreshDelay } from '@/domain/playerCalls';
 import { supabase } from '@/lib/supabase';
 import { startOnlinePolling } from '@/domain/onlinePolling';
+import { onlinePlayerSummary, orientOnlineScore, type OnlineMatchView } from '@/domain/onlineMatchViews';
 import { displayVenueMessage } from '@/domain/venueTerminology';
-interface Match {sideA:string;sideB:string;phase:string;round:string;status:string;table:string;score:string;sets:Array<{sideAScore:number;sideBScore:number}>}
+type Match=OnlineMatchView;
 interface Report {matchId:string;startedAt:number;generation:number;side:'A'|'B';sideA:string;sideB:string;bestOf:number;requiresWinner:boolean;revision:number;aSets:MatchSet[]|null;bSets:MatchSet[]|null}
 interface PlayerView {name:string;participant:string;sport:string;status:string;revision:number;updatedAt:string;complete:boolean|null;matches:Match[]|null}
 const active=(status:string)=>['LIVE','READY','CONFIRMATION'].includes(status);
@@ -65,6 +66,7 @@ export function OnlinePlayerPage({token}:{token:string}) {
   return()=>{alive=false;polling.stop();window.removeEventListener('focus',focus);window.removeEventListener('online',focus);document.removeEventListener('visibilitychange',focus);};
  },[token,refreshVersion]);
  const calls=data&&data.matches?getPlayerCalls(data.matches,data.participant):[];
+ const summary=data?.matches?onlinePlayerSummary(data.matches,data.participant):null;
  const rows=(data?.matches??[]).filter(m=>filter==='all'||(filter==='active'?active(m.status):m.status===filter));
  const lastPage=Math.max(0,Math.ceil(rows.length/25)-1),currentPage=Math.min(lastPage,page);
  return <main className="main online-spectator">
@@ -72,10 +74,15 @@ export function OnlinePlayerPage({token}:{token:string}) {
  <header className="dashboard-page-hero"><div><h1>{data.participant}</h1><p>{data.name} · {data.sport}</p></div><span className="badge">Spieleransicht</span></header>
  <section className="card player-call-panel"><div className="actions"><h2>Meine Spielaufrufe</h2><button className="btn small" disabled={refreshing} onClick={()=>setRefreshVersion(v=>v+1)}>{refreshing?'Aktualisiere …':'Jetzt aktualisieren'}</button></div>
  {newCallText&&<p role="status" className="player-call-notice">{newCallText}</p>}
- {data.matches===null?<p className="muted">Spielaufrufe werden für den aktuellen Stand aktualisiert.</p>:calls.length===0?<p>Momentan kein zugewiesenes Spiel.</p>:calls.map(call=><article className="player-call-card" key={call.key}><span className="muted">Bitte zur Spielfläche</span><strong className="player-call-table">{displayVenueMessage(data.sport,call.table)}</strong><strong>gegen {call.opponent}</strong><span>{call.phase} · {call.round}</span><button className="btn small" disabled={acknowledged.includes(call.key)} onClick={()=>{setAcknowledged(old=>[...old,call.key]);setNewCallText('');}}>{acknowledged.includes(call.key)?'Gesehen':'Aufruf gesehen'}</button></article>)}
+ {data.matches===null?<p className="muted">Spielaufrufe werden für den aktuellen Stand aktualisiert.</p>:calls.length===0?<p>Momentan kein zugewiesenes Spiel.</p>:calls.map(call=><article className="player-call-card" key={call.key}><span className="muted">Bitte zur Spielfläche</span><strong className="player-call-table">{displayVenueMessage(data.sport,call.table)}</strong><strong>gegen {call.opponent}</strong><span>{call.phase} · {call.round}</span><button className="btn small" disabled={acknowledged.includes(call.key)} onClick={()=>{setAcknowledged(old=>[...old,call.key]);setNewCallText('');}}>{acknowledged.includes(call.key)?'Gesehen':'Aufruf gesehen'}</button><small className="muted">Bestätigung nur auf diesem Gerät.</small></article>)}
  {typeof navigator.vibrate==='function'&&<label><input type="checkbox" checked={vibration} onChange={e=>{vibrationRef.current=e.target.checked;setVibration(e.target.checked);if(e.target.checked)navigator.vibrate(80);}}/> Vibration bei neuen Spielaufrufen (geöffnete Ansicht)</label>}
  <p className="muted">{lastChecked?'Zuletzt geprüft: '+new Date(lastChecked).toLocaleTimeString('de-DE'):'Noch nicht geprüft'}. Bitte halte die Ansicht geöffnet. Keine Hintergrund-Push-Nachrichten.</p></section>
  {reports.length>0&&<section className="card"><h2>Ergebnis melden</h2><p>Beide Seiten müssen denselben Endstand melden. Erst die Turnierleitung übernimmt das verbindliche Ergebnis.</p>{reports.map(r=>{const key=reportDraftKey(r);return <ReportForm key={key} report={r} sport={data.sport} token={token} values={drafts[key]??[['','']]} setValues={update=>setDrafts(old=>({...old,[key]:update(old[key]??[['','']])}))} onSaved={()=>setRefreshVersion(v=>v+1)}/>;})}</section>}
+ {summary&&<section className="card"><h2>Weitere geplante Begegnungen</h2>
+ {summary.upcoming.length?<><p className="muted">Auszug aus den bereits feststehenden Paarungen, keine verbindliche Aufrufreihenfolge.</p>{summary.upcoming.map((m,i)=><article className="online-catalog-row" key={i}><strong>gegen {m.sideA===data.participant?m.sideB:m.sideA}</strong><p>{m.phase} · {m.round}</p></article>)}</>:<p>Keine weiteren wartenden Paarungen im veröffentlichten Spielplan.</p>}
+ </section>}
+ {summary&&<section className="card"><h2>Meine Ergebnisübersicht</h2><p className="muted">Aus den veröffentlichten Endständen; Sonderwertungen ohne eindeutigen Sieger werden separat ausgewiesen.{data.complete===false?' Unvollständiger Auszug.':''}</p>
+ <div className="online-summary-grid"><div><span>Siege</span><strong>{summary.wins}</strong></div><div><span>Niederlagen</span><strong>{summary.losses}</strong></div><div><span>Unentschieden</span><strong>{summary.draws}</strong></div><div><span>Sonderwertungen / unklar</span><strong>{summary.other}</strong></div></div></section>}
  <section className="card"><h2>Meine Spiele</h2>
  {data.matches===null?<p role="status">Die Spielübersicht wird für die aktuelle Revision aktualisiert. Bitte warte auf die Turnierleitung.</p>:<>
  <div className="control-metrics-grid"><div><span>Laufend / zugewiesen</span><strong>{data.matches.filter(m=>active(m.status)).length}</strong></div><div><span>Wartend</span><strong>{data.matches.filter(m=>m.status==='WAITING').length}</strong></div><div><span>Beendet</span><strong>{data.matches.filter(m=>m.status==='FINISHED').length}</strong></div></div>
@@ -84,7 +91,7 @@ export function OnlinePlayerPage({token}:{token:string}) {
  {!rows.length&&<p>Keine passenden Begegnungen vorhanden.</p>}
  {rows.slice(currentPage*25,(currentPage+1)*25).map((m,i)=>{
   const sideA=m.sideA===data.participant;
-  const score=sideA?m.score:m.score.replace(/^(\d+)\s*:\s*(\d+)$/,'$2:$1');
+  const score=orientOnlineScore(m.score,sideA);
   return <article className="online-catalog-row" key={i}><div className="actions"><strong>gegen {sideA?m.sideB:m.sideA}</strong><strong>{score}</strong><span className="badge">{statuses[m.status]??m.status}</span></div>
   <p>{m.phase} · {m.round} · {displayVenueMessage(data.sport,m.table)}</p>
   {m.sets.length>0&&<p className="muted">{m.sets.map(s=>sideA?s.sideAScore+':'+s.sideBScore:s.sideBScore+':'+s.sideAScore).join(', ')}</p>}</article>;
