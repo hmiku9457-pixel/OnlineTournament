@@ -2,18 +2,19 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount } from '@/lib/useAccount';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
-import { createOnlineTournamentFromLocal, listOnlineTournaments, onlineWorkspaceUrl, type OnlineTournamentSummary } from '@/services/onlineTournaments';
+import { createOnlineTournamentFromLocal, listOnlineTournaments, onlineWorkspaceUrl, listOnlineCheckpoints, loadOnlineCheckpoint, type OnlineCheckpoint, type OnlineTournamentSummary } from '@/services/onlineTournaments';
 
 export function OnlineTournamentsPage() {
   const { session, loading } = useAccount();
   const userId = session?.user.id;
   const [items, setItems] = useState<OnlineTournamentSummary[]>([]);
   const [busy, setBusy] = useState(false);
+  const [history, setHistory] = useState<{ id: string; rows: OnlineCheckpoint[] } | null>(null);
   const [message, setMessage] = useState('');
   const local = getAllMockTournaments().filter((t) => !t.hasStarted && ['DRAFT','REGISTRATION','READY'].includes(t.status));
   useEffect(() => {
     let active = true;
-    setItems([]); setMessage('');
+    setItems([]); setMessage(''); setHistory(null);
     if (userId) listOnlineTournaments().then((rows) => { if (active) setItems(rows); })
       .catch((error: unknown) => { if (active) setMessage(error instanceof Error ? error.message : 'Laden fehlgeschlagen.'); });
     return () => { active = false; };
@@ -41,7 +42,17 @@ export function OnlineTournamentsPage() {
         {items.map((item) => <div key={item.id} className="actions" style={{ marginTop: 12 }}>
           <strong>{item.name}</strong><span className="muted">Revision {item.revision}</span>
           <a className="btn primary" href={onlineWorkspaceUrl(item.id)}>Online-Turnierleitung öffnen</a>
+          <button className="btn small" disabled={busy} onClick={() => { setBusy(true); void listOnlineCheckpoints(item.id).then(rows=>setHistory({id:item.id,rows})).catch((e: unknown)=>setMessage(e instanceof Error?e.message:'Laden fehlgeschlagen.')).finally(()=>setBusy(false)); }}>Wiederherstellungspunkte</button>
         </div>)}
+        {history && <div className="card" style={{marginTop:12}}><div className="actions"><h3>Wiederherstellungspunkte</h3><button className="btn small" onClick={()=>setHistory(null)}>Schließen</button></div>
+          <p className="muted">Bis zu 20 letzte Revisionen (maximal 16 MiB je Turnier). Der aktive Datenbankstand wird nicht überschrieben. JSON kann separat lokal wiederhergestellt werden.</p>
+          {history.rows.map(row=><div className="actions" key={row.revision}><strong>Revision {row.revision}</strong><span>{new Date(row.created_at).toLocaleString('de-DE')}</span>
+            <button className="btn small" disabled={busy} onClick={()=>{setBusy(true);void loadOnlineCheckpoint(history.id,row.revision).then(backup=>{
+              const url=URL.createObjectURL(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}));
+              const a=document.createElement('a');a.href=url;a.download='turnier-'+history.id+'-r'+row.revision+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+            }).catch((e:unknown)=>setMessage(e instanceof Error?e.message:'Download fehlgeschlagen.')).finally(()=>setBusy(false));}}>JSON herunterladen</button>
+          </div>)}
+        </div>}
       </section>
       <section className="card"><h2>Online-Testturnier vorbereiten</h2>
         <p className="muted">Erstelle ein neues Online-Turnier direkt im Assistenten oder übernimm ein vorhandenes, ungestartetes lokales Turnier als unabhängige Kopie.</p>

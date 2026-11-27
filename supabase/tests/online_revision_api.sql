@@ -35,9 +35,24 @@ begin
  begin perform public.commit_online_tournament(v_id,'Test',2,op3,v_invalid); raise exception 'incomplete snapshot accepted'; exception when invalid_parameter_value then null; end;
  v_invalid := jsonb_set(v_payload,'{entries}',v_entries || jsonb_build_object('online-tournament:mock-match-results:v2','[{"matchId":"local-foreign-phase-1-match-1"}]'));
  begin perform public.commit_online_tournament(v_id,'Test',2,op3,v_invalid); raise exception 'foreign match accepted'; exception when invalid_parameter_value then null; end;
+ v_invalid := jsonb_set(v_payload,'{entries}',v_entries || jsonb_build_object('online-tournament:mock-match-results:v2','[{"matchId":"local-rpc-test-phase-1-m1","status":"FINISHED","sets":[{"number":1,"sideAScore":-1,"sideBScore":11}]}]'));
+ begin perform public.commit_online_tournament(v_id,'Test',2,op3,v_invalid); raise exception 'negative score accepted'; exception when invalid_parameter_value then null; end;
+ v_invalid := jsonb_set(v_payload,'{entries}',v_entries || jsonb_build_object('online-tournament:mock-phase-lifecycle:v1','[{"tournamentId":"local-rpc-test","startedStageIds":[],"completedStageIds":["local-rpc-test-phase-1"]}]'));
+ begin perform public.commit_online_tournament(v_id,'Test',2,op3,v_invalid); raise exception 'unstarted phase completed'; exception when invalid_parameter_value then null; end;
+ v_invalid := jsonb_set(v_payload,'{entries}',v_entries || jsonb_build_object('online-tournament:mock-phase-lifecycle:v1','[{"tournamentId":"local-rpc-test","startedStageIds":["local-rpc-test-phase-1"],"completedStageIds":[]}]','online-tournament:mock-match-runtime:v1','[{"matchId":"local-rpc-test-phase-1-m1","status":"LIVE","table":"Tisch 1"},{"matchId":"local-rpc-test-phase-1-m2","status":"LIVE","table":"Tisch 1"}]'));
+ begin perform public.commit_online_tournament(v_id,'Test',2,op3,v_invalid); raise exception 'duplicate table accepted'; exception when invalid_parameter_value then null; end;
+ if (select count(*) from public.list_online_checkpoints(v_id)) <> 2 then raise exception 'checkpoint count'; end if;
+ if public.load_online_checkpoint(v_id,1) is distinct from v_payload then raise exception 'checkpoint payload'; end if;
  if (public.load_online_tournament(v_id)->>'revision')::int <> 2 then raise exception 'wrong revision'; end if;
  if (select count(*) from public.list_online_tournaments() where id=v_id) <> 1 then raise exception 'list'; end if;
+ for i in 2..24 loop
+   perform public.commit_online_tournament(v_id,'Test',i,gen_random_uuid(),v_payload);
+ end loop;
+ if (select count(*) from public.list_online_checkpoints(v_id)) <> 20 then raise exception 'checkpoint retention'; end if;
+ if (select min(revision) from public.list_online_checkpoints(v_id)) <> 6 then raise exception 'checkpoint retention order'; end if;
  perform set_config('request.jwt.claim.sub','00000000-0000-4000-8000-0000000000b2',true);
+ begin perform public.load_online_checkpoint(v_id,25); raise exception 'foreign checkpoint read'; exception when insufficient_privilege then null; end;
+ begin perform public.list_online_checkpoints(v_id); raise exception 'foreign checkpoint list'; exception when insufficient_privilege then null; end;
  if exists(select 1 from public.list_online_tournaments() where id=v_id) then raise exception 'cross-owner list'; end if;
  begin perform public.load_online_tournament(v_id); raise exception 'cross-owner read'; exception when insufficient_privilege then null; end;
  begin perform public.commit_online_tournament(v_id,'Test',2,op3,v_payload); raise exception 'cross-owner update'; exception when insufficient_privilege then null; end;

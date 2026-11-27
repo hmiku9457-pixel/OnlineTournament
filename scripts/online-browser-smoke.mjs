@@ -108,6 +108,26 @@ try {
   await a.getByText(/Ein anderer Arbeitsbereich hat das Turnier geändert/).waitFor();
   assert.equal(await a.getByRole('button',{name:'Speicherung erneut versuchen'}).count(),0);
   assert.equal(await a.getByRole('button',{name:'Unbestätigten Stand als JSON sichern'}).count(),1);
+  // A previously rejected write survives page reload in its own IndexedDB journal.
+  await a.reload();
+  await a.getByRole('heading',{name:'Unbestätigte Online-Speicherung'}).waitFor();
+  await a.getByRole('button',{name:'Ursprüngliche Anfrage erneut senden'}).click();
+  await a.getByText(/Ein anderer Arbeitsbereich hat das Turnier geändert/).waitFor();
+  await a.getByRole('button',{name:'Verwerfen …'}).click();
+  await a.getByRole('button',{name:'Unbestätigten Eintrag verwerfen'}).click();
+  await confirmed(a);
+  await a.getByRole('button',{name:'Turnier pausieren',exact:true}).waitFor();
+  // Lost response followed by reload: the original UUID must survive in IndexedDB.
+  const crashRevision=rows.get(id).revision;
+  loseResponses=2;
+  await a.getByRole('button',{name:'Turnier pausieren',exact:true}).click();
+  await a.getByRole('button',{name:'Speicherung erneut versuchen'}).waitFor({timeout:45000});
+  await a.reload();
+  await a.getByRole('heading',{name:'Unbestätigte Online-Speicherung'}).waitFor();
+  await a.getByRole('button',{name:'Ursprüngliche Anfrage erneut senden'}).click();
+  await confirmed(a);
+  await a.getByRole('button',{name:'Turnier fortsetzen',exact:true}).waitFor();
+  assert.equal(rows.get(id).revision,crashRevision+1,'recovery must not commit twice');
   await first.close(); await second.close();
   process.stdout.write('Online browser smoke passed: login, cloud creation, start, lost response, retry, second browser and stale revision.\n');
 } finally { await browser.close(); }

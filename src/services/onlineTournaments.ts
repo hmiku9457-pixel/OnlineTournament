@@ -1,3 +1,4 @@
+import { persistOnlineOperation, removeOnlineOperation, listPendingOnlineOperations, type PendingOnlineOperation } from '@/services/onlineOutbox';
 import { supabase } from '@/lib/supabase';
 import { backupTournamentName, captureTournamentBackup, validateTournamentBackup,
   initializeRemoteTournamentStorage, invalidateRemoteTournamentStorage, initialTournamentBackup, RemoteWriteUnavailableError, type TournamentBackup } from '@/services/localTournamentStorage';
@@ -85,19 +86,49 @@ export function localOverviewUrl(): string {
   url.search = ''; url.hash = '/online';
   return url.href;
 }
-export async function initializeOnlineWorkspace(id: string): Promise<void> {
+export interface OnlineCheckpoint { revision: number; name: string; created_at: string }
+export async function listOnlineCheckpoints(id: string): Promise<OnlineCheckpoint[]> {
+  const { client } = await account();
+  const { data,error } = await client.rpc('list_online_checkpoints',{p_id:id});
+  if(error) throw new Error(error.message);
+  return (data ?? []) as OnlineCheckpoint[];
+}
+export async function loadOnlineCheckpoint(id: string, revision: number): Promise<TournamentBackup> {
+  const { client } = await account();
+  const { data,error } = await client.rpc('load_online_checkpoint',{p_id:id,p_revision:revision});
+  if(error) throw new Error(error.message);
+  const backup = validateTournamentBackup(data);
+  if(backup.tournamentId !== id) throw new Error('Falsche Turnierkennung.');
+  return backup;
+}
+export async function resolvePendingOnlineOperation(op: PendingOnlineOperation, discard = false): Promise<void> {
+  const { userId } = await account();
+  if (op.ownerId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
+  if (!discard) await commit(op.snapshot,op.expectedRevision,userId,op.operationId);
+  await removeOnlineOperation(op.operationId);
+}
+export async function initializeOnlineWorkspace(id: string): Promise<PendingOnlineOperation[]> {
   const { client, userId } = await account();
   const loaded = await load(id);
   let revision = loaded.revision;
   if ((await account()).userId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
-  let pending: { snapshot: TournamentBackup; operationId: string } | undefined;
+  const unresolved = await listPendingOnlineOperations(userId,id);
+  if (unresolved.length) return unresolved;
+  let pending: PendingOnlineOperation | undefined;
   initializeRemoteTournamentStorage(loaded.payload, async (snapshot) => {
     if (pending && pending.snapshot !== snapshot) throw new Error('Eine frühere Speicheranfrage ist noch ungeklärt.');
-    pending ??= { snapshot, operationId: crypto.randomUUID() };
-    revision = await commit(snapshot, revision, userId, pending.operationId);
+    pending ??= { snapshot, operationId: crypto.randomUUID(), ownerId: userId, tournamentId: id,
+      expectedRevision: revision, createdAt: new Date().toISOString() };
+    // Durable journal must be committed BEFORE the network request.
+    await persistOnlineOperation(pending);
+    const confirmedRevision = await commit(snapshot, pending.expectedRevision, userId, pending.operationId);
+    try { await removeOnlineOperation(pending.operationId); }
+    catch { throw new RemoteWriteUnavailableError('Datenbankstand bestätigt, aber Wiederherstellungseintrag konnte nicht entfernt werden.'); }
+    revision = confirmedRevision;
     pending = undefined;
   });
   client.auth.onAuthStateChange((_event, session) => {
     if (!session || session.user.id !== userId) invalidateRemoteTournamentStorage();
   });
+  return [];
 }

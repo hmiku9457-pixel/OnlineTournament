@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createHashRouter, RouterProvider } from 'react-router-dom';
 import App from './App';
+import { OnlineRecoveryPage } from './pages/OnlineRecoveryPage';
 import { OnlineWorkspaceApp } from './pages/OnlineWorkspaceApp';
 import { initializeOnlineWorkspace, localOverviewUrl } from './services/onlineTournaments';
 import { initializeLocalTournamentStorage, markLocalTournamentStorageUnavailable } from './services/localTournamentStorage';
@@ -22,7 +23,10 @@ const router = createHashRouter([{ path: '*', element: onlineId ? <OnlineWorkspa
 async function boot() {
   if (onlineId !== null) {
     root.render(<main className="main"><p role="status">Online-Turnier wird geladen …</p></main>);
-    try { await initializeOnlineWorkspace(onlineId); }
+    try {
+      const unresolved = await initializeOnlineWorkspace(onlineId);
+      if (unresolved.length) { root.render(<StrictMode><OnlineRecoveryPage operations={unresolved}/></StrictMode>); return; }
+    }
     catch (error) {
       root.render(<main className="main"><section className="card" role="alert"><h1>Online-Turnier nicht verfügbar</h1>
         <p>{error instanceof Error ? error.message : 'Verbindung fehlgeschlagen.'}</p>
