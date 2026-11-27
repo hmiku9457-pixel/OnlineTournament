@@ -22,7 +22,7 @@ beforeEach(() => {
     constructor(type: string, init?: CustomEventInit<T>) { super(type); this.detail = init?.detail as T; }
   });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 function sample(withBreak = false, manualCeremony = false) {
   const stages = [
@@ -76,6 +76,8 @@ describe('prestart schedule consistency after roster and phase edits', () => {
   });
 
   it('preserves the original schedule until phase start and shows extra time after an uneven draw', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-21T09:00:00+01:00'));
     const tournament = sample();
     const group = tournament.stages[0];
     const assignments = getGroupAssignments(tournament, group);

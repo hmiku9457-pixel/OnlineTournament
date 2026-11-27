@@ -27,8 +27,9 @@ in Supabase. No automatic migration or synchronization of existing local test ev
    The scheduled workflow performs the same read-only query at 05:23, 13:23,
    and 21:23 UTC. No tournament or participant records are touched.
 
-The probe table is not readable by anonymous or authenticated clients. Its only
-public RPC returns a boolean and has a fixed search path. Missing config, unavailable
+The probe table contains only a non-sensitive boolean marker; anonymous and
+ authenticated clients can read but cannot modify it. Its RPC uses invoker
+ privileges and a fixed search path. Missing config, unavailable
 database, or a missing RPC fails the workflow rather than reporting a false success.
 Supabase Free project pausing is not guaranteed to be prevented by health checks.
 GitHub may disable scheduled workflows on public repositories after 60 days of
