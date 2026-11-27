@@ -173,6 +173,7 @@ try {
   await share.getByRole('checkbox',{name:'Teilnehmernamen und Spielergebnisse freigeben'}).click();
   await share.locator('input[type="checkbox"]:checked').waitFor();
   await viewer.goto(newLink);
+  // A hash-only navigation must switch the active capability without stale data.
   await viewer.getByText(/Die Detailansicht wird für die aktuelle Revision aktualisiert/).waitFor();
   await share.getByRole('button',{name:'Schließen'}).click();
   await a.getByRole('link',{name:'Online-Turnierleitung öffnen'}).click();

@@ -20,6 +20,17 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 // Data router enables blocking all internal navigation while pre-start edits are unsaved.
 const onlineId = new URLSearchParams(window.location.search).get('online');
 const root = createRoot(document.getElementById('root')!);
+// A hash-only link change does not reload a document. Public capabilities
+// must never retain the previous token or rendered private workspace.
+let previousWatch = window.location.hash.startsWith('#/watch/') ? window.location.hash : null;
+window.addEventListener('hashchange',()=>{
+  const nextWatch=window.location.hash.startsWith('#/watch/')?window.location.hash:null;
+  if(nextWatch!==previousWatch&&(nextWatch!==null||previousWatch!==null)){
+    previousWatch=nextWatch;
+    root.render(<main className="main"><p role="status">Ansicht wird geladen …</p></main>);
+    window.location.reload();
+  }
+});
 const router = createHashRouter([{ path: '*', element: onlineId ? <OnlineWorkspaceApp id={onlineId} /> : <App /> }]);
 async function boot() {
   const spectator=window.location.hash.match(/^#\/watch\/([^/?#]+)$/);
