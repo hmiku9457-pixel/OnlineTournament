@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount } from '@/lib/useAccount';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
-import { createOnlineTournamentFromLocal, listPendingOnlineCreations, listOnlineCatalog, setOnlineArchive, loadConfirmedOnlineBackup, onlineWorkspaceUrl, listOnlineCheckpoints, loadOnlineCheckpoint, manageOnlineSpectator, onlineSpectatorUrl, spectatorDetailSetting, type OnlineCheckpoint, type OnlineCatalogItem } from '@/services/onlineTournaments';
+import { createOnlineTournamentFromLocal, listPendingOnlineCreations, listOnlineCatalog, setOnlineArchive, loadConfirmedOnlineBackup, onlineWorkspaceUrl, listOnlineCheckpoints, loadOnlineCheckpoint, manageOnlineSpectator, onlineSpectatorUrl, spectatorDetailSetting, listOnlinePlayerAccess, manageOnlinePlayerAccess, onlinePlayerUrl, type OnlinePlayerAccess, type OnlineCheckpoint, type OnlineCatalogItem } from '@/services/onlineTournaments';
 
 const statuses: Record<string,string> = {DRAFT:'Entwurf',REGISTRATION:'Anmeldung',READY:'Bereit',RUNNING:'Läuft',PAUSED:'Pausiert',FINISHED:'Abgeschlossen',ABORTED:'Abgebrochen'};
 function download(backup:TournamentBackup,revision:number) {
@@ -31,6 +31,8 @@ function OnlineCatalog() {
   const [filter,setFilter]=useState('active');
   const [confirm,setConfirm]=useState<OnlineCatalogItem|null>(null);
   const [share,setShare]=useState<{item:OnlineCatalogItem;token:string|null;details:boolean}|null>(null);
+  const [players,setPlayers]=useState<{item:OnlineCatalogItem;rows:OnlinePlayerAccess[]}|null>(null);
+  const [playerSearch,setPlayerSearch]=useState('');
   const alive=useRef(true);
   const running=useRef(false);
   const local=getAllMockTournaments().filter(t=>!t.hasStarted && ['DRAFT','REGISTRATION','READY'].includes(t.status));
@@ -74,6 +76,7 @@ function OnlineCatalog() {
           <button className="btn small" disabled={busy} onClick={()=>void run(async()=>{const result=await loadConfirmedOnlineBackup(item.id);if(alive.current)download(result.backup,result.revision);})}>JSON sichern</button>
           <button className="btn small" disabled={busy} onClick={()=>void run(async()=>{const rows=await listOnlineCheckpoints(item.id);if(alive.current)setHistory({id:item.id,rows});})}>Wiederherstellungspunkte</button>
           <button className="btn small" disabled={busy||!!item.archived_at} onClick={()=>void run(async()=>{const token=await manageOnlineSpectator(item.id,'read');const details=token?await spectatorDetailSetting(item.id):false;if(alive.current)setShare({item,token,details});})}>Zuschauerlink</button>
+          <button className="btn small" disabled={busy||!!item.archived_at} onClick={()=>void run(async()=>{const rows=await listOnlinePlayerAccess(item.id);if(alive.current){setPlayerSearch('');setPlayers({item,rows});}})}>Spielerzugänge</button>
           <button className="btn small" disabled={busy||item.editing||(!item.archived_at&&!['DRAFT','REGISTRATION','READY','FINISHED','ABORTED'].includes(item.status))} onClick={()=>setConfirm(item)}>{item.archived_at?'Archivierung aufheben':'Archivieren'}</button>
         </div>
       </article>)}
@@ -86,6 +89,16 @@ function OnlineCatalog() {
       <Link className="btn primary" to="/tournaments/new?mode=online">Neues Online-Turnier erstellen</Link>
       {local.map(t=><div key={t.id} className="actions" style={{marginTop:12}}><strong>{t.name}</strong><button className="btn small primary" disabled={busy||!loaded||pendingCreations.length>0||items.some(i=>i.id===t.id)} onClick={()=>void run(async()=>{try{await createOnlineTournamentFromLocal(t.id);if(alive.current)setMessage('Online-Testturnier angelegt. Lokale und Online-Version sind unabhängig.');}finally{await refresh();}})}>Als Online-Testturnier anlegen</button></div>)}
     </section>
+    {players&&<div className="prototype-modal-backdrop" onMouseDown={()=>!busy&&setPlayers(null)}><section className="prototype-modal" role="dialog" aria-modal="true" aria-labelledby="players-title" onMouseDown={e=>e.stopPropagation()} onKeyDown={e=>{if(e.key==='Escape'&&!busy)setPlayers(null);}}>
+      <h2 id="players-title">Spielerzugänge · {players.item.name}</h2>
+      <p>Ein persönlicher Link erlaubt ausschließlich das Lesen der eigenen Begegnungen und der zugehörigen Gegnernamen. Kein Benutzerkonto erforderlich. Links vertraulich an die jeweiligen Teilnehmer weitergeben. Die öffentliche Zuschauerfreigabe ist unabhängig.</p>
+      <label>Teilnehmer suchen<input type="search" value={playerSearch} onChange={e=>setPlayerSearch(e.target.value)}/></label>
+      <div style={{maxHeight:'45vh',overflowY:'auto'}}>{players.rows.filter(r=>r.name.toLocaleLowerCase('de-DE').includes(playerSearch.trim().toLocaleLowerCase('de-DE'))).map(r=><article key={r.participant_id} className="online-catalog-row"><div className="actions"><strong>{r.name}</strong><span className="badge">{r.token?'Freigegeben':'Gesperrt'}</span></div>
+      {r.token&&<label>Persönlicher Link<input readOnly aria-label={'Link für '+r.name} value={onlinePlayerUrl(r.token)} onFocus={e=>e.target.select()}/></label>}
+      <div className="actions">{r.token&&<a className="btn small" href={onlinePlayerUrl(r.token)} target="_blank" rel="noopener noreferrer">Öffnen</a>}
+      {(r.token?['rotate','disable']:['enable']).map(action=><button key={action} className="btn small" disabled={busy} onClick={()=>void run(async()=>{await manageOnlinePlayerAccess(players.item.id,r.participant_id,action as 'enable'|'rotate'|'disable');const rows=await listOnlinePlayerAccess(players.item.id);if(alive.current)setPlayers({...players,rows});})}>{action==='enable'?'Zugang erstellen':action==='rotate'?'Neuer Link':'Widerrufen'}</button>)}</div></article>)}</div>
+      {message&&<p role="alert">{message}</p>}<button className="btn" disabled={busy} onClick={()=>setPlayers(null)}>Schließen</button>
+    </section></div>}
     {share&&<div className="prototype-modal-backdrop" onMouseDown={()=>!busy&&setShare(null)}><section className="prototype-modal" role="dialog" aria-modal="true" aria-labelledby="share-title" onMouseDown={e=>e.stopPropagation()} onKeyDown={e=>{if(e.key==='Escape'&&!busy)setShare(null);}}>
       <h2 id="share-title">Zuschauerlink · {share.item.name}</h2>
       <p>Jeder mit dem Link kann ohne Anmeldung den Turnierfortschritt sehen. Standardmäßig werden nur Turnier- und Phasennamen, Status und aggregierte Spielzahlen veröffentlicht. Codes und interne Sicherungen bleiben privat. Verwende nur öffentlich geeignete Bezeichnungen.</p>

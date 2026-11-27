@@ -47,3 +47,6 @@ The same explicit detail consent enables group, round-robin, Swiss and confirmed
 
 ### Spectator brackets and personal filter
 Started knockout phases publish round-ordered brackets, structured participant/bye/pending slots, scores, sets and winner side only, with the same lease and revision checks. Maximum 2,000 bracket matches and 1 MiB. A public participant selector filters already released matches by exact name; it is not a private player login. Hash-only spectator link navigation reloads the isolated boot and cannot retain the previous token.
+
+## Individual read-only player capabilities
+Owner creates a random revocable UUID per stable participant ID. The anonymous read RPC resolves that ID against the current confirmed roster and filters a separate private revision-bound projection to own fixtures only, regardless of spectator consent. Rotation, removal from roster and archiving invalidate access. No account binding, no write/confirmation rights, links must be distributed confidentially. The active director publishes up to 5,000 fixtures / 2 MiB; incomplete views are marked, outdated projections hidden. No private codes or other players' unrelated fixtures are exposed.

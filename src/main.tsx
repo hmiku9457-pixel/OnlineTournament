@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createHashRouter, RouterProvider } from 'react-router-dom';
 import App from './App';
+import { OnlinePlayerPage } from './pages/OnlinePlayerPage';
 import { OnlineSpectatorPage } from './pages/OnlineSpectatorPage';
 import { OnlineRecoveryPage } from './pages/OnlineRecoveryPage';
 import { OnlineWorkspaceApp } from './pages/OnlineWorkspaceApp';
@@ -22,9 +23,9 @@ const onlineId = new URLSearchParams(window.location.search).get('online');
 const root = createRoot(document.getElementById('root')!);
 // A hash-only link change does not reload a document. Public capabilities
 // must never retain the previous token or rendered private workspace.
-let previousWatch = window.location.hash.startsWith('#/watch/') ? window.location.hash : null;
+let previousWatch = /^#\/(watch|my-games)\//.test(window.location.hash) ? window.location.hash : null;
 window.addEventListener('hashchange',()=>{
-  const nextWatch=window.location.hash.startsWith('#/watch/')?window.location.hash:null;
+  const nextWatch=/^#\/(watch|my-games)\//.test(window.location.hash)?window.location.hash:null;
   if(nextWatch!==previousWatch&&(nextWatch!==null||previousWatch!==null)){
     previousWatch=nextWatch;
     root.render(<main className="main"><p role="status">Ansicht wird geladen …</p></main>);
@@ -33,6 +34,8 @@ window.addEventListener('hashchange',()=>{
 });
 const router = createHashRouter([{ path: '*', element: onlineId ? <OnlineWorkspaceApp id={onlineId} /> : <App /> }]);
 async function boot() {
+  const player=window.location.hash.match(/^#\/my-games\/([^/?#]+)$/);
+  if(player){root.render(<StrictMode><OnlinePlayerPage token={player[1]}/></StrictMode>);return;}
   const spectator=window.location.hash.match(/^#\/watch\/([^/?#]+)$/);
   if(spectator){root.render(<StrictMode><OnlineSpectatorPage token={spectator[1]}/></StrictMode>);return;}
   if (onlineId !== null) {

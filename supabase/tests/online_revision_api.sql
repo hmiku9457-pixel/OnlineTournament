@@ -16,6 +16,9 @@ declare
   bracket_fixture jsonb := '[{"phase":"KO","rounds":[{"label":"Halbfinale","matches":[{"a":{"kind":"participant","name":"A"},"b":{"kind":"bye"},"score":"Freilos","winner":"A","status":"FINISHED","sets":[]}]},{"label":"Finale","matches":[{"a":{"kind":"participant","name":"A"},"b":{"kind":"pending"},"score":"–","winner":"NONE","status":"WAITING","sets":[]}]}]}]';
   ranking_fixture jsonb := '[{"phase":"Liga","label":"Tabelle","kind":"ROUND_ROBIN","rows":[{"rank":1,"name":"A","played":1,"wins":1,"losses":0,"draws":0,"points":3,"buchholz":0.5,"sets":"1:0","setDifference":1,"balls":"11:8","ballDifference":3}]}]';
   detail_match jsonb := '[{"sideA":"A","sideB":"B","phase":"Liga","round":"Runde 1","status":"FINISHED","table":"Noch offen","score":"1:0","sets":[{"sideAScore":11,"sideBScore":8}]}]';
+  player_a uuid;
+  player_c uuid;
+  player_new uuid;
   spectator uuid;
   rotated uuid;
   projection jsonb;
@@ -27,7 +30,7 @@ declare
 begin
  v_entries := jsonb_build_object(
    'online-tournament:local-prototype-tournaments:v1:record:local-rpc-test',
-   '{"sortOrder":1,"tournament":{"id":"local-rpc-test","name":"Test","status":"READY","visibility":"PRIVATE","discipline":"SINGLES","sport":"Tischtennis","hasStarted":false,"tables":2,"participantNames":["A","B"],"participantIds":{"A":"p-a","B":"p-b"},"stages":[{"id":"local-rpc-test-phase-1","tournamentId":"local-rpc-test","type":"ROUND_ROBIN","bestOf":1,"settings":{}}]}}',
+   '{"sortOrder":1,"tournament":{"id":"local-rpc-test","name":"Test","status":"READY","visibility":"PRIVATE","discipline":"SINGLES","sport":"Tischtennis","hasStarted":false,"tables":2,"participantNames":["A","B","C"],"participantIds":{"A":"p-a","B":"p-b","C":"p-c"},"stages":[{"id":"local-rpc-test-phase-1","tournamentId":"local-rpc-test","type":"ROUND_ROBIN","bestOf":1,"settings":{}}]}}',
    'online-tournament:mock-draw-config:v1','[]','online-tournament:mock-phase-lifecycle:v1','[]',
    'online-tournament:mock-audit:v1','[]','online-tournament:mock-inline-breaks:v2','[]',
    'online-tournament:group-cutoff-decisions:v1','[]','online-tournament:mock-match-results:v2','[]',
@@ -44,17 +47,39 @@ begin
  spectator:=public.manage_online_spectator(v_id,'enable');
  if spectator is null or public.manage_online_spectator(v_id,'enable') is distinct from spectator then raise exception 'spectator enable not idempotent'; end if;
  projection:=public.read_online_spectator(spectator);
- if projection->>'name'<>'Test' or (projection->>'participantCount')::int<>2 or projection ?| array['payload','entries','participantNames','participantCodes','id','owner_id'] then raise exception 'invalid spectator projection'; end if;
+ if projection->>'name'<>'Test' or (projection->>'participantCount')::int<>3 or projection ?| array['payload','entries','participantNames','participantCodes','id','owner_id'] then raise exception 'invalid spectator projection'; end if;
  rotated:=public.manage_online_spectator(v_id,'rotate');
  if rotated=spectator or public.read_online_spectator(spectator) is not null then raise exception 'old link valid'; end if;
+ if public.online_player_access_active(v_id) then raise exception 'player links enabled by default'; end if;
+ player_a:=public.manage_online_player_access(v_id,'p-a','enable');
+ if player_a is null or public.manage_online_player_access(v_id,'p-a','enable') is distinct from player_a then raise exception 'player enable not idempotent'; end if;
  if not public.set_online_tournament_archive(v_id,1,true) then raise exception 'archive failed'; end if;
  if not exists(select 1 from public.catalog_online_tournaments() c where c.id=v_id and c.archived_at is not null and c.status='READY') then raise exception 'archive catalog'; end if;
  if public.load_online_tournament(v_id)->'payload' is distinct from v_payload then raise exception 'archived backup unavailable'; end if;
  begin perform public.claim_online_workspace(v_id,lease1,false); raise exception 'archived event claimed'; exception when object_not_in_prerequisite_state then null; end;
+ if public.read_online_player_access(player_a) is not null then raise exception 'archived player link survived'; end if;
  if public.read_online_spectator(rotated) is not null then raise exception 'archive did not revoke spectator'; end if;
  if not public.set_online_tournament_archive(v_id,1,false) then raise exception 'unarchive failed'; end if;
  begin perform public.set_online_tournament_archive(v_id,0,true); raise exception 'stale archive accepted'; exception when serialization_failure then null; end;
  if not public.claim_online_workspace(v_id,lease1,false) then raise exception 'claim failed'; end if;
+ if public.publish_online_player_projection(v_id,lease1,1,detail_match,1) then raise exception 'player publication without access'; end if;
+ player_a:=public.manage_online_player_access(v_id,'p-a','enable');
+ player_c:=public.manage_online_player_access(v_id,'p-c','enable');
+ if player_a=player_c or not public.online_player_access_active(v_id) then raise exception 'invalid player link'; end if;
+ if (select count(*) from public.list_online_player_access(v_id) where token is not null)<>2 then raise exception 'owner access list'; end if;
+ begin perform public.manage_online_player_access(v_id,'foreign','enable'); raise exception 'foreign participant enabled'; exception when invalid_parameter_value then null; end;
+ begin perform public.publish_online_player_projection(v_id,lease2,1,detail_match,1); raise exception 'wrong lease published'; exception when lock_not_available then null; end;
+ begin perform public.publish_online_player_projection(v_id,lease1,0,detail_match,1); raise exception 'old revision published'; exception when serialization_failure then null; end;
+ begin perform public.publish_online_player_projection(v_id,lease1,1,jsonb_set(detail_match,'{0,privateCode}','"1234"'),1); raise exception 'private data exposed'; exception when invalid_parameter_value then null; end;
+ if not public.publish_online_player_projection(v_id,lease1,1,detail_match,1) then raise exception 'player publication failed'; end if;
+ if public.read_online_player_access(player_a)->'matches' is distinct from detail_match then raise exception 'own match missing'; end if;
+ if public.read_online_player_access(player_c)->'matches' is distinct from '[]'::jsonb then raise exception 'other player match exposed'; end if;
+ if public.read_online_player_access(player_a)->>'participant'<>'A' then raise exception 'wrong identity'; end if;
+ player_new:=public.manage_online_player_access(v_id,'p-a','rotate');
+ if player_new=player_a or public.read_online_player_access(player_a) is not null then raise exception 'rotated player link survived'; end if;
+ perform public.manage_online_player_access(v_id,'p-c','disable');
+ if public.read_online_player_access(player_c) is not null then raise exception 'revoked player link survived'; end if;
+
  spectator:=public.manage_online_spectator(v_id,'enable');
  if public.online_spectator_detail_setting(v_id,null) then raise exception 'details enabled by default'; end if;
  if public.publish_online_spectator_matches(v_id,lease1,1,detail_match,1) then raise exception 'opt out ignored'; end if;
@@ -84,6 +109,7 @@ begin
  begin perform public.commit_online_tournament(v_id,'Test',1,op2,v_payload); raise exception 'old API bypass'; exception when lock_not_available then null; end;
  begin perform public.commit_leased_online_tournament(v_id,'Test',1,op2,v_payload,lease2); raise exception 'wrong lease write'; exception when lock_not_available then null; end;
  if public.commit_leased_online_tournament(v_id,'Test',1,op2,v_payload,lease1) <> 2 then raise exception 'update'; end if;
+ if public.read_online_player_access(player_new)->'matches' is distinct from 'null'::jsonb then raise exception 'stale player projection exposed'; end if;
  if public.read_online_spectator_details(spectator)->'matches' is distinct from 'null'::jsonb then raise exception 'stale projection exposed'; end if;
  if public.read_online_spectator_brackets(spectator)->'brackets' is distinct from 'null'::jsonb then raise exception 'stale bracket exposed'; end if;
  if public.read_online_spectator_rankings(spectator)->'rankings' is distinct from 'null'::jsonb then raise exception 'stale ranking exposed'; end if;
@@ -139,6 +165,8 @@ begin
  begin perform public.commit_leased_online_tournament(v_id,'Test',29,gen_random_uuid(),v_later,lease1); raise exception 'old token accepted'; exception when lock_not_available then null; end;
  perform set_config('request.jwt.claim.sub','00000000-0000-4000-8000-0000000000b2',true);
  begin perform public.online_spectator_detail_setting(v_id,true); raise exception 'foreign details enabled'; exception when insufficient_privilege then null; end;
+ begin perform public.manage_online_player_access(v_id,'p-a','rotate'); raise exception 'foreign player management'; exception when insufficient_privilege then null; end;
+ begin perform public.list_online_player_access(v_id); raise exception 'foreign player list'; exception when insufficient_privilege then null; end;
  begin perform public.manage_online_spectator(v_id,'enable'); raise exception 'foreign spectator enabled'; exception when insufficient_privilege then null; end;
  begin perform public.set_online_tournament_archive(v_id,29,true); raise exception 'foreign archive accepted'; exception when insufficient_privilege then null; end;
  if exists(select 1 from public.catalog_online_tournaments() c where c.id=v_id) then raise exception 'foreign catalog visible'; end if;
@@ -171,6 +199,7 @@ begin
   begin perform public.set_online_tournament_archive(v_id,30,true); raise exception 'running event archived'; exception when invalid_parameter_value then null; end;
   begin insert into public.tournament_backups(tournament_id,tournament_name,payload) values(v_id,'Broken','{}'); raise exception 'invalid backup accepted'; exception when check_violation then null; end;
 end $$;
+select set_config('test.player_token',public.manage_online_player_access('local-rpc-test','p-a','enable')::text,true);
 select set_config('test.spectator_token',public.manage_online_spectator('local-rpc-test','enable')::text,true);
 reset role;
 set local role anon;
@@ -179,6 +208,9 @@ declare token uuid:=current_setting('test.spectator_token')::uuid; projection js
 begin
  projection:=public.read_online_spectator(token);
  if projection is null or (projection->>'revision')::integer<>30 or (projection->>'recordedResults')::integer<>1 then raise exception 'anonymous public read failed'; end if;
+ if public.read_online_player_access(current_setting('test.player_token')::uuid)->>'participant'<>'A' then raise exception 'anonymous player access failed'; end if;
+ if public.read_online_player_access(gen_random_uuid()) is not null then raise exception 'unknown player token accepted'; end if;
+ if has_function_privilege('anon','public.manage_online_player_access(text,text,text)','EXECUTE') or has_function_privilege('anon','public.publish_online_player_projection(text,uuid,integer,jsonb,integer)','EXECUTE') or has_table_privilege('anon','tournament_private.online_player_links','SELECT') or has_table_privilege('anon','tournament_private.online_player_projection','SELECT') then raise exception 'anon player write access'; end if;
  if public.read_online_spectator(gen_random_uuid()) is not null then raise exception 'unknown token readable'; end if;
  if has_function_privilege('anon','public.publish_online_spectator_rankings(text,uuid,integer,jsonb)','EXECUTE') or has_table_privilege('anon','tournament_private.online_spectator_rankings','SELECT') or has_function_privilege('anon','public.publish_online_spectator_matches(text,uuid,integer,jsonb,integer)','EXECUTE') or has_function_privilege('anon','public.online_spectator_detail_setting(text,boolean)','EXECUTE') or has_table_privilege('anon','tournament_private.online_spectator_details','SELECT') or has_function_privilege('anon','public.manage_online_spectator(text,text)','EXECUTE') or has_function_privilege('anon','public.load_online_tournament(text)','EXECUTE') or has_table_privilege('anon','tournament_private.online_tournaments','SELECT') then raise exception 'anon private access'; end if;
 end $$;

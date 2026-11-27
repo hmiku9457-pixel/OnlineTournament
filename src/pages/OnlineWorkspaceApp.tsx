@@ -77,7 +77,7 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
         }}>Unbestätigten Stand als JSON sichern</button>}
         <button className="btn small" disabled={pending || !connected} onClick={() => void leave(true)}>Datenbankstand neu laden</button>
       </div>{recovery && <p className="muted">Die ursprüngliche übertragene Anfrage wird in diesem Browser journalisiert. Wenn weitere Änderungen hinzugekommen sind, enthält der JSON-Export auch den aktuellsten unbestätigten Stand. Sichere diese Datei vor dem Neuladen. Die JSON-Datei ist keine bestätigte Cloud-Version und darf nicht blind überschrieben werden.</p>}</div>}
-      <p className="muted">Nur für Entwicklungstests. Spieler- und Zuschauerzugriff ist noch nicht öffentlich.</p>
+      <p className="muted">Nur für Entwicklungstests. Spieler- und Zuschauerzugriffe sind in der Online-Übersicht separat freizugeben.</p>
     </section>
     {!error && <div inert={pending || leaving || !connected || revisionState==='stale'} aria-busy={pending}>
       {revisionState!=='stale' && <Routes>

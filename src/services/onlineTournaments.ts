@@ -254,7 +254,8 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
   if(publishing||!supabase||workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
   publishing=true;
   try {
-    if(!await spectatorDetailSetting(start.id))return;
+    const [spectatorEnabled,playerActive]=await Promise.all([spectatorDetailSetting(start.id),supabase.rpc('online_player_access_active',{p_id:start.id})]);
+    if(!spectatorEnabled&&playerActive.data!==true)return;
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
     const tournament=getAllMockTournaments().find(t=>t.id===start.id);
     if(!tournament)return;
@@ -265,10 +266,15 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
     ]).filter(m=>roster.has(m.sideA)&&roster.has(m.sideB)&&m.sideA!==m.sideB);
     const rank=(status:string)=>['LIVE','READY','CONFIRMATION'].includes(status)?0:status==='FINISHED'?1:2;
     rows.sort((a,b)=>rank(a.status)-rank(b.status));
-    const matches=rows.slice(0,1000).map(m=>({sideA:m.sideA,sideB:m.sideB,phase:m.phase,round:m.round,status:m.status,
+    const matches=rows.slice(0,5000).map(m=>({sideA:m.sideA,sideB:m.sideB,phase:m.phase,round:m.round,status:m.status,
       table:m.table,score:m.score,sets:(m.sets??[]).map(s=>({sideAScore:s.sideAScore,sideBScore:s.sideBScore}))}));
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
-    const {error}=await supabase.rpc('publish_online_spectator_matches',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches,p_total:rows.length}).abortSignal(AbortSignal.timeout(8000));
+    if(playerActive.data===true) {
+      // The server filters the projection by the capability's stable roster identity.
+      await supabase.rpc('publish_online_player_projection',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches,p_total:rows.length}).abortSignal(AbortSignal.timeout(8000));
+    }
+    if(!spectatorEnabled||workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+    const {error}=await supabase.rpc('publish_online_spectator_matches',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches.slice(0,1000),p_total:rows.length}).abortSignal(AbortSignal.timeout(8000));
     if(error)throw new Error(error.message);
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
     const rankings:Array<{phase:string;label:string;kind:string;rows:Array<MockStanding|{rank:number;name:string;placement:string;status:string}>}>=[];
@@ -293,4 +299,23 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
     const bracketResult=await supabase.rpc('publish_online_spectator_brackets',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_brackets:brackets}).abortSignal(AbortSignal.timeout(8000));
     if(bracketResult.error)throw new Error(bracketResult.error.message);
   } finally {publishing=false;}
+}
+
+export interface OnlinePlayerAccess {participant_id:string;name:string;token:string|null}
+export async function listOnlinePlayerAccess(id:string):Promise<OnlinePlayerAccess[]> {
+  const {client,userId}=await account();
+  const {data,error}=await client.rpc('list_online_player_access',{p_id:id});
+  if(error)throw new Error(error.message);
+  if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
+  return (data??[]) as OnlinePlayerAccess[];
+}
+export async function manageOnlinePlayerAccess(id:string,participantId:string,action:'enable'|'rotate'|'disable'):Promise<string|null> {
+  const {client,userId}=await account();
+  const {data,error}=await client.rpc('manage_online_player_access',{p_id:id,p_participant_id:participantId,p_action:action});
+  if(error)throw new Error(error.message);
+  if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
+  return typeof data==='string'?data:null;
+}
+export function onlinePlayerUrl(token:string):string {
+  const url=new URL(window.location.href);url.search='';url.hash='/my-games/'+token;return url.href;
 }
