@@ -27,7 +27,7 @@ async function load(id: string): Promise<OnlineTournament> {
   if (payload.tournamentId !== id) throw new Error('Falsche Turnierkennung.');
   return { ...data, payload } as OnlineTournament;
 }
-async function commit(backup: TournamentBackup, expected: number, ownerId: string, operationId = crypto.randomUUID()): Promise<number> {
+async function commit(backup: TournamentBackup, expected: number, ownerId: string, operationId: string = crypto.randomUUID()): Promise<number> {
   const args = { p_id: backup.tournamentId, p_name: backupTournamentName(backup),
     p_expected_revision: expected, p_operation_id: operationId, p_payload: backup };
   for (let attempt = 0; attempt < 2; attempt++) {
