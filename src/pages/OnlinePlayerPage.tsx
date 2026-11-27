@@ -30,7 +30,7 @@ export function OnlinePlayerPage({token}:{token:string}) {
    }catch{if(alive){setData(null);setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
    finally{running=false;}
   }
-  void refresh();const timer=window.setInterval(()=>void refresh(),15000);
+  void refresh();const timer=window.setInterval(()=>void refresh(),10000);
   const focus=()=>void refresh();
   window.addEventListener('focus',focus);window.addEventListener('online',focus);
   return()=>{alive=false;window.clearInterval(timer);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);};
@@ -57,7 +57,7 @@ export function OnlinePlayerPage({token}:{token:string}) {
  {lastPage>0&&<div className="actions"><button className="btn" disabled={!currentPage} onClick={()=>setPage(currentPage-1)}>Zurück</button><span>Seite {currentPage+1}/{lastPage+1}</span><button className="btn" disabled={currentPage===lastPage} onClick={()=>setPage(currentPage+1)}>Weiter</button></div>}
  </>}
  </section>
- <p className="muted">Bestätigter Stand: {new Date(data.updatedAt).toLocaleString('de-DE')} · Revision {data.revision} · Aktualisierung alle 15 Sekunden. Gib diesen persönlichen Link nicht weiter.</p>
+ <p className="muted">Bestätigter Stand: {new Date(data.updatedAt).toLocaleString('de-DE')} · Revision {data.revision} · Aktualisierung alle 10 Sekunden. Gib diesen persönlichen Link nicht weiter.</p>
  </>}
  </main>;
 }

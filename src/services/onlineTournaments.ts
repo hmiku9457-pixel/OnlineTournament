@@ -9,7 +9,7 @@ import { isStageStarted } from '@/services/mockPhaseLifecycle';
 import { persistOnlineOperation, removeOnlineOperation, listPendingOnlineOperations, type PendingOnlineOperation } from '@/services/onlineOutbox';
 import { supabase } from '@/lib/supabase';
 import { backupTournamentName, captureTournamentBackup, validateTournamentBackup,
-  initializeRemoteTournamentStorage, invalidateRemoteTournamentStorage, initialTournamentBackup, hasPendingRemoteWrites, getTournamentStorageError, markRemoteWorkspaceStale, RemoteWriteUnavailableError, type TournamentBackup } from '@/services/localTournamentStorage';
+  initializeRemoteTournamentStorage, runRemoteTournamentBatch, invalidateRemoteTournamentStorage, initialTournamentBackup, hasPendingRemoteWrites, getTournamentStorageError, markRemoteWorkspaceStale, RemoteWriteUnavailableError, type TournamentBackup } from '@/services/localTournamentStorage';
 
 import { buildNewTournament, type CreateMockTournamentInput } from '@/services/mockTournamentStore';
 import type { DemoTournament } from '@/data/demoTournaments';
@@ -252,8 +252,13 @@ export async function spectatorDetailSetting(id:string, enabled:boolean|null=nul
 // Only calculate from a quiescent confirmed director state. The database
 // compares the exact revision and current lease again before publishing.
 let publishing=false;
+let queuedProjection:NonNullable<typeof workspaceRevision>|undefined;
+export function refreshConfirmedOnlineProjection():void {
+  if(workspaceRevision&&!hasPendingRemoteWrites()&&!getTournamentStorageError())void publishSpectatorDetails(workspaceRevision).catch(()=>{});
+}
 async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevision>):Promise<void> {
-  if(publishing||!supabase||workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+  if(!supabase||workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+  if(publishing){queuedProjection=start;return;}
   publishing=true;
   try {
     const [spectatorEnabled,playerActive]=await Promise.all([spectatorDetailSetting(start.id),supabase.rpc('online_player_access_active',{p_id:start.id})]);
@@ -303,7 +308,11 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
     }));
     const bracketResult=await supabase.rpc('publish_online_spectator_brackets',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_brackets:brackets}).abortSignal(AbortSignal.timeout(8000));
     if(bracketResult.error)throw new Error(bracketResult.error.message);
-  } finally {publishing=false;}
+  } finally {
+    publishing=false;
+    const queued=queuedProjection;queuedProjection=undefined;
+    if(queued&&workspaceRevision===queued&&!hasPendingRemoteWrites()&&!getTournamentStorageError())void publishSpectatorDetails(queued).catch(()=>{});
+  }
 }
 
 export interface OnlinePlayerAccess {participant_id:string;name:string;token:string|null}
@@ -339,16 +348,30 @@ export function reportMatchNames(row:OnlineResultReport):{a:string;b:string}|nul
   return match?{a:match.sideA,b:match.sideB}:null;
 }
 export async function adoptOnlineResultReport(row:OnlineResultReport):Promise<void> {
+  await adoptOnlineResultReports([row]);
+}
+export async function adoptOnlineResultReports(requested:readonly OnlineResultReport[]):Promise<number> {
   const start=workspaceRevision;
-  if(!start||start.revision!==row.revision||hasPendingRemoteWrites()||getTournamentStorageError()||!matchingReports(row))throw new Error('Die Meldung ist nicht mehr aktuell oder nicht übereinstimmend.');
-  const fresh=(await listOnlineResultReports(start.id)).find(r=>r.matchId===row.matchId);
-  if(!fresh||!matchingReports(fresh)||!matchingReports({aSets:fresh.aSets,bSets:row.aSets})||workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())throw new Error('Die Meldung hat sich geändert.');
-  const tournament=getAllMockTournaments().find(t=>t.id===start.id);
-  const match=tournament&&getMockRuntimeMatches(tournament).find(m=>m.id===row.matchId);
-  if(!tournament||!match||!['RUNNING','PAUSED'].includes(tournament.status)||!['LIVE','READY'].includes(match.status)||!match.table.startsWith('Tisch ')||match.sets?.length||match.extraTimeProgress||!canEditMockMatch(tournament,match.id)||match.startedAt!==row.startedAt||match.bestOf!==row.bestOf||match.requiresWinner!==row.requiresWinner||tournament.participantIds?.[match.sideA]!==row.aId||tournament.participantIds?.[match.sideB]!==row.bId)throw new Error('Die Begegnung ist nicht mehr unverändert zugewiesen.');
-  const invalid=validateCompleteResult(tournament.sport,match.bestOf,row.aSets!,match.requiresWinner);
-  if(invalid)throw new Error(invalid);
-  completeMockMatch(match.id,row.aSets!,'FINISHED',true);
+  if(!start||!requested.length||requested.length>500||new Set(requested.map(r=>r.matchId)).size!==requested.length||hasPendingRemoteWrites()||getTournamentStorageError()||requested.some(r=>r.revision!==start.revision||!matchingReports(r)))throw new Error('Die Meldungen sind nicht mehr aktuell oder nicht übereinstimmend.');
+  const fresh=new Map((await listOnlineResultReports(start.id)).map(r=>[r.matchId,r]));
+  if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())throw new Error('Die Meldungen haben sich geändert.');
+  function check(row:OnlineResultReport) {
+    const actual=fresh.get(row.matchId);
+    if(!actual||actual.revision!==row.revision||actual.aId!==row.aId||actual.bId!==row.bId||actual.startedAt!==row.startedAt||actual.bestOf!==row.bestOf||actual.requiresWinner!==row.requiresWinner||!matchingReports(actual)||!matchingReports({aSets:actual.aSets,bSets:row.aSets}))throw new Error('Eine Meldung hat sich geändert. Bitte aktualisieren.');
+    const tournament=getAllMockTournaments().find(t=>t.id===start!.id);
+    const match=tournament&&getMockRuntimeMatches(tournament).find(m=>m.id===row.matchId);
+    if(!tournament||!match||!['RUNNING','PAUSED'].includes(tournament.status)||!['LIVE','READY'].includes(match.status)||!match.table.startsWith('Tisch ')||match.sets?.length||match.extraTimeProgress||!canEditMockMatch(tournament,match.id)||match.startedAt!==row.startedAt||match.bestOf!==row.bestOf||match.requiresWinner!==row.requiresWinner||tournament.participantIds?.[match.sideA]!==row.aId||tournament.participantIds?.[match.sideB]!==row.bId)throw new Error('Eine Begegnung ist nicht mehr unverändert zugewiesen.');
+    const invalid=validateCompleteResult(tournament.sport,match.bestOf,row.aSets!,match.requiresWinner);
+    if(invalid)throw new Error(invalid);
+  }
+  requested.forEach(check);
+  return runRemoteTournamentBatch(()=>{
+    for(const row of requested){
+      check(row);
+      completeMockMatch(row.matchId,row.aSets!,'FINISHED',true);
+    }
+    return requested.length;
+  });
 }
 export async function resetOnlineResultReports(row:OnlineResultReport):Promise<void> {
   const start=workspaceRevision;

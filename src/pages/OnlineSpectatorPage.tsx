@@ -49,7 +49,7 @@ export function OnlineSpectatorPage({token}:{token:string}) {
       finally{running=false;}
     }
     void refresh();
-    const timer=window.setInterval(()=>void refresh(),15000);
+    const timer=window.setInterval(()=>void refresh(),10000);
     const focus=()=>void refresh();
     window.addEventListener('focus',focus);window.addEventListener('online',focus);
     return()=>{active=false;window.clearInterval(timer);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);};
@@ -103,7 +103,7 @@ export function OnlineSpectatorPage({token}:{token:string}) {
             {m.sets.length>0&&<small>{m.sets.map(s=>s.sideAScore+':'+s.sideBScore).join(', ')}</small>}
           </article>)}</div></div>}/>
       </section>)}
-      <p className="muted">Bestätigter Stand: {new Date(data.updatedAt).toLocaleString('de-DE')} · Revision {data.revision} · Aktualisierung alle 15 Sekunden. Nur Lesezugriff.</p>
+      <p className="muted">Bestätigter Stand: {new Date(data.updatedAt).toLocaleString('de-DE')} · Revision {data.revision} · Aktualisierung alle 10 Sekunden. Nur Lesezugriff.</p>
     </>}
   </main>;
 }

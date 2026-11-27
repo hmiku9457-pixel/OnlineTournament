@@ -338,8 +338,10 @@ try {
   await opponent.getByText(/Beide Meldungen stimmen überein/).waitFor();
   assert.equal(rows.get(id).revision,beforeReports,'reports cannot mutate canonical revision');
   await a.getByRole('button',{name:'Übereinstimmendes Ergebnis übernehmen'}).click({timeout:45000});
+  await a.getByRole('button',{name:'Übereinstimmendes Ergebnis übernehmen'}).waitFor({state:'hidden',timeout:45000});
   await confirmed(a);
   const adopted=JSON.parse(rows.get(id).payload.entries['online-tournament:mock-match-results:v2']).find(r=>r.matchId===reportId);
+  assert.ok(adopted,'result must be present in the confirmed snapshot');
   assert.equal(adopted.status,'FINISHED');
   assert.equal(adopted.adminConfirmed,true);
   assert.equal(rows.get(id).revision,beforeReports+1);

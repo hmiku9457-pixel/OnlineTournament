@@ -549,6 +549,25 @@ function requireWritableStorage(): void {
   if (currentError) throw new Error(currentError);
   if (remote?.stale) throw new Error('Ein neuerer Datenbankstand ist vorhanden. Bitte neu laden.');
 }
+/** A synchronous compound operation must either enqueue all writes or none.
+ * The remote journal persists the resulting snapshot as one CAS revision.
+ * Never use with an async callback or while another save is pending. */
+export function runRemoteTournamentBatch<T>(action:()=>T):T {
+  requireWritableStorage();
+  if(!remote||remote.invalidated||hasPendingRemoteWrites())throw new Error('Bitte zunächst die laufende Speicherung abschließen.');
+  const before=new Map(workingValues);
+  try {
+    const result=action();
+    return result;
+  } catch(error) {
+    workingValues=before;
+    pendingChanges.clear();
+    window.dispatchEvent(new Event('tournament-canonical-refresh'));
+    window.dispatchEvent(new Event('mock-runtime-change'));
+    window.dispatchEvent(new Event('mock-phase-change'));
+    throw error;
+  }
+}
 export function hasPendingRemoteWrites(): boolean {
   return remote !== null && (pendingChanges.size > 0 || outstandingCommits > 0);
 }
