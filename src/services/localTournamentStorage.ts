@@ -1,3 +1,4 @@
+import type { DemoTournament } from '@/data/demoTournaments';
 /** Canonical, transactionally committed browser-local tournament state.
  * The synchronous façade exists for the match engine; IndexedDB is the
  * durable authority. One browser event's writes share one readwrite tx. */
@@ -476,6 +477,15 @@ export function validateTournamentBackup(value: unknown): TournamentBackup {
     ...Object.entries(verified).map(([key, value]) => ({ key, value }))]);
   if (report.corrupt.length || !validTournament(verified[RECORD_PREFIX + id], id)) throw new Error('Die Sicherung enthält beschädigte Turnierdaten.');
   return { version: 1, tournamentId: id, exportedAt: value.exportedAt, entries: verified };
+}
+/** Produce the initial scoped state without creating a local record. */
+export function initialTournamentBackup(tournament: DemoTournament): TournamentBackup {
+  const entries: Record<string, string> = {
+    [RECORD_PREFIX + tournament.id]: JSON.stringify({ tournament, sortOrder: Date.now() }),
+  };
+  for (const key of ARRAY_KEYS) entries[key] = '[]';
+  for (const key of OBJECT_KEYS) entries[key] = '{}';
+  return validateTournamentBackup({ version: 1, tournamentId: tournament.id, exportedAt: new Date().toISOString(), entries });
 }
 export function backupTournamentName(backup: TournamentBackup): string {
   return JSON.parse(backup.entries[RECORD_PREFIX + backup.tournamentId]).tournament.name as string;

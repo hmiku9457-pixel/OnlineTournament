@@ -44,8 +44,8 @@ export function OnlineTournamentsPage() {
         </div>)}
       </section>
       <section className="card"><h2>Online-Testturnier vorbereiten</h2>
-        <p className="muted">Erstelle zunächst ein lokales Turnier mit dem bekannten Assistenten. Übernimm es vor dem Start hier als separate Online-Version. Spätere lokale Änderungen werden nicht synchronisiert.</p>
-        <Link className="btn" to="/tournaments/new">Turnier vorbereiten</Link>
+        <p className="muted">Erstelle ein neues Online-Turnier direkt im Assistenten oder übernimm ein vorhandenes, ungestartetes lokales Turnier als unabhängige Kopie.</p>
+        <Link className="btn primary" to="/tournaments/new?mode=online">Neues Online-Turnier erstellen</Link>
         {local.map((t) => <div key={t.id} className="actions" style={{ marginTop: 12 }}><strong>{t.name}</strong>
           <button className="btn small primary" disabled={busy || items.some((i) => i.id === t.id)} onClick={() => void copy(t.id)}>Als Online-Testturnier anlegen</button>
         </div>)}

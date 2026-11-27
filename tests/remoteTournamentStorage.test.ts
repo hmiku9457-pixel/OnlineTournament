@@ -78,6 +78,8 @@ describe('isolated remote tournament persistence', () => {
     expect(adapter.prestartRecoveryStorageKey(t.id)).toContain('online-prestart-recovery');
     expect(lifecycle.startFirstStage(t)).toBe(true);
     await adapter.flushPendingLocalTournamentWrites();
+    store.updateMockTournamentStatus(t.id, 'RUNNING');
+    await adapter.flushPendingLocalTournamentWrites();
     const running = store.getMockTournament(t.id);
     const match = runtime.getMockRuntimeMatches(running).find((m) => m.status === 'WAITING');
     expect(match).toBeDefined();
@@ -89,6 +91,21 @@ describe('isolated remote tournament persistence', () => {
     expect(results).toEqual(expect.arrayContaining([expect.objectContaining({ matchId: match!.id })]));
     expect(JSON.stringify(persisted)).toContain('Tisch 1');
     expect(data.get('online-tournament:mock-match-results:v2') ?? '').not.toContain(match!.id);
+  });
+  it('builds initial cloud state without modifying local storage', async () => {
+    const { adapter } = await setup();
+    const store = await import('@/services/mockTournamentStore');
+    const before = [...data];
+    const tournament = store.buildNewTournament({
+      name: 'Direkt online', sport: 'table_tennis', discipline: 'SINGLES', tables: 3,
+      minimumMatches: 2, estimatedDurationMinutes: 60,
+      participantNames: ['A', 'B', 'C', 'D'],
+      phases: [{ type: 'GROUPS', label: 'Gruppen', bestOf: 3, entrantCount: 4, groupCount: 2, swissRounds: 1, knockoutBestOf: [] }],
+    });
+    const backup = adapter.initialTournamentBackup(tournament);
+    expect(adapter.backupTournamentName(backup)).toBe('Direkt online');
+    expect([...data]).toEqual(before);
+    expect(store.getAllMockTournaments().some(t => t.id === tournament.id)).toBe(false);
   });
   it('does not persist a replacement or deletion of the online event', async () => {
     const { adapter, backup } = await setup();

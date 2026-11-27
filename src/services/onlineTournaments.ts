@@ -1,6 +1,9 @@
 import { supabase } from '@/lib/supabase';
 import { backupTournamentName, captureTournamentBackup, validateTournamentBackup,
-  initializeRemoteTournamentStorage, invalidateRemoteTournamentStorage, type TournamentBackup } from '@/services/localTournamentStorage';
+  initializeRemoteTournamentStorage, invalidateRemoteTournamentStorage, initialTournamentBackup, type TournamentBackup } from '@/services/localTournamentStorage';
+
+import { buildNewTournament, type CreateMockTournamentInput } from '@/services/mockTournamentStore';
+import type { DemoTournament } from '@/data/demoTournaments';
 
 export interface OnlineTournamentSummary { id: string; name: string; revision: number; updated_at: string }
 interface OnlineTournament extends OnlineTournamentSummary { payload: TournamentBackup }
@@ -24,9 +27,9 @@ async function load(id: string): Promise<OnlineTournament> {
   if (payload.tournamentId !== id) throw new Error('Falsche Turnierkennung.');
   return { ...data, payload } as OnlineTournament;
 }
-async function commit(backup: TournamentBackup, expected: number, ownerId: string): Promise<number> {
+async function commit(backup: TournamentBackup, expected: number, ownerId: string, operationId = crypto.randomUUID()): Promise<number> {
   const args = { p_id: backup.tournamentId, p_name: backupTournamentName(backup),
-    p_expected_revision: expected, p_operation_id: crypto.randomUUID(), p_payload: backup };
+    p_expected_revision: expected, p_operation_id: operationId, p_payload: backup };
   for (let attempt = 0; attempt < 2; attempt++) {
     const { client, userId } = await account();
     if (userId !== ownerId) throw new Error('Die Anmeldung hat sich geändert.');
@@ -40,6 +43,25 @@ async function commit(backup: TournamentBackup, expected: number, ownerId: strin
     throw new Error(error.message || 'Verbindungsfehler.');
   }
   throw new Error('Speicherung nicht bestätigt.');
+}
+export interface OnlineCreationAttempt {
+  tournament: DemoTournament;
+  backup: TournamentBackup;
+  operationId: string;
+  inputFingerprint: string;
+  ownerId: string;
+}
+/** An ambiguous creation can be retried with the original identity and exact payload. */
+export async function prepareOnlineCreation(input: CreateMockTournamentInput): Promise<OnlineCreationAttempt> {
+  const { userId } = await account();
+  if (input.overwriteTournamentId) throw new Error('Online-Turniere werden nicht automatisch überschrieben.');
+  const tournament = buildNewTournament(input);
+  return { tournament, backup: initialTournamentBackup(tournament), operationId: crypto.randomUUID(),
+    inputFingerprint: JSON.stringify(input), ownerId: userId };
+}
+export async function commitOnlineCreation(attempt: OnlineCreationAttempt): Promise<DemoTournament> {
+  await commit(attempt.backup, 0, attempt.ownerId, attempt.operationId);
+  return attempt.tournament;
 }
 export async function createOnlineTournamentFromLocal(id: string): Promise<void> {
   const { userId } = await account();
