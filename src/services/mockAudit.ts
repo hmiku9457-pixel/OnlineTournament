@@ -49,7 +49,7 @@ export function recordMockAudit(event: Omit<MockAuditEntry, 'id' | 'at'>) {
     if (Array.isArray(parsed)) old = parsed as MockAuditEntry[];
   } catch { /* clean invalid local test state */ }
   const entry: MockAuditEntry = { ...event, id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, at: Date.now() };
-  localTournamentStorage.setItem(KEY, JSON.stringify([entry, ...old].slice(0, 2000)));
+  localTournamentStorage.setItem(KEY, JSON.stringify([entry, ...old]));
   window.dispatchEvent(new CustomEvent('mock-audit-change', { detail: entry }));
   return entry;
 }

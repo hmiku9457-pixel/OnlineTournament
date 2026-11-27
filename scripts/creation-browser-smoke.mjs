@@ -1668,7 +1668,42 @@ try {
     'multiple per-day pauses survive draft reload');
   await dayPlanContext.close();
 
-  process.stdout.write('Creation wizard browser smoke tests passed.\n');
+  // Scoped export/restore through real IndexedDB, across browser contexts.
+  const backupContext = await browser.newContext({ acceptDownloads: true });
+  const backupPage = await backupContext.newPage();
+  await backupPage.goto(base + '/#/backups');
+  await backupPage.getByRole('heading', { name: 'Turniersicherungen', exact: true }).waitFor();
+  const fixture = await backupPage.evaluate(async () => {
+    const { createMockTournament } = await import('/src/services/mockTournamentStore.ts');
+    const { flushPendingLocalTournamentWrites } = await import('/src/services/localTournamentStorage.ts');
+    const tournament = createMockTournament({
+      name: 'Sicherung Browser Test', sport: 'table_tennis', discipline: 'SINGLES',
+      tables: 3, minimumMatches: 2, estimatedDurationMinutes: 60,
+      participantNames: Array.from({ length: 8 }, (_, index) => 'Spieler ' + (index + 1)),
+      phases: [{ type: 'GROUPS', label: 'Gruppen', bestOf: 3, entrantCount: 8, groupCount: 2, swissRounds: 1, knockoutBestOf: [] }],
+    });
+    await flushPendingLocalTournamentWrites();
+    return tournament.id;
+  });
+  await backupPage.reload();
+  await backupPage.getByText('Sicherung Browser Test', { exact: true }).waitFor();
+  const downloadPromise = backupPage.waitForEvent('download');
+  await backupPage.getByRole('button', { name: 'JSON herunterladen' }).click();
+  const backupDownload = await downloadPromise;
+  const backupPath = await backupDownload.path();
+  assert.ok(backupPath);
+  const restoreContext = await browser.newContext();
+  const restorePage = await restoreContext.newPage();
+  await restorePage.goto(base + '/#/backups');
+  await restorePage.locator('#restore-file').setInputFiles(backupPath);
+  await restorePage.waitForURL('**/tournaments/' + fixture + '/control');
+  await restorePage.reload();
+  await restorePage.waitForURL('**/tournaments/' + fixture + '/control');
+  await restorePage.getByText('Sicherung Browser Test', { exact: true }).first().waitFor();
+  await restoreContext.close();
+  await backupContext.close();
+
+  process.stdout.write('Creation wizard and tournament backup browser smoke tests passed.\n');
 } finally {
   await browser.close();
 }

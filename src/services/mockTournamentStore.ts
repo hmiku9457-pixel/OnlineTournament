@@ -234,7 +234,7 @@ export function cleanupReplacedTournamentData(tournamentId: string): void {
     'online-tournament:mock-phase-lifecycle:v1',
     'online-tournament:swiss-round-fixtures:v1',
     'online-tournament:mock-audit:v1',
-    'online-tournament:mock-inline-breaks:v1',
+    'online-tournament:mock-inline-breaks:v2',
     'online-tournament:group-cutoff-decisions:v1',
   ];
   const arraysWithMatchId = [
@@ -1041,6 +1041,8 @@ export function removeLocalPrototypeTournaments() {
   localTournamentStorage.removeItem('online-tournament:mock-blocked-tables:v1');
   localTournamentStorage.removeItem('online-tournament:mock-draw-config:v1');
   localTournamentStorage.removeItem('online-tournament:mock-phase-lifecycle:v1');
+  localTournamentStorage.removeItem('online-tournament:mock-inline-breaks:v2');
+  localTournamentStorage.removeItem('online-tournament:group-cutoff-decisions:v1');
   localTournamentStorage.removeItem('online-tournament:withdrawn-participants:v1');
   localTournamentStorage.removeItem('online-tournament:withdrawal-restore:v1');
   localTournamentStorage.removeItem('online-tournament:withdrawal-timing:v1');
