@@ -11,7 +11,7 @@ export function OnlineRecoveryPage({ operations }: { operations: PendingOnlineOp
   async function resolve(op: PendingOnlineOperation, discard: boolean) {
     if(busy) return;
     setBusy(true); setMessage('');
-    try { await resolvePendingOnlineOperation(op,discard); window.location.reload(); }
+    try { await resolvePendingOnlineOperation(op,discard); if(discard && op.expectedRevision===0) window.location.assign(localOverviewUrl()); else window.location.reload(); }
     catch(error) { setMessage(error instanceof Error ? error.message : 'Wiederherstellung fehlgeschlagen.'); }
     finally { setBusy(false); }
   }
@@ -19,7 +19,7 @@ export function OnlineRecoveryPage({ operations }: { operations: PendingOnlineOp
     <h1>Unbestätigte Online-Speicherung</h1>
     <p>Vor einer weiteren Bearbeitung muss die frühere Speicheranfrage geklärt werden. Sie wurde vor der Übertragung dauerhaft in diesem Browser hinterlegt.</p>
     {loading ? <p>Konto wird geprüft …</p> : session?.user.id !== operations[0]?.ownerId ? <p role="alert">Bitte mit dem ursprünglichen Konto anmelden.</p> : operations.map((op,index) => <div className="card" key={op.operationId}>
-      <strong>Änderung nach Revision {op.expectedRevision}</strong>
+      <strong>{op.expectedRevision===0 ? 'Unbestätigte Turniererstellung' : 'Änderung nach Revision '+op.expectedRevision}</strong>
       <p>{new Date(op.createdAt).toLocaleString('de-DE')}</p>
       <div className="actions">
         <button className="btn primary" disabled={busy || index!==0} onClick={()=>void resolve(op,false)}>Ursprüngliche Anfrage erneut senden</button>

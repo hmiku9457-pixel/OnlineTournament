@@ -60,13 +60,29 @@ export interface OnlineCreationAttempt {
 export async function prepareOnlineCreation(input: CreateMockTournamentInput): Promise<OnlineCreationAttempt> {
   const { userId } = await account();
   if (input.overwriteTournamentId) throw new Error('Online-Turniere werden nicht automatisch überschrieben.');
+  if ((await listPendingOnlineOperations(userId)).some(op => op.expectedRevision === 0)) throw new Error('Eine frühere Online-Erstellung ist ungeklärt. Bitte zuerst in der Online-Übersicht wiederherstellen.');
   const tournament = buildNewTournament(input);
   return { tournament, backup: initialTournamentBackup(tournament), operationId: crypto.randomUUID(),
     inputFingerprint: JSON.stringify(input), ownerId: userId };
 }
 export async function commitOnlineCreation(attempt: OnlineCreationAttempt): Promise<DemoTournament> {
-  await commit(attempt.backup, 0, attempt.ownerId, attempt.operationId);
+  await commitCreationJournal({ snapshot: attempt.backup, ownerId: attempt.ownerId, tournamentId: attempt.tournament.id,
+    expectedRevision: 0, operationId: attempt.operationId, createdAt: new Date().toISOString() });
   return attempt.tournament;
+}
+async function commitCreationJournal(op: PendingOnlineOperation): Promise<void> {
+  const { userId } = await account();
+  if (op.ownerId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
+  const pending = await listPendingOnlineOperations(userId);
+  if (pending.some(entry => entry.expectedRevision === 0 && entry.operationId !== op.operationId))
+    throw new Error('Eine frühere Online-Erstellung ist ungeklärt. Bitte zuerst in der Online-Übersicht wiederherstellen.');
+  await persistOnlineOperation(op);
+  await commit(op.snapshot,0,userId,op.operationId);
+  await removeOnlineOperation(op.operationId);
+}
+export async function listPendingOnlineCreations(): Promise<PendingOnlineOperation[]> {
+  const { userId } = await account();
+  return (await listPendingOnlineOperations(userId)).filter(op=>op.expectedRevision===0);
 }
 export async function createOnlineTournamentFromLocal(id: string): Promise<void> {
   const { userId } = await account();
@@ -74,7 +90,7 @@ export async function createOnlineTournamentFromLocal(id: string): Promise<void>
   const record = JSON.parse(backup.entries['online-tournament:local-prototype-tournaments:v1:record:' + id]);
   if (record.tournament.hasStarted || !['DRAFT','REGISTRATION','READY'].includes(record.tournament.status))
     throw new Error('Nur noch nicht gestartete Turniere können als Online-Testturnier übernommen werden.');
-  await commit(backup, 0, userId);
+  await commitCreationJournal({snapshot:backup, ownerId:userId,tournamentId:id,expectedRevision:0,operationId:crypto.randomUUID(),createdAt:new Date().toISOString()});
 }
 export function onlineWorkspaceUrl(id: string): string {
   const url = new URL(window.location.href);
@@ -109,11 +125,12 @@ export async function resolvePendingOnlineOperation(op: PendingOnlineOperation, 
 }
 export async function initializeOnlineWorkspace(id: string): Promise<PendingOnlineOperation[]> {
   const { client, userId } = await account();
+  const unresolved = await listPendingOnlineOperations(userId,id);
+  if ((await account()).userId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
+  if (unresolved.length) return unresolved;
   const loaded = await load(id);
   let revision = loaded.revision;
   if ((await account()).userId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
-  const unresolved = await listPendingOnlineOperations(userId,id);
-  if (unresolved.length) return unresolved;
   let pending: PendingOnlineOperation | undefined;
   initializeRemoteTournamentStorage(loaded.payload, async (snapshot) => {
     if (pending && pending.snapshot !== snapshot) throw new Error('Eine frühere Speicheranfrage ist noch ungeklärt.');

@@ -39,12 +39,13 @@ export async function persistOnlineOperation(op: PendingOnlineOperation): Promis
 export async function removeOnlineOperation(operationId: string): Promise<void> {
   await transact('readwrite',store => store.delete(operationId));
 }
-export async function listPendingOnlineOperations(ownerId: string,tournamentId: string): Promise<PendingOnlineOperation[]> {
-  const rows = await transact('readonly',store => store.index('ownerTournament').getAll([ownerId,tournamentId]));
+export async function listPendingOnlineOperations(ownerId: string,tournamentId?: string): Promise<PendingOnlineOperation[]> {
+  const range = tournamentId ? IDBKeyRange.only([ownerId,tournamentId]) : IDBKeyRange.bound([ownerId],[ownerId,[]],false,true);
+  const rows = await transact('readonly',store => store.index('ownerTournament').getAll(range));
   return (rows as PendingOnlineOperation[]).map(op => {
-    if (op.ownerId !== ownerId || op.tournamentId !== tournamentId || !Number.isInteger(op.expectedRevision)
-      || op.expectedRevision < 1 || !/^[0-9a-f-]{36}$/i.test(op.operationId)
-      || validateTournamentBackup(op.snapshot).tournamentId !== tournamentId) throw new Error('Ungültige Wiederherstellungsdaten. Bitte nicht überschreiben.');
+    if (op.ownerId !== ownerId || (tournamentId !== undefined && op.tournamentId !== tournamentId) || !Number.isInteger(op.expectedRevision)
+      || op.expectedRevision < 0 || !/^[0-9a-f-]{36}$/i.test(op.operationId)
+      || validateTournamentBackup(op.snapshot).tournamentId !== op.tournamentId) throw new Error('Ungültige Wiederherstellungsdaten. Bitte nicht überschreiben.');
     return op;
   }).sort((a,b) => a.expectedRevision-b.expectedRevision || a.createdAt.localeCompare(b.createdAt));
 }
