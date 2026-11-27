@@ -72,6 +72,13 @@ begin
  begin perform public.publish_online_player_projection(v_id,lease1,0,detail_match,1); raise exception 'old revision published'; exception when serialization_failure then null; end;
  begin perform public.publish_online_player_projection(v_id,lease1,1,jsonb_set(detail_match,'{0,privateCode}','"1234"'),1); raise exception 'private data exposed'; exception when invalid_parameter_value then null; end;
  if not public.publish_online_player_projection(v_id,lease1,1,detail_match,1) then raise exception 'player publication failed'; end if;
+ if public.online_projection_plan_v2(v_id,1)->'player' is distinct from 'true'::jsonb then raise exception 'missing context not planned'; end if;
+ if not public.publish_online_player_projection_v2(v_id,lease1,1,detail_match,1,'{"p-a":{"phaseStatus":"Aktiv","placement":null,"lastFinishedAt":12345,"breakUntil":null,"rankings":[{"phase":"Liga","label":"Tabelle","rank":1}]},"p-c":{"phaseStatus":"Nicht qualifiziert","placement":null,"lastFinishedAt":null,"breakUntil":null,"rankings":[]}}') then raise exception 'personal context publication failed'; end if;
+ if public.online_projection_plan_v2(v_id,1)->'player' is distinct from 'false'::jsonb then raise exception 'current context planned again'; end if;
+ if public.read_online_player_bundle(player_a)->'context'->>'phaseStatus'<>'Aktiv' or public.read_online_player_bundle(player_c)->'context'->>'phaseStatus'<>'Nicht qualifiziert' then raise exception 'private context mismatch'; end if;
+ if public.read_online_player_bundle(gen_random_uuid())->'context' is distinct from 'null'::jsonb then raise exception 'foreign context exposed'; end if;
+ begin perform public.publish_online_player_projection_v2(v_id,lease1,1,detail_match,1,'{"foreign":{}}'); raise exception 'foreign participant context accepted'; exception when invalid_parameter_value then null; end;
+
  if public.read_online_player_access(player_a)->'matches' is distinct from detail_match then raise exception 'own match missing'; end if;
  if public.read_online_player_access(player_c)->'matches' is distinct from '[]'::jsonb then raise exception 'other player match exposed'; end if;
  if public.read_online_player_access(player_a)->>'participant'<>'A' then raise exception 'wrong identity'; end if;
