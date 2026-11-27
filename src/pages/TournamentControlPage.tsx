@@ -1,3 +1,4 @@
+import { prestartRecoveryStorageKey } from '@/services/localTournamentStorage';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { PrestartDrawEditor } from '@/components/PrestartDrawEditor';
@@ -86,7 +87,7 @@ function PrestartNavigationGuard({ dirty, tournamentId }: { dirty: boolean; tour
       <p>Du verlässt die Turnierleitung, ohne die Phasenplanung zu speichern. Die Änderungen gehen verloren.</p>
       <div className="actions">
         <button type="button" className="btn danger" onClick={() => {
-          try { window.sessionStorage.removeItem(`online-tournament:prestart-recovery:${tournamentId}`); } catch { /* blocked storage */ }
+          try { window.sessionStorage.removeItem(prestartRecoveryStorageKey(tournamentId)); } catch { /* blocked storage */ }
           blocker.proceed();
         }}>Änderungen verwerfen und verlassen</button>
         <button type="button" className="btn primary" onClick={() => blocker.reset()}>Weiter bearbeiten</button>
@@ -1289,8 +1290,10 @@ export function TournamentControlPage() {
             <div className="control-utility-bar">
               <button className="btn small control-back-button" type="button" onClick={() => navigate(-1)}>← Zurück</button>
               <div className="control-utility-links">
-                <Link className="btn small" to={`/player/${tournament.id}`}>Spieleransicht</Link>
-                <Link className="btn small" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
+                {!new URLSearchParams(window.location.search).has('online') && <>
+                  <Link className="btn small" to={`/player/${tournament.id}`}>Spieleransicht</Link>
+                  <Link className="btn small" to={`/live/${tournament.id}`}>Zuschaueransicht</Link>
+                </>}
                 <button className="btn small control-help-main-button" type="button" onClick={() => setHelpTopic('start')}>Anleitung & Hilfe</button>
               </div>
             </div>

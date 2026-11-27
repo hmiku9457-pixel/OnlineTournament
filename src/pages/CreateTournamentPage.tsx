@@ -1,3 +1,6 @@
+import { useAccount } from '@/lib/useAccount';
+import { prepareOnlineCreation, commitOnlineCreation, onlineWorkspaceUrl, type OnlineCreationAttempt } from '@/services/onlineTournaments';
+import { prestartRecoveryStorageKey } from '@/services/localTournamentStorage';
 import { VenueLayoutEditor } from '@/components/VenueLayout';
 import { createVenueLayout, resizeVenueLayoutForTableCount, validateVenueLayout } from '@/domain/venueLayout';
 import { getVenueTerminology } from '@/domain/venueTerminology';
@@ -449,13 +452,16 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const navigate = useNavigate();
   const location = useLocation();
   const savedDraftId = new URLSearchParams(location.search).get('draft');
+  const { session } = useAccount();
+  const [onlineCreation, setOnlineCreation] = useState(!prestart && new URLSearchParams(location.search).get('mode') === 'online');
+  const onlineAttempt = useRef<OnlineCreationAttempt | null>(null);
   const sessionDraftKey = `${CREATION_DRAFT_KEY}:${savedDraftId ?? 'new'}`;
   const recoveryKey = !prestart ? creationRecoveryKey(savedDraftId) : '';
   const [restoredDraft] = useState(() => {
     if (prestart) {
       const t = prestart.tournament;
       const recovered = typeof window !== 'undefined'
-        ? loadCreationDraft(window.sessionStorage, `online-tournament:prestart-recovery:${t.id}`) : null;
+        ? loadCreationDraft(window.sessionStorage, prestartRecoveryStorageKey(t.id)) : null;
       if (recovered?.name === t.name && recovered.step === 4) return recovered;
       const phases = initialPrestartPhases(t);
       const sportId = findSportOption(t.sport)?.id ?? 'table_tennis';
@@ -503,7 +509,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   });
   const [prestartRecovered] = useState(() => {
     if (!prestart || typeof window === 'undefined') return false;
-    return Boolean(loadCreationDraft(window.sessionStorage, `online-tournament:prestart-recovery:${prestart.tournament.id}`));
+    return Boolean(loadCreationDraft(window.sessionStorage, prestartRecoveryStorageKey(prestart.tournament.id)));
   });
   const [creationError, setCreationError] = useState<string | null>(null);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
@@ -537,7 +543,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const prestartConfirmationSignature = useRef<string | null>(null);
   const [confirmPrestartDiscard, setConfirmPrestartDiscard] = useState(false);
   const [overwriteTournamentId, setOverwriteTournamentId] = useState<string | null>(null);
-  const [createdTournamentWithDraftNotice, setCreatedTournamentWithDraftNotice] = useState<{ id: string; message: string } | null>(null);
+  const [createdTournamentWithDraftNotice, setCreatedTournamentWithDraftNotice] = useState<{ id: string; message: string; online?: boolean } | null>(null);
   const [submittingTournament, setSubmittingTournament] = useState(false);
   const [prestartSaveError, setPrestartSaveError] = useState('');
   const [prestartSaveBusy, setPrestartSaveBusy] = useState(false);
@@ -550,7 +556,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const [hasVisitedPhaseStep, setHasVisitedPhaseStep] = useState(restoredDraft?.hasVisitedPhaseStep ?? false);
   const [name, setName] = useState(restoredDraft?.name ?? '');
   const nameCollision = useMemo(() => {
-    if (prestart || !name.trim() || typeof window === 'undefined') return null;
+    if (prestart || onlineCreation || !name.trim() || typeof window === 'undefined') return null;
     try {
       // The wizard can be server-rendered or tested with sessionStorage only.
       if (!window.localStorage) return null;
@@ -558,7 +564,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     } catch {
       return null;
     }
-  }, [name, prestart]);
+  }, [name, prestart, onlineCreation]);
   const collisionAlreadyStarted = Boolean(nameCollision
     && hasStartedAnyStage(nameCollision, getPhaseLifecycle(nameCollision).startedStageIds));
   // Keep the local time in sync while the wizard is open. Date and time are
@@ -1056,7 +1062,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const originalPrestartPhases = useRef(prestart ? initialPrestartPhases(prestart.tournament) : []);
   // Recovery is based on the version that was originally edited, never on
   // the latest tournament loaded after a browser refresh.
-  const prestartRecoveryKey = prestart ? `online-tournament:prestart-recovery:${prestart.tournament.id}` : '';
+  const prestartRecoveryKey = prestart ? prestartRecoveryStorageKey(prestart.tournament.id) : '';
   const originalPrestartFingerprint = useRef((() => {
     if (!prestart) return '';
     if (prestartRecovered) {
@@ -1099,7 +1105,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   // successful save removes it; navigating within the director does not.
   useEffect(() => {
     if (!prestart) return;
-    const key = `online-tournament:prestart-recovery:${prestart.tournament.id}`;
+    const key = prestartRecoveryStorageKey(prestart.tournament.id);
     if (prestartDirty) {
       saveCreationDraft(draftSnapshot, window.sessionStorage, key);
       if (!prestartRecovered && originalPrestartFingerprint.current) {
@@ -2200,9 +2206,28 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     }
   }
 
+  async function retryOnlineCreation() {
+    const attempt = onlineAttempt.current;
+    if (!attempt || submittingTournament) return;
+    setSubmittingTournament(true); setCreationError(null);
+    try {
+      const tournament = await commitOnlineCreation(attempt);
+      clearCreationDraft(window.sessionStorage, sessionDraftKey);
+      await clearCreationRecoveryAtomic(recoveryKey).catch(() => undefined);
+      if (savedDraftId) {
+        try { await removeSavedCreationDraftAtomic(savedDraftId, savedDraftRevision.current ?? undefined); }
+        catch { setCreatedTournamentWithDraftNotice({ id: tournament.id, online: true, message: 'Das Online-Turnier wurde gespeichert. Der ursprüngliche Entwurf bleibt zur Sicherheit erhalten.' }); return; }
+      }
+      window.location.assign(onlineWorkspaceUrl(tournament.id));
+    } catch (error) {
+      setCreationError(error instanceof Error ? error.message : 'Speicherung nicht bestätigt.');
+    } finally { setSubmittingTournament(false); }
+  }
+
   async function submitTournament(overwriteExistingId?: string) {
     if (step !== 5 || !canCreate || scheduleIssues.length > 0 || submittingTournament || createdTournamentWithDraftNotice) return;
-    const collision = findTournamentNameConflict(name);
+    if (onlineCreation && !session?.user.id) { setCreationError('Bitte für ein Online-Turnier zuerst anmelden.'); return; }
+    const collision = onlineCreation ? null : findTournamentNameConflict(name);
     if (collision && !overwriteExistingId) {
       if (hasStartedAnyStage(collision, getPhaseLifecycle(collision).startedStageIds)) {
         setCreationError('Ein bereits gestartetes Turnier trägt diesen Namen. Bitte einen anderen Namen wählen.');
@@ -2231,13 +2256,13 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     setCreationError(null);
     setSubmittingTournament(true);
     try {
-    const tournament = await createMockTournamentAtomic({
+    const creationInput = {
       name,
       sport,
       discipline,
       scheduledStart: submitStart,
       requireFutureStart: true,
-      overwriteTournamentId: overwriteExistingId,
+      overwriteTournamentId: onlineCreation ? undefined : overwriteExistingId,
       plannedSchedule: finalSchedule.map((entry) => ({ ...entry, title: entry.title.trim(), note: entry.note?.trim() })),
       tables,
       minimumMatches,
@@ -2266,9 +2291,22 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
         inlineBreakUntilDate: phase.inlineBreakUntilDate || finalTimeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at.slice(0, 10),
         dayBreaks: phase.dayBreaks, extraInlineBreaks: phase.extraInlineBreaks,
       })),
+      tournamentMode,
+      plannedDays,
       estimatedDurationMinutes: estimatedPlayingMinutes + plannedActiveBreakMinutes(finalTimeline),
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
-    });
+    };
+    let tournament;
+    if (onlineCreation) {
+      // Retrying after an uncertain response must use the original operation ID.
+      if (onlineAttempt.current && onlineAttempt.current.inputFingerprint !== JSON.stringify(creationInput)) {
+        throw new Error('Eine Online-Erstellung wurde noch nicht bestätigt. Bitte den ursprünglichen Stand erneut speichern oder in der Online-Übersicht prüfen, bevor du ein weiteres Turnier anlegst.');
+      }
+      onlineAttempt.current ??= await prepareOnlineCreation(creationInput);
+      tournament = await commitOnlineCreation(onlineAttempt.current);
+    } else {
+      tournament = await createMockTournamentAtomic(creationInput);
+    }
     clearCreationDraft(window.sessionStorage, sessionDraftKey);
     await clearCreationRecoveryAtomic(recoveryKey).catch(() => undefined);
     if (savedDraftId) {
@@ -2278,6 +2316,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
         const conflict = error instanceof Error && error.message === 'DRAFT_CONFLICT';
         setCreatedTournamentWithDraftNotice({
           id: tournament.id,
+          online: onlineCreation,
           message: conflict
             ? 'Der gespeicherte Entwurf wurde in einem anderen Tab geändert. Deine neue Turniererstellung war erfolgreich, aber der neuere Entwurf wurde zur Sicherheit nicht gelöscht.'
             : 'Das Turnier wurde erstellt. Der bisherige Entwurf konnte jedoch nicht gelöscht werden und bleibt vorerst in deiner Entwurfsliste erhalten.',
@@ -2285,7 +2324,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
         return;
       }
     }
-    navigate(`/tournaments/${tournament.id}/control`, { replace: true });
+    if (onlineCreation) window.location.assign(onlineWorkspaceUrl(tournament.id));
+    else navigate(`/tournaments/${tournament.id}/control`, { replace: true });
     } catch (error) {
       setCreationError(error instanceof Error ? error.message : 'Das Turnier konnte nicht gespeichert werden. Bitte Speicherplatz prüfen und erneut versuchen.');
     } finally {
@@ -3838,9 +3878,19 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                   <button className="btn" type="button" onClick={goBack}>← Zurück</button>
                   <button className="btn primary wizard-create-button" type="button" onClick={() => { void submitTournament(); }}
                     title={!canCreate ? 'Die nachfolgenden Erstellungshindernisse müssen zuerst behoben werden.' : undefined}
-                    disabled={!canCreate || scheduleIssues.length > 0 || submittingTournament || Boolean(createdTournamentWithDraftNotice)}>Turnier erstellen</button>
+                    disabled={!canCreate || scheduleIssues.length > 0 || submittingTournament || Boolean(createdTournamentWithDraftNotice) || (onlineCreation && !session)}>Turnier erstellen</button>
                 </div>
               </div>
+            </div>
+            <div className="card" style={{ marginBottom: 12 }}>
+              <h3>Speicherort</h3>
+              <div className="actions" role="group" aria-label="Speicherort">
+                <button type="button" className={onlineCreation ? 'btn' : 'btn primary'} aria-pressed={!onlineCreation} disabled={submittingTournament || Boolean(onlineAttempt.current)} onClick={() => setOnlineCreation(false)}>Lokal</button>
+                <button type="button" className={onlineCreation ? 'btn primary' : 'btn'} aria-pressed={onlineCreation} disabled={submittingTournament || Boolean(onlineAttempt.current)} onClick={() => setOnlineCreation(true)}>Online (Testbetrieb)</button>
+              </div>
+              <p className="muted">{onlineCreation ? 'Das Turnier wird direkt und privat in Supabase gespeichert. Internetverbindung erforderlich.' : 'Das Turnier wird ausschließlich in diesem Browser gespeichert.'}</p>
+              {onlineAttempt.current && !submittingTournament && <div className="callout"><p>Eine frühere Online-Erstellung wurde noch nicht bestätigt. Prüfe die ursprüngliche Anfrage, ohne ein zweites Turnier anzulegen.</p><button type="button" className="btn primary" onClick={() => void retryOnlineCreation()}>Ursprüngliche Speicherung erneut versuchen</button></div>}
+              {onlineCreation && !session && <p role="status">Bitte zuerst in einem anderen Tab <a href="#/login" target="_blank" rel="noopener noreferrer">anmelden</a>. Der Entwurf bleibt erhalten.</p>}
             </div>
             {minimumMatchesShortfall > 0 && (
               <div className="wizard-review-check" role="status">
@@ -4084,7 +4134,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
           <p>{createdTournamentWithDraftNotice.message}</p>
           <p>Das neu erstellte Turnier wurde erfolgreich gespeichert. Du kannst es jetzt unabhängig vom weiterhin vorhandenen Entwurf verwalten.</p>
           <div className="actions">
-            <button type="button" className="btn primary" onClick={() => navigate(`/tournaments/${createdTournamentWithDraftNotice.id}/control`, { replace: true })}>
+            <button type="button" className="btn primary" onClick={() => createdTournamentWithDraftNotice.online ? window.location.assign(onlineWorkspaceUrl(createdTournamentWithDraftNotice.id)) : navigate(`/tournaments/${createdTournamentWithDraftNotice.id}/control`, { replace: true })}>
               Zur Turnierleitung
             </button>
           </div>
