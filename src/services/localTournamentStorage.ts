@@ -50,7 +50,7 @@ let writeTail: Promise<void> = Promise.resolve();
 let channel: BroadcastChannel | null = null;
 export class RemoteWriteUnavailableError extends Error {}
 interface RemoteRecovery { snapshot: TournamentBackup; values: Map<string, string>; retryable: boolean }
-let remote: { id: string; save: (snapshot: TournamentBackup) => Promise<void>; confirmed: Map<string, string>; recovery?: RemoteRecovery; invalidated?: boolean } | null = null;
+let remote: { id: string; save: (snapshot: TournamentBackup) => Promise<void>; confirmed: Map<string, string>; recovery?: RemoteRecovery; invalidated?: boolean; stale?: boolean } | null = null;
 
 function nativeStorage(): Storage { return window.localStorage; }
 function allLocalKeys(): string[] {
@@ -353,9 +353,23 @@ export function flushPendingLocalTournamentWrites(): Promise<void> {
       await target.save(attempted);
       if (!currentError) target.confirmed = captured;
     } catch (error) {
+      // Later actions may already have been applied to the synchronous view
+      // while this commit was in flight. Preserve their cumulative state for
+      // manual recovery; never resend it under the failed operation's UUID.
+      if (!target.invalidated && attempted) {
+        const hasLaterChanges = outstandingCommits > 1 || pendingChanges.size > 0;
+        let recoverySnapshot = attempted;
+        let recoveryValues = captured;
+        if (hasLaterChanges) {
+          try {
+            recoveryValues = new Map(workingValues);
+            recoverySnapshot = captureFromStorage(target.id, (key) => recoveryValues.get(key) ?? null);
+          } catch { recoveryValues = captured; recoverySnapshot = attempted; }
+        }
+        target.recovery = { snapshot: recoverySnapshot, values: recoveryValues,
+          retryable: !hasLaterChanges && error instanceof RemoteWriteUnavailableError };
+      }
       if (!currentError) workingValues = new Map(target.confirmed);
-      if (!target.invalidated && attempted) target.recovery = { snapshot: attempted, values: captured,
-        retryable: error instanceof RemoteWriteUnavailableError && outstandingCommits === 1 && pendingChanges.size === 0 };
       pendingChanges.clear();
       signalError('Online-Speicherung nicht bestätigt. Bitte neu laden und den Datenbankstand prüfen. ' +
         (error instanceof Error ? error.message : ''));
@@ -392,21 +406,21 @@ export const localTournamentStorage: Storage = {
   },
   setItem(key: string, value: string) {
     if (ready && key.startsWith(PREFIX)) {
-      if (currentError) throw new Error(currentError);
+      requireWritableStorage();
       workingValues.set(key, String(value));
       scheduleWrite(key, String(value));
     } else nativeStorage().setItem(key, value);
   },
   removeItem(key: string) {
     if (ready && key.startsWith(PREFIX)) {
-      if (currentError) throw new Error(currentError);
+      requireWritableStorage();
       workingValues.delete(key);
       scheduleWrite(key, null);
     } else nativeStorage().removeItem(key);
   },
   clear() {
     if (!ready) { nativeStorage().clear(); return; }
-    if (currentError) throw new Error(currentError);
+    requireWritableStorage();
     const keys = [...workingValues.keys()];
     workingValues.clear();
     for (const key of keys) scheduleWrite(key, null);
@@ -524,6 +538,16 @@ export function initializeRemoteTournamentStorage(input: unknown, save: (snapsho
 }
 export function prestartRecoveryStorageKey(id: string): string {
   return 'online-tournament:' + (remote ? 'online-prestart-recovery:' : 'prestart-recovery:') + id;
+}
+/** Freeze the actual storage boundary, not only pointer/keyboard interaction. */
+export function markRemoteWorkspaceStale(): boolean {
+  if (!remote || currentError || hasPendingRemoteWrites()) return false;
+  remote.stale = true;
+  return true;
+}
+function requireWritableStorage(): void {
+  if (currentError) throw new Error(currentError);
+  if (remote?.stale) throw new Error('Ein neuerer Datenbankstand ist vorhanden. Bitte neu laden.');
 }
 export function hasPendingRemoteWrites(): boolean {
   return remote !== null && (pendingChanges.size > 0 || outstandingCommits > 0);

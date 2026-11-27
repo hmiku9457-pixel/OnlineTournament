@@ -15,6 +15,12 @@ try {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(base + '/#/tournaments/new');
   await page.locator('.creation-page-container').waitFor();
+  const buildVersion = page.locator('#app-build-version');
+  await buildVersion.waitFor({ state: 'visible' });
+  assert.match(await buildVersion.innerText(), /^v\d+\.\d+\.\d+ · Dev · [0-9a-f]{8}$/);
+  const versionBox = await buildVersion.boundingBox();
+  assert.ok(versionBox && versionBox.x < 30 && versionBox.y + versionBox.height > 930,
+    'build label is anchored at the bottom left');
   // Check the creation wizard is centered within the content area at
   // ultra-wide widths, while the main navigation stays at the far left.
   await page.setViewportSize({ width: 2560, height: 960 });
