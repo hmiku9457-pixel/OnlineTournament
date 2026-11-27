@@ -59,3 +59,6 @@ Explicit batch action revalidates all identical bilateral proposals and their cu
 
 ## Player call and bulk access usability
 Bulk enable/disable validates all requested roster IDs and updates in one DB transaction; existing enabled tokens stay unchanged. Player bundle reads own matches and proposals in one statement snapshot. Visible player pages poll every 4 seconds, hidden pages every 30 seconds, failures back off to 60 seconds. Active assigned games are prominently displayed, with optional supported-device vibration for newly observed assignments in a visible page. Seen status is local UI only. No background push or Realtime public channels; the existing revocable capability model remains authoritative. Browser focus/reconnect/manual refresh bypass the regular interval.
+
+## Workspace recovery safeguards
+Runtime journal discard requires acquiring the same exclusive workspace lease as retry; a verified archived catalog row is the exception because the server forbids claims on archived events. A second tab cannot discard an active editor's local journal. Creation journal discard is unchanged. Owner-only reads recheck the account after the RPC. Unknown revision state blocks editor actions until revalidation; a stale workspace stops renewing its lease. Deployment also runs lint and disposable PostgreSQL regression checks before publishing.

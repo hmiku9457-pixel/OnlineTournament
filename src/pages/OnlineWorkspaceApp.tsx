@@ -14,6 +14,7 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
   const [, refresh] = useState(0);
   const [connected, setConnected] = useState(navigator.onLine);
   const [revisionState,setRevisionState] = useState<'current'|'stale'|'unknown'>('current');
+  const revisionStateRef=useRef<'current'|'stale'|'unknown'>('current');
   const [checking,setChecking] = useState(false);
   const [leaving,setLeaving] = useState(false);
   const [resultVersion,setResultVersion]=useState(0);
@@ -22,12 +23,12 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
   const inFlight=useRef(false);
   const active=useRef(true);
   const checkRevision=useCallback(async ()=>{
-    if(inFlight.current || !navigator.onLine || hasPendingRemoteWrites() || getTournamentStorageError()) return;
+    if(inFlight.current || revisionStateRef.current==='stale' || !navigator.onLine || hasPendingRemoteWrites() || getTournamentStorageError()) return;
     inFlight.current=true; setChecking(true);
     try {
       const result=await checkOnlineWorkspaceRevision(id);
-      if(active.current) setRevisionState(previous=>previous==='stale'?'stale':result);
-    } catch { if(active.current) setRevisionState(previous=>previous==='stale'?'stale':'unknown'); }
+      if(active.current) {revisionStateRef.current=result;setRevisionState(result);}
+    } catch { if(active.current) {revisionStateRef.current='unknown';setRevisionState('unknown');} }
     finally { inFlight.current=false; if(active.current) setChecking(false); }
   },[id]);
   useEffect(()=>{
@@ -47,7 +48,7 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
       wasPending=pendingNow;refresh(n=>n+1);
     };
     window.addEventListener('tournament-storage-integrity-change', changed);
-    const connectionChanged = () => setConnected(navigator.onLine);
+    const connectionChanged = () => {setConnected(navigator.onLine);if(!navigator.onLine&&revisionStateRef.current!=='stale'){revisionStateRef.current='unknown';setRevisionState('unknown');}};
     window.addEventListener('online', connectionChanged);
     window.addEventListener('offline', connectionChanged);
     changed();
@@ -75,7 +76,7 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
       </div>
       {!connected && <p role="alert">Keine Internetverbindung. Bereits laufende Partien können am Tisch beendet werden. Neue Änderungen werden erst nach Wiederverbindung zugelassen.</p>}
       {revisionState==='stale' && !error && <div role="alert"><p>Die Bearbeitungssperre ist abgelaufen oder ein neuerer Datenbankstand vorhanden. Bitte lade das Turnier neu.</p><button className="btn primary small" disabled={pending || !connected} onClick={()=>void leave(true)}>Datenbankstand neu laden</button></div>}
-      {revisionState==='unknown' && !error && connected && <p className="muted">Die Aktualität konnte nicht geprüft werden. Der nächste Schreibvorgang wird weiterhin durch die Datenbankrevision abgesichert.</p>}
+      {revisionState==='unknown' && !error && connected && <p className="muted">Die Aktualität konnte nicht geprüft werden. Bearbeitung bleibt gesperrt, bis der Datenbankstand erneut bestätigt ist.</p>}
       {error && <div role="alert"><p>{error}</p><div className="actions">
         {recovery?.retryable && <button className="btn primary small" disabled={!connected || pending} onClick={() => void retryRemoteTournamentWrite().catch(() => {})}>Speicherung erneut versuchen</button>}
         {recovery && <button className="btn small" disabled={pending} onClick={() => {
@@ -88,7 +89,7 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
       <p className="muted">Nur für Entwicklungstests. Spieler- und Zuschauerzugriffe sind in der Online-Übersicht separat freizugeben.</p>
     </section>
     {!error&&revisionState!=='stale'&&<OnlineResultInbox id={id} disabled={pending||leaving||!connected||revisionState!=='current'} onBusyChange={setReportBusy} onApplied={()=>{setResultVersion(v=>v+1);refreshConfirmedOnlineProjection();}}/>}
-    {!error && <div inert={pending || leaving || reportBusy || !connected || revisionState==='stale'} aria-busy={pending}>
+    {!error && <div inert={pending || leaving || reportBusy || !connected || revisionState!=='current'} aria-busy={pending}>
       {revisionState!=='stale' && <Routes key={resultVersion}>
         <Route path="/tournaments/:tournamentId/control" element={<OnlineControl id={id} />} />
         <Route path="/score/:matchId" element={<ScoringPage />} />

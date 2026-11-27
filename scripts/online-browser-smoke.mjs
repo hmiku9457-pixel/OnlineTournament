@@ -446,6 +446,16 @@ try {
   loseResponses=2;
   await a.getByRole('button',{name:'Turnier pausieren',exact:true}).click();
   await a.getByRole('button',{name:'Speicherung erneut versuchen'}).waitFor({timeout:45000});
+  // A second tab in the same browser must not remove an active journal.
+  const recoveryTab=await a.context().newPage();
+  await recoveryTab.goto(base+'/?online='+encodeURIComponent(id)+'#/tournaments/'+id+'/control');
+  await recoveryTab.getByRole('heading',{name:'Unbestätigte Online-Speicherung'}).waitFor();
+  await recoveryTab.getByRole('button',{name:'Verwerfen …'}).click();
+  await recoveryTab.getByRole('button',{name:'Unbestätigten Eintrag verwerfen'}).click();
+  await recoveryTab.getByRole('alert').filter({hasText:'Bearbeitungssperre'}).waitFor();
+  await recoveryTab.reload();
+  await recoveryTab.getByRole('heading',{name:'Unbestätigte Online-Speicherung'}).waitFor();
+  await recoveryTab.close();
   // Simulate the server lease expiring after a crashed browser.
   leases.delete(id);
   await a.reload();

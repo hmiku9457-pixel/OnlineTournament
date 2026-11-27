@@ -17,7 +17,7 @@ export function OnlineRecoveryPage({ operations }: { operations: PendingOnlineOp
   }
   return <main className="main"><section className="card">
     <h1>Unbestätigte Online-Speicherung</h1>
-    <p>Vor einer weiteren Bearbeitung muss die frühere Speicheranfrage geklärt werden. Sie wurde vor der Übertragung dauerhaft in diesem Browser hinterlegt.</p>
+    <p>Vor einer weiteren Bearbeitung muss die frühere Speicheranfrage geklärt werden. Sie wurde vor der Übertragung dauerhaft in diesem Browser hinterlegt. Solange ein anderer Arbeitsbereich die Bearbeitungssperre hält, können Änderungen weder erneut gesendet noch verworfen werden.</p>
     {loading ? <p>Konto wird geprüft …</p> : session?.user.id !== operations[0]?.ownerId ? <p role="alert">Bitte mit dem ursprünglichen Konto anmelden.</p> : operations.map((op,index) => <div className="card" key={op.operationId}>
       <strong>{op.expectedRevision===0 ? 'Unbestätigte Turniererstellung' : 'Änderung nach Revision '+op.expectedRevision}</strong>
       <p>{new Date(op.createdAt).toLocaleString('de-DE')}</p>

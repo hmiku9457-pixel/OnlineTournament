@@ -17,8 +17,9 @@ import type { DemoTournament } from '@/data/demoTournaments';
 export interface OnlineTournamentSummary { id: string; name: string; revision: number; updated_at: string }
 export interface OnlineCatalogItem extends OnlineTournamentSummary { status: string; archived_at: string | null; editing: boolean }
 export async function listOnlineCatalog(): Promise<OnlineCatalogItem[]> {
-  const {client}=await account();
+  const {client,userId}=await account();
   const {data,error}=await client.rpc('catalog_online_tournaments');
+  if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
   if(error) throw new Error(error.message);
   return (data ?? []) as OnlineCatalogItem[];
 }
@@ -43,14 +44,16 @@ async function account() {
   return { client: supabase, userId: data.user.id };
 }
 export async function listOnlineTournaments(): Promise<OnlineTournamentSummary[]> {
-  const { client } = await account();
+  const {client,userId}=await account();
   const { data, error } = await client.rpc('list_online_tournaments');
+  if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
   if (error) throw new Error('Online-Turniere konnten nicht geladen werden: ' + error.message);
   return (data ?? []) as OnlineTournamentSummary[];
 }
 async function load(id: string): Promise<OnlineTournament> {
-  const { client } = await account();
+  const {client,userId}=await account();
   const { data, error } = await client.rpc('load_online_tournament', { p_id: id });
+  if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
   if (error || !data || data.id !== id || !Number.isInteger(data.revision) || data.revision < 1) throw new Error('Online-Turnier nicht verfügbar.');
   const payload = validateTournamentBackup(data.payload);
   if (payload.tournamentId !== id) throw new Error('Falsche Turnierkennung.');
@@ -133,14 +136,16 @@ export function localOverviewUrl(): string {
 }
 export interface OnlineCheckpoint { revision: number; name: string; created_at: string }
 export async function listOnlineCheckpoints(id: string): Promise<OnlineCheckpoint[]> {
-  const { client } = await account();
+  const {client,userId}=await account();
   const { data,error } = await client.rpc('list_online_checkpoints',{p_id:id});
+  if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
   if(error) throw new Error(error.message);
   return (data ?? []) as OnlineCheckpoint[];
 }
 export async function loadOnlineCheckpoint(id: string, revision: number): Promise<TournamentBackup> {
-  const { client } = await account();
+  const {client,userId}=await account();
   const { data,error } = await client.rpc('load_online_checkpoint',{p_id:id,p_revision:revision});
+  if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
   if(error) throw new Error(error.message);
   const backup = validateTournamentBackup(data);
   if(backup.tournamentId !== id) throw new Error('Falsche Turnierkennung.');
@@ -168,16 +173,27 @@ export async function releaseCurrentOnlineWorkspace(): Promise<void> {
 export async function resolvePendingOnlineOperation(op: PendingOnlineOperation, discard = false): Promise<void> {
   const { userId } = await account();
   if (op.ownerId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
-  if (!discard) {
-    if(op.expectedRevision===0) await commit(op.snapshot,0,userId,op.operationId);
-    else {
-      const token=crypto.randomUUID();
-      if(!await claimWorkspace(op.tournamentId,token,false)) throw new WorkspaceBusyError('Ein anderer Arbeitsbereich besitzt noch die Bearbeitungssperre. Bitte zuerst freigeben oder Ablauf abwarten.');
-      try {await commit(op.snapshot,op.expectedRevision,userId,op.operationId,token);}
-      finally {await releaseWorkspace(op.tournamentId,token).catch(()=>{});}
-    }
+  if(op.expectedRevision===0){
+    if(!discard)await commit(op.snapshot,0,userId,op.operationId);
+    await removeOnlineOperation(op.operationId);
+    return;
   }
-  await removeOnlineOperation(op.operationId);
+  // Even discarding a local journal entry is forbidden while another editor
+  // holds the lease: its still-running request may need this recovery record.
+  // Archived events cannot acquire leases; a confirmed archived catalog row
+  // is sufficient for explicitly discarding only the local recovery copy.
+  if(discard){
+    const catalog=await listOnlineCatalog();
+    const row=catalog.find(item=>item.id===op.tournamentId);
+    if(row?.archived_at&&!row.editing){await removeOnlineOperation(op.operationId);return;}
+  }
+  const token=crypto.randomUUID();
+  if(!await claimWorkspace(op.tournamentId,token,false))throw new WorkspaceBusyError('Ein anderer Arbeitsbereich besitzt noch die Bearbeitungssperre. Bitte zuerst freigeben oder Ablauf abwarten.');
+  try {
+    if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
+    if(!discard)await commit(op.snapshot,op.expectedRevision,userId,op.operationId,token);
+    await removeOnlineOperation(op.operationId);
+  } finally {await releaseWorkspace(op.tournamentId,token).catch(()=>{});}
 }
 let workspaceRevision: {id: string; revision: number; ownerId: string; token: string} | undefined;
 /** Only metadata is loaded. Never replace the director state automatically. */
@@ -339,7 +355,8 @@ export function matchingReports(row:Pick<OnlineResultReport,'aSets'|'bSets'>):bo
   return !!row.aSets&&!!row.bSets&&row.aSets.length===row.bSets.length&&row.aSets.every((s,i)=>s.number===row.bSets![i].number&&s.sideAScore===row.bSets![i].sideAScore&&s.sideBScore===row.bSets![i].sideBScore);
 }
 export async function listOnlineResultReports(id:string):Promise<OnlineResultReport[]> {
-  const {client}=await account();const {data,error}=await client.rpc('list_online_result_reports',{p_id:id}).abortSignal(AbortSignal.timeout(8000));
+  const {client,userId}=await account();const {data,error}=await client.rpc('list_online_result_reports',{p_id:id}).abortSignal(AbortSignal.timeout(8000));
+  if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
   if(error)throw new Error(error.message);return (data??[]) as OnlineResultReport[];
 }
 export function reportMatchNames(row:OnlineResultReport):{a:string;b:string}|null {
