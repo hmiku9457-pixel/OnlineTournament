@@ -1,7 +1,7 @@
 import { persistOnlineOperation, removeOnlineOperation, listPendingOnlineOperations, type PendingOnlineOperation } from '@/services/onlineOutbox';
 import { supabase } from '@/lib/supabase';
 import { backupTournamentName, captureTournamentBackup, validateTournamentBackup,
-  initializeRemoteTournamentStorage, invalidateRemoteTournamentStorage, initialTournamentBackup, hasPendingRemoteWrites, getTournamentStorageError, RemoteWriteUnavailableError, type TournamentBackup } from '@/services/localTournamentStorage';
+  initializeRemoteTournamentStorage, invalidateRemoteTournamentStorage, initialTournamentBackup, hasPendingRemoteWrites, getTournamentStorageError, markRemoteWorkspaceStale, RemoteWriteUnavailableError, type TournamentBackup } from '@/services/localTournamentStorage';
 
 import { buildNewTournament, type CreateMockTournamentInput } from '@/services/mockTournamentStore';
 import type { DemoTournament } from '@/data/demoTournaments';
@@ -131,7 +131,8 @@ export async function checkOnlineWorkspaceRevision(id: string): Promise<'current
   const { data, error } = await supabase.rpc('list_online_tournaments').abortSignal(AbortSignal.timeout(8000));
   if (error || workspaceRevision !== start || hasPendingRemoteWrites() || getTournamentStorageError()) return 'unknown';
   const row = (data as OnlineTournamentSummary[] | null)?.find(t => t.id === id);
-  return row?.revision === start.revision ? 'current' : 'stale';
+  if (row?.revision === start.revision) return 'current';
+  return markRemoteWorkspaceStale() ? 'stale' : 'unknown';
 }
 export async function initializeOnlineWorkspace(id: string): Promise<PendingOnlineOperation[]> {
   const { client, userId } = await account();

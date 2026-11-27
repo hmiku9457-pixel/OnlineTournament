@@ -280,6 +280,40 @@ describe('isolated remote tournament persistence', () => {
     await nextAdapter.flushPendingLocalTournamentWrites();
     expect(nextStore.getMockTournament(t.id).status).toBe('FINISHED');
   });
+  it('preserves cumulative unsaved changes for export when an earlier queued write fails', async () => {
+    const { adapter, backup, key } = await setup();
+    let rejectFirst!: (reason: Error) => void;
+    const gate = new Promise<void>((_resolve,reject)=>{rejectFirst=reject;});
+    const save = vi.fn(async ()=>gate);
+    adapter.initializeRemoteTournamentStorage(backup,save);
+    const record=JSON.parse(backup.entries[key]);
+    const rename=(name:string)=>adapter.localTournamentStorage.setItem(key,JSON.stringify({...record,tournament:{...record.tournament,name}}));
+    rename('Erste Änderung');
+    const first=adapter.flushPendingLocalTournamentWrites();
+    rename('Zweite Änderung');
+    const second=adapter.flushPendingLocalTournamentWrites();
+    const errors=Promise.allSettled([first,second]);
+    await Promise.resolve();
+    rejectFirst(new adapter.RemoteWriteUnavailableError('offline'));
+    expect((await errors).map(result=>result.status)).toEqual(['rejected','rejected']);
+    const recovery=adapter.getRemoteRecovery();
+    expect(recovery?.retryable).toBe(false);
+    expect(adapter.backupTournamentName(recovery!.snapshot)).toBe('Zweite Änderung');
+    expect(adapter.localTournamentStorage.getItem(key)).toBe(backup.entries[key]);
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+  it('blocks mutations at the storage boundary after a stale revision is detected', async () => {
+    const {adapter,backup,key}=await setup();
+    const save=vi.fn(async()=>{});
+    adapter.initializeRemoteTournamentStorage(backup,save);
+    expect(adapter.markRemoteWorkspaceStale()).toBe(true);
+    expect(()=>adapter.localTournamentStorage.setItem(key,'{}')).toThrow('neuerer Datenbankstand');
+    expect(()=>adapter.localTournamentStorage.removeItem(key)).toThrow('neuerer Datenbankstand');
+    expect(()=>adapter.localTournamentStorage.clear()).toThrow('neuerer Datenbankstand');
+    expect(adapter.localTournamentStorage.getItem(key)).toBe(backup.entries[key]);
+    await adapter.flushPendingLocalTournamentWrites();
+    expect(save).not.toHaveBeenCalled();
+  });
   it('does not persist a replacement or deletion of the online event', async () => {
     const { adapter, backup } = await setup();
     const save = vi.fn(async () => {});
