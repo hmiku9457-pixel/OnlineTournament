@@ -68,3 +68,6 @@ Every explicit report reset increments a per-fixture generation. The v2 submissi
 
 ## Projection refresh efficiency
 A single owner-only revision plan checks which detail projections are missing for the current confirmed revision. The director computes and publishes only missing projections, retries failed publications, and still discovers new access grants/rotations on the heartbeat. The anonymous spectator bundle reads all allowlisted sections in a single statement, replacing four RPC calls per poll. Visible polling remains 10s, hidden 30s and failures back off to 60s. No public realtime channel.
+
+## Additional scoring and Swiss integrity
+Standard tie-break tennis/padel sets allow 6:0 through 6:4, 7:5 and 7:6; badminton uses the 21-point model with a 30-point cap. Decision and extra-time metadata are checked by PostgreSQL, and technical IDs use reserved non-NUL serialization. Swiss round fixtures must use unique roster IDs, at most one bye and valid indexed game IDs; a played or assigned round cannot be repartnered. Started phase evidence cannot be removed. Exact Swiss pairing optimality, full KO topology and every dependency are not independently calculated by the server.

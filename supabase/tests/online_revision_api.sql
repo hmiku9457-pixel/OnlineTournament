@@ -151,8 +151,19 @@ begin
  v_live := jsonb_set(v_payload,'{entries}',v_entries || jsonb_build_object(
    'online-tournament:local-prototype-tournaments:v1:record:local-rpc-test',v_header::text,
    'online-tournament:mock-phase-lifecycle:v1','[{"tournamentId":"local-rpc-test","startedStageIds":["local-rpc-test-phase-1"],"completedStageIds":[]}]',
+   'online-tournament:swiss-round-fixtures:v1','[{"tournamentId":"local-rpc-test","stageId":"local-rpc-test-phase-1","round":1,"pairs":[["p-a","p-b"],["p-c","ot:slot:bye"]]},{"tournamentId":"local-rpc-test","stageId":"local-rpc-test-phase-1","round":2,"pairs":[["p-a","p-b"],["p-c","ot:slot:bye"]]}]',
    'online-tournament:mock-match-results:v2',jsonb_build_array(v_match)::text));
+ v_invalid:=jsonb_set(v_live,'{entries}',(v_live->'entries')||jsonb_build_object('online-tournament:swiss-round-fixtures:v1','[{"tournamentId":"local-rpc-test","stageId":"local-rpc-test-phase-1","round":1,"pairs":[["p-a","p-b"],["p-a","ot:slot:bye"]]}]'));
+ begin perform public.commit_leased_online_tournament(v_id,'Test',25,gen_random_uuid(),v_invalid,lease1); raise exception 'duplicate Swiss participant accepted'; exception when invalid_parameter_value then null; end;
+ v_invalid:=jsonb_set(v_live,'{entries}',(v_live->'entries')||jsonb_build_object('online-tournament:mock-match-results:v2',jsonb_build_array(jsonb_set(v_match,'{matchId}','"local-rpc-test-phase-1-sw-r1-m2"'))::text));
+ begin perform public.commit_leased_online_tournament(v_id,'Test',25,gen_random_uuid(),v_invalid,lease1); raise exception 'bye was scored'; exception when invalid_parameter_value then null; end;
+ v_invalid:=jsonb_set(v_live,'{entries}',(v_live->'entries')||jsonb_build_object('online-tournament:mock-match-results:v2',jsonb_build_array(jsonb_set(v_match,'{matchId}','"local-rpc-test-phase-1-sw-r1-m99"'))::text));
+ begin perform public.commit_leased_online_tournament(v_id,'Test',25,gen_random_uuid(),v_invalid,lease1); raise exception 'unknown Swiss game accepted'; exception when invalid_parameter_value then null; end;
  if public.commit_leased_online_tournament(v_id,'Test',25,gen_random_uuid(),v_live,lease1)<>26 then raise exception 'valid initial result rejected'; end if;
+ v_invalid:=jsonb_set(v_live,'{entries}',(v_live->'entries')||jsonb_build_object('online-tournament:swiss-round-fixtures:v1','[{"tournamentId":"local-rpc-test","stageId":"local-rpc-test-phase-1","round":1,"pairs":[["p-a","p-c"],["p-b","ot:slot:bye"]]}]'));
+ begin perform public.commit_leased_online_tournament(v_id,'Test',26,gen_random_uuid(),v_invalid,lease1); raise exception 'played Swiss pairing changed'; exception when invalid_parameter_value then null; end;
+ v_invalid:=jsonb_set(v_live,'{entries}',(v_live->'entries')||jsonb_build_object('online-tournament:mock-phase-lifecycle:v1','[]','online-tournament:swiss-round-fixtures:v1','[]','online-tournament:mock-match-results:v2','[]'));
+ begin perform public.commit_leased_online_tournament(v_id,'Test',26,gen_random_uuid(),v_invalid,lease1); raise exception 'phase start erased'; exception when invalid_parameter_value then null; end;
  v_corrected := jsonb_set(v_live,'{entries}',(v_live->'entries') || jsonb_build_object('online-tournament:mock-match-results:v2',jsonb_build_array(jsonb_set(v_match,'{sets,0,sideBScore}','8'))::text));
  if public.commit_leased_online_tournament(v_id,'Test',26,gen_random_uuid(),v_corrected,lease1)<>27 then raise exception 'valid correction rejected'; end if;
  v_later := jsonb_set(v_corrected,'{entries}',(v_corrected->'entries') || jsonb_build_object(
