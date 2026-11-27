@@ -1,0 +1,43 @@
+name: Supabase database health
+
+on:
+  schedule:
+    - cron: '23 5,13,21 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: supabase-health
+  cancel-in-progress: false
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+    steps:
+      - name: Verify real database access (read-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$SUPABASE_URL" || -z "$SUPABASE_KEY" ]]; then
+            echo "::error::Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in repository Actions secrets."
+            exit 1
+          fi
+          if [[ ! "$SUPABASE_URL" =~ ^https://[a-z0-9-]+\.supabase\.co/?$ ]]; then
+            echo "::error::Expected a hosted Supabase project URL."
+            exit 1
+          fi
+          response=$(curl --silent --show-error --fail --retry 2 --retry-all-errors \
+            --connect-timeout 8 --max-time 20 --request POST \
+            --header "apikey: $SUPABASE_KEY" \
+            --header 'Content-Type: application/json' \
+            --data '{}' "${SUPABASE_URL%/}/rest/v1/rpc/tournament_health_check")
+          if [[ "$response" != "true" ]]; then
+            echo "::error::Database health RPC did not return true."
+            exit 1
+          fi
+          echo "Supabase database query succeeded."
