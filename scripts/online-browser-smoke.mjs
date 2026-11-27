@@ -13,7 +13,7 @@ const exp = Math.floor(Date.now()/1000)+3600;
 const segment = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 const accessToken = segment({alg:'HS256',typ:'JWT'})+'.'+segment({sub:user.id,role:'authenticated',exp})+'.smoke';
 const session = { access_token: accessToken, refresh_token:'smoke-refresh', token_type:'bearer', expires_in:3600, expires_at:exp, user };
-const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), spectatorLinks = new Map(), calls = [];
+const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), spectatorLinks = new Map(), detailSettings = new Set(), detailRows = new Map(), calls = [];
 let loseResponses = 0;
 async function install(context) {
   await context.route(api+'/**', async route => {
@@ -28,9 +28,29 @@ async function install(context) {
     const body = req.method()==='POST' ? req.postDataJSON() : {};
     if(path.endsWith('/manage_online_spectator')) {
       assert.equal(req.headers()['authorization'],'Bearer '+accessToken,'only authenticated owner manages links');
-      if(body.p_action==='disable') spectatorLinks.delete(body.p_id);
+      if(body.p_action==='disable'||body.p_action==='rotate'){spectatorLinks.delete(body.p_id);detailSettings.delete(body.p_id);detailRows.delete(body.p_id);}
       if(body.p_action==='enable'&&!spectatorLinks.has(body.p_id)||body.p_action==='rotate') spectatorLinks.set(body.p_id,crypto.randomUUID());
       return send(spectatorLinks.get(body.p_id)??null);
+    }
+    if(path.endsWith('/online_spectator_detail_setting')) {
+      assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
+      if(body.p_enabled===true)detailSettings.add(body.p_id);
+      if(body.p_enabled===false){detailSettings.delete(body.p_id);detailRows.delete(body.p_id);}
+      return send(detailSettings.has(body.p_id));
+    }
+    if(path.endsWith('/publish_online_spectator_matches')) {
+      if(!detailSettings.has(body.p_id))return send(false);
+      assert.equal(leases.get(body.p_id),body.p_token);
+      if(rows.get(body.p_id).revision!==body.p_revision)return send({code:'40001',message:'revision conflict'},409);
+      for(const m of body.p_matches)assert.deepEqual(Object.keys(m).sort(),['phase','round','score','sets','sideA','sideB','status','table']);
+      detailRows.set(body.p_id,{revision:body.p_revision,matches:body.p_matches,total:body.p_total});
+      return send(true);
+    }
+    if(path.endsWith('/read_online_spectator_details')) {
+      const id=[...spectatorLinks].find(([,token])=>token===body.p_token)?.[0];
+      if(!id||!detailSettings.has(id)||archives.has(id))return send(null);
+      const revision=rows.get(id).revision;
+      return send(detailRows.get(id)?.revision===revision?detailRows.get(id):{revision,matches:null,total:null});
     }
     if(path.endsWith('/read_online_spectator')) {
       const id=[...spectatorLinks].find(([,token])=>token===body.p_token)?.[0];
@@ -136,10 +156,12 @@ try {
   await a.waitForFunction(old=>document.querySelector('a[href*="/watch/"]')?.getAttribute('href')!==old,viewerLink);
   await viewer.reload();
   await viewer.getByText('Dieser Zuschauerlink ist nicht mehr verfügbar.').waitFor();
-  await share.getByRole('button',{name:'Freigabe beenden'}).click();
-  await share.getByRole('button',{name:'Zuschaueransicht freigeben'}).waitFor();
+  const newLink=await share.getByRole('link',{name:'Zuschaueransicht öffnen'}).getAttribute('href');
+  await share.getByRole('checkbox',{name:'Teilnehmernamen und Spielergebnisse freigeben'}).check();
+  await a.waitForFunction(()=>document.querySelector('input[type="checkbox"]:checked')!==null);
+  await viewer.goto(newLink);
+  await viewer.getByText(/Die Detailansicht wird für die aktuelle Revision aktualisiert/).waitFor();
   await share.getByRole('button',{name:'Schließen'}).click();
-  await spectator.close();
   await a.getByRole('link',{name:'Online-Turnierleitung öffnen'}).click();
   await confirmed(a);
   await a.locator('#app-build-version').waitFor({state:'visible'});
@@ -147,6 +169,16 @@ try {
   await a.getByRole('button',{name:'Jetzt starten',exact:true}).click();
   await a.getByRole('button',{name:'Turnier pausieren',exact:true}).waitFor();
   await confirmed(a);
+  // Explicit check publishes the latest confirmed fixture list.
+  await a.getByRole('button',{name:'Datenbankstand prüfen',exact:true}).click();
+  await a.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).some(b=>b.textContent?.includes('Prüfe …')));
+  // The director's heartbeat retries automatically if a publication was busy.
+  await viewer.reload();
+  await viewer.getByRole('heading',{name:'Spielpaarungen und Ergebnisse'}).waitFor();
+  await viewer.getByText(/Anna – | – Anna/).first().waitFor({timeout:45000});
+  assert.ok(detailRows.get(id)?.matches.length>0);
+  assert.equal(detailRows.get(id).revision,rows.get(id).revision);
+  await spectator.close();
   // The server commits, but both automatic HTTP responses are lost.
   loseResponses=2;
   const before=rows.get(id).revision;
