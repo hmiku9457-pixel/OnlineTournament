@@ -379,3 +379,13 @@ export async function resetOnlineResultReports(row:OnlineResultReport):Promise<v
   const {data,error}=await supabase.rpc('reset_online_result_reports',{p_id:start.id,p_token:start.token,p_match_id:row.matchId,p_revision:start.revision});
   if(error||data!==true)throw new Error(error?.message??'Zurücksetzen nicht bestätigt.');
 }
+
+export async function batchOnlinePlayerAccess(id:string, ids:string[], action:'enable'|'disable'):Promise<number> {
+  const {client,userId}=await account();
+  if(!ids.length)return 0;
+  const {data,error}=await client.rpc('batch_online_player_access',{p_id:id,p_ids:ids,p_action:action}).abortSignal(AbortSignal.timeout(15000));
+  if(error)throw new Error(error.message);
+  if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
+  if(data!==ids.length)throw new Error('Änderung der Spielerzugänge nicht vollständig bestätigt.');
+  return data;
+}

@@ -329,7 +329,7 @@ describe('isolated remote tournament persistence', () => {
   });
   it('commits a compound operation in one revision and rejects overlapping work',async()=>{
     const {adapter,backup,key}=await setup();
-    const save=vi.fn(async(_snapshot:Snapshot)=>{});
+    const save=vi.fn(async(snapshot:Snapshot)=>{void snapshot;});
     adapter.initializeRemoteTournamentStorage(backup,save);
     const initial=JSON.parse(backup.entries[key]);
     const rename=(name:string)=>adapter.localTournamentStorage.setItem(key,JSON.stringify({...initial,tournament:{...initial.tournament,name}}));

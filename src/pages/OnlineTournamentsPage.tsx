@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount } from '@/lib/useAccount';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
-import { createOnlineTournamentFromLocal, listPendingOnlineCreations, listOnlineCatalog, setOnlineArchive, loadConfirmedOnlineBackup, onlineWorkspaceUrl, listOnlineCheckpoints, loadOnlineCheckpoint, manageOnlineSpectator, onlineSpectatorUrl, spectatorDetailSetting, listOnlinePlayerAccess, manageOnlinePlayerAccess, onlinePlayerUrl, type OnlinePlayerAccess, type OnlineCheckpoint, type OnlineCatalogItem } from '@/services/onlineTournaments';
+import { createOnlineTournamentFromLocal, listPendingOnlineCreations, listOnlineCatalog, setOnlineArchive, loadConfirmedOnlineBackup, onlineWorkspaceUrl, listOnlineCheckpoints, loadOnlineCheckpoint, manageOnlineSpectator, onlineSpectatorUrl, spectatorDetailSetting, listOnlinePlayerAccess, manageOnlinePlayerAccess, batchOnlinePlayerAccess, onlinePlayerUrl, type OnlinePlayerAccess, type OnlineCheckpoint, type OnlineCatalogItem } from '@/services/onlineTournaments';
 
 const statuses: Record<string,string> = {DRAFT:'Entwurf',REGISTRATION:'Anmeldung',READY:'Bereit',RUNNING:'Läuft',PAUSED:'Pausiert',FINISHED:'Abgeschlossen',ABORTED:'Abgebrochen'};
 function download(backup:TournamentBackup,revision:number) {
@@ -33,6 +33,8 @@ function OnlineCatalog() {
   const [share,setShare]=useState<{item:OnlineCatalogItem;token:string|null;details:boolean}|null>(null);
   const [players,setPlayers]=useState<{item:OnlineCatalogItem;rows:OnlinePlayerAccess[]}|null>(null);
   const [playerSearch,setPlayerSearch]=useState('');
+  const [playerFilter,setPlayerFilter]=useState('all');
+  const [playerBatch,setPlayerBatch]=useState<'enable'|'disable'|null>(null);
   const alive=useRef(true);
   const running=useRef(false);
   const local=getAllMockTournaments().filter(t=>!t.hasStarted && ['DRAFT','REGISTRATION','READY'].includes(t.status));
@@ -76,7 +78,7 @@ function OnlineCatalog() {
           <button className="btn small" disabled={busy} onClick={()=>void run(async()=>{const result=await loadConfirmedOnlineBackup(item.id);if(alive.current)download(result.backup,result.revision);})}>JSON sichern</button>
           <button className="btn small" disabled={busy} onClick={()=>void run(async()=>{const rows=await listOnlineCheckpoints(item.id);if(alive.current)setHistory({id:item.id,rows});})}>Wiederherstellungspunkte</button>
           <button className="btn small" disabled={busy||!!item.archived_at} onClick={()=>void run(async()=>{const token=await manageOnlineSpectator(item.id,'read');const details=token?await spectatorDetailSetting(item.id):false;if(alive.current)setShare({item,token,details});})}>Zuschauerlink</button>
-          <button className="btn small" disabled={busy||!!item.archived_at} onClick={()=>void run(async()=>{const rows=await listOnlinePlayerAccess(item.id);if(alive.current){setPlayerSearch('');setPlayers({item,rows});}})}>Spielerzugänge</button>
+          <button className="btn small" disabled={busy||!!item.archived_at} onClick={()=>void run(async()=>{const rows=await listOnlinePlayerAccess(item.id);if(alive.current){setPlayerSearch('');setPlayerFilter('all');setPlayerBatch(null);setPlayers({item,rows});}})}>Spielerzugänge</button>
           <button className="btn small" disabled={busy||item.editing||(!item.archived_at&&!['DRAFT','REGISTRATION','READY','FINISHED','ABORTED'].includes(item.status))} onClick={()=>setConfirm(item)}>{item.archived_at?'Archivierung aufheben':'Archivieren'}</button>
         </div>
       </article>)}
@@ -92,10 +94,12 @@ function OnlineCatalog() {
     {players&&<div className="prototype-modal-backdrop" onMouseDown={()=>!busy&&setPlayers(null)}><section className="prototype-modal" role="dialog" aria-modal="true" aria-labelledby="players-title" onMouseDown={e=>e.stopPropagation()} onKeyDown={e=>{if(e.key==='Escape'&&!busy)setPlayers(null);}}>
       <h2 id="players-title">Spielerzugänge · {players.item.name}</h2>
       <p>Ein persönlicher Link erlaubt das Lesen eigener Begegnungen sowie die Meldung und gegenseitige Bestätigung regulärer Endergebnisse. Die Turnierleitung übernimmt das verbindliche Ergebnis. Kein Benutzerkonto erforderlich. Links vertraulich an die jeweiligen Teilnehmer weitergeben. Die öffentliche Zuschauerfreigabe ist unabhängig.</p>
-      <label>Teilnehmer suchen<input type="search" value={playerSearch} onChange={e=>setPlayerSearch(e.target.value)}/></label>
-      <div style={{maxHeight:'45vh',overflowY:'auto'}}>{players.rows.filter(r=>r.name.toLocaleLowerCase('de-DE').includes(playerSearch.trim().toLocaleLowerCase('de-DE'))).map(r=><article key={r.participant_id} className="online-catalog-row"><div className="actions"><strong>{r.name}</strong><span className="badge">{r.token?'Freigegeben':'Gesperrt'}</span></div>
+      <div className="actions"><span className="badge">{players.rows.filter(r=>r.token).length} / {players.rows.length} freigegeben</span><button className="btn small primary" disabled={busy||players.rows.every(r=>r.token)} onClick={()=>setPlayerBatch('enable')}>Alle fehlenden Zugänge erstellen</button><button className="btn small danger" disabled={busy||players.rows.every(r=>!r.token)} onClick={()=>setPlayerBatch('disable')}>Alle Zugänge widerrufen</button></div>
+      {playerBatch&&<div className="card" role="dialog" aria-label="Sammeländerung Spielerzugänge"><p>{playerBatch==='enable'?'Für alle Teilnehmer ohne Zugang einen persönlichen Link erstellen? Bestehende Links bleiben gültig.':'Alle Spielerlinks widerrufen? Bereits gemeldete Ergebnisse bleiben erhalten.'}</p><div className="actions"><button className="btn" disabled={busy} onClick={()=>setPlayerBatch(null)}>Abbrechen</button><button className="btn primary" disabled={busy} onClick={()=>void run(async()=>{const ids=players.rows.filter(r=>playerBatch==='enable'?!r.token:!!r.token).map(r=>r.participant_id);await batchOnlinePlayerAccess(players.item.id,ids,playerBatch);const rows=await listOnlinePlayerAccess(players.item.id);if(alive.current){setPlayers({...players,rows});setPlayerBatch(null);}})}>Sammeländerung bestätigen</button></div></div>}
+      <div className="actions"><label>Teilnehmer suchen<input type="search" value={playerSearch} onChange={e=>setPlayerSearch(e.target.value)}/></label><label>Spielerzugänge<select aria-label="Zugangsstatus" value={playerFilter} onChange={e=>setPlayerFilter(e.target.value)}><option value="all">Alle</option><option value="enabled">Freigegeben</option><option value="disabled">Gesperrt</option></select></label></div>
+      <div style={{maxHeight:'45vh',overflowY:'auto'}}>{players.rows.filter(r=>(playerFilter==='all'||(playerFilter==='enabled'?!!r.token:!r.token))&&r.name.toLocaleLowerCase('de-DE').includes(playerSearch.trim().toLocaleLowerCase('de-DE'))).map(r=><article key={r.participant_id} className="online-catalog-row"><div className="actions"><strong>{r.name}</strong><span className="badge">{r.token?'Freigegeben':'Gesperrt'}</span></div>
       {r.token&&<label>Persönlicher Link<input readOnly aria-label={'Link für '+r.name} value={onlinePlayerUrl(r.token)} onFocus={e=>e.target.select()}/></label>}
-      <div className="actions">{r.token&&<a className="btn small" href={onlinePlayerUrl(r.token)} target="_blank" rel="noopener noreferrer">Öffnen</a>}
+      <div className="actions">{r.token&&<><a className="btn small" href={onlinePlayerUrl(r.token)} target="_blank" rel="noopener noreferrer">Öffnen</a><button className="btn small" disabled={busy} onClick={()=>void run(async()=>{if(!navigator.clipboard)throw new Error('Bitte den persönlichen Link manuell kopieren.');await navigator.clipboard.writeText(onlinePlayerUrl(r.token!));if(alive.current)setMessage('Persönlicher Link kopiert.');})}>Link kopieren</button></>}
       {(r.token?['rotate','disable']:['enable']).map(action=><button key={action} className="btn small" disabled={busy} onClick={()=>void run(async()=>{await manageOnlinePlayerAccess(players.item.id,r.participant_id,action as 'enable'|'rotate'|'disable');const rows=await listOnlinePlayerAccess(players.item.id);if(alive.current)setPlayers({...players,rows});})}>{action==='enable'?'Zugang erstellen':action==='rotate'?'Neuer Link':'Widerrufen'}</button>)}</div></article>)}</div>
       {message&&<p role="alert">{message}</p>}<button className="btn" disabled={busy} onClick={()=>setPlayers(null)}>Schließen</button>
     </section></div>}

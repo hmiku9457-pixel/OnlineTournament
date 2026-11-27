@@ -198,7 +198,14 @@ begin
   snapshot:=jsonb_set(snapshot,'{entries}',(snapshot->'entries')||jsonb_build_object('online-tournament:mock-match-runtime:v1','[{"matchId":"local-rpc-test-phase-1-sw-r2-m1","table":"Tisch 1","status":"LIVE","startedAt":12345}]'));
   if public.commit_leased_online_tournament(v_id,'Test',30,gen_random_uuid(),snapshot,new_token)<>31 then raise exception 'report fixture setup'; end if;
   fixture:='[{"matchId":"local-rpc-test-phase-1-sw-r2-m1","aId":"p-a","bId":"p-b","startedAt":12345,"bestOf":1,"requiresWinner":true}]';
-  pa:=public.manage_online_player_access(v_id,'p-a','enable');pb:=public.manage_online_player_access(v_id,'p-b','enable');pc:=public.manage_online_player_access(v_id,'p-c','enable');
+  begin perform public.batch_online_player_access(v_id,'["p-b","missing"]','enable'); raise exception 'invalid batch succeeded'; exception when invalid_parameter_value then null; end;
+  if exists(select 1 from public.list_online_player_access(v_id) where participant_id='p-b' and token is not null) then raise exception 'partial batch'; end if;
+  if public.batch_online_player_access(v_id,'["p-a","p-b","p-c"]','enable')<>3 then raise exception 'bulk enable failed'; end if;
+  select token into pa from public.list_online_player_access(v_id) where participant_id='p-a';
+  select token into pb from public.list_online_player_access(v_id) where participant_id='p-b';
+  select token into pc from public.list_online_player_access(v_id) where participant_id='p-c';
+  perform public.batch_online_player_access(v_id,'["p-a"]','enable');
+  if (select token from public.list_online_player_access(v_id) where participant_id='p-a') is distinct from pa then raise exception 'bulk enable rotated existing link'; end if;
   if not public.publish_online_report_fixtures(v_id,new_token,31,fixture) then raise exception 'publish report fixtures'; end if;
   if public.read_online_player_reports(pc) is distinct from '[]'::jsonb then raise exception 'foreign report list'; end if;
   begin perform public.submit_online_player_report(pc,'local-rpc-test-phase-1-sw-r2-m1',31,score); raise exception 'foreign report'; exception when insufficient_privilege then null; end;
@@ -213,6 +220,10 @@ begin
   perform public.submit_online_player_report(pb,'local-rpc-test-phase-1-sw-r2-m1',31,score);
   if public.list_online_result_reports(v_id)->0->'aSets' is distinct from public.list_online_result_reports(v_id)->0->'bSets' then raise exception 'matching reports lost'; end if;
   if (public.load_online_tournament(v_id)->>'revision')::int<>31 then raise exception 'player changed canonical revision'; end if;
+  if public.read_online_player_bundle(pa)->'reports' is distinct from public.read_online_player_reports(pa) then raise exception 'bundle reports differ'; end if;
+  if public.read_online_player_bundle(pa)->'view' is distinct from public.read_online_player_access(pa) then raise exception 'bundle view differs'; end if;
+  if public.batch_online_player_access(v_id,'["p-c"]','disable')<>1 then raise exception 'bulk revoke count'; end if;
+  if public.read_online_player_bundle(pc)->'view' is distinct from 'null'::jsonb then raise exception 'bulk revoke failed'; end if;
   perform set_config('test.report_token',pa::text,true);
   perform public.release_online_workspace(v_id,new_token);
   begin perform public.set_online_tournament_archive(v_id,31,true); raise exception 'running event archived'; exception when invalid_parameter_value then null; end;
@@ -228,8 +239,9 @@ begin
  projection:=public.read_online_spectator(token);
  if projection is null or (projection->>'revision')::integer<>31 or (projection->>'recordedResults')::integer<>1 then raise exception 'anonymous public read failed'; end if;
  if public.read_online_player_access(current_setting('test.player_token')::uuid)->>'participant'<>'A' then raise exception 'anonymous player access failed'; end if;
+ if public.read_online_player_bundle(current_setting('test.report_token')::uuid)->'view'->>'participant'<>'A' then raise exception 'anonymous bundle identity'; end if;
  if public.read_online_player_reports(current_setting('test.report_token')::uuid)->0->'aSets' is null then raise exception 'anon report read failed'; end if;
- if has_function_privilege('anon','public.list_online_result_reports(text)','EXECUTE') or has_function_privilege('anon','public.reset_online_result_reports(text,uuid,text,integer)','EXECUTE') or has_table_privilege('anon','tournament_private.online_result_reports','SELECT') then raise exception 'anonymous report privilege'; end if;
+ if has_function_privilege('anon','public.batch_online_player_access(text,jsonb,text)','EXECUTE') or has_function_privilege('anon','public.list_online_result_reports(text)','EXECUTE') or has_function_privilege('anon','public.reset_online_result_reports(text,uuid,text,integer)','EXECUTE') or has_table_privilege('anon','tournament_private.online_result_reports','SELECT') then raise exception 'anonymous report privilege'; end if;
  if public.read_online_player_access(gen_random_uuid()) is not null then raise exception 'unknown player token accepted'; end if;
  if has_function_privilege('anon','public.manage_online_player_access(text,text,text)','EXECUTE') or has_function_privilege('anon','public.publish_online_player_projection(text,uuid,integer,jsonb,integer)','EXECUTE') or has_table_privilege('anon','tournament_private.online_player_links','SELECT') or has_table_privilege('anon','tournament_private.online_player_projection','SELECT') then raise exception 'anon player write access'; end if;
  if public.read_online_spectator(gen_random_uuid()) is not null then raise exception 'unknown token readable'; end if;
