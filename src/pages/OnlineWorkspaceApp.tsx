@@ -62,6 +62,7 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
         <strong>Online-Testbetrieb</strong>
         <span role="status">{pending ? 'Wird in Supabase gespeichert …' : error ? 'Speicherung nicht bestätigt' : !connected ? 'Offline – Bearbeitung gesperrt' : revisionState==='stale' ? 'Bearbeitungssperre verloren oder neuer Datenbankstand' : revisionState==='unknown' ? 'Aktualität nicht geprüft' : 'Datenbankstand bestätigt'}</span>
         <button className="btn small" disabled={pending || checking || !connected || !!error || revisionState==='stale'} onClick={()=>void checkRevision()}>{checking?'Prüfe …':'Datenbankstand prüfen'}</button>
+        <button className="btn small" disabled={pending || leaving || !connected} onClick={()=>void leave(true)}>Arbeitsbereich neu laden</button>
         <button className="btn small" disabled={pending || leaving} onClick={()=>void leave()}>Bearbeitung freigeben und zurück</button>
       </div>
       {!connected && <p role="alert">Keine Internetverbindung. Bereits laufende Partien können am Tisch beendet werden. Neue Änderungen werden erst nach Wiederverbindung zugelassen.</p>}

@@ -99,5 +99,20 @@ begin
  begin perform public.commit_online_tournament(v_id,'Test',0,op3,v_payload); raise exception 'cross-owner create'; exception when insufficient_privilege then null; end;
  if has_table_privilege('authenticated','tournament_private.online_tournaments','UPDATE') or has_function_privilege('anon','public.commit_online_tournament(text,text,integer,uuid,jsonb)','EXECUTE') then raise exception 'privilege leak'; end if;
 end $$;
+-- Expire the existing fixture lease without waiting 90 seconds.
+reset role;
+update tournament_private.online_workspace_leases set expires_at=clock_timestamp()-interval '1 second' where tournament_id='local-rpc-test';
+set local role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-0000000000a1',true);
+do $$
+declare v_id text:='local-rpc-test'; old_token uuid:='20000000-0000-4000-8000-000000000002'; new_token uuid:='20000000-0000-4000-8000-000000000003'; snapshot jsonb;
+begin
+  snapshot:=public.load_online_tournament(v_id)->'payload';
+  if public.claim_online_workspace(v_id,old_token,true) then raise exception 'expired lease renewed'; end if;
+  begin perform public.commit_leased_online_tournament(v_id,'Test',29,gen_random_uuid(),snapshot,old_token); raise exception 'expired lease write accepted'; exception when lock_not_available then null; end;
+  if not public.claim_online_workspace(v_id,new_token,false) then raise exception 'expired lease takeover failed'; end if;
+  if public.release_online_workspace(v_id,old_token) then raise exception 'old token released new lease'; end if;
+  if public.commit_leased_online_tournament(v_id,'Test',29,gen_random_uuid(),snapshot,new_token)<>30 then raise exception 'new owner write failed'; end if;
+end $$;
 rollback;
 select 'create, retry, update, conflict, owner isolation passed' as result;
