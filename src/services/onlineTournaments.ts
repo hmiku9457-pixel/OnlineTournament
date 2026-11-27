@@ -1,7 +1,7 @@
 import { persistOnlineOperation, removeOnlineOperation, listPendingOnlineOperations, type PendingOnlineOperation } from '@/services/onlineOutbox';
 import { supabase } from '@/lib/supabase';
 import { backupTournamentName, captureTournamentBackup, validateTournamentBackup,
-  initializeRemoteTournamentStorage, invalidateRemoteTournamentStorage, initialTournamentBackup, RemoteWriteUnavailableError, type TournamentBackup } from '@/services/localTournamentStorage';
+  initializeRemoteTournamentStorage, invalidateRemoteTournamentStorage, initialTournamentBackup, hasPendingRemoteWrites, getTournamentStorageError, RemoteWriteUnavailableError, type TournamentBackup } from '@/services/localTournamentStorage';
 
 import { buildNewTournament, type CreateMockTournamentInput } from '@/services/mockTournamentStore';
 import type { DemoTournament } from '@/data/demoTournaments';
@@ -123,6 +123,16 @@ export async function resolvePendingOnlineOperation(op: PendingOnlineOperation, 
   if (!discard) await commit(op.snapshot,op.expectedRevision,userId,op.operationId);
   await removeOnlineOperation(op.operationId);
 }
+let workspaceRevision: {id: string; revision: number; ownerId: string} | undefined;
+/** Only metadata is loaded. Never replace the director state automatically. */
+export async function checkOnlineWorkspaceRevision(id: string): Promise<'current' | 'stale' | 'unknown'> {
+  const start = workspaceRevision;
+  if (!start || start.id !== id || hasPendingRemoteWrites() || getTournamentStorageError() || !supabase) return 'unknown';
+  const { data, error } = await supabase.rpc('list_online_tournaments').abortSignal(AbortSignal.timeout(8000));
+  if (error || workspaceRevision !== start || hasPendingRemoteWrites() || getTournamentStorageError()) return 'unknown';
+  const row = (data as OnlineTournamentSummary[] | null)?.find(t => t.id === id);
+  return row?.revision === start.revision ? 'current' : 'stale';
+}
 export async function initializeOnlineWorkspace(id: string): Promise<PendingOnlineOperation[]> {
   const { client, userId } = await account();
   const unresolved = await listPendingOnlineOperations(userId,id);
@@ -130,6 +140,7 @@ export async function initializeOnlineWorkspace(id: string): Promise<PendingOnli
   if (unresolved.length) return unresolved;
   const loaded = await load(id);
   let revision = loaded.revision;
+  workspaceRevision = {id,revision,ownerId:userId};
   if ((await account()).userId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
   let pending: PendingOnlineOperation | undefined;
   initializeRemoteTournamentStorage(loaded.payload, async (snapshot) => {
@@ -142,10 +153,11 @@ export async function initializeOnlineWorkspace(id: string): Promise<PendingOnli
     try { await removeOnlineOperation(pending.operationId); }
     catch { throw new RemoteWriteUnavailableError('Datenbankstand bestätigt, aber Wiederherstellungseintrag konnte nicht entfernt werden.'); }
     revision = confirmedRevision;
+    if (workspaceRevision?.ownerId === userId) workspaceRevision = {id,revision,ownerId:userId};
     pending = undefined;
   });
   client.auth.onAuthStateChange((_event, session) => {
-    if (!session || session.user.id !== userId) invalidateRemoteTournamentStorage();
+    if (!session || session.user.id !== userId) { workspaceRevision = undefined; invalidateRemoteTournamentStorage(); }
   });
   return [];
 }

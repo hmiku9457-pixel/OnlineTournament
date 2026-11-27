@@ -147,6 +147,22 @@ try {
   await a.getByRole('button',{name:'Ursprüngliche Anfrage erneut senden'}).click();
   await confirmed(a);
   assert.equal(rows.get(created).revision,1);
+  // Explicit freshness check must block stale editing before any write.
+  await b.goto(base+'/?online='+encodeURIComponent(created)+'#/tournaments/'+created+'/control');
+  await confirmed(b);
+  await b.getByRole('button',{name:'Turnier starten',exact:true}).click();
+  await b.getByRole('button',{name:'Jetzt starten',exact:true}).click();
+  await b.getByRole('button',{name:'Turnier pausieren',exact:true}).waitFor();
+  await confirmed(b);
+  const writesBeforeCheck=calls.length;
+  const staleLabel=a.getByText('Neuerer Datenbankstand vorhanden',{exact:true});
+  if(!(await staleLabel.isVisible())) await a.getByRole('button',{name:'Datenbankstand prüfen',exact:true}).click();
+  await staleLabel.waitFor();
+  assert.equal(calls.length,writesBeforeCheck);
+  assert.equal(await a.locator('[inert]').count()>0,true);
+  await a.getByRole('button',{name:'Datenbankstand neu laden',exact:true}).click();
+  await confirmed(a);
+  await a.getByRole('button',{name:'Turnier pausieren',exact:true}).waitFor();
   await first.close(); await second.close();
   process.stdout.write('Online browser smoke passed: login, cloud creation, start, lost response, retry, second browser and stale revision.\n');
 } finally { await browser.close(); }

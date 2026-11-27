@@ -8,6 +8,11 @@ declare
   v_payload jsonb;
   v_entries jsonb;
   v_invalid jsonb;
+  v_header jsonb;
+  v_live jsonb;
+  v_corrected jsonb;
+  v_later jsonb;
+  v_match jsonb;
   op1 uuid := '10000000-0000-4000-8000-000000000001';
   op2 uuid := '10000000-0000-4000-8000-000000000002';
   op3 uuid := '10000000-0000-4000-8000-000000000003';
@@ -52,6 +57,24 @@ begin
  end loop;
  if (select count(*) from public.list_online_checkpoints(v_id)) <> 20 then raise exception 'checkpoint retention'; end if;
  if (select min(revision) from public.list_online_checkpoints(v_id)) <> 6 then raise exception 'checkpoint retention order'; end if;
+ -- Exercise correction before and after the next Swiss round begins.
+ v_header := (v_entries->>'online-tournament:local-prototype-tournaments:v1:record:local-rpc-test')::jsonb;
+ v_header := jsonb_set(jsonb_set(jsonb_set(jsonb_set(v_header,'{tournament,status}','"RUNNING"'),'{tournament,hasStarted}','true'),'{tournament,stages,0,type}','"SWISS"'),'{tournament,stages,0,orderIndex}','0');
+ v_match := '{"matchId":"local-rpc-test-phase-1-sw-r1-m1","status":"FINISHED","sets":[{"number":1,"sideAScore":11,"sideBScore":7}]}';
+ v_live := jsonb_set(v_payload,'{entries}',v_entries || jsonb_build_object(
+   'online-tournament:local-prototype-tournaments:v1:record:local-rpc-test',v_header::text,
+   'online-tournament:mock-phase-lifecycle:v1','[{"tournamentId":"local-rpc-test","startedStageIds":["local-rpc-test-phase-1"],"completedStageIds":[]}]',
+   'online-tournament:mock-match-results:v2',jsonb_build_array(v_match)::text));
+ if public.commit_online_tournament(v_id,'Test',25,gen_random_uuid(),v_live)<>26 then raise exception 'valid initial result rejected'; end if;
+ v_corrected := jsonb_set(v_live,'{entries}',(v_live->'entries') || jsonb_build_object('online-tournament:mock-match-results:v2',jsonb_build_array(jsonb_set(v_match,'{sets,0,sideBScore}','8'))::text));
+ if public.commit_online_tournament(v_id,'Test',26,gen_random_uuid(),v_corrected)<>27 then raise exception 'valid correction rejected'; end if;
+ v_later := jsonb_set(v_corrected,'{entries}',(v_corrected->'entries') || jsonb_build_object(
+   'online-tournament:mock-match-runtime:v1','[{"matchId":"local-rpc-test-phase-1-sw-r2-m1","table":"Noch offen","status":"WAITING","startedAt":12345}]'));
+ if public.commit_online_tournament(v_id,'Test',27,gen_random_uuid(),v_later)<>28 then raise exception 'valid round start rejected'; end if;
+ v_invalid := jsonb_set(v_later,'{entries}',(v_later->'entries') || jsonb_build_object('online-tournament:mock-match-results:v2',jsonb_build_array(v_match)::text));
+ begin perform public.commit_online_tournament(v_id,'Test',28,gen_random_uuid(),v_invalid); raise exception 'locked result correction accepted'; exception when invalid_parameter_value then null; end;
+ v_invalid := jsonb_set(v_later,'{entries}',(v_later->'entries') || jsonb_build_object('online-tournament:mock-match-results:v2',jsonb_build_array(jsonb_set(v_match,'{sets,0,sideBScore}','8') || '{"reviewConfirmed":true}'::jsonb)::text));
+ if public.commit_online_tournament(v_id,'Test',28,gen_random_uuid(),v_invalid)<>29 then raise exception 'valid review flag rejected'; end if;
  perform set_config('request.jwt.claim.sub','00000000-0000-4000-8000-0000000000b2',true);
  begin perform public.load_online_checkpoint(v_id,25); raise exception 'foreign checkpoint read'; exception when insufficient_privilege then null; end;
  begin perform public.list_online_checkpoints(v_id); raise exception 'foreign checkpoint list'; exception when insufficient_privilege then null; end;
