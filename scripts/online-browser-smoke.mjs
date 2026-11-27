@@ -77,6 +77,7 @@ try {
   await a.goto(base+'/#/online');
   await a.getByRole('link',{name:'Online-Turnierleitung öffnen'}).click();
   await confirmed(a);
+  await a.locator('#app-build-version').waitFor({state:'visible'});
   await a.getByRole('button',{name:'Turnier starten',exact:true}).click();
   await a.getByRole('button',{name:'Jetzt starten',exact:true}).click();
   await a.getByRole('button',{name:'Turnier pausieren',exact:true}).waitFor();

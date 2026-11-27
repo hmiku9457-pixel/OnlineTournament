@@ -9262,3 +9262,30 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
   .wizard-workspace .phase-wizard-step .phase-day-start-label { padding-bottom: 0; }
   .wizard-workspace .phase-wizard-step .phase-day-card { padding: 9px; }
 }
+
+
+/* The displayed version is baked into the delivered HTML, not fetched from
+   the latest GitHub revision. It identifies the page currently being tested. */
+.app-build-version {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 9;
+  max-width: calc(100vw - 24px);
+  padding: 4px 8px;
+  border: 1px solid #344054;
+  border-radius: 6px;
+  background: #101828;
+  color: #d0d5dd;
+  font-size: .65rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+@media (min-width: 901px) {
+  .sidebar-inner { padding-bottom: 44px; }
+}
+@media print {
+  .app-build-version { display: none !important; }
+}
