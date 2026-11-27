@@ -314,6 +314,78 @@ describe('isolated remote tournament persistence', () => {
     await adapter.flushPendingLocalTournamentWrites();
     expect(save).not.toHaveBeenCalled();
   });
+  it('rolls back a failed compound remote operation without committing partial data', async()=>{
+    const {adapter,backup,key}=await setup();
+    const save=vi.fn(async()=>{});
+    adapter.initializeRemoteTournamentStorage(backup,save);
+    expect(()=>adapter.runRemoteTournamentBatch(()=>{
+      adapter.localTournamentStorage.setItem(key,JSON.stringify({...JSON.parse(backup.entries[key]),tournament:{...JSON.parse(backup.entries[key]).tournament,name:'Partial'}}));
+      throw new Error('second operation failed');
+    })).toThrow('second operation failed');
+    await adapter.flushPendingLocalTournamentWrites();
+    expect(save).not.toHaveBeenCalled();
+    expect(adapter.localTournamentStorage.getItem(key)).toBe(backup.entries[key]);
+    expect(adapter.hasPendingRemoteWrites()).toBe(false);
+  });
+  it('commits a compound operation in one revision and rejects overlapping work',async()=>{
+    const {adapter,backup,key}=await setup();
+    const save=vi.fn(async(_snapshot:Snapshot)=>{});
+    adapter.initializeRemoteTournamentStorage(backup,save);
+    const initial=JSON.parse(backup.entries[key]);
+    const rename=(name:string)=>adapter.localTournamentStorage.setItem(key,JSON.stringify({...initial,tournament:{...initial.tournament,name}}));
+    expect(adapter.runRemoteTournamentBatch(()=>{rename('First');rename('Second');return 2;})).toBe(2);
+    expect(()=>adapter.runRemoteTournamentBatch(()=>rename('Third'))).toThrow('Speicherung abschließen');
+    await adapter.flushPendingLocalTournamentWrites();
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(adapter.backupTournamentName(save.mock.calls[0][0] as Snapshot)).toBe('Second');
+  });
+  it('simulates a 16-player round robin with eight tables and atomic result batches',async()=>{
+    const {adapter}=await setup();
+    const store=await import('@/services/mockTournamentStore');
+    const lifecycle=await import('@/services/mockPhaseLifecycle');
+    const runtime=await import('@/services/mockRuntime');
+    const {planControlAssignments}=await import('@/domain/controlAssignment');
+    const t=store.buildNewTournament({name:'16 Spieler Online-Simulation',sport:'table_tennis',discipline:'SINGLES',
+      tables:8,minimumMatches:15,estimatedDurationMinutes:240,participantNames:Array.from({length:16},(_,i)=>'Teilnehmer '+(i+1)),
+      phases:[{type:'ROUND_ROBIN',label:'Liga',entrantCount:16,groupCount:1,swissRounds:1,bestOf:1,knockoutBestOf:[]}]});
+    let saved=adapter.initialTournamentBackup(t);
+    recordSqlFixture(saved);
+    let writes=0;
+    adapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);writes++;recordSqlFixture(saved);});
+    expect(lifecycle.startFirstStage(t)).toBe(true);
+    store.updateMockTournamentStatus(t.id,'RUNNING');
+    await adapter.flushPendingLocalTournamentWrites();
+    const free=Array.from({length:8},(_,i)=>'Tisch '+(i+1));
+    let total=0,batches=0;
+    while(total<120){
+      const active=store.getMockTournament(t.id);
+      const waiting=runtime.getMockRuntimeMatches(active).filter(m=>m.status==='WAITING');
+      const plan=planControlAssignments(waiting,runtime.getMockQueueAssignableTables(active),free);
+      expect(plan.length).toBeGreaterThan(0);
+      expect(plan.length).toBeLessThanOrEqual(8);
+      adapter.runRemoteTournamentBatch(()=>{
+        for(const item of plan)expect(runtime.assignMockMatchToTable(active,item.matchId,item.table)).toBe(true);
+      });
+      await adapter.flushPendingLocalTournamentWrites();
+      const before=writes;
+      adapter.runRemoteTournamentBatch(()=>{
+        for(const item of plan)runtime.completeMockMatch(item.matchId,[{number:1,sideAScore:11,sideBScore:7}],'FINISHED',true);
+      });
+      await adapter.flushPendingLocalTournamentWrites();
+      expect(writes).toBe(before+1);
+      total+=plan.length;batches++;
+      expect(batches).toBeLessThanOrEqual(120);
+    }
+    const active=store.getMockTournament(t.id);
+    expect(runtime.getPendingMockApproval(active)?.kind).toBe('STAGE');
+    expect(runtime.approveMockProgress(active)?.isLastStage).toBe(true);
+    await adapter.flushPendingLocalTournamentWrites();
+    expect(store.getMockTournament(t.id).status).toBe('FINISHED');
+    const finished=JSON.parse(saved.entries['online-tournament:mock-match-results:v2']);
+    expect(finished).toHaveLength(120);
+    expect(new Set(finished.map((m:{matchId:string})=>m.matchId)).size).toBe(120);
+    expect(finished.every((m:{status:string;adminConfirmed:boolean})=>m.status==='FINISHED'&&m.adminConfirmed)).toBe(true);
+  },30000);
   it('does not persist a replacement or deletion of the online event', async () => {
     const { adapter, backup } = await setup();
     const save = vi.fn(async () => {});
