@@ -370,6 +370,42 @@ try {
   await player.getByRole('button',{name:'Gesehen',exact:true}).waitFor();
   await player.getByLabel('Eigene Punkte 1',{exact:true}).fill('11');
   await player.getByLabel('Gegnerpunkte 1',{exact:true}).fill('8');
+  // A confirmed unrelated revision must not erase a partially entered score.
+  const draftRevision=rows.get(id).revision;
+  await a.evaluate(async(tournamentId)=>{
+    const {localTournamentStorage,flushPendingLocalTournamentWrites}=await import('/src/services/localTournamentStorage.ts');
+    const key='online-tournament:local-prototype-tournaments:v1:record:'+tournamentId;
+    const current=localTournamentStorage.getItem(key);
+    if(!current)throw new Error('missing record');
+    localTournamentStorage.setItem(key,current);
+    await flushPendingLocalTournamentWrites();
+  },id);
+  assert.equal(rows.get(id).revision,draftRevision+1);
+  await player.getByRole('button',{name:'Jetzt aktualisieren',exact:true}).click({timeout:45000});
+  await player.getByText(new RegExp('Revision '+(draftRevision+1)+' ·')).waitFor({timeout:45000});
+  await player.getByLabel('Eigene Punkte 1',{exact:true}).waitFor({timeout:45000});
+  assert.equal(await player.getByLabel('Eigene Punkte 1',{exact:true}).inputValue(),'11');
+  assert.equal(await player.getByLabel('Gegnerpunkte 1',{exact:true}).inputValue(),'8');
+  await player.getByRole('button',{name:'Ergebnis prüfen'}).click();
+  await player.getByRole('dialog',{name:'Spielermeldung bestätigen'}).getByRole('button',{name:'Ergebnis melden'}).click();
+  await player.getByText('Wartet auf Meldung des Gegners.').waitFor();
+  // Reset proposals without changing the sporting revision.
+  const resetRevision=rows.get(id).revision;
+  await a.getByRole('button',{name:'Meldungen zurücksetzen',exact:true}).click({timeout:45000});
+  await a.getByRole('dialog',{name:'Spielermeldungen zurücksetzen'}).getByRole('button',{name:'Zurücksetzen bestätigen'}).click();
+  await a.getByRole('dialog',{name:'Spielermeldungen zurücksetzen'}).waitFor({state:'hidden',timeout:45000});
+  assert.equal(rows.get(id).revision,resetRevision);
+  const staleCode=await player.evaluate(async({token,matchId,revision})=>{
+    const {supabase}=await import('/src/lib/supabase.ts');
+    const result=await supabase.rpc('submit_online_player_report_v2',{p_token:token,p_match_id:matchId,p_revision:revision,p_sets:[{number:1,sideAScore:11,sideBScore:8}],p_generation:0});
+    return result.error?.code;
+  },{token:new URL(personalLink).hash.split('/').at(-1),matchId:reportId[0],revision:resetRevision});
+  assert.equal(staleCode,'40001','reset must invalidate the old generation');
+  await player.getByRole('button',{name:'Jetzt aktualisieren',exact:true}).click({timeout:45000});
+  await player.getByLabel('Eigene Punkte 1',{exact:true}).waitFor({timeout:45000});
+  assert.equal(await player.getByLabel('Eigene Punkte 1',{exact:true}).inputValue(),'');
+  await player.getByLabel('Eigene Punkte 1',{exact:true}).fill('11');
+  await player.getByLabel('Gegnerpunkte 1',{exact:true}).fill('8');
   await player.getByRole('button',{name:'Ergebnis prüfen'}).click();
   await player.getByRole('dialog',{name:'Spielermeldung bestätigen'}).getByRole('button',{name:'Ergebnis melden'}).click();
   await player.getByText('Wartet auf Meldung des Gegners.').waitFor();
