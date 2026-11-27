@@ -234,7 +234,7 @@ export function cleanupReplacedTournamentData(tournamentId: string): void {
     'online-tournament:mock-phase-lifecycle:v1',
     'online-tournament:swiss-round-fixtures:v1',
     'online-tournament:mock-audit:v1',
-    'online-tournament:mock-inline-breaks:v1',
+    'online-tournament:mock-inline-breaks:v2',
     'online-tournament:group-cutoff-decisions:v1',
   ];
   const arraysWithMatchId = [

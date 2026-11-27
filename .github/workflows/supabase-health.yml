@@ -5,7 +5,8 @@ on:
     - cron: '23 5,13,21 * * *'
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 concurrency:
   group: supabase-health
@@ -19,10 +20,13 @@ jobs:
       SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
       SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
     steps:
+      - uses: actions/checkout@v4
       - name: Verify real database access (read-only)
         shell: bash
         run: |
           set -euo pipefail
+          SUPABASE_URL="${SUPABASE_URL:-$(jq -r .url supabase-public.json)}"
+          SUPABASE_KEY="${SUPABASE_KEY:-$(jq -r .publishableKey supabase-public.json)}"
           if [[ -z "$SUPABASE_URL" || -z "$SUPABASE_KEY" ]]; then
             echo "::error::Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in repository Actions secrets."
             exit 1

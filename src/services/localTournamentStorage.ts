@@ -12,7 +12,7 @@ const ARRAY_KEYS = [
   'online-tournament:mock-draw-config:v1',
   'online-tournament:mock-phase-lifecycle:v1',
   'online-tournament:mock-audit:v1',
-  'online-tournament:mock-inline-breaks:v1',
+  'online-tournament:mock-inline-breaks:v2',
   'online-tournament:group-cutoff-decisions:v1',
   'online-tournament:mock-match-results:v2',
   'online-tournament:mock-match-runtime:v1',
@@ -391,4 +391,112 @@ export async function discardCorruptLocalRecord(key: string): Promise<void> {
   });
   quarantine = quarantine.filter((item) => item.key !== key);
   window.dispatchEvent(new Event('tournament-storage-integrity-change'));
+}
+
+
+export interface TournamentBackup {
+  version: 1;
+  tournamentId: string;
+  exportedAt: string;
+  entries: Record<string, string>;
+}
+
+const MATCH_KEYS = new Set<string>([
+  'online-tournament:mock-match-results:v2', 'online-tournament:mock-match-runtime:v1',
+]);
+const COMPOSITE_KEYS = new Set<string>([
+  'online-tournament:swiss-cutoff-decisions:v1', 'online-tournament:swiss-round-robin-history:v1',
+  'online-tournament:swiss-extra-rounds:v1',
+]);
+const recordObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+function belongsToTournament(key: string, item: unknown, id: string): boolean {
+  if (!recordObject(item)) return false;
+  return MATCH_KEYS.has(key)
+    ? typeof item.matchId === 'string' && item.matchId.startsWith(id + '-phase-')
+    : item.tournamentId === id;
+}
+function belongsMapKey(key: string, entry: string, id: string): boolean {
+  return COMPOSITE_KEYS.has(key) ? entry.startsWith(id + ':') : entry === id;
+}
+function parseArray(raw: string | null): unknown[] {
+  const parsed: unknown = JSON.parse(raw ?? '[]');
+  if (!Array.isArray(parsed) || !parsed.every(recordObject)) throw new Error('Ungültige Turnierliste.');
+  return parsed;
+}
+function parseMap(raw: string | null): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(raw ?? '{}');
+  if (!recordObject(parsed)) throw new Error('Ungültige Turniereinstellungen.');
+  return parsed;
+}
+function requireHealthyStorage() {
+  if (currentError || quarantine.length) throw new Error('Der Turnierspeicher muss vor dem Sichern oder Wiederherstellen geprüft werden.');
+}
+export function validateTournamentBackup(value: unknown): TournamentBackup {
+  if (!recordObject(value) || value.version !== 1 || typeof value.tournamentId !== 'string'
+    || !/^local-[a-zA-Z0-9-]{1,140}$/.test(value.tournamentId)
+    || typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt))
+    || !recordObject(value.entries)) throw new Error('Unbekanntes oder ungültiges Sicherungsformat.');
+  const id = value.tournamentId;
+  const entries = value.entries;
+  const allowed = [RECORD_PREFIX + id, ...ARRAY_KEYS, ...OBJECT_KEYS];
+  if (Object.keys(entries).length !== allowed.length || !allowed.every((k) => typeof entries[k] === 'string')
+    || Object.keys(entries).some((k) => !allowed.includes(k))) throw new Error('Unvollständige oder fremde Sicherungsdaten.');
+  const verified = entries as Record<string, string>;
+  for (const k of ARRAY_KEYS) {
+    if (!parseArray(verified[k]).every((item) => belongsToTournament(k, item, id))) throw new Error('Die Sicherung enthält fremde Turnierdaten.');
+  }
+  for (const k of OBJECT_KEYS) {
+    if (!Object.keys(parseMap(verified[k])).every((entry) => belongsMapKey(k, entry, id))) throw new Error('Die Sicherung enthält fremde Turniereinstellungen.');
+  }
+  const report = inspectSnapshot([{ key: INDEX, value: JSON.stringify([id]) },
+    ...Object.entries(verified).map(([key, value]) => ({ key, value }))]);
+  if (report.corrupt.length || !validTournament(verified[RECORD_PREFIX + id], id)) throw new Error('Die Sicherung enthält beschädigte Turnierdaten.');
+  return { version: 1, tournamentId: id, exportedAt: value.exportedAt, entries: verified };
+}
+export function backupTournamentName(backup: TournamentBackup): string {
+  return JSON.parse(backup.entries[RECORD_PREFIX + backup.tournamentId]).tournament.name as string;
+}
+export async function captureTournamentBackup(id: string): Promise<TournamentBackup> {
+  await flushPendingLocalTournamentWrites();
+  requireHealthyStorage();
+  const raw = localTournamentStorage.getItem(RECORD_PREFIX + id);
+  if (!raw) throw new Error('Turnier nicht gefunden.');
+  const entries: Record<string, string> = { [RECORD_PREFIX + id]: raw };
+  for (const k of ARRAY_KEYS) entries[k] = JSON.stringify(parseArray(localTournamentStorage.getItem(k)).filter((item) => belongsToTournament(k, item, id)));
+  for (const k of OBJECT_KEYS) entries[k] = JSON.stringify(Object.fromEntries(Object.entries(parseMap(localTournamentStorage.getItem(k))).filter(([entry]) => belongsMapKey(k, entry, id))));
+  return validateTournamentBackup({ version: 1, tournamentId: id, exportedAt: new Date().toISOString(), entries });
+}
+/** Restore only into an empty tournament ID. No existing tournament is overwritten. */
+export async function restoreTournamentBackup(input: unknown): Promise<string> {
+  const backup = validateTournamentBackup(input);
+  await flushPendingLocalTournamentWrites();
+  requireHealthyStorage();
+  const id = backup.tournamentId;
+  const ids: unknown = JSON.parse(localTournamentStorage.getItem(INDEX) ?? '[]');
+  if (!Array.isArray(ids) || !ids.every((v) => typeof v === 'string')) throw new Error('Ungültiger Turnierindex.');
+  if (ids.includes(id) || localTournamentStorage.getItem(RECORD_PREFIX + id)) throw new Error('Dieses Turnier existiert bereits lokal. Es wird nicht überschrieben.');
+  const changes: Record<string, string> = { [RECORD_PREFIX + id]: backup.entries[RECORD_PREFIX + id], [INDEX]: JSON.stringify([id, ...ids]) };
+  for (const k of ARRAY_KEYS) changes[k] = JSON.stringify([
+    ...parseArray(localTournamentStorage.getItem(k)).filter((item) => !belongsToTournament(k, item, id)), ...parseArray(backup.entries[k]),
+  ]);
+  for (const k of OBJECT_KEYS) changes[k] = JSON.stringify({
+    ...Object.fromEntries(Object.entries(parseMap(localTournamentStorage.getItem(k))).filter(([entry]) => !belongsMapKey(k, entry, id))),
+    ...parseMap(backup.entries[k]),
+  });
+  // Validate the merged state before scheduling any write.
+  const merged = new Map<string, string>();
+  for (let i = 0; i < localTournamentStorage.length; i++) {
+    const key = localTournamentStorage.key(i);
+    if (key?.startsWith(PREFIX)) { const value = localTournamentStorage.getItem(key); if (value !== null) merged.set(key, value); }
+  }
+  for (const [key, value] of Object.entries(changes)) merged.set(key, value);
+  if (inspectSnapshot([...merged].map(([key, value]) => ({key, value}))).corrupt.length) throw new Error('Die Wiederherstellung würde ungültige Turnierdaten erzeugen.');
+  // The existing IndexedDB commit batches this synchronous operation in one transaction.
+  for (const [key, value] of Object.entries(changes)) localTournamentStorage.setItem(key, value);
+  await flushPendingLocalTournamentWrites();
+  window.dispatchEvent(new Event('mock-runtime-change'));
+  window.dispatchEvent(new Event('mock-phase-change'));
+  window.dispatchEvent(new Event('mock-draw-change'));
+  return id;
 }

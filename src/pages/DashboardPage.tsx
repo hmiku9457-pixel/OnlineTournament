@@ -195,7 +195,7 @@ export function DashboardPage() {
           <h1>Turniere</h1>
           <p className="muted">Alle Turniere, ihre aktuellen Stände und die nächsten Schritte an einem Ort.</p>
         </div>
-        <Link className="btn primary dashboard-new-button" to="/tournaments/new">+ Neues Turnier</Link>
+        <div className="actions"><Link className="btn" to="/backups">Turniersicherungen</Link><Link className="btn primary dashboard-new-button" to="/tournaments/new">+ Neues Turnier</Link></div>
       </header>
 
       <section className="dashboard-kpis" aria-label="Kennzahlen aller Turniere">

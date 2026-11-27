@@ -1,7 +1,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+import publicConfig from '../../supabase-public.json';
+
+// This is a public, RLS-protected browser key, never a service role key.
+// Local development and browser smoke tests remain unconfigured unless opted in.
+const url = import.meta.env.VITE_SUPABASE_URL || (import.meta.env.PROD ? publicConfig.url : '');
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || (import.meta.env.PROD ? publicConfig.publishableKey : '');
 
 export const supabaseConfigured = Boolean(url && anonKey);
 export const supabase: SupabaseClient | null = supabaseConfigured
