@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const path=process.env.ONLINE_SQL_FIXTURES;
 if(!path || !process.env.DATABASE_URL) throw new Error('Fixture path and test database URL required');
 const snapshots=readFileSync(path,'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
-const ids=new Map();
+const ids=new Map(), tokens=new Map();
 const q=v=>"'"+String(v).replaceAll("'","''")+"'";
 let sql="begin;\ninsert into auth.users(id,email) values ('00000000-0000-4000-8000-0000000000c3','fixture@example.invalid');\nset local role authenticated;\nselect set_config('request.jwt.claim.sub','00000000-0000-4000-8000-0000000000c3',true);\n";
 for(const snapshot of snapshots){
@@ -12,7 +12,11 @@ for(const snapshot of snapshots){
   const revision=ids.get(id) ?? 0;
   const tournament=JSON.parse(snapshot.entries['online-tournament:local-prototype-tournaments:v1:record:'+id]).tournament;
   const op=crypto.randomUUID();
-  sql+="select public.commit_online_tournament("+q(id)+","+q(tournament.name)+","+revision+","+q(op)+"::uuid,"+q(JSON.stringify(snapshot))+"::jsonb);\n";
+  if(revision===0) {
+    sql+="select public.commit_online_tournament("+q(id)+","+q(tournament.name)+","+revision+","+q(op)+"::uuid,"+q(JSON.stringify(snapshot))+"::jsonb);\n";
+    const token=crypto.randomUUID();tokens.set(id,token);
+    sql+="select public.claim_online_workspace("+q(id)+","+q(token)+"::uuid,false);\n";
+  } else sql+="select public.commit_leased_online_tournament("+q(id)+","+q(tournament.name)+","+revision+","+q(op)+"::uuid,"+q(JSON.stringify(snapshot))+"::jsonb,"+q(tokens.get(id))+"::uuid);\n";
   ids.set(id,revision+1);
 }
 assert.ok(ids.size>=3,'Expected round-robin, Swiss and group/KO fixtures');

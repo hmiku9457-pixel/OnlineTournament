@@ -4,7 +4,7 @@ import { createHashRouter, RouterProvider } from 'react-router-dom';
 import App from './App';
 import { OnlineRecoveryPage } from './pages/OnlineRecoveryPage';
 import { OnlineWorkspaceApp } from './pages/OnlineWorkspaceApp';
-import { initializeOnlineWorkspace, localOverviewUrl } from './services/onlineTournaments';
+import { initializeOnlineWorkspace, localOverviewUrl, WorkspaceBusyError } from './services/onlineTournaments';
 import { initializeLocalTournamentStorage, markLocalTournamentStorageUnavailable } from './services/localTournamentStorage';
 import './styles.css';
 
@@ -28,8 +28,10 @@ async function boot() {
       if (unresolved.length) { root.render(<StrictMode><OnlineRecoveryPage operations={unresolved}/></StrictMode>); return; }
     }
     catch (error) {
-      root.render(<main className="main"><section className="card" role="alert"><h1>Online-Turnier nicht verfügbar</h1>
+      root.render(<main className="main"><section className="card" role="alert"><h1>{error instanceof WorkspaceBusyError ? 'Turnier wird bereits bearbeitet' : 'Online-Turnier nicht verfügbar'}</h1>
         <p>{error instanceof Error ? error.message : 'Verbindung fehlgeschlagen.'}</p>
+        {error instanceof WorkspaceBusyError && <p>Gib die Sperre im bisherigen Arbeitsbereich frei. Nach einem Verbindungsabbruch oder Schließen läuft sie spätestens 90 Sekunden nach der letzten Verlängerung aus.</p>}
+        <button className="btn primary" onClick={()=>window.location.reload()}>Erneut versuchen</button>
         <a className="btn" href={localOverviewUrl()}>Zur Online-Übersicht</a>
       </section></main>);
       return;
