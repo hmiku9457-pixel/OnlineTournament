@@ -394,6 +394,15 @@ export function getBracketSlots(tournament: DemoTournament, stage: TournamentSta
   return balancedBracketSlots(participants);
 }
 
+/** Persist the actual initial draw before freezing the phase entrants.
+ * Default draws must be stored too, not recomputed by a future client. */
+export function freezeKnockoutDraw(tournament:DemoTournament,stage:TournamentStage){
+ const slots=getBracketSlots(tournament,stage);
+ const old=findConfig(tournament.id,stage.id);
+ if(old?.bracketSlots?.length===slots.length&&old.bracketSlots.every((name,index)=>name===slots[index]))return;
+ upsert({...old,tournamentId:tournament.id,stageId:stage.id,bracketSlots:slots});
+}
+
 export function setBracketSlot(
   tournament: DemoTournament,
   stage: TournamentStage,

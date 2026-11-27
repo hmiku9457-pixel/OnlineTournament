@@ -5,7 +5,7 @@ import { groupLetter } from '@/domain/groupLabels';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { TournamentStage } from '@/domain/types';
 import { getRuntimeParticipantNames } from '@/services/mockParticipants';
-import { getGroupAssignments, compactStartedGroupAssignments } from '@/services/mockDrawStore';
+import { getGroupAssignments, compactStartedGroupAssignments, freezeKnockoutDraw } from '@/services/mockDrawStore';
 import { isParticipantWithdrawn } from '@/services/mockWithdrawals';
 import { estimatePhaseMetrics } from '@/domain/tournamentCreation';
 import { planningMinutesPerSet } from '@/domain/sports';
@@ -264,6 +264,7 @@ export function startStage(tournament: DemoTournament, stage: TournamentStage, p
     additionalMinutes = Math.max(0, actual - baseline);
     compactStartedGroupAssignments(tournament, stage, entrants);
   }
+  if(stage.type==='KNOCKOUT')freezeKnockoutDraw(tournament,stage);
   // Die vor dem Start gültige Auslosung einfrieren. Ansonsten würden bei
   // einem späteren Lesen die ursprüngliche Teilnehmerzahl aus dem Wizard
   // erneut greifen und Nachmeldungen verschwinden / Rückzüge zurückkehren.

@@ -298,3 +298,34 @@ set local role authenticated;
 select public.manage_online_spectator('local-rpc-test','disable');
 rollback;
 select 'create, retry, update, conflict, owner isolation passed' as result;
+
+-- A synthetic trigger probe validates draw and fixture identities without
+-- touching hosted data. The real director snapshots are replayed separately.
+begin;
+do $ko$
+declare e jsonb; probe_payload jsonb; slots jsonb:='[{"kind":"participant","participantId":"a"},{"kind":"participant","participantId":"b"},{"kind":"participant","participantId":"c"},{"kind":"participant","participantId":"d"}]';
+ results jsonb; expected jsonb; f tournament_private.online_report_fixtures; t tournament_private.online_tournaments;
+begin
+ create temporary table ko_probe(id text,payload jsonb) on commit drop;
+ create trigger ko_probe_guard before insert or update on ko_probe for each row execute function tournament_private.validate_online_ko_draw();
+ e:=jsonb_build_object('online-tournament:local-prototype-tournaments:v1:record:probe','{"tournament":{"stages":[{"id":"ko","type":"KNOCKOUT"}]}}',
+ 'online-tournament:mock-phase-lifecycle:v1','[{"startedStageIds":["ko"],"stageEntrants":{"ko":["a","b","c","d"]}}]',
+ 'online-tournament:mock-draw-config:v1',jsonb_build_array(jsonb_build_object('stageId','ko','bracketSlots',slots))::text,
+ 'online-tournament:mock-match-runtime:v1','[]','online-tournament:mock-match-results:v2','[]');
+ probe_payload:=jsonb_build_object('entries',e);
+ insert into ko_probe values('probe',probe_payload);
+ expected:=tournament_private.ko_expected_pairs('probe',probe_payload,'ko',slots);
+ if expected->'ko-r1-m1' is distinct from '["a","b"]'::jsonb or expected ? 'ko-r2-m1' then raise exception 'invalid initial bracket'; end if;
+ begin update ko_probe q set payload=jsonb_set(q.payload,'{entries}',e||jsonb_build_object('online-tournament:mock-match-results:v2','[{"matchId":"ko-r2-m1","status":"FINISHED","sets":[{"sideAScore":11,"sideBScore":8}]}]')); raise exception 'unresolved final accepted'; exception when invalid_parameter_value then null; end;
+ results:='[{"matchId":"ko-r1-m1","status":"FINISHED","sets":[{"sideAScore":11,"sideBScore":8}]},{"matchId":"ko-r1-m2","status":"FINISHED","sets":[{"sideAScore":7,"sideBScore":11}]}]';
+ e:=e||jsonb_build_object('online-tournament:mock-match-results:v2',results::text);
+ probe_payload:=jsonb_build_object('entries',e);
+ update ko_probe q set payload=jsonb_build_object('entries',e) where q.id='probe';
+ expected:=tournament_private.ko_expected_pairs('probe',probe_payload,'ko',slots);
+ if expected->'ko-r2-m1' is distinct from '["a","d"]'::jsonb or expected->'ko-third-place' is distinct from '["b","c"]'::jsonb then raise exception 'dependent KO pairs incorrect'; end if;
+ t.id:='probe';t.payload:=probe_payload;f.match_id:='ko-third-place';f.a_id:='b';f.b_id:='c';
+ if not tournament_private.ko_report_pair_valid(f,t) then raise exception 'valid bronze rejected'; end if;
+ f.b_id:='d';if tournament_private.ko_report_pair_valid(f,t) then raise exception 'foreign bronze accepted'; end if;
+ begin update ko_probe q set payload=jsonb_build_object('entries',e||jsonb_build_object('online-tournament:mock-draw-config:v1','[]')) where q.id='probe'; raise exception 'frozen KO draw removed'; exception when invalid_parameter_value then null; end;
+end $ko$;
+rollback;

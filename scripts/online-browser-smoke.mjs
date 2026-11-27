@@ -345,7 +345,7 @@ try {
   const share=a.getByRole('dialog',{name:/Zuschauerlink/});
   await share.getByRole('button',{name:'Zuschaueransicht freigeben'}).click();
   await share.getByRole('button',{name:'QR-Code anzeigen',exact:true}).click();
-  await share.locator('svg').filter({has:share.locator('title',{hasText:'QR-Code für die Zuschaueransicht'})}).waitFor();
+  await share.locator('.online-qr svg').waitFor();
   await share.getByRole('button',{name:'QR-Code ausblenden',exact:true}).click();
   const viewerLink=await share.getByRole('link',{name:'Zuschaueransicht öffnen'}).getAttribute('href');
   assert.ok(viewerLink);

@@ -313,6 +313,37 @@ describe('isolated remote tournament persistence', () => {
     await nextAdapter.flushPendingLocalTournamentWrites();
     expect(nextStore.getMockTournament(t.id).status).toBe('FINISHED');
   });
+  it('replays a six-player knockout including byes, semifinals and bronze through PostgreSQL',async()=>{
+    const {adapter}=await setup();
+    const store=await import('@/services/mockTournamentStore');
+    const lifecycle=await import('@/services/mockPhaseLifecycle');
+    const runtime=await import('@/services/mockRuntime');
+    const t=store.buildNewTournament({name:'KO mit Freilosen und Bronze',sport:'table_tennis',discipline:'SINGLES',tables:3,minimumMatches:1,estimatedDurationMinutes:90,
+      participantNames:['A','B','C','D','E','F'],phases:[{type:'KNOCKOUT',label:'KO',entrantCount:6,groupCount:1,swissRounds:1,bestOf:1,knockoutBestOf:[1,1,1]}]});
+    let saved=adapter.initialTournamentBackup(t);
+    recordSqlFixture(saved);
+    adapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);recordSqlFixture(saved);});
+    adapter.runRemoteTournamentBatch(()=>{expect(lifecycle.startFirstStage(t)).toBe(true);store.updateMockTournamentStatus(t.id,'RUNNING');});
+    await adapter.flushPendingLocalTournamentWrites();
+    const draws=JSON.parse(saved.entries['online-tournament:mock-draw-config:v1']);
+    const slots=draws.find((d:{stageId:string})=>d.stageId===t.stages[0].id).bracketSlots;
+    expect(slots).toHaveLength(8);
+    expect(slots.filter((slot:{kind:string})=>slot.kind==='bye')).toHaveLength(2);
+    const score=[{number:1,sideAScore:11,sideBScore:7}];
+    let played=0;
+    for(let pass=0;pass<4;pass++){
+      const active=store.getMockTournament(t.id);
+      const pending=runtime.getMockStageMatches(active,active.stages[0]).filter(m=>m.status==='WAITING');
+      for(const match of pending){runtime.completeMockMatch(match.id,score,'FINISHED',true);await adapter.flushPendingLocalTournamentWrites();played++;}
+      if(!pending.length)break;
+    }
+    const active=store.getMockTournament(t.id);
+    expect(played).toBe(6);
+    expect(runtime.getMockStageMatches(active,active.stages[0]).find(m=>m.round==='Spiel um Platz 3')?.status).toBe('FINISHED');
+    expect(runtime.approveMockProgress(active)?.isLastStage).toBe(true);
+    await adapter.flushPendingLocalTournamentWrites();
+    expect(store.getMockTournament(t.id).status).toBe('FINISHED');
+  });
   it('preserves cumulative unsaved changes for export when an earlier queued write fails', async () => {
     const { adapter, backup, key } = await setup();
     let rejectFirst!: (reason: Error) => void;

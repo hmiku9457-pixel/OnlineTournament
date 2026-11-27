@@ -1,3 +1,4 @@
+import { decodeMatchSlot } from '@/domain/matchSlots';
 import type { DemoTournament } from '@/data/demoTournaments';
 import type { OnlinePersonalContext,PersonalRanking } from '@/domain/onlinePersonalContext';
 import { buildMockGroups,buildRoundRobinStandings,buildSwissStandings,buildMockBracket } from '@/services/mockCompetitionViews';
@@ -32,7 +33,7 @@ export function buildOnlinePersonalContexts(t:DemoTournament,matches:readonly Mo
   const rounds=buildMockBracket(t,latest);
   const bronze=rounds.find(r=>r.label==='Spiel um Platz 3');
   for(const round of rounds)for(const m of round.matches){
-   if(!m.winner||m.status!=='FINISHED'||m.sideA==='Freilos'||m.sideB==='Freilos')continue;
+   if(!m.winner||m.status!=='FINISHED'||decodeMatchSlot(m.sideA).kind!=='participant'||decodeMatchSlot(m.sideB).kind!=='participant')continue;
    const loser=m.winner===m.sideA?m.sideB:m.sideA;
    if(round.label==='Halbfinale'&&bronze?.matches.some(b=>b.status!=='FINISHED'&&(b.sideA===loser||b.sideB===loser)))continue;
    eliminated.add(loser);
