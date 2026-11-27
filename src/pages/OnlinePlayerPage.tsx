@@ -5,7 +5,7 @@ import { reportDraftKey,retainReportDrafts,type ReportDraft,type ReportDrafts } 
 import { getPlayerCalls,newPlayerCalls,playerRefreshDelay } from '@/domain/playerCalls';
 import { supabase } from '@/lib/supabase';
 import { startOnlinePolling } from '@/domain/onlinePolling';
-import { onlinePlayerSummary, orientOnlineScore, type OnlineMatchView } from '@/domain/onlineMatchViews';
+import { onlinePlayerSummary, orientOnlineScore, onlineMatchOutcome, filterPlayerMatches, type OnlineMatchView } from '@/domain/onlineMatchViews';
 import { displayVenueMessage } from '@/domain/venueTerminology';
 type Match=OnlineMatchView;
 interface Report {matchId:string;startedAt:number;generation:number;side:'A'|'B';sideA:string;sideB:string;bestOf:number;requiresWinner:boolean;revision:number;aSets:MatchSet[]|null;bSets:MatchSet[]|null}
@@ -19,6 +19,8 @@ export function OnlinePlayerPage({token}:{token:string}) {
  const [drafts,setDrafts]=useState<ReportDrafts>({});
  const [refreshVersion,setRefreshVersion]=useState(0);
  const [filter,setFilter]=useState('all');
+ const [phase,setPhase]=useState('');
+ const [query,setQuery]=useState('');
  const [page,setPage]=useState(0);
  const [lastChecked,setLastChecked]=useState<number|null>(null);
  const [refreshing,setRefreshing]=useState(false);
@@ -67,7 +69,8 @@ export function OnlinePlayerPage({token}:{token:string}) {
  },[token,refreshVersion]);
  const calls=data&&data.matches?getPlayerCalls(data.matches,data.participant):[];
  const summary=data?.matches?onlinePlayerSummary(data.matches,data.participant):null;
- const rows=(data?.matches??[]).filter(m=>filter==='all'||(filter==='active'?active(m.status):m.status===filter));
+ const phases=[...new Set((data?.matches??[]).map(m=>m.phase))];
+ const rows=filterPlayerMatches(data?.matches??[],data?.participant??'',phase,query,filter);
  const lastPage=Math.max(0,Math.ceil(rows.length/25)-1),currentPage=Math.min(lastPage,page);
  return <main className="main online-spectator">
  {!data?<section className="card"><h1>Persönliche Spielübersicht</h1><p role="status">{message}</p></section>:<>
@@ -78,21 +81,21 @@ export function OnlinePlayerPage({token}:{token:string}) {
  {typeof navigator.vibrate==='function'&&<label><input type="checkbox" checked={vibration} onChange={e=>{vibrationRef.current=e.target.checked;setVibration(e.target.checked);if(e.target.checked)navigator.vibrate(80);}}/> Vibration bei neuen Spielaufrufen (geöffnete Ansicht)</label>}
  <p className="muted">{lastChecked?'Zuletzt geprüft: '+new Date(lastChecked).toLocaleTimeString('de-DE'):'Noch nicht geprüft'}. Bitte halte die Ansicht geöffnet. Keine Hintergrund-Push-Nachrichten.</p></section>
  {reports.length>0&&<section className="card"><h2>Ergebnis melden</h2><p>Beide Seiten müssen denselben Endstand melden. Erst die Turnierleitung übernimmt das verbindliche Ergebnis.</p>{reports.map(r=>{const key=reportDraftKey(r);return <ReportForm key={key} report={r} sport={data.sport} token={token} values={drafts[key]??[['','']]} setValues={update=>setDrafts(old=>({...old,[key]:update(old[key]??[['','']])}))} onSaved={()=>setRefreshVersion(v=>v+1)}/>;})}</section>}
- {summary&&<section className="card"><h2>Weitere geplante Begegnungen</h2>
+ {summary&&<section className="card" aria-label="Weitere geplante Begegnungen"><h2>Weitere geplante Begegnungen</h2>
  {summary.upcoming.length?<><p className="muted">Auszug aus den bereits feststehenden Paarungen, keine verbindliche Aufrufreihenfolge.</p>{summary.upcoming.map((m,i)=><article className="online-catalog-row" key={i}><strong>gegen {m.sideA===data.participant?m.sideB:m.sideA}</strong><p>{m.phase} · {m.round}</p></article>)}</>:<p>Keine weiteren wartenden Paarungen im veröffentlichten Spielplan.</p>}
  </section>}
  {summary&&<section className="card"><h2>Meine Ergebnisübersicht</h2><p className="muted">Aus den veröffentlichten Endständen; Sonderwertungen ohne eindeutigen Sieger werden separat ausgewiesen.{data.complete===false?' Unvollständiger Auszug.':''}</p>
  <div className="online-summary-grid"><div><span>Siege</span><strong>{summary.wins}</strong></div><div><span>Niederlagen</span><strong>{summary.losses}</strong></div><div><span>Unentschieden</span><strong>{summary.draws}</strong></div><div><span>Sonderwertungen / unklar</span><strong>{summary.other}</strong></div></div></section>}
- <section className="card"><h2>Meine Spiele</h2>
+ <section className="card" aria-label="Meine Spiele"><h2>Meine Spiele</h2>
  {data.matches===null?<p role="status">Die Spielübersicht wird für die aktuelle Revision aktualisiert. Bitte warte auf die Turnierleitung.</p>:<>
  <div className="control-metrics-grid"><div><span>Laufend / zugewiesen</span><strong>{data.matches.filter(m=>active(m.status)).length}</strong></div><div><span>Wartend</span><strong>{data.matches.filter(m=>m.status==='WAITING').length}</strong></div><div><span>Beendet</span><strong>{data.matches.filter(m=>m.status==='FINISHED').length}</strong></div></div>
  {data.complete===false&&<p role="status">Die Übersicht enthält einen begrenzten Auszug des Spielplans.</p>}
- <label>Spielstatus<select aria-label="Spielstatus" value={filter} onChange={e=>{setFilter(e.target.value);setPage(0);}}><option value="all">Alle Spiele</option><option value="active">Laufend / zugewiesen</option><option value="WAITING">Wartend</option><option value="FINISHED">Beendet</option></select></label>
+ <div className="control-match-filter-fields"><label>Gegner suchen<input type="search" value={query} onChange={e=>{setQuery(e.target.value);setPage(0);}} placeholder="Name"/></label><label>Phase<select aria-label="Phase" value={phase} onChange={e=>{setPhase(e.target.value);setPage(0);}}><option value="">Alle Phasen</option>{phases.map(p=><option key={p}>{p}</option>)}</select></label><label>Spielstatus<select aria-label="Spielstatus" value={filter} onChange={e=>{setFilter(e.target.value);setPage(0);}}><option value="all">Alle Spiele</option><option value="active">Laufend / zugewiesen</option><option value="WAITING">Wartend</option><option value="FINISHED">Beendet</option><option value="CANCELLED">Abgebrochen</option></select></label></div><p className="muted">{rows.length} passende Begegnungen</p>
  {!rows.length&&<p>Keine passenden Begegnungen vorhanden.</p>}
  {rows.slice(currentPage*25,(currentPage+1)*25).map((m,i)=>{
   const sideA=m.sideA===data.participant;
   const score=orientOnlineScore(m.score,sideA);
-  return <article className="online-catalog-row" key={i}><div className="actions"><strong>gegen {sideA?m.sideB:m.sideA}</strong><strong>{score}</strong><span className="badge">{statuses[m.status]??m.status}</span></div>
+  return <article className="online-catalog-row" key={i}><div className="actions"><strong>gegen {sideA?m.sideB:m.sideA}</strong><strong className={'online-result-'+onlineMatchOutcome(m,data.participant)}>{score}</strong><span className="badge">{statuses[m.status]??m.status}</span></div>
   <p>{m.phase} · {m.round} · {displayVenueMessage(data.sport,m.table)}</p>
   {m.sets.length>0&&<p className="muted">{m.sets.map(s=>sideA?s.sideAScore+':'+s.sideBScore:s.sideBScore+':'+s.sideAScore).join(', ')}</p>}</article>;
  })}

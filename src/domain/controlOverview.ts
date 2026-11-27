@@ -119,3 +119,23 @@ export function summarizeControlQueue<T extends RestQueueMatch>(matches: readonl
   return { total: matches.length, assignable: assignable.length, blocked: matches.length - assignable.length,
     longestSharedRest: measured.length ? Math.max(...measured.map(match => Math.min(match.pauseA!, match.pauseB!))) : null };
 }
+
+/** Instantaneous occupancy, not historical utilization. Deduplicate physical
+ * venues and never count a blocked, occupied venue twice. */
+export function summarizeVenueCapacity(total:number, occupied:Iterable<string>, blocked:Iterable<string>) {
+  const valid = new Set(Array.from({length:Math.max(0,total)},(_,i)=>'Tisch '+(i+1)));
+  const used = new Set([...occupied].filter(name=>valid.has(name)));
+  const locked = new Set([...blocked].filter(name=>valid.has(name)));
+  const unavailable = new Set([...used,...locked]);
+  const usable = valid.size - locked.size;
+  const busyUsable = [...used].filter(name=>!locked.has(name)).length;
+  return {occupied:used.size, blocked:locked.size, free:valid.size-unavailable.size,
+    usable, utilization:usable?Math.round(busyUsable/usable*100):null, overlap:[...used].filter(name=>locked.has(name)).length};
+}
+
+/** Measured shared rest is a warning, not a scheduling restriction.
+ * Missing timestamps and interrupted games do not qualify. */
+export function longRestMatches<T extends RestQueueMatch>(matches:readonly T[], assignable:ReadonlySet<string>, threshold:number):T[] {
+  return orderControlQueue(matches.filter(m=>assignable.has(m.id)&&!m.startedAt&&m.pauseA!==null&&m.pauseB!==null
+    && Number.isFinite(m.pauseA)&&Number.isFinite(m.pauseB)&&Math.min(m.pauseA,m.pauseB)>=threshold),'rest');
+}

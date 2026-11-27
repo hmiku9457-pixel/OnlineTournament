@@ -349,6 +349,9 @@ try {
   await viewer.getByRole('heading',{name:'Aktuelle Hallenbelegung'}).waitFor();
   await viewer.getByRole('button',{name:'Hallenanzeige',exact:true}).click();
   await viewer.getByRole('heading',{name:'Spielpaarungen und Ergebnisse'}).waitFor({state:'hidden'});
+  await viewer.getByLabel('Spielflächen pro Seite').selectOption('4');
+  await viewer.getByLabel('Automatischer Seitenwechsel (12 s)').check();
+  await viewer.getByLabel('Automatischer Seitenwechsel (12 s)').uncheck();
   await viewer.getByRole('button',{name:'Gesamtübersicht',exact:true}).click();
   await viewer.getByRole('heading',{name:'Spielpaarungen und Ergebnisse'}).waitFor();
   await viewer.getByText(/Anna – | – Anna/).first().waitFor({timeout:45000});
@@ -361,8 +364,13 @@ try {
   await player.getByRole('heading',{name:'Meine Spiele'}).waitFor();
   await player.getByRole('heading',{name:'Meine Ergebnisübersicht'}).waitFor();
   await player.getByRole('heading',{name:'Weitere geplante Begegnungen'}).waitFor();
-  await player.getByText('gegen Bernd',{exact:true}).waitFor({timeout:45000});
-  assert.equal(await player.locator('article.online-catalog-row').count(),3);
+  const personalGames=player.getByRole('region',{name:'Meine Spiele',exact:true});
+  await personalGames.getByText('gegen Bernd',{exact:true}).waitFor({timeout:45000});
+  assert.equal(await personalGames.locator('article.online-catalog-row').count(),3);
+  await personalGames.getByRole('searchbox').fill('Bernd');
+  assert.equal(await personalGames.locator('article.online-catalog-row').count(),1);
+  await personalGames.getByRole('searchbox').clear();
+  assert.equal(await personalGames.locator('article.online-catalog-row').count(),3);
   assert.ok(playerRows.get(id).matches.length>3);
   await viewer.getByLabel('Teilnehmer auswählen',{exact:true}).selectOption('Anna');
   await viewer.getByText(/Aktuelle und kommende Spiele von/).waitFor();

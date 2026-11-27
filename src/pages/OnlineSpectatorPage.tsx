@@ -6,7 +6,7 @@ import { playerRefreshDelay } from '@/domain/playerCalls';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { startOnlinePolling } from '@/domain/onlinePolling';
-import { publicHallAssignments, type OnlineMatchView } from '@/domain/onlineMatchViews';
+import { publicHallAssignments, onlinePage, type OnlineMatchView } from '@/domain/onlineMatchViews';
 import { displayVenueName, getVenueTerminology } from '@/domain/venueTerminology';
 
 interface Progress {
@@ -35,6 +35,13 @@ export function OnlineSpectatorPage({token}:{token:string}) {
   const [pageIndex,setPageIndex]=useState(0);
   const [message,setMessage]=useState('Turnier wird geladen …');
   const [hallOnly,setHallOnly]=useState(false);
+  const [hallPage,setHallPage]=useState(0);
+  const [hallSize,setHallSize]=useState(8);
+  const [rotate,setRotate]=useState(false);
+  const [fullScreen,setFullScreen]=useState(false);
+  const [screenError,setScreenError]=useState('');
+  useEffect(()=>{const changed=()=>setFullScreen(!!document.fullscreenElement);document.addEventListener('fullscreenchange',changed);return()=>document.removeEventListener('fullscreenchange',changed);},[]);
+  async function toggleFullscreen(){try{setScreenError('');if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{setScreenError('Vollbild wird von diesem Browser nicht unterstützt.');}}
   useEffect(()=>{
     let active=true, failures=0;
     const client=supabase;
@@ -67,24 +74,32 @@ export function OnlineSpectatorPage({token}:{token:string}) {
   const currentPage=Math.min(pageIndex,maxPage);
   const hall=publicHallAssignments(details?.matches??[],data?.tables??0);
   const venue=getVenueTerminology(data?.sport??'');
+  const hallView=onlinePage(hall,hallPage,hallSize);
+  const hallPages=hallView.pages;
+  const hallAvailable=details!==null;
+  useEffect(()=>{if(!hallOnly||!rotate||!hallAvailable||hallPages<2)return;const timer=window.setInterval(()=>{if(document.visibilityState==='visible')setHallPage(p=>(Math.min(p,hallPages-1)+1)%hallPages);},12000);return()=>window.clearInterval(timer);},[hallOnly,rotate,hallAvailable,hallPages]);
   return <main className={`main online-spectator${hallOnly?' online-hall-mode':''}`}>
     {!data?<section className="card"><h1>Zuschaueransicht</h1><p role="status">{message}</p></section>:<>
-      <header className="dashboard-page-hero"><div><h1>{data.name}</h1><p className="muted">{data.sport} · Zuschaueransicht</p></div><div className="actions"><span className="badge">{statuses[data.status]??data.status}</span>{details&&<button className="btn small" onClick={()=>setHallOnly(v=>!v)}>{hallOnly?'Gesamtübersicht':'Hallenanzeige'}</button>}</div></header>
+      <header className="dashboard-page-hero"><div><h1>{data.name}</h1><p className="muted">{data.sport} · Zuschaueransicht</p></div><div className="actions"><span className="badge">{statuses[data.status]??data.status}</span>{details&&<button className="btn small" onClick={()=>{setHallOnly(v=>!v);setHallPage(0);}}>{hallOnly?'Gesamtübersicht':'Hallenanzeige'}</button>}{hallOnly&&details&&document.fullscreenEnabled&&<button className="btn small" onClick={()=>void toggleFullscreen()}>{fullScreen?'Vollbild verlassen':'Vollbild'}</button>}</div></header>
       <section className="card"><h2>Turnier auf einen Blick</h2><div className="control-metrics-grid">
         <div><span className="muted">Teilnehmer</span><strong>{data.participantCount}</strong></div>
         <div><span className="muted">Belegte Spielflächen</span><strong>{data.occupiedTables}/{data.tables}</strong></div>
         <div><span className="muted">Erfasste Endergebnisse</span><strong>{data.recordedResults}</strong></div>
         <div><span className="muted">Abgeschlossene Phasen</span><strong>{data.phases.filter(p=>p.completed).length}/{data.phases.length}</strong></div>
       </div></section>
+      {screenError&&<p role="status">{screenError}</p>}
       {details&&<section className="card online-hall"><h2>Aktuelle Hallenbelegung</h2>
         {details.matches===null?<p role="status">Belegung wird aktualisiert.</p>:<>
           <p className="muted">{hall.length} veröffentlichte belegte {venue.plural} · {data.tables} insgesamt. Nicht aufgeführte {venue.plural} sind nicht zwingend frei.</p>
           {!hall.length&&<p>Keine laufenden oder zugewiesenen Spiele veröffentlicht.</p>}
-          <div className="online-hall-grid">{hall.map(item=><article className="online-hall-tile" key={item.number}>
+          {hallOnly&&<div className="actions online-hall-controls"><label>{venue.plural} pro Seite<select aria-label="Spielflächen pro Seite" value={hallSize} onChange={e=>{setHallSize(Number(e.target.value));setHallPage(0);}}>{[4,8,12,16].map(n=><option key={n}>{n}</option>)}</select></label><label><input type="checkbox" checked={rotate} onChange={e=>setRotate(e.target.checked)}/> Automatischer Seitenwechsel (12 s)</label></div>}
+          <div className="online-hall-grid">{(hallOnly?hallView.items:hall.slice(0,8)).map(item=><article className="online-hall-tile" key={item.number}>
             <strong className="online-hall-venue">{displayVenueName(data.sport,'Tisch '+item.number)}</strong>
             {item.matches.length>1&&<p role="status">Mehrere Zuordnungen veröffentlicht</p>}
             {item.matches.map((m,i)=><div className="online-hall-match" key={i}><strong>{m.sideA} – {m.sideB}</strong><span className="online-hall-score">{m.score}</span><span className="badge">{matchStatuses[m.status]??m.status}</span><small>{m.phase} · {m.round}</small></div>)}
           </article>)}</div>
+          {hallOnly&&hallPages>1&&<div className="actions"><button className="btn small" disabled={hallView.page===0} onClick={()=>setHallPage(hallView.page-1)}>Vorherige Spielflächen</button><span>Seite {hallView.page+1}/{hallPages}</span><button className="btn small" disabled={hallView.page+1===hallPages} onClick={()=>setHallPage(hallView.page+1)}>Weitere Spielflächen</button></div>}
+          {!hallOnly&&hall.length>8&&<button className="btn small" onClick={()=>{setHallOnly(true);setHallPage(0);}}>Alle {hall.length} veröffentlichten {venue.plural} anzeigen</button>}
         </>}
       </section>}
       {(!hallOnly||!details)&&<>

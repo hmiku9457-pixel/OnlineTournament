@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterControlMatches, filterControlQueueMatches, orderControlQueue, summarizeControlQueue, summarizeControlProgress } from '@/domain/controlOverview';
+import { filterControlMatches, filterControlQueueMatches, orderControlQueue, summarizeControlQueue, summarizeControlProgress, summarizeVenueCapacity, longRestMatches } from '@/domain/controlOverview';
 
 const matches = [
   { id: 'a', sideA: 'Anna Müller', sideB: 'Ben', phase: 'Gruppen', table: 'Tisch 1', status: 'LIVE' },
@@ -90,5 +90,16 @@ describe('Optionale Wartelistenpriorität', () => {
   it('berechnet nur für zuweisbare, noch nicht begonnene Partien eine gemeinsame Pause', () => {
     expect(summarizeControlQueue(queue,new Set(['balanced','unknown','resume']))).toEqual({total:6,assignable:3,blocked:3,longestSharedRest:12});
     expect(summarizeControlQueue(queue,new Set(['unknown','resume'])).longestSharedRest).toBeNull();
+  });
+});
+
+describe('director capacity and rest warnings',()=>{
+  it('deduplicates assignments and distinguishes overlapping blocked venues',()=>{
+    expect(summarizeVenueCapacity(4,['Tisch 1','Tisch 1','Tisch 2','Tisch 99'],['Tisch 2','Tisch 3'])).toEqual({occupied:2,blocked:2,free:1,usable:2,utilization:50,overlap:1});
+    expect(summarizeVenueCapacity(1,[],['Tisch 1']).utilization).toBeNull();
+  });
+  it('only warns about assignable games with both measured rest times',()=>{
+    const rows=[{id:'a',pauseA:31,pauseB:45},{id:'b',pauseA:60,pauseB:null},{id:'c',pauseA:60,pauseB:60,startedAt:1},{id:'d',pauseA:50,pauseB:55},{id:'e',pauseA:45,pauseB:50}];
+    expect(longRestMatches(rows,new Set(['a','b','c','e']),30).map(m=>m.id)).toEqual(['e','a']);
   });
 });

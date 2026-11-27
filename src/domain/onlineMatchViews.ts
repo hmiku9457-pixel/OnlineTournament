@@ -18,16 +18,11 @@ export function onlinePlayerSummary(matches: readonly OnlineMatchView[], partici
     if (match.status === 'WAITING') summary.waiting++;
     if (match.status !== 'FINISHED') continue;
     summary.finished++;
-    const score = orientOnlineScore(match.score, match.sideA === participant);
-    const numeric = /^(\d+)\s*:\s*(\d+)(?:\s+n\.V\.)?$/.exec(score);
-    const penalties = /^\d+\s*:\s*\d+\s*\((\d+)\s*:\s*(\d+)\s+i\.E\.\)$/.exec(score);
-    const values = penalties ?? numeric;
-    if (!values) { summary.other++; continue; }
-    const a = Number(values[1]), b = Number(values[2]);
-    if (a > b) summary.wins++;
-    else if (a < b) summary.losses++;
-    else if (penalties) summary.other++;
-    else summary.draws++;
+    const outcome = onlineMatchOutcome(match, participant);
+    if (outcome === 'win') summary.wins++;
+    else if (outcome === 'loss') summary.losses++;
+    else if (outcome === 'draw') summary.draws++;
+    else summary.other++;
   }
   // Published fixture order is not a guaranteed assignment sequence.
   return { ...summary, upcoming: own.filter(m => m.status === 'WAITING').slice(0, 3) };
@@ -50,4 +45,24 @@ export function onlinePage<T>(items: readonly T[], requested: number, size: numb
   const pages = Math.max(1, Math.ceil(items.length / size));
   const page = Math.max(0, Math.min(requested, pages - 1));
   return { page, pages, items: items.slice(page * size, (page + 1) * size) };
+}
+
+export type OnlineOutcome = 'win'|'loss'|'draw'|'other'|'open';
+export function onlineMatchOutcome(match:OnlineMatchView, participant:string):OnlineOutcome {
+  if(match.status!=='FINISHED'||![match.sideA,match.sideB].includes(participant))return 'open';
+  const score=orientOnlineScore(match.score,match.sideA===participant);
+  const penalties=/^\d+\s*:\s*\d+\s*\((\d+)\s*:\s*(\d+)\s+i\.E\.\)$/.exec(score);
+  const numeric=/^(\d+)\s*:\s*(\d+)(?:\s+n\.V\.)?$/.exec(score);
+  const value=penalties??numeric;
+  if(!value)return 'other';
+  const a=Number(value[1]),b=Number(value[2]);
+  return a>b?'win':a<b?'loss':penalties?'other':'draw';
+}
+export function filterPlayerMatches(matches:readonly OnlineMatchView[],participant:string,phase:string,query:string,status:string) {
+  const term=query.trim().toLocaleLowerCase('de-DE');
+  return matches.filter(m=>{
+    if(![m.sideA,m.sideB].includes(participant)||phase&&m.phase!==phase)return false;
+    if(term&&!(m.sideA===participant?m.sideB:m.sideA).toLocaleLowerCase('de-DE').includes(term))return false;
+    return status==='all'||(status==='active'?['LIVE','READY','CONFIRMATION'].includes(m.status):m.status===status);
+  });
 }

@@ -9332,3 +9332,13 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 .online-hall-mode .online-hall-venue { font-size:clamp(1.5rem,3vw,2.4rem); }
 .online-hall-mode .online-hall-score { font-size:clamp(1.9rem,4vw,3rem); }
 @media(max-width:600px){.online-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+
+.queue-rest-warning { display:inline-flex; gap:5px; align-items:center; }
+.queue-rest-warning select { min-height:28px; width:auto; }
+.queue-rest-alert { color:#9a4b10; font-weight:700; }
+.online-result-win { color:#16803d; }
+.online-result-loss { color:#b42318; }
+.online-result-draw { color:#175cd3; }
+.online-hall-controls { margin:8px 0 14px; flex-wrap:wrap; }
+.online-hall-controls label { display:flex; align-items:center; gap:8px; }
+.online-hall-controls select { width:auto; }

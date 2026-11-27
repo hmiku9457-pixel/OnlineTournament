@@ -32,7 +32,7 @@ import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
 import { getGroupQualificationHints } from '@/domain/groupQualification';
-import { filterControlMatches, filterControlQueueMatches, orderControlQueue, summarizeControlQueue, summarizeControlProgress, type ControlQueueOrder, type ControlMatchFilters, type ControlMatchFilter, type ControlQueueFilters, type ControlQueueStatusFilter } from '@/domain/controlOverview';
+import { filterControlMatches, filterControlQueueMatches, orderControlQueue, summarizeControlQueue, summarizeControlProgress, summarizeVenueCapacity, longRestMatches, type ControlQueueOrder, type ControlMatchFilters, type ControlMatchFilter, type ControlQueueFilters, type ControlQueueStatusFilter } from '@/domain/controlOverview';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
@@ -662,6 +662,7 @@ export function TournamentControlPage() {
   const [matchFilters, setMatchFilters] = useState<ControlMatchFilters>({ status: 'all', phase: '', table: '', search: '' });
   const [queueFilters, setQueueFilters] = useState<ControlQueueFilters>(emptyQueueFilters);
   const [queueOrder, setQueueOrder] = useState<ControlQueueOrder>('scheduled');
+  const [restWarningMinutes, setRestWarningMinutes] = useState(30);
   const [correctionNotice, setCorrectionNotice] = useState<CorrectionNotice | null>(null);
   // Die Mock-Services lesen mutable localStorage-Daten. Diese Snapshots
   // halten die bisherigen Cache-Invalidierungen durch Versionsänderungen bei,
@@ -718,6 +719,7 @@ export function TournamentControlPage() {
   const orderedNextMatches = orderControlQueue(nextMatches, queueOrder);
   const filteredNextMatches = filterControlQueueMatches(orderedNextMatches, queueFilters, assignableWaitingIds);
   const queueSummary = summarizeControlQueue(nextMatches, assignableWaitingIds);
+  const longRest = longRestMatches(nextMatches, assignableWaitingIds, restWarningMinutes);
   const queuePositions = new Map(nextMatches.map((match, index) => [match.id, index + 1]));
   const queueGroups = useMemo(() => [...new Set(matches.filter((match) => match.status === 'WAITING' && match.round.startsWith('Gruppe ')).map((match) => match.round))].sort((a, b) => a.localeCompare(b, 'de', { numeric: true })), [matches]);
   const queueMatchDays = useMemo(() => [...new Set(matches.filter((match) => match.status === 'WAITING').map((match) => match.matchDay).filter((day): day is number => typeof day === 'number'))].sort((a, b) => a - b), [matches]);
@@ -742,6 +744,7 @@ export function TournamentControlPage() {
     ? allTournamentMatches.filter((match) => match.sideA === participantPanel.name || match.sideB === participantPanel.name)
     : [];
   const matchesByTable = new Map(tableMatches.map((match) => [match.table, match]));
+  const capacity = summarizeVenueCapacity(tournament.tables, matchesByTable.keys(), blockedTables);
   const freeTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`).filter((table) => !matchesByTable.has(table) && !blockedTables.has(table));
   const activeStage = useMemo(() => getActiveStage(phaseSource.tournament), [phaseSource]);
   const pendingApproval = useMemo(() => getPendingMockApproval(phaseRuntimeSource.tournament), [phaseRuntimeSource]);
@@ -1534,6 +1537,8 @@ export function TournamentControlPage() {
                   <div className="control-match-filter-summary" aria-live="polite">
                     <span>{filteredNextMatches.length} von {nextMatches.length} wartenden Spielen</span>
                     <span title="Kürzere der beiden gemessenen Pausenzeiten; nur aktuell zuweisbare, noch nicht gestartete Spiele">Längste gemeinsame Pause: <strong>{queueSummary.longestSharedRest === null ? '–' : queueSummary.longestSharedRest + ' min'}</strong></span>
+                    <label className="queue-rest-warning">Pausenhinweis ab <select aria-label="Pausenhinweis ab" value={restWarningMinutes} onChange={e=>setRestWarningMinutes(Number(e.target.value))}>{[15,20,30,45,60].map(minutes=><option key={minutes} value={minutes}>{minutes} min</option>)}</select></label>
+                    {longRest.length>0&&<span className="queue-rest-alert" role="status">{longRest.length} zuweisbare {longRest.length===1?'Partie':'Partien'} mit langer gemeinsamer Pause</span>}
                     {(queueFilters.status !== 'all' || queueFilters.group || queueFilters.matchDay || queueFilters.search) && <button className="btn small" type="button" onClick={() => setQueueFilters(emptyQueueFilters)}>Filter zurücksetzen</button>}
                   </div>
                   {queueOrder === 'rest' && <p className="muted queue-order-note">Bereits begonnene Partien zuerst, danach längste gemeinsame gemessene Pause. Unbekannte Pausenzeiten werden nicht geschätzt. Die automatische Sammelzuweisung berücksichtigt diese Reihenfolge für alle wartenden Spiele, unabhängig von den Filtern, und sucht nach einer möglichst guten Tischbelegung.</p>}
@@ -1599,7 +1604,10 @@ export function TournamentControlPage() {
               <div className="card control-status-card">
                 <div className="control-help-title"><h3>Turnierstatus</h3><ControlHelpButton topic="queue" onOpen={setHelpTopic} /></div>
                 <div className="control-metrics-grid">
-                  <div><span className="muted">{venue.singular}belegung</span><strong>{tableMatches.length}/{tournament.tables} · {blockedTables.size} gesperrt</strong></div>
+                  <div><span className="muted">{venue.singular}belegung</span><strong>{capacity.occupied}/{tournament.tables} · {capacity.blocked} gesperrt</strong></div>
+                  <div><span className="muted">Freie {venue.plural}</span><strong>{capacity.free}</strong></div>
+                  <div><span className="muted">Aktuelle Auslastung</span><strong title="Anteil belegter an nicht gesperrten Spielflächen, keine historische Auslastung">{capacity.utilization===null?'–':capacity.utilization+' %'}</strong></div>
+                  {capacity.overlap>0&&<div><span className="muted">Belegt und gesperrt</span><strong>{capacity.overlap}</strong></div>}
                   <div><button className="control-metric-link" type="button" disabled={nextMatches.length === 0} onClick={() => openWaitingQueue()} title={nextMatches.length ? 'Zu den wartenden Spielen springen' : undefined}><span className="muted">Wartende Spiele</span><strong>{nextMatches.length}</strong></button></div>
                   <div><span className="muted">Restzeit grob</span><strong title={`Prognose aus offenen Spielen, Best-of und verfügbaren ${venue.dativePlural} (bei Tischtennis 15 Minuten je Satz).`}>{restTimeLabel}</strong></div>
                 </div>
