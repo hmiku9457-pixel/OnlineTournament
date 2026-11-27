@@ -9289,3 +9289,5 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 @media print {
   .app-build-version { display: none !important; }
 }
+
+.queue-order-note { margin: 4px 0 0; font-size: .72rem; line-height: 1.45; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterControlMatches, filterControlQueueMatches, summarizeControlProgress } from '@/domain/controlOverview';
+import { filterControlMatches, filterControlQueueMatches, orderControlQueue, summarizeControlQueue, summarizeControlProgress } from '@/domain/controlOverview';
 
 const matches = [
   { id: 'a', sideA: 'Anna Müller', sideB: 'Ben', phase: 'Gruppen', table: 'Tisch 1', status: 'LIVE' },
@@ -70,5 +70,25 @@ describe('Fortschritt nach Phasen', () => {
   it('erkennt den Turnierabschluss und einen leeren Phasenplan', () => {
     expect(summarizeControlProgress(stages.map((stage) => ({ ...stage, completed: true })), null, []).percent).toBe(100);
     expect(summarizeControlProgress([], null, []).percent).toBe(0);
+  });
+});
+
+describe('Optionale Wartelistenpriorität', () => {
+  const queue = [
+    { id: 'short', pauseA: 2, pauseB: 40 },
+    { id: 'balanced', pauseA: 12, pauseB: 15 },
+    { id: 'unknown', pauseA: null, pauseB: 90 },
+    { id: 'resume', pauseA: 0, pauseB: 0, startedAt: 100 },
+    { id: 'tie', pauseA: 12, pauseB: 15 },
+    { id: 'long', pauseA: 20, pauseB: 25 },
+  ];
+  it('behält standardmäßig den Spielplan und verändert das Eingabearray nicht', () => {
+    expect(orderControlQueue(queue, 'scheduled')).toEqual(queue);
+    expect(orderControlQueue(queue, 'rest').map(m=>m.id)).toEqual(['resume','long','balanced','tie','short','unknown']);
+    expect(queue[0].id).toBe('short');
+  });
+  it('berechnet nur für zuweisbare, noch nicht begonnene Partien eine gemeinsame Pause', () => {
+    expect(summarizeControlQueue(queue,new Set(['balanced','unknown','resume']))).toEqual({total:6,assignable:3,blocked:3,longestSharedRest:12});
+    expect(summarizeControlQueue(queue,new Set(['unknown','resume'])).longestSharedRest).toBeNull();
   });
 });
