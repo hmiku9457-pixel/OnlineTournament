@@ -116,8 +116,8 @@ export function isValidSportSet(sport: string, bestOf: number, index: number, se
   const winner = Math.max(a, b);
   const loser = Math.min(a, b);
   const target = setTarget(sport, index, bestOf);
-  if (id === 'tennis' || id === 'padel') return (winner === 7 && loser === 6) || (winner >= target && winner - loser === 2 && loser <= 5);
-  if (id === 'badminton') return (winner === 30 && loser === 29) || (winner >= 21 && winner - loser === 2 && winner <= 30);
+  if (id === 'tennis' || id === 'padel') return (winner === 6 && loser <= 4) || (winner === 7 && (loser === 5 || loser === 6));
+  if (id === 'badminton') return (winner === 30 && loser === 29) || (winner === 21 && loser <= 19) || (winner > 21 && winner - loser === 2 && winner <= 30);
   return (winner >= target && winner - loser === 2) || (winner === target && loser < target - 1);
 }
 

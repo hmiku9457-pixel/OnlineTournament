@@ -37,6 +37,15 @@ describe('Sportartspezifische Ergebniserfassung', () => {
     expect(isValidSportSet('volleyball', 5, 4, set(25, 23))).toBe(true);
     expect(isValidSportSet('volleyball', 5, 4, set(15, 14))).toBe(false);
     expect(isValidSportSet('beach_volleyball', 3, 2, set(15, 13))).toBe(true);
+    for(const sport of ['tennis','padel']) {
+      for(const loser of [0,1,2,3,4])expect(isValidSportSet(sport,3,0,set(6,loser))).toBe(true);
+      expect(isValidSportSet(sport,3,0,set(7,5))).toBe(true);
+      expect(isValidSportSet(sport,3,0,set(7,4))).toBe(false);
+      expect(isValidSportSet(sport,3,0,set(8,6))).toBe(false);
+    }
+    for(const loser of [0,10,18,19])expect(isValidSportSet('badminton',3,0,set(21,loser))).toBe(true);
+    expect(isValidSportSet('badminton',3,0,set(22,19))).toBe(false);
+    expect(isValidSportSet('badminton',3,0,set(30,28))).toBe(true);
     expect(isValidSportSet('tennis', 3, 0, set(6, 4))).toBe(true);
     expect(isValidSportSet('padel', 3, 0, set(7, 6))).toBe(true);
     expect(isValidSportSet('tennis', 3, 0, set(6, 5))).toBe(false);

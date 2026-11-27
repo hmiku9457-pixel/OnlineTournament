@@ -4,14 +4,19 @@ import { BYE_SLOT, PENDING_SLOT, UNCLAIMED_WINNER, type MatchSlot } from '@/doma
 /** Stable participant identities belong to one tournament and never change
  * when the organizer edits the display name. The fallback covers synthetic
  * in-memory test fixtures, not any previous storage schema. */
+// PostgreSQL jsonb cannot decode U+0000 in nested JSON strings. Keep
+// technical tokens distinct in memory but use reserved non-NUL storage IDs.
+const storedSlots = new Map([[BYE_SLOT,'ot:slot:bye'],[PENDING_SLOT,'ot:slot:pending'],[UNCLAIMED_WINNER,'ot:slot:unclaimed']]);
+const restoredSlots = new Map([...storedSlots].map(([slot,id])=>[id,slot]));
 export function participantId(tournament: DemoTournament, name: string): string {
-  if (name === BYE_SLOT || name === PENDING_SLOT || name === UNCLAIMED_WINNER) return name;
+  if (storedSlots.has(name)) return storedSlots.get(name)!;
   return tournament.participantIds?.[name] ?? name;
 }
 // One reverse index per immutable tournament snapshot avoids O(n²) work
 // when restoring thousands of match slots and group assignments.
 const reverseIndex = new WeakMap<DemoTournament, Map<string, string>>();
 export function participantName(tournament: DemoTournament, id: string): string {
+  if (restoredSlots.has(id)) return restoredSlots.get(id)!;
   if (id === BYE_SLOT || id === PENDING_SLOT || id === UNCLAIMED_WINNER) return id;
   let lookup = reverseIndex.get(tournament);
   if (!lookup) {
