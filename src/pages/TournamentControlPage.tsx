@@ -1,3 +1,4 @@
+import { planControlAssignments } from '@/domain/controlAssignment';
 import { prestartRecoveryStorageKey } from '@/services/localTournamentStorage';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
@@ -1125,23 +1126,17 @@ export function TournamentControlPage() {
   }
 
   function autoAssignWaitingMatches() {
-    const waitingMatches = orderedNextMatches.filter((match) => match.status === 'WAITING');
+    // Re-read current runtime at the moment of the click, not from a render
+    // snapshot. Every actual assignment still goes through the domain guard.
+    const currentMatches = getMockRuntimeMatches(tournament);
+    const waitingMatches = orderControlQueue(currentMatches.filter(match=>match.status==='WAITING'),queueOrder);
+    const eligibility = getMockQueueAssignableTables(tournament);
+    const availableTables = [...new Set([...eligibility.values()].flat())];
+    const plan = planControlAssignments(waitingMatches,eligibility,availableTables,queueOrder==='rest');
     let assigned = 0;
-
-    for (const match of waitingMatches) {
-      const currentMatches = getMockRuntimeMatches(tournament);
-      const currentOccupied = new Set(
-        currentMatches
-          .filter((item) => ['LIVE', 'READY', 'CONFIRMATION'].includes(item.status) && item.table.startsWith('Tisch '))
-          .map((item) => item.table),
-      );
-      const availableTables = Array.from({ length: tournament.tables }, (_, index) => `Tisch ${index + 1}`)
-        .filter((table) => !currentOccupied.has(table) && !blockedTables.has(table));
-
-      const targetTable = availableTables.find((table) => !getMockAssignmentBlockReason(tournament, match.id, table));
-      if (targetTable && assignMockMatchToTable(tournament, match.id, targetTable)) assigned += 1;
+    for (const assignment of plan) {
+      if (assignMockMatchToTable(tournament,assignment.matchId,assignment.table)) assigned += 1;
     }
-
     setAssignmentMessage(assigned > 0 ? `${assigned} Spiel${assigned === 1 ? '' : 'e'} automatisch zugewiesen und gestartet.` : 'Aktuell konnte kein wartendes Spiel konfliktfrei zugewiesen werden.');
     setAssigningMatchId(null);
     refreshRuntime();
@@ -1541,7 +1536,7 @@ export function TournamentControlPage() {
                     <span title="Kürzere der beiden gemessenen Pausenzeiten; nur aktuell zuweisbare, noch nicht gestartete Spiele">Längste gemeinsame Pause: <strong>{queueSummary.longestSharedRest === null ? '–' : queueSummary.longestSharedRest + ' min'}</strong></span>
                     {(queueFilters.status !== 'all' || queueFilters.group || queueFilters.matchDay || queueFilters.search) && <button className="btn small" type="button" onClick={() => setQueueFilters(emptyQueueFilters)}>Filter zurücksetzen</button>}
                   </div>
-                  {queueOrder === 'rest' && <p className="muted queue-order-note">Bereits begonnene Partien zuerst, danach längste gemeinsame gemessene Pause. Unbekannte Pausenzeiten werden nicht geschätzt. Die automatische Sammelzuweisung berücksichtigt diese Reihenfolge für alle wartenden Spiele, unabhängig von den Filtern.</p>}
+                  {queueOrder === 'rest' && <p className="muted queue-order-note">Bereits begonnene Partien zuerst, danach längste gemeinsame gemessene Pause. Unbekannte Pausenzeiten werden nicht geschätzt. Die automatische Sammelzuweisung berücksichtigt diese Reihenfolge für alle wartenden Spiele, unabhängig von den Filtern, und sucht nach einer möglichst guten Tischbelegung.</p>}
                 </div>
               )}
               <div className="match-queue">
