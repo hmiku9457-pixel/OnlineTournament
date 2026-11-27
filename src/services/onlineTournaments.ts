@@ -1,8 +1,10 @@
+import type { MatchSet } from '@/domain/types';
+import { validateCompleteResult } from '@/domain/sportScoring';
 import { decodeMatchSlot } from '@/domain/matchSlots';
 import { buildMockBracket, buildMockGroups, buildRoundRobinStandings, buildSwissStandings, type MockStanding } from '@/services/mockCompetitionViews';
 import { getMockConfirmedFinalStandings } from '@/services/mockParticipantProgress';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
-import { getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches } from '@/services/mockRuntime';
+import { getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getMockRuntimeMatches, canEditMockMatch, completeMockMatch } from '@/services/mockRuntime';
 import { isStageStarted } from '@/services/mockPhaseLifecycle';
 import { persistOnlineOperation, removeOnlineOperation, listPendingOnlineOperations, type PendingOnlineOperation } from '@/services/onlineOutbox';
 import { supabase } from '@/lib/supabase';
@@ -270,6 +272,9 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
       table:m.table,score:m.score,sets:(m.sets??[]).map(s=>({sideAScore:s.sideAScore,sideBScore:s.sideBScore}))}));
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
     if(playerActive.data===true) {
+      const fixtures=getMockRuntimeMatches(tournament).filter(m=>['LIVE','READY'].includes(m.status)&&m.startedAt&&m.table.startsWith('Tisch ')&&!m.sets?.length&&!m.extraTimeProgress&&canEditMockMatch(tournament,m.id)&&roster.has(m.sideA)&&roster.has(m.sideB)&&tournament.participantIds?.[m.sideA]&&tournament.participantIds?.[m.sideB]).map(m=>({matchId:m.id,aId:tournament.participantIds![m.sideA],bId:tournament.participantIds![m.sideB],startedAt:m.startedAt,bestOf:m.bestOf,requiresWinner:m.requiresWinner}));
+      const reportResult=await supabase.rpc('publish_online_report_fixtures',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_fixtures:fixtures}).abortSignal(AbortSignal.timeout(8000));
+      if(reportResult.error)throw new Error(reportResult.error.message);
       // The server filters the projection by the capability's stable roster identity.
       await supabase.rpc('publish_online_player_projection',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches,p_total:rows.length}).abortSignal(AbortSignal.timeout(8000));
     }
@@ -318,4 +323,36 @@ export async function manageOnlinePlayerAccess(id:string,participantId:string,ac
 }
 export function onlinePlayerUrl(token:string):string {
   const url=new URL(window.location.href);url.search='';url.hash='/my-games/'+token;return url.href;
+}
+
+export interface OnlineResultReport {matchId:string;aId:string;bId:string;startedAt:number;bestOf:number;requiresWinner:boolean;revision:number;aSets:MatchSet[]|null;bSets:MatchSet[]|null}
+export function matchingReports(row:Pick<OnlineResultReport,'aSets'|'bSets'>):boolean {
+  return !!row.aSets&&!!row.bSets&&row.aSets.length===row.bSets.length&&row.aSets.every((s,i)=>s.number===row.bSets![i].number&&s.sideAScore===row.bSets![i].sideAScore&&s.sideBScore===row.bSets![i].sideBScore);
+}
+export async function listOnlineResultReports(id:string):Promise<OnlineResultReport[]> {
+  const {client}=await account();const {data,error}=await client.rpc('list_online_result_reports',{p_id:id}).abortSignal(AbortSignal.timeout(8000));
+  if(error)throw new Error(error.message);return (data??[]) as OnlineResultReport[];
+}
+export function reportMatchNames(row:OnlineResultReport):{a:string;b:string}|null {
+  const tournament=getAllMockTournaments().find(t=>t.id===workspaceRevision?.id);
+  const match=tournament&&getMockRuntimeMatches(tournament).find(m=>m.id===row.matchId);
+  return match?{a:match.sideA,b:match.sideB}:null;
+}
+export async function adoptOnlineResultReport(row:OnlineResultReport):Promise<void> {
+  const start=workspaceRevision;
+  if(!start||start.revision!==row.revision||hasPendingRemoteWrites()||getTournamentStorageError()||!matchingReports(row))throw new Error('Die Meldung ist nicht mehr aktuell oder nicht übereinstimmend.');
+  const fresh=(await listOnlineResultReports(start.id)).find(r=>r.matchId===row.matchId);
+  if(!fresh||!matchingReports(fresh)||!matchingReports({aSets:fresh.aSets,bSets:row.aSets})||workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())throw new Error('Die Meldung hat sich geändert.');
+  const tournament=getAllMockTournaments().find(t=>t.id===start.id);
+  const match=tournament&&getMockRuntimeMatches(tournament).find(m=>m.id===row.matchId);
+  if(!tournament||!match||!['RUNNING','PAUSED'].includes(tournament.status)||!['LIVE','READY'].includes(match.status)||!match.table.startsWith('Tisch ')||match.sets?.length||match.extraTimeProgress||!canEditMockMatch(tournament,match.id)||match.startedAt!==row.startedAt||match.bestOf!==row.bestOf||match.requiresWinner!==row.requiresWinner||tournament.participantIds?.[match.sideA]!==row.aId||tournament.participantIds?.[match.sideB]!==row.bId)throw new Error('Die Begegnung ist nicht mehr unverändert zugewiesen.');
+  const invalid=validateCompleteResult(tournament.sport,match.bestOf,row.aSets!,match.requiresWinner);
+  if(invalid)throw new Error(invalid);
+  completeMockMatch(match.id,row.aSets!,'FINISHED',true);
+}
+export async function resetOnlineResultReports(row:OnlineResultReport):Promise<void> {
+  const start=workspaceRevision;
+  if(!start||start.revision!==row.revision||hasPendingRemoteWrites()||getTournamentStorageError()||!supabase)throw new Error('Bitte aktuellen Datenbankstand prüfen.');
+  const {data,error}=await supabase.rpc('reset_online_result_reports',{p_id:start.id,p_token:start.token,p_match_id:row.matchId,p_revision:start.revision});
+  if(error||data!==true)throw new Error(error?.message??'Zurücksetzen nicht bestätigt.');
 }

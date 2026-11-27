@@ -1,3 +1,4 @@
+import { OnlineResultInbox } from '@/components/OnlineResultInbox';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { TournamentControlPage } from '@/pages/TournamentControlPage';
@@ -15,6 +16,7 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
   const [revisionState,setRevisionState] = useState<'current'|'stale'|'unknown'>('current');
   const [checking,setChecking] = useState(false);
   const [leaving,setLeaving] = useState(false);
+  const [resultVersion,setResultVersion]=useState(0);
   
   const inFlight=useRef(false);
   const active=useRef(true);
@@ -79,8 +81,9 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
       </div>{recovery && <p className="muted">Die ursprüngliche übertragene Anfrage wird in diesem Browser journalisiert. Wenn weitere Änderungen hinzugekommen sind, enthält der JSON-Export auch den aktuellsten unbestätigten Stand. Sichere diese Datei vor dem Neuladen. Die JSON-Datei ist keine bestätigte Cloud-Version und darf nicht blind überschrieben werden.</p>}</div>}
       <p className="muted">Nur für Entwicklungstests. Spieler- und Zuschauerzugriffe sind in der Online-Übersicht separat freizugeben.</p>
     </section>
+    {!error&&revisionState!=='stale'&&<OnlineResultInbox id={id} disabled={pending||leaving||!connected||revisionState!=='current'} onApplied={()=>{setResultVersion(v=>v+1);void checkRevision();}}/>}
     {!error && <div inert={pending || leaving || !connected || revisionState==='stale'} aria-busy={pending}>
-      {revisionState!=='stale' && <Routes>
+      {revisionState!=='stale' && <Routes key={resultVersion}>
         <Route path="/tournaments/:tournamentId/control" element={<OnlineControl id={id} />} />
         <Route path="/score/:matchId" element={<ScoringPage />} />
         <Route path="*" element={<Navigate to={route} replace />} />

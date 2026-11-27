@@ -91,7 +91,7 @@ function OnlineCatalog() {
     </section>
     {players&&<div className="prototype-modal-backdrop" onMouseDown={()=>!busy&&setPlayers(null)}><section className="prototype-modal" role="dialog" aria-modal="true" aria-labelledby="players-title" onMouseDown={e=>e.stopPropagation()} onKeyDown={e=>{if(e.key==='Escape'&&!busy)setPlayers(null);}}>
       <h2 id="players-title">Spielerzugänge · {players.item.name}</h2>
-      <p>Ein persönlicher Link erlaubt ausschließlich das Lesen der eigenen Begegnungen und der zugehörigen Gegnernamen. Kein Benutzerkonto erforderlich. Links vertraulich an die jeweiligen Teilnehmer weitergeben. Die öffentliche Zuschauerfreigabe ist unabhängig.</p>
+      <p>Ein persönlicher Link erlaubt das Lesen eigener Begegnungen sowie die Meldung und gegenseitige Bestätigung regulärer Endergebnisse. Die Turnierleitung übernimmt das verbindliche Ergebnis. Kein Benutzerkonto erforderlich. Links vertraulich an die jeweiligen Teilnehmer weitergeben. Die öffentliche Zuschauerfreigabe ist unabhängig.</p>
       <label>Teilnehmer suchen<input type="search" value={playerSearch} onChange={e=>setPlayerSearch(e.target.value)}/></label>
       <div style={{maxHeight:'45vh',overflowY:'auto'}}>{players.rows.filter(r=>r.name.toLocaleLowerCase('de-DE').includes(playerSearch.trim().toLocaleLowerCase('de-DE'))).map(r=><article key={r.participant_id} className="online-catalog-row"><div className="actions"><strong>{r.name}</strong><span className="badge">{r.token?'Freigegeben':'Gesperrt'}</span></div>
       {r.token&&<label>Persönlicher Link<input readOnly aria-label={'Link für '+r.name} value={onlinePlayerUrl(r.token)} onFocus={e=>e.target.select()}/></label>}

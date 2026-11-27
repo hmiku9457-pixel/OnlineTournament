@@ -9297,3 +9297,5 @@ button.swiss-cutoff-fixture { width: 100%; cursor: pointer; }
 
 .online-spectator { max-width: 1100px; margin: 0 auto; display: grid; gap: 14px; }
 .online-spectator .dashboard-page-hero { margin-bottom: 0; }
+
+.online-report-score input { width: 76px; min-width: 0; text-align: center; }
