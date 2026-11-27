@@ -13,6 +13,7 @@ declare
   v_corrected jsonb;
   v_later jsonb;
   v_match jsonb;
+  ranking_fixture jsonb := '[{"phase":"Liga","label":"Tabelle","kind":"ROUND_ROBIN","rows":[{"rank":1,"name":"A","played":1,"wins":1,"losses":0,"draws":0,"points":3,"buchholz":0.5,"sets":"1:0","setDifference":1,"balls":"11:8","ballDifference":3}]}]';
   detail_match jsonb := '[{"sideA":"A","sideB":"B","phase":"Liga","round":"Runde 1","status":"FINISHED","table":"Noch offen","score":"1:0","sets":[{"sideAScore":11,"sideBScore":8}]}]';
   spectator uuid;
   rotated uuid;
@@ -64,6 +65,11 @@ begin
  begin perform public.publish_online_spectator_matches(v_id,lease1,1,jsonb_set(detail_match,'{0,privateCode}','"1234"'),1); raise exception 'extra field published'; exception when invalid_parameter_value then null; end;
  if not public.publish_online_spectator_matches(v_id,lease1,1,detail_match,1) then raise exception 'publish failed'; end if;
  if public.read_online_spectator_details(spectator)->'matches' is distinct from detail_match then raise exception 'projection differs'; end if;
+ if not public.publish_online_spectator_rankings(v_id,lease1,1,ranking_fixture) then raise exception 'ranking publication failed'; end if;
+ if public.read_online_spectator_rankings(spectator)->'rankings' is distinct from ranking_fixture then raise exception 'rankings differ'; end if;
+ begin perform public.publish_online_spectator_rankings(v_id,lease2,1,ranking_fixture); raise exception 'wrong ranking lease accepted'; exception when lock_not_available then null; end;
+ begin perform public.publish_online_spectator_rankings(v_id,lease1,1,jsonb_set(ranking_fixture,'{0,rows,0,name}','"Other"')); raise exception 'foreign ranking name accepted'; exception when invalid_parameter_value then null; end;
+ begin perform public.publish_online_spectator_rankings(v_id,lease1,1,jsonb_set(ranking_fixture,'{0,rows,0,code}','"1234"')); raise exception 'private ranking field accepted'; exception when invalid_parameter_value then null; end;
 
  begin perform public.set_online_tournament_archive(v_id,1,true); raise exception 'active workspace archived'; exception when lock_not_available then null; end;
  if public.claim_online_workspace(v_id,lease2,false) then raise exception 'second workspace acquired'; end if;
@@ -73,7 +79,9 @@ begin
  begin perform public.commit_leased_online_tournament(v_id,'Test',1,op2,v_payload,lease2); raise exception 'wrong lease write'; exception when lock_not_available then null; end;
  if public.commit_leased_online_tournament(v_id,'Test',1,op2,v_payload,lease1) <> 2 then raise exception 'update'; end if;
  if public.read_online_spectator_details(spectator)->'matches' is distinct from 'null'::jsonb then raise exception 'stale projection exposed'; end if;
+ if public.read_online_spectator_rankings(spectator)->'rankings' is distinct from 'null'::jsonb then raise exception 'stale ranking exposed'; end if;
  perform public.online_spectator_detail_setting(v_id,false);
+ if public.read_online_spectator_rankings(spectator) is not null then raise exception 'disabled ranking exposed'; end if;
  if public.read_online_spectator_details(spectator) is not null then raise exception 'disabled details visible'; end if;
  if public.commit_online_tournament(v_id,'Test',0,op1,v_payload) <> 1 then raise exception 'late retry'; end if;
  begin perform public.commit_leased_online_tournament(v_id,'Test',1,op3,v_payload,lease1); raise exception 'stale update accepted'; exception when serialization_failure then null; end;
@@ -164,7 +172,7 @@ begin
  projection:=public.read_online_spectator(token);
  if projection is null or (projection->>'revision')::integer<>30 or (projection->>'recordedResults')::integer<>1 then raise exception 'anonymous public read failed'; end if;
  if public.read_online_spectator(gen_random_uuid()) is not null then raise exception 'unknown token readable'; end if;
- if has_function_privilege('anon','public.publish_online_spectator_matches(text,uuid,integer,jsonb,integer)','EXECUTE') or has_function_privilege('anon','public.online_spectator_detail_setting(text,boolean)','EXECUTE') or has_table_privilege('anon','tournament_private.online_spectator_details','SELECT') or has_function_privilege('anon','public.manage_online_spectator(text,text)','EXECUTE') or has_function_privilege('anon','public.load_online_tournament(text)','EXECUTE') or has_table_privilege('anon','tournament_private.online_tournaments','SELECT') then raise exception 'anon private access'; end if;
+ if has_function_privilege('anon','public.publish_online_spectator_rankings(text,uuid,integer,jsonb)','EXECUTE') or has_table_privilege('anon','tournament_private.online_spectator_rankings','SELECT') or has_function_privilege('anon','public.publish_online_spectator_matches(text,uuid,integer,jsonb,integer)','EXECUTE') or has_function_privilege('anon','public.online_spectator_detail_setting(text,boolean)','EXECUTE') or has_table_privilege('anon','tournament_private.online_spectator_details','SELECT') or has_function_privilege('anon','public.manage_online_spectator(text,text)','EXECUTE') or has_function_privilege('anon','public.load_online_tournament(text)','EXECUTE') or has_table_privilege('anon','tournament_private.online_tournaments','SELECT') then raise exception 'anon private access'; end if;
 end $$;
 reset role;
 set local role authenticated;

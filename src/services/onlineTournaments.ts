@@ -1,3 +1,5 @@
+import { buildMockGroups, buildRoundRobinStandings, buildSwissStandings, type MockStanding } from '@/services/mockCompetitionViews';
+import { getMockConfirmedFinalStandings } from '@/services/mockParticipantProgress';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
 import { getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches } from '@/services/mockRuntime';
 import { isStageStarted } from '@/services/mockPhaseLifecycle';
@@ -267,5 +269,17 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
     const {error}=await supabase.rpc('publish_online_spectator_matches',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches,p_total:rows.length}).abortSignal(AbortSignal.timeout(8000));
     if(error)throw new Error(error.message);
+    if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+    const rankings:Array<{phase:string;label:string;kind:string;rows:Array<MockStanding|{rank:number;name:string;placement:string;status:string}>}>=[];
+    for(const stage of tournament.stages.filter(s=>isStageStarted(tournament,s))) {
+      if(stage.type==='GROUPS') for(const group of buildMockGroups(tournament,stage)) rankings.push({phase:stage.name,label:group.label,kind:'GROUPS',rows:group.standings.filter(r=>roster.has(r.name))});
+      if(stage.type==='SWISS') rankings.push({phase:stage.name,label:'Schweizer System',kind:'SWISS',rows:buildSwissStandings(tournament,stage).filter(r=>roster.has(r.name))});
+      if(stage.type==='ROUND_ROBIN') rankings.push({phase:stage.name,label:'Tabelle',kind:'ROUND_ROBIN',rows:buildRoundRobinStandings(tournament,stage).filter(r=>roster.has(r.name))});
+    }
+    const final=getMockConfirmedFinalStandings(tournament).filter(r=>roster.has(r.name)&&Number.isSafeInteger(r.placementNumber)&&r.placementNumber>0);
+    if(final.length) rankings.push({phase:'Gesamtwertung',label:'Bestätigte Endplatzierungen',kind:'FINAL',rows:final.map(r=>({rank:r.placementNumber,name:r.name,placement:r.placement??'Platz '+r.placementNumber,status:r.status}))});
+    if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+    const result=await supabase.rpc('publish_online_spectator_rankings',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_rankings:rankings}).abortSignal(AbortSignal.timeout(8000));
+    if(result.error)throw new Error(result.error.message);
   } finally {publishing=false;}
 }

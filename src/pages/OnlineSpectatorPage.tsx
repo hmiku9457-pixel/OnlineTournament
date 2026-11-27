@@ -1,3 +1,5 @@
+import { sportScoring } from '@/domain/sportScoring';
+import type { MockStanding } from '@/services/mockCompetitionViews';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -8,11 +10,15 @@ interface Progress {
 }
 interface MatchDetail {sideA:string;sideB:string;phase:string;round:string;status:string;table:string;score:string;sets:Array<{sideAScore:number;sideBScore:number}>}
 interface Details {revision:number;matches:MatchDetail[]|null;total:number|null}
+type RankingRow=MockStanding|{rank:number;name:string;placement:string;status:string};
+interface RankingTable {phase:string;label:string;kind:string;rows:RankingRow[]}
+interface Rankings {revision:number;rankings:RankingTable[]|null}
 const matchStatuses:Record<string,string>={WAITING:'Wartend',LIVE:'Läuft',READY:'Zugewiesen',CONFIRMATION:'Bestätigung offen',FINISHED:'Beendet',CANCELLED:'Abgebrochen'};
 const statuses:Record<string,string>={DRAFT:'Entwurf',REGISTRATION:'Anmeldung',READY:'Bereit',RUNNING:'Läuft',PAUSED:'Pausiert',FINISHED:'Abgeschlossen',ABORTED:'Abgebrochen'};
 export function OnlineSpectatorPage({token}:{token:string}) {
   const [data,setData]=useState<Progress|null>(null);
   const [details,setDetails]=useState<Details|null>(null);
+  const [rankings,setRankings]=useState<Rankings|null>(null);
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState('all');
   const [pageIndex,setPageIndex]=useState(0);
@@ -21,16 +27,17 @@ export function OnlineSpectatorPage({token}:{token:string}) {
     let active=true, running=false;
     async function refresh() {
       if(running||!active)return;
-      if(!supabase||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){setData(null);setDetails(null);setMessage('Zuschauerlink ungültig oder nicht verfügbar.');return;}
+      if(!supabase||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){setData(null);setDetails(null);setRankings(null);setMessage('Zuschauerlink ungültig oder nicht verfügbar.');return;}
       running=true;
       try {
-        const [result,detailResult]=await Promise.all([supabase.rpc('read_online_spectator',{p_token:token}).abortSignal(AbortSignal.timeout(8000)),supabase.rpc('read_online_spectator_details',{p_token:token}).abortSignal(AbortSignal.timeout(8000))]);
+        const [result,detailResult,rankingResult]=await Promise.all([supabase.rpc('read_online_spectator',{p_token:token}).abortSignal(AbortSignal.timeout(8000)),supabase.rpc('read_online_spectator_details',{p_token:token}).abortSignal(AbortSignal.timeout(8000)),supabase.rpc('read_online_spectator_rankings',{p_token:token}).abortSignal(AbortSignal.timeout(8000))]);
         if(!active)return;
         if(result.error)throw new Error(result.error.message);
         setData(result.data as Progress|null);
         setDetails(!detailResult.error&&result.data&&detailResult.data?.revision===result.data.revision?detailResult.data as Details:null);
+        setRankings(!rankingResult.error&&result.data&&rankingResult.data?.revision===result.data.revision?rankingResult.data as Rankings:null);
         setMessage(result.data?'':'Dieser Zuschauerlink ist nicht mehr verfügbar.');
-      } catch {if(active){setData(null);setDetails(null);setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
+      } catch {if(active){setData(null);setDetails(null);setRankings(null);setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
       finally{running=false;}
     }
     void refresh();
@@ -63,6 +70,18 @@ export function OnlineSpectatorPage({token}:{token:string}) {
           </article>)}
           {maxPage>0&&<div className="actions"><button className="btn small" disabled={!currentPage} onClick={()=>setPageIndex(currentPage-1)}>Zurück</button><span>Seite {currentPage+1} / {maxPage+1}</span><button className="btn small" disabled={currentPage===maxPage} onClick={()=>setPageIndex(currentPage+1)}>Weiter</button></div>}
         </>}
+      </section>}
+      {rankings&&<section className="card"><h2>Ranglisten und Platzierungen</h2>
+        {rankings.rankings===null?<p>Ranglisten werden aktualisiert.</p>:rankings.rankings.length===0?<p>Noch keine Ranglisten vorhanden.</p>:rankings.rankings.map((table,index)=>{
+          const scoreSport=sportScoring(data.sport).mode==='score';
+          return <section className="online-catalog-row" key={index}><h3>{table.phase} · {table.label}</h3>
+            <div className="table-wrap"><table className="compact-table spectator-rankings"><thead><tr><th>#</th><th>Teilnehmer</th>
+              {table.kind==='FINAL'?<><th>Platzierung</th><th>Status</th></>:<><th>Sp.</th><th>S</th>{scoreSport&&<th>U</th>}<th>N</th>{table.kind==='SWISS'&&<th title="Sonneborn-Berger">SB</th>}{scoreSport?<><th>{sportScoring(data.sport).plural}</th><th>±</th><th>Pkt.</th></>:<><th>Sätze</th><th>±</th><th>Bälle</th><th>±</th></>}</>}
+            </tr></thead><tbody>{table.rows.map(r=><tr key={r.name}><td>{r.rank}</td><td><strong>{r.name}</strong></td>
+              {'placement' in r?<><td>{r.placement}</td><td>{r.status}</td></>:<><td>{r.played}</td><td>{r.wins}</td>{scoreSport&&<td>{r.draws}</td>}<td>{r.losses}</td>{table.kind==='SWISS'&&<td>{r.buchholz.toLocaleString('de-DE',{maximumFractionDigits:2})}</td>}{scoreSport?<><td>{r.balls}</td><td>{r.ballDifference}</td><td>{r.points}</td></>:<><td>{r.sets}</td><td>{r.setDifference}</td><td>{r.balls}</td><td>{r.ballDifference}</td></>}</>}
+            </tr>)}</tbody></table></div>
+          </section>;
+        })}
       </section>}
       <p className="muted">Bestätigter Stand: {new Date(data.updatedAt).toLocaleString('de-DE')} · Revision {data.revision} · Aktualisierung alle 15 Sekunden. Nur Lesezugriff.</p>
     </>}
