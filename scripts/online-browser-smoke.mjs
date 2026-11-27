@@ -13,7 +13,7 @@ const exp = Math.floor(Date.now()/1000)+3600;
 const segment = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 const accessToken = segment({alg:'HS256',typ:'JWT'})+'.'+segment({sub:user.id,role:'authenticated',exp})+'.smoke';
 const session = { access_token: accessToken, refresh_token:'smoke-refresh', token_type:'bearer', expires_in:3600, expires_at:exp, user };
-const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), calls = [];
+const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), spectatorLinks = new Map(), calls = [];
 let loseResponses = 0;
 async function install(context) {
   await context.route(api+'/**', async route => {
@@ -26,11 +26,24 @@ async function install(context) {
     if(path==='/auth/v1/token') return send(session);
     if(path==='/auth/v1/user') return send(user);
     const body = req.method()==='POST' ? req.postDataJSON() : {};
+    if(path.endsWith('/manage_online_spectator')) {
+      assert.equal(req.headers()['authorization'],'Bearer '+accessToken,'only authenticated owner manages links');
+      if(body.p_action==='disable') spectatorLinks.delete(body.p_id);
+      if(body.p_action==='enable'&&!spectatorLinks.has(body.p_id)||body.p_action==='rotate') spectatorLinks.set(body.p_id,crypto.randomUUID());
+      return send(spectatorLinks.get(body.p_id)??null);
+    }
+    if(path.endsWith('/read_online_spectator')) {
+      const id=[...spectatorLinks].find(([,token])=>token===body.p_token)?.[0];
+      if(!id || archives.has(id))return send(null);
+      const row=rows.get(id);
+      const t=JSON.parse(row.payload.entries['online-tournament:local-prototype-tournaments:v1:record:'+id]).tournament;
+      return send({name:row.name,sport:t.sport,status:t.status,revision:row.revision,updatedAt:row.updated_at,participantCount:t.participantNames.length,tables:t.tables,recordedResults:0,occupiedTables:0,phases:t.stages.map(p=>({name:p.name,type:p.type,started:false,completed:false}))});
+    }
     if(path.endsWith('/catalog_online_tournaments')) return send([...rows.values()].map(({payload,...row})=>({...row,status:JSON.parse(payload.entries['online-tournament:local-prototype-tournaments:v1:record:'+row.id]).tournament.status,archived_at:archives.get(row.id)??null,editing:leases.has(row.id)})));
     if(path.endsWith('/set_online_tournament_archive')) {
       if(rows.get(body.p_id)?.revision!==body.p_revision) return send({code:'40001',message:'revision conflict'},409);
       if(leases.has(body.p_id)) return send({code:'55P03',message:'workspace active'},409);
-      if(body.p_archived) archives.set(body.p_id,new Date().toISOString()); else archives.delete(body.p_id);
+      if(body.p_archived) {archives.set(body.p_id,new Date().toISOString());spectatorLinks.delete(body.p_id);} else archives.delete(body.p_id);
       return send(true);
     }
     if(path.endsWith('/list_online_tournaments')) return send([...rows.values()].map(({payload,...row})=>row));
@@ -106,6 +119,27 @@ try {
   await a.getByText('Keine passenden Online-Turniere vorhanden.').waitFor();
   await a.getByLabel('Anzeige',{exact:true}).selectOption('active');
   assert.equal(rows.get(id).revision,1);
+  // A fresh anonymous browser sees only the allowlisted progress projection.
+  const spectator=await browser.newContext();
+  await install(spectator);
+  const viewer=await spectator.newPage();
+  await a.getByRole('button',{name:'Zuschauerlink',exact:true}).click();
+  const share=a.getByRole('dialog',{name:/Zuschauerlink/});
+  await share.getByRole('button',{name:'Zuschaueransicht freigeben'}).click();
+  const viewerLink=await share.getByRole('link',{name:'Zuschaueransicht öffnen'}).getAttribute('href');
+  assert.ok(viewerLink);
+  await viewer.goto(viewerLink);
+  await viewer.getByRole('heading',{name:'Online Browser Abnahme'}).waitFor();
+  assert.equal(await viewer.getByText('Anna',{exact:true}).count(),0);
+  assert.equal(await viewer.getByRole('button',{name:'Turnier starten'}).count(),0);
+  await share.getByRole('button',{name:'Neuen Link erzeugen'}).click();
+  await a.waitForFunction(old=>document.querySelector('a[href*="/watch/"]')?.getAttribute('href')!==old,viewerLink);
+  await viewer.reload();
+  await viewer.getByText('Dieser Zuschauerlink ist nicht mehr verfügbar.').waitFor();
+  await share.getByRole('button',{name:'Freigabe beenden'}).click();
+  await share.getByRole('button',{name:'Zuschaueransicht freigeben'}).waitFor();
+  await share.getByRole('button',{name:'Schließen'}).click();
+  await spectator.close();
   await a.getByRole('link',{name:'Online-Turnierleitung öffnen'}).click();
   await confirmed(a);
   await a.locator('#app-build-version').waitFor({state:'visible'});
