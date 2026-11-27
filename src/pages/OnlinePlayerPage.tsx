@@ -4,6 +4,7 @@ import { useEffect,useRef,useState } from 'react';
 import { reportDraftKey,retainReportDrafts,type ReportDraft,type ReportDrafts } from '@/domain/playerReportDrafts';
 import { getPlayerCalls,newPlayerCalls,playerRefreshDelay } from '@/domain/playerCalls';
 import { supabase } from '@/lib/supabase';
+import { startOnlinePolling } from '@/domain/onlinePolling';
 import { displayVenueMessage } from '@/domain/venueTerminology';
 interface Match {sideA:string;sideB:string;phase:string;round:string;status:string;table:string;score:string;sets:Array<{sideAScore:number;sideBScore:number}>}
 interface Report {matchId:string;startedAt:number;generation:number;side:'A'|'B';sideA:string;sideB:string;bestOf:number;requiresWinner:boolean;revision:number;aSets:MatchSet[]|null;bSets:MatchSet[]|null}
@@ -26,14 +27,14 @@ export function OnlinePlayerPage({token}:{token:string}) {
  const [acknowledged,setAcknowledged]=useState<string[]>([]);
  const [newCallText,setNewCallText]=useState('');
  useEffect(()=>{
-  let alive=true,running=false,failures=0,timer:number|undefined;
-  function schedule(){if(alive){window.clearTimeout(timer);timer=window.setTimeout(()=>void refresh(),playerRefreshDelay(document.visibilityState==='visible',failures));}}
-  async function refresh(){
-   if(!alive||running)return;
-   if(!supabase||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){setData(null);setReports([]);setDrafts({});setMessage('Spielerlink ungültig.');return;}
-   running=true;setRefreshing(true);
+  let alive=true,failures=0;
+  const client=supabase;
+  if(!client||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){setData(null);setReports([]);setDrafts({});setMessage('Spielerlink ungültig.');return;}
+  async function refresh(signal:AbortSignal){
+   if(!alive)return;
+   setRefreshing(true);
    try{
-    const result=await supabase.rpc('read_online_player_bundle',{p_token:token}).abortSignal(AbortSignal.timeout(8000));
+    const result=await client!.rpc('read_online_player_bundle',{p_token:token}).abortSignal(signal);
     if(!alive)return;
     if(result.error)throw new Error(result.error.message);
     const view=result.data?.view as PlayerView|null;
@@ -56,12 +57,12 @@ export function OnlinePlayerPage({token}:{token:string}) {
       } else if(!calls.length)setNewCallText('');
     }
    }catch{if(alive){failures++;setData(null);setReports([]);setNewCallText('');setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
-   finally{running=false;if(alive){setRefreshing(false);schedule();}}
+   finally{if(alive)setRefreshing(false);}
   }
-  const focus=()=>{window.clearTimeout(timer);if(!running)void refresh();};
-  void refresh();
+  const polling=startOnlinePolling(refresh,()=>playerRefreshDelay(document.visibilityState==='visible',failures));
+  const focus=()=>{if(document.visibilityState==='visible')polling.refresh();};
   window.addEventListener('focus',focus);window.addEventListener('online',focus);document.addEventListener('visibilitychange',focus);
-  return()=>{alive=false;window.clearTimeout(timer);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);document.removeEventListener('visibilitychange',focus);};
+  return()=>{alive=false;polling.stop();window.removeEventListener('focus',focus);window.removeEventListener('online',focus);document.removeEventListener('visibilitychange',focus);};
  },[token,refreshVersion]);
  const calls=data&&data.matches?getPlayerCalls(data.matches,data.participant):[];
  const rows=(data?.matches??[]).filter(m=>filter==='all'||(filter==='active'?active(m.status):m.status===filter));

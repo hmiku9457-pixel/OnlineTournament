@@ -5,6 +5,7 @@ import type { MockStanding } from '@/services/mockCompetitionViews';
 import { playerRefreshDelay } from '@/domain/playerCalls';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { startOnlinePolling } from '@/domain/onlinePolling';
 
 interface Progress {
   name:string; sport:string; status:string; revision:number; updatedAt:string;
@@ -32,14 +33,13 @@ export function OnlineSpectatorPage({token}:{token:string}) {
   const [pageIndex,setPageIndex]=useState(0);
   const [message,setMessage]=useState('Turnier wird geladen …');
   useEffect(()=>{
-    let active=true, running=false, failures=0, timer:number|undefined;
-    function schedule(){if(active){window.clearTimeout(timer);timer=window.setTimeout(()=>void refresh(),failures?playerRefreshDelay(true,failures):document.visibilityState==='visible'?10000:30000);}}
-    async function refresh() {
-      if(running||!active)return;
-      if(!supabase||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){setData(null);setDetails(null);setRankings(null);setBrackets(null);setMessage('Zuschauerlink ungültig oder nicht verfügbar.');return;}
-      running=true;
+    let active=true, failures=0;
+    const client=supabase;
+    if(!client||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){setData(null);setDetails(null);setRankings(null);setBrackets(null);setMessage('Zuschauerlink ungültig oder nicht verfügbar.');return;}
+    async function refresh(signal:AbortSignal) {
+      if(!active)return;
       try {
-        const result=await supabase.rpc('read_online_spectator_bundle',{p_token:token}).abortSignal(AbortSignal.timeout(8000));
+        const result=await client!.rpc('read_online_spectator_bundle',{p_token:token}).abortSignal(signal);
         if(!active)return;
         if(result.error)throw new Error(result.error.message);
         const progress=result.data?.progress as Progress|null;
@@ -51,12 +51,11 @@ export function OnlineSpectatorPage({token}:{token:string}) {
         setBrackets(current<Brackets>(result.data?.brackets));
         setMessage(progress?'':'Dieser Zuschauerlink ist nicht mehr verfügbar.');
       } catch {if(active){failures++;setData(null);setDetails(null);setRankings(null);setBrackets(null);setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
-      finally{running=false;schedule();}
     }
-    void refresh();
-    const focus=()=>{window.clearTimeout(timer);if(!running)void refresh();};
+    const polling=startOnlinePolling(refresh,()=>failures?playerRefreshDelay(true,failures):document.visibilityState==='visible'?10000:30000);
+    const focus=()=>{if(document.visibilityState==='visible')polling.refresh();};
     window.addEventListener('focus',focus);window.addEventListener('online',focus);document.addEventListener('visibilitychange',focus);
-    return()=>{active=false;window.clearTimeout(timer);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);document.removeEventListener('visibilitychange',focus);};
+    return()=>{active=false;polling.stop();window.removeEventListener('focus',focus);window.removeEventListener('online',focus);document.removeEventListener('visibilitychange',focus);};
   },[token]);
   const names=[...new Set([...(details?.matches??[]).flatMap(m=>[m.sideA,m.sideB]),...(rankings?.rankings??[]).flatMap(t=>t.rows.map(r=>r.name))])].sort((a,b)=>a.localeCompare(b,'de'));
   const selected=names.includes(participant)?participant:'';

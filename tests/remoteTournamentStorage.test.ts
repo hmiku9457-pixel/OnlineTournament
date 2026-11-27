@@ -246,14 +246,15 @@ describe('isolated remote tournament persistence', () => {
     const lifecycle=await import('@/services/mockPhaseLifecycle');
     const runtime=await import('@/services/mockRuntime');
     const t=store.buildNewTournament({name:'Swiss Freilos Test',sport:'table_tennis',discipline:'SINGLES',tables:2,minimumMatches:2,estimatedDurationMinutes:90,
-      participantNames:['Anna','Bernd','Clara','Dieter','Eva'],phases:[{type:'SWISS',label:'Schweizer',entrantCount:5,groupCount:1,bestOf:1,swissRounds:2,knockoutBestOf:[]}]});
+      participantNames:['Anna','Bernd','Clara','Dieter','Eva'],phases:[{type:'SWISS',label:'Schweizer',entrantCount:5,groupCount:1,bestOf:1,swissRounds:4,knockoutBestOf:[]}]});
     let saved=adapter.initialTournamentBackup(t);
     recordSqlFixture(saved);
     adapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);recordSqlFixture(saved);});
     expect(lifecycle.startFirstStage(t)).toBe(true);
     store.updateMockTournamentStatus(t.id,'RUNNING');
     await adapter.flushPendingLocalTournamentWrites();
-    for(let round=1;round<=2;round++){
+    const byes=new Set<string>();
+    for(let round=1;round<=4;round++){
       const active=store.getMockTournament(t.id);
       const matches=runtime.getMockRuntimeMatches(active).filter(m=>m.round==='Runde '+round);
       expect(matches).toHaveLength(2);
@@ -262,9 +263,12 @@ describe('isolated remote tournament persistence', () => {
       const persisted=JSON.parse(saved.entries['online-tournament:swiss-round-fixtures:v1']);
       const pairs=persisted.find((r:{round:number})=>r.round===round).pairs;
       expect(pairs).toHaveLength(3);
-      expect(pairs.filter((pair:string[])=>pair[1]==='ot:slot:bye')).toHaveLength(1);
+      const byePairs=pairs.filter((pair:string[])=>pair[1]==='ot:slot:bye');
+      expect(byePairs).toHaveLength(1);
+      expect(byes.has(byePairs[0][0])).toBe(false);
+      byes.add(byePairs[0][0]);
       expect(JSON.stringify(pairs)).not.toContain('\\u0000');
-      expect(runtime.approveMockProgress(active)?.kind).toBe(round===1?'ROUND':'STAGE');
+      expect(runtime.approveMockProgress(active)?.kind).toBe(round<4?'ROUND':'STAGE');
       await adapter.flushPendingLocalTournamentWrites();
     }
     expect(store.getMockTournament(t.id).status).toBe('FINISHED');
