@@ -13,7 +13,7 @@ const exp = Math.floor(Date.now()/1000)+3600;
 const segment = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 const accessToken = segment({alg:'HS256',typ:'JWT'})+'.'+segment({sub:user.id,role:'authenticated',exp})+'.smoke';
 const session = { access_token: accessToken, refresh_token:'smoke-refresh', token_type:'bearer', expires_in:3600, expires_at:exp, user };
-const rows = new Map(), operations = new Map(), leases = new Map(), calls = [];
+const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), calls = [];
 let loseResponses = 0;
 async function install(context) {
   await context.route(api+'/**', async route => {
@@ -26,6 +26,13 @@ async function install(context) {
     if(path==='/auth/v1/token') return send(session);
     if(path==='/auth/v1/user') return send(user);
     const body = req.method()==='POST' ? req.postDataJSON() : {};
+    if(path.endsWith('/catalog_online_tournaments')) return send([...rows.values()].map(({payload,...row})=>({...row,status:JSON.parse(payload.entries['online-tournament:local-prototype-tournaments:v1:record:'+row.id]).tournament.status,archived_at:archives.get(row.id)??null,editing:leases.has(row.id)})));
+    if(path.endsWith('/set_online_tournament_archive')) {
+      if(rows.get(body.p_id)?.revision!==body.p_revision) return send({code:'40001',message:'revision conflict'},409);
+      if(leases.has(body.p_id)) return send({code:'55P03',message:'workspace active'},409);
+      if(body.p_archived) archives.set(body.p_id,new Date().toISOString()); else archives.delete(body.p_id);
+      return send(true);
+    }
     if(path.endsWith('/list_online_tournaments')) return send([...rows.values()].map(({payload,...row})=>row));
     if(path.endsWith('/load_online_tournament')) return send(rows.get(body.p_id) ?? {message:'Not found',code:'42501'},rows.has(body.p_id)?200:403);
     if(path.endsWith('/claim_online_workspace')) {
@@ -90,6 +97,15 @@ try {
   });
   assert.equal(rows.get(id).revision,1);
   await a.goto(base+'/#/online');
+  await a.getByRole('button',{name:'Archivieren',exact:true}).click();
+  await a.getByRole('dialog',{name:'Turnier archivieren?'}).getByRole('button',{name:'Archivieren',exact:true}).click();
+  await a.getByText('Keine passenden Online-Turniere vorhanden.').waitFor();
+  await a.getByLabel('Anzeige',{exact:true}).selectOption('archived');
+  await a.getByRole('button',{name:'Archivierung aufheben',exact:true}).click();
+  await a.getByRole('dialog',{name:'Archivierung aufheben?'}).getByRole('button',{name:'Wieder anzeigen'}).click();
+  await a.getByText('Keine passenden Online-Turniere vorhanden.').waitFor();
+  await a.getByLabel('Anzeige',{exact:true}).selectOption('active');
+  assert.equal(rows.get(id).revision,1);
   await a.getByRole('link',{name:'Online-Turnierleitung öffnen'}).click();
   await confirmed(a);
   await a.locator('#app-build-version').waitFor({state:'visible'});

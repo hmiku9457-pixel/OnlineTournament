@@ -32,3 +32,6 @@ Safety review: stale revision detection freezes the storage facade itself. If mu
 
 ## Exclusive director workspace
 Every update now requires a private event-scoped token and a live 90-second lease, renewed every 20 seconds and on successful commits. Acquisition, release and writes share the same database transaction lock. The old five-argument RPC supports creation only, never a runtime write. A second tab/device is blocked at open, until the first explicitly releases or its lease expires. An ordinary reload or crash may require waiting for expiry; the explicit release-and-back button avoids this. Recovery obtains a fresh lease before replaying journaled updates; idempotency and revision checks still apply. No automatic forced takeover. Hidden tabs may be throttled. This is an exclusive editor, not a read-only public viewer.
+
+## Online catalog and archive
+Owner-only catalog exposes status, archive timestamp and lease state (not lease tokens). Archiving is reversible metadata and does not increment sporting revisions or discard checkpoints. The event lock serializes archive with claims/commits, and active leases and running/paused events cannot be archived. Archived events cannot acquire an editor lease. Confirmed JSON export is read-only. The backup envelope now rejects missing required fields on new inserts. Existing backup rows are preserved.

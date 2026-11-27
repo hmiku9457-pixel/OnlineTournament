@@ -7,6 +7,25 @@ import { buildNewTournament, type CreateMockTournamentInput } from '@/services/m
 import type { DemoTournament } from '@/data/demoTournaments';
 
 export interface OnlineTournamentSummary { id: string; name: string; revision: number; updated_at: string }
+export interface OnlineCatalogItem extends OnlineTournamentSummary { status: string; archived_at: string | null; editing: boolean }
+export async function listOnlineCatalog(): Promise<OnlineCatalogItem[]> {
+  const {client}=await account();
+  const {data,error}=await client.rpc('catalog_online_tournaments');
+  if(error) throw new Error(error.message);
+  return (data ?? []) as OnlineCatalogItem[];
+}
+export async function setOnlineArchive(item: OnlineCatalogItem, archived: boolean): Promise<void> {
+  const {client,userId}=await account();
+  if((await listPendingOnlineOperations(userId,item.id)).length) throw new Error('Bitte zuerst die unbestätigte Speicherung klären.');
+  const {data,error}=await client.rpc('set_online_tournament_archive',{p_id:item.id,p_revision:item.revision,p_archived:archived});
+  if(error?.code==='40001') throw new Error('Turnierstand geändert. Bitte Übersicht aktualisieren.');
+  if(error?.code==='55P03') throw new Error('Bitte zuerst die Bearbeitungssperre freigeben.');
+  if(error || data!==true) throw new Error(error?.message ?? 'Archivierung nicht bestätigt.');
+}
+export async function loadConfirmedOnlineBackup(id: string): Promise<{ backup: TournamentBackup; revision: number }> {
+  const result=await load(id);
+  return {backup:result.payload,revision:result.revision};
+}
 interface OnlineTournament extends OnlineTournamentSummary { payload: TournamentBackup }
 async function account() {
   if (!supabase) throw new Error('Supabase ist nicht eingerichtet.');

@@ -34,7 +34,14 @@ begin
  perform set_config('request.jwt.claim.sub','00000000-0000-4000-8000-0000000000a1',true);
  if public.commit_online_tournament(v_id,'Test',0,op1,v_payload) <> 1 then raise exception 'create'; end if;
  if public.commit_online_tournament(v_id,'Test',0,op1,v_payload) <> 1 then raise exception 'retry'; end if;
+ if not public.set_online_tournament_archive(v_id,1,true) then raise exception 'archive failed'; end if;
+ if not exists(select 1 from public.catalog_online_tournaments() c where c.id=v_id and c.archived_at is not null and c.status='READY') then raise exception 'archive catalog'; end if;
+ if public.load_online_tournament(v_id)->'payload' is distinct from v_payload then raise exception 'archived backup unavailable'; end if;
+ begin perform public.claim_online_workspace(v_id,lease1,false); raise exception 'archived event claimed'; exception when object_not_in_prerequisite_state then null; end;
+ if not public.set_online_tournament_archive(v_id,1,false) then raise exception 'unarchive failed'; end if;
+ begin perform public.set_online_tournament_archive(v_id,0,true); raise exception 'stale archive accepted'; exception when serialization_failure then null; end;
  if not public.claim_online_workspace(v_id,lease1,false) then raise exception 'claim failed'; end if;
+ begin perform public.set_online_tournament_archive(v_id,1,true); raise exception 'active workspace archived'; exception when lock_not_available then null; end;
  if public.claim_online_workspace(v_id,lease2,false) then raise exception 'second workspace acquired'; end if;
  if not public.claim_online_workspace(v_id,lease1,true) then raise exception 'renew failed'; end if;
  if public.release_online_workspace(v_id,lease2) then raise exception 'foreign token released lease'; end if;
@@ -88,6 +95,8 @@ begin
  if not public.claim_online_workspace(v_id,lease2,false) then raise exception 'takeover after release failed'; end if;
  begin perform public.commit_leased_online_tournament(v_id,'Test',29,gen_random_uuid(),v_later,lease1); raise exception 'old token accepted'; exception when lock_not_available then null; end;
  perform set_config('request.jwt.claim.sub','00000000-0000-4000-8000-0000000000b2',true);
+ begin perform public.set_online_tournament_archive(v_id,29,true); raise exception 'foreign archive accepted'; exception when insufficient_privilege then null; end;
+ if exists(select 1 from public.catalog_online_tournaments() c where c.id=v_id) then raise exception 'foreign catalog visible'; end if;
  begin perform public.claim_online_workspace(v_id,lease2,false); raise exception 'foreign lease claimed'; exception when insufficient_privilege then null; end;
  begin perform public.release_online_workspace(v_id,lease2); raise exception 'foreign lease released'; exception when insufficient_privilege then null; end;
  if has_function_privilege('authenticated','tournament_private.commit_online(text,text,integer,uuid,jsonb)','EXECUTE') or has_function_privilege('anon','public.claim_online_workspace(text,uuid,boolean)','EXECUTE') then raise exception 'lease privilege leak'; end if;
@@ -113,6 +122,9 @@ begin
   if not public.claim_online_workspace(v_id,new_token,false) then raise exception 'expired lease takeover failed'; end if;
   if public.release_online_workspace(v_id,old_token) then raise exception 'old token released new lease'; end if;
   if public.commit_leased_online_tournament(v_id,'Test',29,gen_random_uuid(),snapshot,new_token)<>30 then raise exception 'new owner write failed'; end if;
+  perform public.release_online_workspace(v_id,new_token);
+  begin perform public.set_online_tournament_archive(v_id,30,true); raise exception 'running event archived'; exception when invalid_parameter_value then null; end;
+  begin insert into public.tournament_backups(tournament_id,tournament_name,payload) values(v_id,'Broken','{}'); raise exception 'invalid backup accepted'; exception when check_violation then null; end;
 end $$;
 rollback;
 select 'create, retry, update, conflict, owner isolation passed' as result;
