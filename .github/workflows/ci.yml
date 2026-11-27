@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,7 +22,7 @@ jobs:
       - run: npm run build
 
   browser-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,7 +43,7 @@ jobs:
           node scripts/creation-browser-smoke.mjs
 
   online-browser-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -65,3 +65,41 @@ jobs:
             sleep 1
           done
           node scripts/online-browser-smoke.mjs
+
+  postgres-integration:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: tournament_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:ci-only@127.0.0.1:5432/tournament_ci
+      ONLINE_SQL_FIXTURES: /tmp/online-sql-fixtures.jsonl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Apply migrations to disposable PostgreSQL
+        run: |
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/ci_auth_stub.sql
+          for file in supabase/migrations/*.sql; do psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f "$file"; done
+      - name: SQL permissions, revisions and sport guards
+        run: |
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/online_revision_api.sql
+          psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f supabase/tests/online_scoring.sql
+      - name: Generate and replay actual director states
+        run: |
+          npx vitest run tests/remoteTournamentStorage.test.ts
+          node scripts/replay-online-sql-fixtures.mjs

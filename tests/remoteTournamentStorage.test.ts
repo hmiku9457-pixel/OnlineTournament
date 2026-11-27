@@ -1,4 +1,9 @@
+import { appendFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+type Snapshot = import('@/services/localTournamentStorage').TournamentBackup;
+function recordSqlFixture(snapshot: Snapshot) {
+  if(process.env.ONLINE_SQL_FIXTURES) appendFileSync(process.env.ONLINE_SQL_FIXTURES,JSON.stringify(snapshot)+'\n');
+}
 const data = new Map<string, string>();
 const storage = {
   get length() { return data.size; },
@@ -149,10 +154,12 @@ describe('isolated remote tournament persistence', () => {
       tables: 2, minimumMatches: 1, estimatedDurationMinutes: 60, participantNames: ['Anna','Bernd','Clara','Dieter'],
       phases: [{ type: 'ROUND_ROBIN', label: 'Liga', bestOf: 1, entrantCount: 4, groupCount: 1, swissRounds: 1, knockoutBestOf: [] }] });
     let persisted = adapter.initialTournamentBackup(t);
+    recordSqlFixture(persisted);
     let disconnect = false;
     const save = async (next: typeof persisted) => {
       if (disconnect) { disconnect = false; throw new adapter.RemoteWriteUnavailableError('offline'); }
       persisted = structuredClone(next);
+      recordSqlFixture(persisted);
     };
     adapter.initializeRemoteTournamentStorage(persisted, save);
     expect(lifecycle.startFirstStage(t)).toBe(true);
@@ -172,7 +179,7 @@ describe('isolated remote tournament persistence', () => {
     const nextAdapter = await import('@/services/localTournamentStorage');
     const nextStore = await import('@/services/mockTournamentStore');
     const nextRuntime = await import('@/services/mockRuntime');
-    nextAdapter.initializeRemoteTournamentStorage(persisted, async (next) => { persisted = structuredClone(next); });
+    nextAdapter.initializeRemoteTournamentStorage(persisted, async (next) => { persisted = structuredClone(next); recordSqlFixture(persisted); });
     expect(nextRuntime.getMockStoredResult(first.id)?.sets).toEqual(sets);
     const active = nextStore.getMockTournament(t.id);
     const rest = nextRuntime.getMockStageMatches(active, active.stages[0]).filter(m => m.id !== first.id);
@@ -198,7 +205,8 @@ describe('isolated remote tournament persistence', () => {
       tournamentMode:'multi',plannedDays:2,participantNames:['Anna','Bernd','Clara','Dieter'],
       phases:[{type:'SWISS',label:'Schweizer',entrantCount:4,groupCount:1,bestOf:1,swissRounds:2,knockoutBestOf:[],dayBreaks:[{afterRound:1,date:'2031-11-21',time:'09:00'}]}]});
     let saved=adapter.initialTournamentBackup(t);
-    adapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);});
+    recordSqlFixture(saved);
+    adapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);recordSqlFixture(saved);});
     expect(lifecycle.startFirstStage(t)).toBe(true);
     store.updateMockTournamentStatus(t.id,'RUNNING');
     await adapter.flushPendingLocalTournamentWrites();
@@ -217,7 +225,7 @@ describe('isolated remote tournament persistence', () => {
     const nextRuntime=await import('@/services/mockRuntime');
     const nextStore=await import('@/services/mockTournamentStore');
     const nextBreaks=await import('@/services/mockInlineBreak');
-    nextAdapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);});
+    nextAdapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);recordSqlFixture(saved);});
     const paused=nextStore.getMockTournament(t.id);
     expect(paused.status).toBe('PAUSED');
     expect(nextBreaks.getInlineBreakStatus(paused,paused.stages[0])?.state).toBe('running');
@@ -241,7 +249,8 @@ describe('isolated remote tournament persistence', () => {
       phases:[{type:'GROUPS',label:'Gruppen',entrantCount:4,groupCount:2,swissRounds:1,bestOf:1,knockoutBestOf:[]},
         {type:'KNOCKOUT',label:'Finale',entrantCount:2,groupCount:1,swissRounds:1,bestOf:1,knockoutBestOf:[1]}]});
     let saved=adapter.initialTournamentBackup(t);
-    adapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);});
+    recordSqlFixture(saved);
+    adapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);recordSqlFixture(saved);});
     expect(lifecycle.startFirstStage(t)).toBe(true);
     store.updateMockTournamentStatus(t.id,'RUNNING');
     await adapter.flushPendingLocalTournamentWrites();
@@ -256,7 +265,7 @@ describe('isolated remote tournament persistence', () => {
     const nextRuntime=await import('@/services/mockRuntime');
     const nextStore=await import('@/services/mockTournamentStore');
     const nextLifecycle=await import('@/services/mockPhaseLifecycle');
-    nextAdapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);});
+    nextAdapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);recordSqlFixture(saved);});
     const paused=nextStore.getMockTournament(t.id);
     expect(paused.status).toBe('PAUSED');
     expect(nextLifecycle.startStage(paused,paused.stages[1])).toBe(true);
