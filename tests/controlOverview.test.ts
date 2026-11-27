@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterControlMatches, filterControlQueueMatches, orderControlQueue, summarizeControlQueue, summarizeControlProgress, summarizeVenueCapacity, longRestMatches } from '@/domain/controlOverview';
+import { filterControlMatches, filterControlQueueMatches, orderControlQueue, summarizeControlQueue, summarizeControlProgress, summarizeVenueCapacity, longRestMatches, elapsedMatchMinutes } from '@/domain/controlOverview';
 
 const matches = [
   { id: 'a', sideA: 'Anna Müller', sideB: 'Ben', phase: 'Gruppen', table: 'Tisch 1', status: 'LIVE' },
@@ -102,4 +102,8 @@ describe('director capacity and rest warnings',()=>{
     const rows=[{id:'a',pauseA:31,pauseB:45},{id:'b',pauseA:60,pauseB:null},{id:'c',pauseA:60,pauseB:60,startedAt:1},{id:'d',pauseA:50,pauseB:55},{id:'e',pauseA:45,pauseB:50}];
     expect(longRestMatches(rows,new Set(['a','b','c','e']),30).map(m=>m.id)).toEqual(['e','a']);
   });
+});
+
+it('uses actual assignment time and never invents missing or future durations',()=>{
+ expect(elapsedMatchMinutes(1000,121000)).toBe(2);expect(elapsedMatchMinutes(undefined,121000)).toBeNull();expect(elapsedMatchMinutes(5000,1000)).toBeNull();
 });

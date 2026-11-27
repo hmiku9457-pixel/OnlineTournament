@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+const conditional=(body,bundle)=>{const tag=createHash('md5').update(JSON.stringify(bundle)).digest('hex');return body.p_known_tag===tag&&(bundle.view||bundle.progress)?{unchanged:true,tag}:{...bundle,unchanged:false,tag};};
 import { chromium } from 'playwright';
 
 // No hosted credentials or production data: exercise the real client and browser
@@ -106,7 +108,7 @@ async function install(context) {
       for(const pid of body.p_ids){if(body.p_action==='disable')links.delete(pid);else if(!links.has(pid))links.set(pid,crypto.randomUUID());}
       return send(body.p_ids.length);
     }
-    if(path.endsWith('/read_online_player_bundle')) {
+    if(path.endsWith('/read_online_player_bundle')||path.endsWith('/read_online_player_bundle_v2')) {
       const access=resolvePlayer(body.p_token);
       if(!access)return send({view:null,reports:[]});
       const {id,pid}=access,row=rows.get(id),t=record(id);
@@ -114,7 +116,7 @@ async function install(context) {
       const participant=names[pid];
       if(!participant)return send({view:null,reports:[]});
       const projection=playerRows.get(id),current=projection?.revision===row.revision;
-      return send({context:current?projection.contexts?.[pid]??null:null,calls:currentMatchCalls(id).filter(c=>[c.aId,c.bId].includes(pid)).map(c=>({callId:c.callId,matchId:c.matchId,table:c.table,calledAt:c.calledAt,sideA:c.sideA,sideB:c.sideB,revision:c.revision,acknowledged:c.aId===pid?c.ackA:c.ackB})),view:{name:row.name,participant,sport:t.sport,status:t.status,revision:row.revision,updatedAt:row.updated_at,complete:current?projection.total===projection.matches.length:null,matches:current?projection.matches.filter(m=>m.sideA===participant||m.sideB===participant):null},reports:currentReportRows(id).filter(r=>[r.aId,r.bId].includes(pid)).map(r=>({matchId:r.matchId,side:r.aId===pid?'A':'B',sideA:names[r.aId],sideB:names[r.bId],startedAt:r.startedAt,generation:r.generation,bestOf:r.bestOf,requiresWinner:r.requiresWinner,revision:r.revision,aSets:r.aSets,bSets:r.bSets}))});
+      return send(conditional(body,{context:current?projection.contexts?.[pid]??null:null,calls:currentMatchCalls(id).filter(c=>[c.aId,c.bId].includes(pid)).map(c=>({callId:c.callId,matchId:c.matchId,table:c.table,calledAt:c.calledAt,sideA:c.sideA,sideB:c.sideB,revision:c.revision,acknowledged:c.aId===pid?c.ackA:c.ackB})),view:{name:row.name,participant,sport:t.sport,status:t.status,revision:row.revision,updatedAt:row.updated_at,complete:current?projection.total===projection.matches.length:null,matches:current?projection.matches.filter(m=>m.sideA===participant||m.sideB===participant):null},reports:currentReportRows(id).filter(r=>[r.aId,r.bId].includes(pid)).map(r=>({matchId:r.matchId,side:r.aId===pid?'A':'B',sideA:names[r.aId],sideB:names[r.bId],startedAt:r.startedAt,generation:r.generation,bestOf:r.bestOf,requiresWinner:r.requiresWinner,revision:r.revision,aSets:r.aSets,bSets:r.bSets}))}));
     }
     if(path.endsWith('/list_online_player_access')) {
       assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
@@ -159,12 +161,12 @@ async function install(context) {
       if(body.p_enabled===false){detailSettings.delete(body.p_id);detailRows.delete(body.p_id);rankingRows.delete(body.p_id);bracketRows.delete(body.p_id);}
       return send(detailSettings.has(body.p_id));
     }
-    if(path.endsWith('/publish_online_spectator_matches')) {
+    if(path.endsWith('/publish_online_spectator_matches')||path.endsWith('/publish_online_spectator_matches_v2')) {
       if(!detailSettings.has(body.p_id))return send(false);
       assert.equal(leases.get(body.p_id),body.p_token);
       if(rows.get(body.p_id).revision!==body.p_revision)return send({code:'40001',message:'revision conflict'},409);
       for(const m of body.p_matches)assert.deepEqual(Object.keys(m).sort(),['phase','round','score','sets','sideA','sideB','status','table']);
-      detailRows.set(body.p_id,{revision:body.p_revision,matches:body.p_matches,total:body.p_total});
+      detailRows.set(body.p_id,{revision:body.p_revision,matches:body.p_matches,total:body.p_total,overview:body.p_overview??null});
       return send(true);
     }
     if(path.endsWith('/publish_online_spectator_brackets')) {
@@ -205,11 +207,11 @@ async function install(context) {
       const spectator=detailSettings.has(id)&&spectatorLinks.has(id);
       return send({player:!!playerLinks.get(id)?.size&&playerRows.get(id)?.revision!==revision,matches:spectator&&detailRows.get(id)?.revision!==revision,rankings:spectator&&rankingRows.get(id)?.revision!==revision,brackets:spectator&&bracketRows.get(id)?.revision!==revision});
     }
-    if(path.endsWith('/read_online_spectator_bundle')) {
+    if(path.endsWith('/read_online_spectator_bundle')||path.endsWith('/read_online_spectator_bundle_v2')) {
       const id=[...spectatorLinks].find(([,token])=>token===body.p_token)?.[0];
       if(!id||archives.has(id))return send({progress:null,details:null,rankings:null,brackets:null});
       const row=rows.get(id),t=record(id),revision=row.revision,enabled=detailSettings.has(id);
-      return send({progress:{name:row.name,sport:t.sport,status:t.status,revision,updatedAt:row.updated_at,participantCount:t.participantNames.length,tables:t.tables,recordedResults:0,occupiedTables:0,phases:t.stages.map(p=>({name:p.name,type:p.type,started:false,completed:false}))},details:enabled?(detailRows.get(id)?.revision===revision?detailRows.get(id):{revision,matches:null,total:null}):null,rankings:enabled?(rankingRows.get(id)?.revision===revision?rankingRows.get(id):{revision,rankings:null}):null,brackets:enabled?(bracketRows.get(id)?.revision===revision?bracketRows.get(id):{revision,brackets:null}):null});
+      return send(conditional(body,{progress:{name:row.name,sport:t.sport,status:t.status,revision,updatedAt:row.updated_at,participantCount:t.participantNames.length,tables:t.tables,recordedResults:0,occupiedTables:0,phases:t.stages.map(p=>({name:p.name,type:p.type,started:false,completed:false}))},details:enabled?(detailRows.get(id)?.revision===revision?detailRows.get(id):{revision,matches:null,total:null}):null,rankings:enabled?(rankingRows.get(id)?.revision===revision?rankingRows.get(id):{revision,rankings:null}):null,brackets:enabled?(bracketRows.get(id)?.revision===revision?bracketRows.get(id):{revision,brackets:null}):null}));
     }
     if(path.endsWith('/read_online_spectator')) {
       const id=[...spectatorLinks].find(([,token])=>token===body.p_token)?.[0];

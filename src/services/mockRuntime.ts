@@ -561,8 +561,12 @@ function getLatestFinishedTimes(tournament: DemoTournament, results: StoredMatch
   return timestamps;
 }
 
+export function getMockRecordedFinishTimes():Map<string,number> {
+ return new Map(readResults().filter(r=>r.status==='FINISHED'&&Number.isSafeInteger(r.finishedAt)&&r.finishedAt!>0&&!r.forcedWinner&&!r.thirdPlaceSkipped).map(r=>[r.matchId,r.finishedAt!]));
+}
+
 export function getMockPlayedFinishTimes(matches:readonly Pick<MockRuntimeMatch,'id'|'sideA'|'sideB'|'status'>[]):Map<string,number> {
- const stored=new Map(readResults().filter(r=>r.status==='FINISHED'&&r.finishedAt&&!r.forcedWinner&&!r.thirdPlaceSkipped).map(r=>[r.matchId,r.finishedAt!]));
+ const stored=getMockRecordedFinishTimes();
  const times=new Map<string,number>();
  for(const match of matches){
   const finished=stored.get(match.id);

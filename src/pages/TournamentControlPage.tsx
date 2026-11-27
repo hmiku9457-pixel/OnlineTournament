@@ -32,7 +32,7 @@ import { getBracketScoreStages } from '@/domain/bracketScoreStages';
 import { PlayerGameOutcome } from '@/components/PlayerGameOutcome';
 import { summarizeParticipantStatuses } from '@/domain/participantStatistics';
 import { getGroupQualificationHints } from '@/domain/groupQualification';
-import { filterControlMatches, filterControlQueueMatches, orderControlQueue, summarizeControlQueue, summarizeControlProgress, summarizeVenueCapacity, longRestMatches, type ControlQueueOrder, type ControlMatchFilters, type ControlMatchFilter, type ControlQueueFilters, type ControlQueueStatusFilter } from '@/domain/controlOverview';
+import { filterControlMatches, filterControlQueueMatches, orderControlQueue, summarizeControlQueue, summarizeControlProgress, summarizeVenueCapacity, longRestMatches, elapsedMatchMinutes, type ControlQueueOrder, type ControlMatchFilters, type ControlMatchFilter, type ControlQueueFilters, type ControlQueueStatusFilter } from '@/domain/controlOverview';
 import { resultForMatchParticipant } from '@/services/matchPresentation';
 import type { TournamentStage, TournamentStatus } from '@/domain/types';
 import { buildMockBracket, buildMockGroups, buildSwissStandings, getPreviousStageFinishLabels, getSwissUnplayedWinWinners } from '@/services/mockCompetitionViews';
@@ -1183,6 +1183,7 @@ export function TournamentControlPage() {
                     {match ? (
                       <>
                         <span className="muted">{match.phase} · {match.round}{sportScoring(match.sport).mode === 'sets' ? ` · BO${match.bestOf}` : ''}</span>
+                        {elapsedMatchMinutes(match.startedAt,Date.now())!==null&&<span className="muted" title="Zeit seit der ersten Zuweisung einschließlich Unterbrechungen">Seit erster Zuweisung: {elapsedMatchMinutes(match.startedAt,Date.now())} Min.</span>}
                         <SportResultEntry
                           match={match}
                           swissAdminEntry={(activeStage?.type === 'SWISS' || activeStage?.type === 'KNOCKOUT')}

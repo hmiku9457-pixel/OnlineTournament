@@ -1,3 +1,4 @@
+import type { PublicMatchOverview } from '@/domain/publicMatchOverview';
 import { BracketRoundViewport } from '@/components/BracketRoundViewport';
 import type { MatchSlot } from '@/domain/matchSlots';
 import { sportScoring } from '@/domain/sportScoring';
@@ -16,7 +17,7 @@ interface Progress {
   phases:Array<{name:string|null;type:string;started:boolean;completed:boolean}>;
 }
 type MatchDetail=OnlineMatchView;
-interface Details {revision:number;matches:MatchDetail[]|null;total:number|null}
+interface Details {revision:number;matches:MatchDetail[]|null;total:number|null;overview?:PublicMatchOverview|null}
 type RankingRow=MockStanding|{rank:number;name:string;placement:string;status:string};
 interface RankingTable {phase:string;label:string;kind:string;rows:RankingRow[]}
 interface Rankings {revision:number;rankings:RankingTable[]|null}
@@ -47,15 +48,17 @@ export function OnlineSpectatorPage({token}:{token:string}) {
   useEffect(()=>{const changed=()=>setFullScreen(!!document.fullscreenElement);document.addEventListener('fullscreenchange',changed);return()=>document.removeEventListener('fullscreenchange',changed);},[]);
   async function toggleFullscreen(){try{setScreenError('');if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{setScreenError('Vollbild wird von diesem Browser nicht unterstützt.');}}
   useEffect(()=>{
-    let active=true, failures=0;
+    let active=true, failures=0, knownTag:string|null=null;
     const client=supabase;
     if(!client||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){setData(null);setDetails(null);setRankings(null);setBrackets(null);setMessage('Zuschauerlink ungültig oder nicht verfügbar.');return;}
     async function refresh(signal:AbortSignal) {
       if(!active)return;
       try {
-        const result=await client!.rpc('read_online_spectator_bundle',{p_token:token}).abortSignal(signal);
+        const result=await client!.rpc('read_online_spectator_bundle_v2',{p_token:token,p_known_tag:knownTag}).abortSignal(signal);
         if(!active)return;
         if(result.error)throw new Error(result.error.message);
+        if(result.data?.unchanged===true&&knownTag!==null){failures=0;return;}
+        knownTag=typeof result.data?.tag==='string'?result.data.tag:null;
         const progress=result.data?.progress as Progress|null;
         const current=<T extends {revision:number}>(value:T|null|undefined):T|null=>progress&&value?.revision===progress.revision?value:null;
         failures=0;
@@ -64,16 +67,18 @@ export function OnlineSpectatorPage({token}:{token:string}) {
         setRankings(current<Rankings>(result.data?.rankings));
         setBrackets(current<Brackets>(result.data?.brackets));
         setMessage(progress?'':'Dieser Zuschauerlink ist nicht mehr verfügbar.');
-      } catch {if(active){failures++;setData(null);setDetails(null);setRankings(null);setBrackets(null);setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
+      } catch {if(active){knownTag=null;failures++;setData(null);setDetails(null);setRankings(null);setBrackets(null);setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
     }
     const polling=startOnlinePolling(refresh,()=>failures?playerRefreshDelay(true,failures):document.visibilityState==='visible'?10000:30000);
     const focus=()=>{if(document.visibilityState==='visible')polling.refresh();};
     window.addEventListener('focus',focus);window.addEventListener('online',focus);document.addEventListener('visibilitychange',focus);
     return()=>{active=false;polling.stop();window.removeEventListener('focus',focus);window.removeEventListener('online',focus);document.removeEventListener('visibilitychange',focus);};
   },[token]);
+  const phaseNames=[...new Set([...(details?.matches??[]).map(m=>m.phase),...(rankings?.rankings??[]).map(t=>t.phase),...(brackets?.brackets??[]).map(b=>b.phase)])];
+  const effectivePhase=phaseNames.includes(phaseFilter)?phaseFilter:'';
   const names=[...new Set([...(details?.matches??[]).flatMap(m=>[m.sideA,m.sideB]),...(rankings?.rankings??[]).flatMap(t=>t.rows.map(r=>r.name))])].sort((a,b)=>a.localeCompare(b,'de'));
   const selected=names.includes(participant)?participant:'';
-  const matches=(details?.matches??[]).filter(m=>(!phaseFilter||m.phase===phaseFilter)&&(!selected||m.sideA===selected||m.sideB===selected)&&(filter==='all'||(filter==='live'?['LIVE','READY','CONFIRMATION'].includes(m.status):m.status===filter))&&[m.sideA,m.sideB,m.phase,m.round].some(v=>v.toLocaleLowerCase('de-DE').includes(search.trim().toLocaleLowerCase('de-DE'))));
+  const matches=(details?.matches??[]).filter(m=>(!effectivePhase||m.phase===effectivePhase)&&(!selected||m.sideA===selected||m.sideB===selected)&&(filter==='all'||(filter==='live'?['LIVE','READY','CONFIRMATION'].includes(m.status):m.status===filter))&&[m.sideA,m.sideB,m.phase,m.round].some(v=>v.toLocaleLowerCase('de-DE').includes(search.trim().toLocaleLowerCase('de-DE'))));
   const maxPage=Math.max(0,Math.ceil(matches.length/25)-1);
   const currentPage=Math.min(pageIndex,maxPage);
   const hall=publicHallAssignments(details?.matches??[],data?.tables??0);
@@ -108,10 +113,13 @@ export function OnlineSpectatorPage({token}:{token:string}) {
       </section>}
       {(!hallOnly||!details)&&<>
       <section className="card"><h2>Turnierverlauf</h2>{data.phases.map((phase,index)=><div className="online-catalog-row actions" key={index}><strong>{phase.name||'Phase '+(index+1)}</strong><span className="badge">{phase.completed?'Abgeschlossen':phase.started?'Gestartet':'Ausstehend'}</span></div>)}</section>
+      {phaseNames.length>0&&<section className="card spectator-phase-nav"><h2>Phasenansicht</h2><label>Turnierphase<select aria-label="Turnierphase" value={effectivePhase} onChange={e=>{setPhaseFilter(e.target.value);setPageIndex(0);}}><option value="">Alle Phasen</option>{phaseNames.map(p=><option key={p}>{p}</option>)}</select></label><button className="btn small" onClick={()=>window.print()}>Übersicht drucken</button></section>}
+      {details?.matches&&<section className="card"><h2>Zugewiesene Spiele und Aufrufe</h2><p className="muted">Bereits zugewiesene und laufende Partien, keine garantierte zukünftige Startreihenfolge.</p>{hall.length===0?<p>Keine zugewiesenen Partien.</p>:hall.flatMap(item=>item.matches.filter(m=>!effectivePhase||m.phase===effectivePhase).map((m,i)=><div className="spectator-short-row" key={item.number+'-'+i}><strong>{m.sideA} – {m.sideB}</strong><span>{displayVenueName(data.sport,m.table)} · {matchStatuses[m.status]??m.status}</span></div>)).slice(0,16)}</section>}
+      {details?.matches&&details.overview&&<section className="card"><h2>Zuletzt beendete Spiele</h2>{details.overview.recent.length===0?<p>Noch keine Spiele mit erfasstem Abschlusszeitpunkt.</p>:details.overview.recent.filter(r=>!effectivePhase||details.matches?.[r.index]?.phase===effectivePhase).map(r=>{const m=details.matches?.[r.index];return m&&m.status==='FINISHED'?<div className="spectator-short-row" key={r.index}><div><strong>{m.sideA} – {m.sideB}</strong><small>{m.phase} · {new Date(r.finishedAt).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</small></div><strong>{m.score}</strong></div>:null;})}</section>}
       {names.length>0&&<section className="card"><h2>Persönliche Spielübersicht</h2><p className="muted">Filtert die bereits freigegebenen Spiele nach einem Teilnehmer. Keine Anmeldung oder private Spielerberechtigung.</p><label>Teilnehmer auswählen<select aria-label="Teilnehmer auswählen" value={selected} onChange={e=>{setParticipant(e.target.value);setSearch('');setFilter('all');setPageIndex(0);}}><option value="">Alle Teilnehmer</option>{names.map(n=><option key={n} value={n}>{n}</option>)}</select></label>{selected&&<p>Aktuelle und kommende Spiele von <strong>{selected}</strong> findest du unten in der gefilterten Spielübersicht.</p>}</section>}
       {details&&<section className="card"><h2>Spielpaarungen und Ergebnisse</h2>
         {details.matches===null?<p role="status">Die Detailansicht wird für die aktuelle Revision aktualisiert. Bitte die Turnierleitung geöffnet lassen.</p>:<>
-          <div className="control-match-filter-fields"><label>Teilnehmer suchen<input type="search" value={search} onChange={e=>{setSearch(e.target.value);setPageIndex(0);}} placeholder="Name oder Phase"/></label><label>Phase<select aria-label="Turnierphase" value={phaseFilter} onChange={e=>{setPhaseFilter(e.target.value);setPageIndex(0);}}><option value="">Alle Phasen</option>{[...new Set((details.matches??[]).map(m=>m.phase))].map(p=><option key={p}>{p}</option>)}</select></label><label>Status<select aria-label="Spielstatus" value={filter} onChange={e=>{setFilter(e.target.value);setPageIndex(0);}}><option value="all">Alle</option><option value="live">Laufend</option><option value="FINISHED">Beendet</option><option value="WAITING">Wartend</option></select></label></div>
+          <div className="control-match-filter-fields"><label>Teilnehmer suchen<input type="search" value={search} onChange={e=>{setSearch(e.target.value);setPageIndex(0);}} placeholder="Name oder Phase"/></label><label>Status<select aria-label="Spielstatus" value={filter} onChange={e=>{setFilter(e.target.value);setPageIndex(0);}}><option value="all">Alle</option><option value="live">Laufend</option><option value="FINISHED">Beendet</option><option value="WAITING">Wartend</option></select></label></div>
           {(details.total??0)>details.matches.length&&<p className="muted">Auszug: {details.matches.length} von {details.total} Partien.</p>}
           {!matches.length&&<p>Keine passenden Spiele.</p>}
           {matches.slice(currentPage*25,(currentPage+1)*25).map((m,i)=><article className="online-catalog-row" key={currentPage*25+i}>
@@ -122,18 +130,20 @@ export function OnlineSpectatorPage({token}:{token:string}) {
         </>}
       </section>}
       {rankings&&<section className="card"><h2>Ranglisten und Platzierungen</h2>
-        {rankings.rankings===null?<p>Ranglisten werden aktualisiert.</p>:rankings.rankings.length===0?<p>Noch keine Ranglisten vorhanden.</p>:rankings.rankings.map((table,index)=>{
+        {rankings.rankings===null?<p>Ranglisten werden aktualisiert.</p>:rankings.rankings.length===0?<p>Noch keine Ranglisten vorhanden.</p>:rankings.rankings.filter(t=>!effectivePhase||t.phase===effectivePhase).map((table,index)=>{
           const scoreSport=sportScoring(data.sport).mode==='score';
-          return <section className="online-catalog-row" key={index}><h3>{table.phase} · {table.label}</h3>
+          const qualification=details?.overview?.qualification.find(q=>q.phase===table.phase);
+          const qualified=(name:string)=>qualification?.confirmed!==null&&qualification?.confirmed!==undefined?qualification.confirmed.includes(name)?'Qualifiziert':'':qualification?.projected.includes(name)?'Auf Qualifikationsplatz':qualification?.possible.includes(name)?'Qualifikation offen':'';
+          return <section className="online-catalog-row" key={index}><h3>{table.phase} · {table.label}</h3>{qualification&&<p className="muted">{qualification.target} geplante Qualifikationsplätze · {qualification.confirmed===null?'Vorläufiger Stand, Entscheidung der Turnierleitung abwarten.':'Qualifikation freigegeben.'}</p>}
             <div className="table-wrap"><table className="compact-table spectator-rankings"><thead><tr><th>#</th><th>Teilnehmer</th>
               {table.kind==='FINAL'?<><th>Platzierung</th><th>Status</th></>:<><th>Sp.</th><th>S</th>{scoreSport&&<th>U</th>}<th>N</th>{table.kind==='SWISS'&&<th title="Sonneborn-Berger">SB</th>}{scoreSport?<><th>{sportScoring(data.sport).plural}</th><th>±</th><th>Pkt.</th></>:<><th>Sätze</th><th>±</th><th>Bälle</th><th>±</th></>}</>}
-            </tr></thead><tbody>{table.rows.map(r=><tr key={r.name}><td>{r.rank}</td><td><strong>{r.name}</strong></td>
+            </tr></thead><tbody>{table.rows.map(r=><tr key={r.name}><td>{r.rank}</td><td><strong>{r.name}</strong>{qualified(r.name)&&<small className="spectator-qualification">{qualified(r.name)}</small>}</td>
               {'placement' in r?<><td>{r.placement}</td><td>{r.status}</td></>:<><td>{r.played}</td><td>{r.wins}</td>{scoreSport&&<td>{r.draws}</td>}<td>{r.losses}</td>{table.kind==='SWISS'&&<td>{r.buchholz.toLocaleString('de-DE',{maximumFractionDigits:2})}</td>}{scoreSport?<><td>{r.balls}</td><td>{r.ballDifference}</td><td>{r.points}</td></>:<><td>{r.sets}</td><td>{r.setDifference}</td><td>{r.balls}</td><td>{r.ballDifference}</td></>}</>}
             </tr>)}</tbody></table></div>
           </section>;
         })}
       </section>}
-      {brackets?.brackets?.map((bracket,bi)=><section className="card" key={bi}><h2>{bracket.phase} · KO-Baum</h2>
+      {brackets?.brackets?.filter(b=>!effectivePhase||b.phase===effectivePhase).map((bracket,bi)=><section className="card" key={bi}><h2>{bracket.phase} · KO-Baum</h2>
         <BracketRoundViewport rounds={bracket.rounds.map((round,ri)=>({...round,matches:round.matches.map((m,mi)=>({...m,id:ri+'-'+mi,live:['LIVE','READY','CONFIRMATION'].includes(m.status)}))}))}
           renderRound={(round,ri)=><div className="bracket-round" key={ri}><h3>{round.label}</h3><div className="bracket-round-matches">{round.matches.map(m=><article className="bracket-match" key={m.id}>
             <span className="muted">{matchStatuses[m.status]??m.status} · {m.score}</span>

@@ -37,16 +37,18 @@ export function OnlinePlayerPage({token}:{token:string}) {
  const [ackError,setAckError]=useState('');
  const [newCallText,setNewCallText]=useState('');
  useEffect(()=>{
-  let alive=true,failures=0;
+  let alive=true,failures=0,knownTag:string|null=null;
   const client=supabase;
   if(!client||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){setData(null);setReports([]);setDrafts({});setMessage('Spielerlink ungültig.');return;}
   async function refresh(signal:AbortSignal){
    if(!alive)return;
    setRefreshing(true);
    try{
-    const result=await client!.rpc('read_online_player_bundle',{p_token:token}).abortSignal(signal);
+    const result=await client!.rpc('read_online_player_bundle_v2',{p_token:token,p_known_tag:knownTag}).abortSignal(signal);
     if(!alive)return;
     if(result.error)throw new Error(result.error.message);
+    if(result.data?.unchanged===true&&knownTag!==null){failures=0;setLastChecked(Date.now());return;}
+    knownTag=typeof result.data?.tag==='string'?result.data.tag:null;
     const view=result.data?.view as PlayerView|null;
     const raw=result.data?.reports;
     const currentReports:Report[]=view&&Array.isArray(raw)?raw.filter((r:Report)=>r.revision===view.revision):[];
@@ -66,7 +68,7 @@ export function OnlinePlayerPage({token}:{token:string}) {
         if(vibrationRef.current&&document.visibilityState==='visible'&&typeof navigator.vibrate==='function')navigator.vibrate([180,100,180]);
       } else if(!currentCalls.some(c=>!c.acknowledged))setNewCallText('');
     }
-   }catch{if(alive){failures++;setData(null);setContext(null);setReports([]);setCalls([]);setNewCallText('');setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
+   }catch{if(alive){knownTag=null;failures++;setData(null);setContext(null);setReports([]);setCalls([]);setNewCallText('');setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
    finally{if(alive)setRefreshing(false);}
   }
   const polling=startOnlinePolling(refresh,()=>playerRefreshDelay(document.visibilityState==='visible',failures));

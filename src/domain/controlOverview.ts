@@ -139,3 +139,8 @@ export function longRestMatches<T extends RestQueueMatch>(matches:readonly T[], 
   return orderControlQueue(matches.filter(m=>assignable.has(m.id)&&!m.startedAt&&m.pauseA!==null&&m.pauseB!==null
     && Number.isFinite(m.pauseA)&&Number.isFinite(m.pauseB)&&Math.min(m.pauseA,m.pauseB)>=threshold),'rest');
 }
+
+/** A wall-clock assignment age, not net playing time. */
+export function elapsedMatchMinutes(startedAt:number|undefined,now:number):number|null {
+ return typeof startedAt==='number'&&Number.isFinite(startedAt)&&startedAt>0&&Number.isFinite(now)&&now>=startedAt?Math.floor((now-startedAt)/60000):null;
+}

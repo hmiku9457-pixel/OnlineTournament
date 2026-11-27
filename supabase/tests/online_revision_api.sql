@@ -79,6 +79,9 @@ begin
  if public.read_online_player_bundle(gen_random_uuid())->'context' is distinct from 'null'::jsonb then raise exception 'foreign context exposed'; end if;
  begin perform public.publish_online_player_projection_v2(v_id,lease1,1,detail_match,1,'{"foreign":{}}'); raise exception 'foreign participant context accepted'; exception when invalid_parameter_value then null; end;
 
+ projection:=public.read_online_player_bundle_v2(player_a,null);
+ if projection->'view' is distinct from public.read_online_player_access(player_a) or public.read_online_player_bundle_v2(player_a,projection->>'tag')->'unchanged' is distinct from 'true'::jsonb then raise exception 'conditional player bundle mismatch'; end if;
+ if public.read_online_player_bundle_v2(gen_random_uuid(),projection->>'tag')->'view' is distinct from 'null'::jsonb then raise exception 'conditional foreign access'; end if;
  if public.read_online_player_access(player_a)->'matches' is distinct from detail_match then raise exception 'own match missing'; end if;
  if public.read_online_player_access(player_c)->'matches' is distinct from '[]'::jsonb then raise exception 'other player match exposed'; end if;
  if public.read_online_player_access(player_a)->>'participant'<>'A' then raise exception 'wrong identity'; end if;
@@ -97,6 +100,13 @@ begin
  begin perform public.publish_online_spectator_matches(v_id,lease1,1,jsonb_set(detail_match,'{0,sideA}','"Other"'),1); raise exception 'foreign name published'; exception when invalid_parameter_value then null; end;
  begin perform public.publish_online_spectator_matches(v_id,lease1,1,jsonb_set(detail_match,'{0,privateCode}','"1234"'),1); raise exception 'extra field published'; exception when invalid_parameter_value then null; end;
  if not public.publish_online_spectator_matches(v_id,lease1,1,detail_match,1) then raise exception 'publish failed'; end if;
+ if public.online_projection_plan_v2(v_id,1)->'matches' is distinct from 'true'::jsonb then raise exception 'overview republish missing'; end if;
+ if not public.publish_online_spectator_matches_v2(v_id,lease1,1,detail_match,1,'{"recent":[{"index":0,"finishedAt":12345}],"qualification":[]}') then raise exception 'overview publish failed'; end if;
+ if public.online_projection_plan_v2(v_id,1)->'matches' is distinct from 'false'::jsonb then raise exception 'overview republished'; end if;
+ if public.read_online_spectator_details(spectator)->'overview'->'recent'->0->>'finishedAt'<>'12345' then raise exception 'recent result absent'; end if;
+ begin perform public.publish_online_spectator_matches_v2(v_id,lease1,1,detail_match,1,'{"recent":[{"index":1,"finishedAt":12345}],"qualification":[]}'); raise exception 'bad recent reference accepted'; exception when invalid_parameter_value then null; end;
+ projection:=public.read_online_spectator_bundle_v2(spectator,null);
+ if public.read_online_spectator_bundle_v2(spectator,projection->>'tag')->'unchanged' is distinct from 'true'::jsonb then raise exception 'conditional spectator bundle mismatch'; end if;
  if public.read_online_spectator_details(spectator)->'matches' is distinct from detail_match then raise exception 'projection differs'; end if;
  if not public.publish_online_spectator_rankings(v_id,lease1,1,ranking_fixture) then raise exception 'ranking publication failed'; end if;
  if public.read_online_spectator_rankings(spectator)->'rankings' is distinct from ranking_fixture then raise exception 'rankings differ'; end if;
@@ -120,6 +130,7 @@ begin
  if public.commit_leased_online_tournament(v_id,'Test',1,op2,v_payload,lease1) <> 2 then raise exception 'update'; end if;
  if public.read_online_player_access(player_new)->'matches' is distinct from 'null'::jsonb then raise exception 'stale player projection exposed'; end if;
  if public.read_online_spectator_details(spectator)->'matches' is distinct from 'null'::jsonb then raise exception 'stale projection exposed'; end if;
+ if public.read_online_spectator_details(spectator)->'overview' is distinct from 'null'::jsonb then raise exception 'stale overview exposed'; end if;
  if not (public.online_projection_plan(v_id,2)->>'rankings')::boolean then raise exception 'stale ranking not planned'; end if;
  if public.read_online_spectator_brackets(spectator)->'brackets' is distinct from 'null'::jsonb then raise exception 'stale bracket exposed'; end if;
  if public.read_online_spectator_rankings(spectator)->'rankings' is distinct from 'null'::jsonb then raise exception 'stale ranking exposed'; end if;

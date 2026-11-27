@@ -1,3 +1,4 @@
+import { buildPublicMatchOverview } from '@/services/onlinePublicOverview';
 import type { DirectorMatchCall } from '@/domain/onlineMatchCalls';
 import type { MatchSet } from '@/domain/types';
 import { buildOnlinePersonalContexts } from '@/services/onlinePersonalContexts';
@@ -6,7 +7,7 @@ import { decodeMatchSlot } from '@/domain/matchSlots';
 import { buildMockBracket, buildMockGroups, buildRoundRobinStandings, buildSwissStandings, type MockStanding } from '@/services/mockCompetitionViews';
 import { getMockConfirmedFinalStandings } from '@/services/mockParticipantProgress';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
-import { getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getMockRuntimeMatches, canEditMockMatch, completeMockMatch } from '@/services/mockRuntime';
+import { getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches, getMockRuntimeMatches, getMockRecordedFinishTimes, canEditMockMatch, completeMockMatch } from '@/services/mockRuntime';
 import { isStageStarted } from '@/services/mockPhaseLifecycle';
 import { persistOnlineOperation, removeOnlineOperation, listPendingOnlineOperations, type PendingOnlineOperation } from '@/services/onlineOutbox';
 import { supabase } from '@/lib/supabase';
@@ -292,7 +293,8 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
       ...(s.type==='SWISS'?[...getSwissRoundRobinMatches(tournament,s),...getSwissCutoffSetMatches(tournament,s)]:[])
     ]).filter(m=>roster.has(m.sideA)&&roster.has(m.sideB)&&m.sideA!==m.sideB);
     const rank=(status:string)=>['LIVE','READY','CONFIRMATION'].includes(status)?0:status==='FINISHED'?1:2;
-    rows.sort((a,b)=>rank(a.status)-rank(b.status));
+    const finishTimes=getMockRecordedFinishTimes();
+    rows.sort((a,b)=>rank(a.status)-rank(b.status)||(a.status==='FINISHED'&&b.status==='FINISHED'?(finishTimes.get(b.id)??0)-(finishTimes.get(a.id)??0):0));
     const matches=rows.slice(0,5000).map(m=>({sideA:m.sideA,sideB:m.sideB,phase:m.phase,round:m.round,status:m.status,
       table:m.table,score:[m.score,scoreDecisionSuffix(m.decision)].filter(Boolean).join(' '),sets:(m.sets??[]).map(s=>({sideAScore:s.sideAScore,sideBScore:s.sideBScore}))}));
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
@@ -306,7 +308,7 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
     }
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
     if(plan.matches===true){
-    const {error}=await supabase.rpc('publish_online_spectator_matches',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches.slice(0,1000),p_total:rows.length}).abortSignal(AbortSignal.timeout(8000));
+    const {error}=await supabase.rpc('publish_online_spectator_matches_v2',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches.slice(0,1000),p_total:rows.length,p_overview:buildPublicMatchOverview(tournament,rows.slice(0,1000),finishTimes)}).abortSignal(AbortSignal.timeout(8000));
     if(error)throw new Error(error.message);
     }
     }
@@ -328,7 +330,7 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
     if(plan.brackets===true){
     const brackets=tournament.stages.filter(s=>isStageStarted(tournament,s)&&['KNOCKOUT','DOUBLE_ELIMINATION','PLACEMENT'].includes(s.type)).map(stage=>({
       phase:stage.name,rounds:buildMockBracket(tournament,stage).map(round=>({label:round.label,matches:round.matches.map(m=>({
-        a:decodeMatchSlot(m.sideA),b:decodeMatchSlot(m.sideB),score:m.score??'–',
+        a:decodeMatchSlot(m.sideA),b:decodeMatchSlot(m.sideB),score:[m.score??'–',scoreDecisionSuffix(m.decision)].filter(Boolean).join(' '),
         winner:m.winner&&roster.has(m.winner)?m.winner===m.sideA?'A':m.winner===m.sideB?'B':'NONE':'NONE',
         status:m.status??'WAITING',sets:(m.sets??[]).map(s=>({sideAScore:s.sideAScore,sideBScore:s.sideBScore}))
       }))}))
