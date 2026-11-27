@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount } from '@/lib/useAccount';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
-import { createOnlineTournamentFromLocal, listPendingOnlineCreations, listOnlineCatalog, setOnlineArchive, loadConfirmedOnlineBackup, onlineWorkspaceUrl, listOnlineCheckpoints, loadOnlineCheckpoint, manageOnlineSpectator, onlineSpectatorUrl, type OnlineCheckpoint, type OnlineCatalogItem } from '@/services/onlineTournaments';
+import { createOnlineTournamentFromLocal, listPendingOnlineCreations, listOnlineCatalog, setOnlineArchive, loadConfirmedOnlineBackup, onlineWorkspaceUrl, listOnlineCheckpoints, loadOnlineCheckpoint, manageOnlineSpectator, onlineSpectatorUrl, spectatorDetailSetting, type OnlineCheckpoint, type OnlineCatalogItem } from '@/services/onlineTournaments';
 
 const statuses: Record<string,string> = {DRAFT:'Entwurf',REGISTRATION:'Anmeldung',READY:'Bereit',RUNNING:'Läuft',PAUSED:'Pausiert',FINISHED:'Abgeschlossen',ABORTED:'Abgebrochen'};
 function download(backup:TournamentBackup,revision:number) {
@@ -30,7 +30,7 @@ function OnlineCatalog() {
   const [search,setSearch]=useState('');
   const [filter,setFilter]=useState('active');
   const [confirm,setConfirm]=useState<OnlineCatalogItem|null>(null);
-  const [share,setShare]=useState<{item:OnlineCatalogItem;token:string|null}|null>(null);
+  const [share,setShare]=useState<{item:OnlineCatalogItem;token:string|null;details:boolean}|null>(null);
   const alive=useRef(true);
   const running=useRef(false);
   const local=getAllMockTournaments().filter(t=>!t.hasStarted && ['DRAFT','REGISTRATION','READY'].includes(t.status));
@@ -73,7 +73,7 @@ function OnlineCatalog() {
           {!item.archived_at&&<a className="btn primary" href={onlineWorkspaceUrl(item.id)}>Online-Turnierleitung öffnen</a>}
           <button className="btn small" disabled={busy} onClick={()=>void run(async()=>{const result=await loadConfirmedOnlineBackup(item.id);if(alive.current)download(result.backup,result.revision);})}>JSON sichern</button>
           <button className="btn small" disabled={busy} onClick={()=>void run(async()=>{const rows=await listOnlineCheckpoints(item.id);if(alive.current)setHistory({id:item.id,rows});})}>Wiederherstellungspunkte</button>
-          <button className="btn small" disabled={busy||!!item.archived_at} onClick={()=>void run(async()=>{const token=await manageOnlineSpectator(item.id,'read');if(alive.current)setShare({item,token});})}>Zuschauerlink</button>
+          <button className="btn small" disabled={busy||!!item.archived_at} onClick={()=>void run(async()=>{const token=await manageOnlineSpectator(item.id,'read');const details=token?await spectatorDetailSetting(item.id):false;if(alive.current)setShare({item,token,details});})}>Zuschauerlink</button>
           <button className="btn small" disabled={busy||item.editing||(!item.archived_at&&!['DRAFT','REGISTRATION','READY','FINISHED','ABORTED'].includes(item.status))} onClick={()=>setConfirm(item)}>{item.archived_at?'Archivierung aufheben':'Archivieren'}</button>
         </div>
       </article>)}
@@ -88,8 +88,9 @@ function OnlineCatalog() {
     </section>
     {share&&<div className="prototype-modal-backdrop" onMouseDown={()=>!busy&&setShare(null)}><section className="prototype-modal" role="dialog" aria-modal="true" aria-labelledby="share-title" onMouseDown={e=>e.stopPropagation()} onKeyDown={e=>{if(e.key==='Escape'&&!busy)setShare(null);}}>
       <h2 id="share-title">Zuschauerlink · {share.item.name}</h2>
-      <p>Jeder mit dem Link kann ohne Anmeldung den Turnierfortschritt sehen. Veröffentlicht werden Turnier- und Phasennamen, Status und aggregierte Spielzahlen, keine Teilnehmernamen, Codes oder internen Sicherungen. Verwende nur öffentlich geeignete Bezeichnungen.</p>
-      {share.token?<><label>Freigabelink<input readOnly value={onlineSpectatorUrl(share.token)} onFocus={e=>e.target.select()}/></label><div className="actions"><a className="btn" href={onlineSpectatorUrl(share.token)} target="_blank" rel="noopener noreferrer">Zuschaueransicht öffnen</a><button className="btn" disabled={busy} onClick={()=>void run(async()=>{const token=await manageOnlineSpectator(share.item.id,'rotate');if(alive.current)setShare({...share,token});})}>Neuen Link erzeugen</button><button className="btn danger" disabled={busy} onClick={()=>void run(async()=>{await manageOnlineSpectator(share.item.id,'disable');if(alive.current)setShare({...share,token:null});})}>Freigabe beenden</button></div></>:<button className="btn primary" disabled={busy} onClick={()=>void run(async()=>{const token=await manageOnlineSpectator(share.item.id,'enable');if(alive.current)setShare({...share,token});})}>Zuschaueransicht freigeben</button>}
+      <p>Jeder mit dem Link kann ohne Anmeldung den Turnierfortschritt sehen. Standardmäßig werden nur Turnier- und Phasennamen, Status und aggregierte Spielzahlen veröffentlicht. Codes und interne Sicherungen bleiben privat. Verwende nur öffentlich geeignete Bezeichnungen.</p>
+      {share.token?<><label>Freigabelink<input readOnly value={onlineSpectatorUrl(share.token)} onFocus={e=>e.target.select()}/></label><div className="actions"><a className="btn" href={onlineSpectatorUrl(share.token)} target="_blank" rel="noopener noreferrer">Zuschaueransicht öffnen</a><button className="btn" disabled={busy} onClick={()=>void run(async()=>{const token=await manageOnlineSpectator(share.item.id,'rotate');if(alive.current)setShare({...share,token,details:false});})}>Neuen Link erzeugen</button><button className="btn danger" disabled={busy} onClick={()=>void run(async()=>{await manageOnlineSpectator(share.item.id,'disable');if(alive.current)setShare({...share,token:null,details:false});})}>Freigabe beenden</button></div></>:<button className="btn primary" disabled={busy} onClick={()=>void run(async()=>{const token=await manageOnlineSpectator(share.item.id,'enable');if(alive.current)setShare({...share,token});})}>Zuschaueransicht freigeben</button>}
+      {share.token&&<div className="card"><h3>Spielpaarungen und Ergebnisse</h3><p>Optional: Teilnehmernamen, Paarungen, Spielorte und Ergebnisse werden für jeden mit diesem Link sichtbar. Aktiviere dies nur, wenn diese Daten veröffentlicht werden dürfen. Die Turnierleitung muss zum Aktualisieren geöffnet sein.</p><label><input type="checkbox" checked={share.details} disabled={busy} onChange={e=>{const enabled=e.target.checked;void run(async()=>{const details=await spectatorDetailSetting(share.item.id,enabled);if(alive.current)setShare({...share,details});});}}/> Teilnehmernamen und Spielergebnisse freigeben</label></div>}
       {message&&<p role="alert">{message}</p>}<button className="btn" disabled={busy} onClick={()=>setShare(null)}>Schließen</button>
     </section></div>}
     {confirm&&<div className="prototype-modal-backdrop" onMouseDown={()=>!busy&&setConfirm(null)}><section className="prototype-modal" role="dialog" aria-modal="true" aria-labelledby="archive-title" onMouseDown={e=>e.stopPropagation()} onKeyDown={e=>{if(e.key==='Escape'&&!busy)setConfirm(null);}}>

@@ -1,3 +1,6 @@
+import { getAllMockTournaments } from '@/services/mockTournamentStore';
+import { getMockStageMatches, getSwissRoundRobinMatches, getSwissCutoffSetMatches } from '@/services/mockRuntime';
+import { isStageStarted } from '@/services/mockPhaseLifecycle';
 import { persistOnlineOperation, removeOnlineOperation, listPendingOnlineOperations, type PendingOnlineOperation } from '@/services/onlineOutbox';
 import { supabase } from '@/lib/supabase';
 import { backupTournamentName, captureTournamentBackup, validateTournamentBackup,
@@ -182,7 +185,7 @@ export async function checkOnlineWorkspaceRevision(id: string): Promise<'current
   const { data, error } = await supabase.rpc('list_online_tournaments').abortSignal(AbortSignal.timeout(8000));
   if (error || workspaceRevision !== start || hasPendingRemoteWrites() || getTournamentStorageError()) return 'unknown';
   const row = (data as OnlineTournamentSummary[] | null)?.find(t => t.id === id);
-  if (row?.revision === start.revision) return 'current';
+  if (row?.revision === start.revision) { void publishSpectatorDetails(start).catch(()=>{}); return 'current'; }
   return markRemoteWorkspaceStale() ? 'stale' : 'unknown';
 }
 export async function initializeOnlineWorkspace(id: string): Promise<PendingOnlineOperation[]> {
@@ -216,6 +219,7 @@ export async function initializeOnlineWorkspace(id: string): Promise<PendingOnli
   client.auth.onAuthStateChange((_event, session) => {
     if (!session || session.user.id !== userId) { workspaceRevision = undefined; invalidateRemoteTournamentStorage(); }
   });
+  void publishSpectatorDetails(workspaceRevision).catch(()=>{});
   return [];
 }
 
@@ -231,4 +235,37 @@ export function onlineSpectatorUrl(token:string):string {
   const url=new URL(window.location.href);
   url.search='';url.hash='/watch/'+token;
   return url.href;
+}
+
+export async function spectatorDetailSetting(id:string, enabled:boolean|null=null):Promise<boolean> {
+  const {client,userId}=await account();
+  const {data,error}=await client.rpc('online_spectator_detail_setting',{p_id:id,p_enabled:enabled});
+  if(error)throw new Error(error.message);
+  if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
+  return data===true;
+}
+// Only calculate from a quiescent confirmed director state. The database
+// compares the exact revision and current lease again before publishing.
+let publishing=false;
+async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevision>):Promise<void> {
+  if(publishing||!supabase||workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+  publishing=true;
+  try {
+    if(!await spectatorDetailSetting(start.id))return;
+    if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+    const tournament=getAllMockTournaments().find(t=>t.id===start.id);
+    if(!tournament)return;
+    const roster=new Set(tournament.participantNames);
+    const rows=tournament.stages.filter(s=>isStageStarted(tournament,s)).flatMap(s=>[
+      ...getMockStageMatches(tournament,s),
+      ...(s.type==='SWISS'?[...getSwissRoundRobinMatches(tournament,s),...getSwissCutoffSetMatches(tournament,s)]:[])
+    ]).filter(m=>roster.has(m.sideA)&&roster.has(m.sideB)&&m.sideA!==m.sideB);
+    const rank=(status:string)=>['LIVE','READY','CONFIRMATION'].includes(status)?0:status==='FINISHED'?1:2;
+    rows.sort((a,b)=>rank(a.status)-rank(b.status));
+    const matches=rows.slice(0,1000).map(m=>({sideA:m.sideA,sideB:m.sideB,phase:m.phase,round:m.round,status:m.status,
+      table:m.table,score:m.score,sets:(m.sets??[]).map(s=>({sideAScore:s.sideAScore,sideBScore:s.sideBScore}))}));
+    if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
+    const {error}=await supabase.rpc('publish_online_spectator_matches',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches,p_total:rows.length}).abortSignal(AbortSignal.timeout(8000));
+    if(error)throw new Error(error.message);
+  } finally {publishing=false;}
 }
