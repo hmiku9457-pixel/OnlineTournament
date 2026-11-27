@@ -1686,7 +1686,7 @@ try {
     return tournament.id;
   });
   await backupPage.reload();
-  await backupPage.getByText('Sicherung Browser Test', { exact: true }).waitFor();
+  await backupPage.getByRole('main').getByText('Sicherung Browser Test', { exact: true }).waitFor();
   const downloadPromise = backupPage.waitForEvent('download');
   await backupPage.getByRole('button', { name: 'JSON herunterladen' }).click();
   const backupDownload = await downloadPromise;
@@ -1699,7 +1699,7 @@ try {
   await restorePage.waitForURL('**/tournaments/' + fixture + '/control');
   await restorePage.reload();
   await restorePage.waitForURL('**/tournaments/' + fixture + '/control');
-  await restorePage.getByText('Sicherung Browser Test', { exact: true }).first().waitFor();
+  await restorePage.getByRole('main').getByText('Sicherung Browser Test', { exact: true }).first().waitFor();
   await restoreContext.close();
   await backupContext.close();
 

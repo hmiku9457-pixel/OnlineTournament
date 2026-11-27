@@ -47,6 +47,7 @@ let outstandingCommits = 0;
 let flushScheduled = false;
 let writeTail: Promise<void> = Promise.resolve();
 let channel: BroadcastChannel | null = null;
+let remote: { id: string; save: (snapshot: TournamentBackup) => Promise<void>; confirmed: Map<string, string> } | null = null;
 
 function nativeStorage(): Storage { return window.localStorage; }
 function allLocalKeys(): string[] {
@@ -332,9 +333,31 @@ export function flushPendingLocalTournamentWrites(): Promise<void> {
   // Capture each tab's own mutations. Sampling shared localStorage later could
   // accidentally commit a competing tab's uncommitted value instead.
   const snapshot = [...pendingChanges].map(([key, value]) => ({ key, value }));
+  const target = remote;
+  const captured = target ? new Map(workingValues) : null;
   pendingChanges.clear();
   outstandingCommits += 1;
-  writeTail = writeTail.then(() => commitChanges(snapshot)).finally(() => { outstandingCommits -= 1; });
+  if (target) window.dispatchEvent(new Event('tournament-storage-integrity-change'));
+  writeTail = writeTail.then(async () => {
+    if (!target || !captured) return commitChanges(snapshot);
+    if (currentError) throw new Error(currentError);
+    try {
+      const ids: unknown = JSON.parse(captured.get(INDEX) ?? '[]');
+      if (!Array.isArray(ids) || ids.length !== 1 || ids[0] !== target.id)
+        throw new Error('Online-Turniere können hier nicht gelöscht oder ersetzt werden.');
+      await target.save(captureFromStorage(target.id, (key) => captured.get(key) ?? null));
+      if (!currentError) target.confirmed = captured;
+    } catch (error) {
+      if (!currentError) workingValues = new Map(target.confirmed);
+      pendingChanges.clear();
+      signalError('Online-Speicherung nicht bestätigt. Bitte neu laden und den Datenbankstand prüfen. ' +
+        (error instanceof Error ? error.message : ''));
+      throw error;
+    }
+  }).finally(() => {
+    outstandingCommits -= 1;
+    if (target) window.dispatchEvent(new Event('tournament-storage-integrity-change'));
+  });
   void writeTail.catch(() => { /* An error banner is displayed; no silent success. */ });
   return writeTail;
 }
@@ -343,6 +366,7 @@ function scheduleWrite(key: string, value: string | null): void {
   if (!ready || !key.startsWith(PREFIX)) return;
   if (currentError) throw new Error(currentError);
   pendingChanges.set(key, value);
+  if (remote) window.dispatchEvent(new Event('tournament-storage-integrity-change'));
   if (flushScheduled) return;
   flushScheduled = true;
   queueMicrotask(() => {
@@ -460,12 +484,38 @@ export function backupTournamentName(backup: TournamentBackup): string {
 export async function captureTournamentBackup(id: string): Promise<TournamentBackup> {
   await flushPendingLocalTournamentWrites();
   requireHealthyStorage();
-  const raw = localTournamentStorage.getItem(RECORD_PREFIX + id);
+  return captureFromStorage(id, (key) => localTournamentStorage.getItem(key));
+}
+function captureFromStorage(id: string, get: (key: string) => string | null): TournamentBackup {
+  const raw = get(RECORD_PREFIX + id);
   if (!raw) throw new Error('Turnier nicht gefunden.');
   const entries: Record<string, string> = { [RECORD_PREFIX + id]: raw };
-  for (const k of ARRAY_KEYS) entries[k] = JSON.stringify(parseArray(localTournamentStorage.getItem(k)).filter((item) => belongsToTournament(k, item, id)));
-  for (const k of OBJECT_KEYS) entries[k] = JSON.stringify(Object.fromEntries(Object.entries(parseMap(localTournamentStorage.getItem(k))).filter(([entry]) => belongsMapKey(k, entry, id))));
+  for (const k of ARRAY_KEYS) entries[k] = JSON.stringify(parseArray(get(k)).filter((item) => belongsToTournament(k, item, id)));
+  for (const k of OBJECT_KEYS) entries[k] = JSON.stringify(Object.fromEntries(Object.entries(parseMap(get(k))).filter(([entry]) => belongsMapKey(k, entry, id))));
   return validateTournamentBackup({ version: 1, tournamentId: id, exportedAt: new Date().toISOString(), entries });
+}
+
+/** Isolated, one-event online workspace. No tournament IndexedDB reads/writes. */
+export function initializeRemoteTournamentStorage(input: unknown, save: (snapshot: TournamentBackup) => Promise<void>): void {
+  if (ready) throw new Error('Der Turnierspeicher wurde bereits initialisiert.');
+  const backup = validateTournamentBackup(input);
+  workingValues = new Map(Object.entries(backup.entries));
+  workingValues.set(INDEX, JSON.stringify([backup.tournamentId]));
+  remote = { id: backup.tournamentId, save, confirmed: new Map(workingValues) };
+  ready = true;
+  window.addEventListener('beforeunload', (event) => {
+    if (hasPendingRemoteWrites()) { event.preventDefault(); event.returnValue = ''; }
+  });
+}
+export function hasPendingRemoteWrites(): boolean {
+  return remote !== null && (pendingChanges.size > 0 || outstandingCommits > 0);
+}
+export function invalidateRemoteTournamentStorage(): void {
+  if (!remote) return;
+  workingValues.clear();
+  pendingChanges.clear();
+  remote.confirmed.clear();
+  signalError('Die Anmeldung hat sich geändert. Bitte den Online-Arbeitsbereich schließen und erneut anmelden.');
 }
 /** Restore only into an empty tournament ID. No existing tournament is overwritten. */
 export async function restoreTournamentBackup(input: unknown): Promise<string> {
