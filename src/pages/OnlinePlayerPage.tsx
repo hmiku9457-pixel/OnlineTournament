@@ -1,11 +1,12 @@
 import { sportScoring,validateCompleteResult } from '@/domain/sportScoring';
 import type { MatchSet } from '@/domain/types';
 import { useEffect,useRef,useState } from 'react';
+import { reportDraftKey,retainReportDrafts,type ReportDraft,type ReportDrafts } from '@/domain/playerReportDrafts';
 import { getPlayerCalls,newPlayerCalls,playerRefreshDelay } from '@/domain/playerCalls';
 import { supabase } from '@/lib/supabase';
 import { displayVenueMessage } from '@/domain/venueTerminology';
 interface Match {sideA:string;sideB:string;phase:string;round:string;status:string;table:string;score:string;sets:Array<{sideAScore:number;sideBScore:number}>}
-interface Report {matchId:string;side:'A'|'B';sideA:string;sideB:string;bestOf:number;requiresWinner:boolean;revision:number;aSets:MatchSet[]|null;bSets:MatchSet[]|null}
+interface Report {matchId:string;startedAt:number;generation:number;side:'A'|'B';sideA:string;sideB:string;bestOf:number;requiresWinner:boolean;revision:number;aSets:MatchSet[]|null;bSets:MatchSet[]|null}
 interface PlayerView {name:string;participant:string;sport:string;status:string;revision:number;updatedAt:string;complete:boolean|null;matches:Match[]|null}
 const active=(status:string)=>['LIVE','READY','CONFIRMATION'].includes(status);
 const statuses:Record<string,string>={WAITING:'Wartend',LIVE:'Läuft',READY:'Zugewiesen',CONFIRMATION:'Bestätigung offen',FINISHED:'Beendet',CANCELLED:'Abgebrochen'};
@@ -13,6 +14,7 @@ export function OnlinePlayerPage({token}:{token:string}) {
  const [data,setData]=useState<PlayerView|null>(null);
  const [message,setMessage]=useState('Persönliche Spielübersicht wird geladen …');
  const [reports,setReports]=useState<Report[]>([]);
+ const [drafts,setDrafts]=useState<ReportDrafts>({});
  const [refreshVersion,setRefreshVersion]=useState(0);
  const [filter,setFilter]=useState('all');
  const [page,setPage]=useState(0);
@@ -28,7 +30,7 @@ export function OnlinePlayerPage({token}:{token:string}) {
   function schedule(){if(alive){window.clearTimeout(timer);timer=window.setTimeout(()=>void refresh(),playerRefreshDelay(document.visibilityState==='visible',failures));}}
   async function refresh(){
    if(!alive||running)return;
-   if(!supabase||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){setData(null);setReports([]);setMessage('Spielerlink ungültig.');return;}
+   if(!supabase||! /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)){setData(null);setReports([]);setDrafts({});setMessage('Spielerlink ungültig.');return;}
    running=true;setRefreshing(true);
    try{
     const result=await supabase.rpc('read_online_player_bundle',{p_token:token}).abortSignal(AbortSignal.timeout(8000));
@@ -36,7 +38,9 @@ export function OnlinePlayerPage({token}:{token:string}) {
     if(result.error)throw new Error(result.error.message);
     const view=result.data?.view as PlayerView|null;
     const raw=result.data?.reports;
-    setReports(view&&Array.isArray(raw)?raw.filter((r:Report)=>r.revision===view.revision):[]);
+    const currentReports:Report[]=view&&Array.isArray(raw)?raw.filter((r:Report)=>r.revision===view.revision):[];
+    setReports(currentReports);
+    setDrafts(old=>!view?{}:retainReportDrafts(old,currentReports,view.matches!==null&&Array.isArray(raw)));
     setData(view);setLastChecked(Date.now());failures=0;
     setMessage(view?'':'Dieser Spielerlink ist nicht mehr verfügbar.');
     if(!view){previousCalls.current=null;setAcknowledged([]);setNewCallText('');}
@@ -70,7 +74,7 @@ export function OnlinePlayerPage({token}:{token:string}) {
  {data.matches===null?<p className="muted">Spielaufrufe werden für den aktuellen Stand aktualisiert.</p>:calls.length===0?<p>Momentan kein zugewiesenes Spiel.</p>:calls.map(call=><article className="player-call-card" key={call.key}><span className="muted">Bitte zur Spielfläche</span><strong className="player-call-table">{displayVenueMessage(data.sport,call.table)}</strong><strong>gegen {call.opponent}</strong><span>{call.phase} · {call.round}</span><button className="btn small" disabled={acknowledged.includes(call.key)} onClick={()=>{setAcknowledged(old=>[...old,call.key]);setNewCallText('');}}>{acknowledged.includes(call.key)?'Gesehen':'Aufruf gesehen'}</button></article>)}
  {typeof navigator.vibrate==='function'&&<label><input type="checkbox" checked={vibration} onChange={e=>{vibrationRef.current=e.target.checked;setVibration(e.target.checked);if(e.target.checked)navigator.vibrate(80);}}/> Vibration bei neuen Spielaufrufen (geöffnete Ansicht)</label>}
  <p className="muted">{lastChecked?'Zuletzt geprüft: '+new Date(lastChecked).toLocaleTimeString('de-DE'):'Noch nicht geprüft'}. Bitte halte die Ansicht geöffnet. Keine Hintergrund-Push-Nachrichten.</p></section>
- {reports.length>0&&<section className="card"><h2>Ergebnis melden</h2><p>Beide Seiten müssen denselben Endstand melden. Erst die Turnierleitung übernimmt das verbindliche Ergebnis.</p>{reports.map(r=><ReportForm key={r.matchId+'-'+r.revision} report={r} sport={data.sport} token={token} onSaved={()=>setRefreshVersion(v=>v+1)}/>)}</section>}
+ {reports.length>0&&<section className="card"><h2>Ergebnis melden</h2><p>Beide Seiten müssen denselben Endstand melden. Erst die Turnierleitung übernimmt das verbindliche Ergebnis.</p>{reports.map(r=>{const key=reportDraftKey(r);return <ReportForm key={key} report={r} sport={data.sport} token={token} values={drafts[key]??[['','']]} setValues={update=>setDrafts(old=>({...old,[key]:update(old[key]??[['','']])}))} onSaved={()=>setRefreshVersion(v=>v+1)}/>;})}</section>}
  <section className="card"><h2>Meine Spiele</h2>
  {data.matches===null?<p role="status">Die Spielübersicht wird für die aktuelle Revision aktualisiert. Bitte warte auf die Turnierleitung.</p>:<>
  <div className="control-metrics-grid"><div><span>Laufend / zugewiesen</span><strong>{data.matches.filter(m=>active(m.status)).length}</strong></div><div><span>Wartend</span><strong>{data.matches.filter(m=>m.status==='WAITING').length}</strong></div><div><span>Beendet</span><strong>{data.matches.filter(m=>m.status==='FINISHED').length}</strong></div></div>
@@ -92,10 +96,9 @@ export function OnlinePlayerPage({token}:{token:string}) {
  </main>;
 }
 
-function ReportForm({report:r,sport,token,onSaved}:{report:Report;sport:string;token:string;onSaved:()=>void}) {
+function ReportForm({report:r,sport,token,onSaved,values,setValues}:{report:Report;sport:string;token:string;onSaved:()=>void;values:ReportDraft;setValues:(update:(old:ReportDraft)=>ReportDraft)=>void}) {
  const own=r.side==='A'?r.aSets:r.bSets,other=r.side==='A'?r.bSets:r.aSets;
  const orient=(sets:MatchSet[])=>sets.map(s=>({number:s.number,sideAScore:r.side==='A'?s.sideAScore:s.sideBScore,sideBScore:r.side==='A'?s.sideBScore:s.sideAScore}));
- const [values,setValues]=useState<Array<[string,string]>>([['','']]);
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
  const [confirm,setConfirm]=useState<MatchSet[]|null>(null);
  const mode=sportScoring(sport).mode;
@@ -112,7 +115,7 @@ function ReportForm({report:r,sport,token,onSaved}:{report:Report;sport:string;t
  async function submit(){
   if(!confirm||busy||!supabase)return;setBusy(true);setError('');
   try{
-   const {data,error}=await supabase.rpc('submit_online_player_report',{p_token:token,p_match_id:r.matchId,p_revision:r.revision,p_sets:confirm}).abortSignal(AbortSignal.timeout(8000));
+   const {data,error}=await supabase.rpc('submit_online_player_report_v2',{p_token:token,p_match_id:r.matchId,p_revision:r.revision,p_sets:confirm,p_generation:r.generation}).abortSignal(AbortSignal.timeout(8000));
    if(error||data!==true)throw new Error(error?.message??'Meldung nicht bestätigt.');
    setConfirm(null);onSaved();
   }catch{setError('Meldung nicht bestätigt. Bitte erneut prüfen oder Turnierleitung kontaktieren.');}

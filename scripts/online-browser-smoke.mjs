@@ -13,7 +13,7 @@ const exp = Math.floor(Date.now()/1000)+3600;
 const segment = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 const accessToken = segment({alg:'HS256',typ:'JWT'})+'.'+segment({sub:user.id,role:'authenticated',exp})+'.smoke';
 const session = { access_token: accessToken, refresh_token:'smoke-refresh', token_type:'bearer', expires_in:3600, expires_at:exp, user };
-const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), spectatorLinks = new Map(), detailSettings = new Set(), detailRows = new Map(), rankingRows = new Map(), bracketRows = new Map(), playerLinks = new Map(), playerRows = new Map(), reportFixtures = new Map(), reports = new Map(), calls = [];
+const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), spectatorLinks = new Map(), detailSettings = new Set(), detailRows = new Map(), rankingRows = new Map(), bracketRows = new Map(), playerLinks = new Map(), playerRows = new Map(), reportFixtures = new Map(), reports = new Map(), reportGenerations=new Map(), calls = [];
 let loseResponses = 0;
 async function install(context) {
   await context.route(api+'/**', async route => {
@@ -30,7 +30,7 @@ async function install(context) {
     function currentReportRows(id) {
       const published=reportFixtures.get(id);
       if(published?.revision!==rows.get(id)?.revision)return [];
-      return published.fixtures.map(f=>({...f,revision:published.revision,aSets:reports.get(id+'|'+f.matchId+'|'+f.aId)??null,bSets:reports.get(id+'|'+f.matchId+'|'+f.bId)??null}));
+      return published.fixtures.map(f=>({...f,revision:published.revision,generation:reportGenerations.get(id+'|'+f.matchId)??0,aSets:reports.get(id+'|'+f.matchId+'|'+f.aId)??null,bSets:reports.get(id+'|'+f.matchId+'|'+f.bId)??null}));
     }
     function resolvePlayer(token) {
       for(const [id,links] of playerLinks) {
@@ -53,19 +53,21 @@ async function install(context) {
       const access=resolvePlayer(body.p_token);
       if(!access)return send(null);
       const names=Object.fromEntries(Object.entries(record(access.id).participantIds).map(([name,id])=>[id,name]));
-      return send(currentReportRows(access.id).filter(r=>[r.aId,r.bId].includes(access.pid)).map(r=>({matchId:r.matchId,side:r.aId===access.pid?'A':'B',sideA:names[r.aId],sideB:names[r.bId],bestOf:r.bestOf,requiresWinner:r.requiresWinner,revision:r.revision,aSets:r.aSets,bSets:r.bSets})));
+      return send(currentReportRows(access.id).filter(r=>[r.aId,r.bId].includes(access.pid)).map(r=>({matchId:r.matchId,side:r.aId===access.pid?'A':'B',sideA:names[r.aId],sideB:names[r.bId],startedAt:r.startedAt,generation:r.generation,bestOf:r.bestOf,requiresWinner:r.requiresWinner,revision:r.revision,aSets:r.aSets,bSets:r.bSets})));
     }
-    if(path.endsWith('/submit_online_player_report')) {
+    if(path.endsWith('/submit_online_player_report')||path.endsWith('/submit_online_player_report_v2')) {
       const access=resolvePlayer(body.p_token);
       if(!access)return send({code:'42501',message:'player unavailable'},403);
       const f=currentReportRows(access.id).find(r=>r.matchId===body.p_match_id&&[r.aId,r.bId].includes(access.pid)&&r.revision===body.p_revision);
-      if(!f)return send({code:'40001',message:'match state changed'},409);
+      if(!f||f.generation!==(body.p_generation??0))return send({code:'40001',message:'match state changed'},409);
       const key=access.id+'|'+f.matchId+'|'+access.pid;
       if(reports.has(key))assert.deepEqual(reports.get(key),body.p_sets);
       reports.set(key,body.p_sets);return send(true);
     }
     if(path.endsWith('/reset_online_result_reports')) {
       assert.equal(leases.get(body.p_id),body.p_token);
+      const generationKey=body.p_id+'|'+body.p_match_id;
+      reportGenerations.set(generationKey,(reportGenerations.get(generationKey)??0)+1);
       for(const key of reports.keys())if(key.startsWith(body.p_id+'|'+body.p_match_id+'|'))reports.delete(key);
       return send(true);
     }
@@ -84,7 +86,7 @@ async function install(context) {
       const participant=names[pid];
       if(!participant)return send({view:null,reports:[]});
       const projection=playerRows.get(id),current=projection?.revision===row.revision;
-      return send({view:{name:row.name,participant,sport:t.sport,status:t.status,revision:row.revision,updatedAt:row.updated_at,complete:current?projection.total===projection.matches.length:null,matches:current?projection.matches.filter(m=>m.sideA===participant||m.sideB===participant):null},reports:currentReportRows(id).filter(r=>[r.aId,r.bId].includes(pid)).map(r=>({matchId:r.matchId,side:r.aId===pid?'A':'B',sideA:names[r.aId],sideB:names[r.bId],bestOf:r.bestOf,requiresWinner:r.requiresWinner,revision:r.revision,aSets:r.aSets,bSets:r.bSets}))});
+      return send({view:{name:row.name,participant,sport:t.sport,status:t.status,revision:row.revision,updatedAt:row.updated_at,complete:current?projection.total===projection.matches.length:null,matches:current?projection.matches.filter(m=>m.sideA===participant||m.sideB===participant):null},reports:currentReportRows(id).filter(r=>[r.aId,r.bId].includes(pid)).map(r=>({matchId:r.matchId,side:r.aId===pid?'A':'B',sideA:names[r.aId],sideB:names[r.bId],startedAt:r.startedAt,generation:r.generation,bestOf:r.bestOf,requiresWinner:r.requiresWinner,revision:r.revision,aSets:r.aSets,bSets:r.bSets}))});
     }
     if(path.endsWith('/list_online_player_access')) {
       assert.equal(req.headers()['authorization'],'Bearer '+accessToken);

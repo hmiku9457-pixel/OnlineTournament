@@ -350,7 +350,7 @@ export function onlinePlayerUrl(token:string):string {
   const url=new URL(window.location.href);url.search='';url.hash='/my-games/'+token;return url.href;
 }
 
-export interface OnlineResultReport {matchId:string;aId:string;bId:string;startedAt:number;bestOf:number;requiresWinner:boolean;revision:number;aSets:MatchSet[]|null;bSets:MatchSet[]|null}
+export interface OnlineResultReport {matchId:string;aId:string;bId:string;startedAt:number;generation:number;bestOf:number;requiresWinner:boolean;revision:number;aSets:MatchSet[]|null;bSets:MatchSet[]|null}
 export function matchingReports(row:Pick<OnlineResultReport,'aSets'|'bSets'>):boolean {
   return !!row.aSets&&!!row.bSets&&row.aSets.length===row.bSets.length&&row.aSets.every((s,i)=>s.number===row.bSets![i].number&&s.sideAScore===row.bSets![i].sideAScore&&s.sideBScore===row.bSets![i].sideBScore);
 }
@@ -374,7 +374,7 @@ export async function adoptOnlineResultReports(requested:readonly OnlineResultRe
   if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())throw new Error('Die Meldungen haben sich geändert.');
   function check(row:OnlineResultReport) {
     const actual=fresh.get(row.matchId);
-    if(!actual||actual.revision!==row.revision||actual.aId!==row.aId||actual.bId!==row.bId||actual.startedAt!==row.startedAt||actual.bestOf!==row.bestOf||actual.requiresWinner!==row.requiresWinner||!matchingReports(actual)||!matchingReports({aSets:actual.aSets,bSets:row.aSets}))throw new Error('Eine Meldung hat sich geändert. Bitte aktualisieren.');
+    if(!actual||actual.revision!==row.revision||actual.aId!==row.aId||actual.bId!==row.bId||actual.startedAt!==row.startedAt||actual.generation!==row.generation||actual.bestOf!==row.bestOf||actual.requiresWinner!==row.requiresWinner||!matchingReports(actual)||!matchingReports({aSets:actual.aSets,bSets:row.aSets}))throw new Error('Eine Meldung hat sich geändert. Bitte aktualisieren.');
     const tournament=getAllMockTournaments().find(t=>t.id===start!.id);
     const match=tournament&&getMockRuntimeMatches(tournament).find(m=>m.id===row.matchId);
     if(!tournament||!match||!['RUNNING','PAUSED'].includes(tournament.status)||!['LIVE','READY'].includes(match.status)||!match.table.startsWith('Tisch ')||match.sets?.length||match.extraTimeProgress||!canEditMockMatch(tournament,match.id)||match.startedAt!==row.startedAt||match.bestOf!==row.bestOf||match.requiresWinner!==row.requiresWinner||tournament.participantIds?.[match.sideA]!==row.aId||tournament.participantIds?.[match.sideB]!==row.bId)throw new Error('Eine Begegnung ist nicht mehr unverändert zugewiesen.');

@@ -216,10 +216,15 @@ begin
   perform public.submit_online_player_report(pb,'local-rpc-test-phase-1-sw-r2-m1',31,different);
   if public.list_online_result_reports(v_id)->0->'aSets' is distinct from score or public.list_online_result_reports(v_id)->0->'bSets' is distinct from different then raise exception 'conflict not preserved'; end if;
   if not public.reset_online_result_reports(v_id,new_token,'local-rpc-test-phase-1-sw-r2-m1',31) then raise exception 'reset failed'; end if;
-  perform public.submit_online_player_report(pa,'local-rpc-test-phase-1-sw-r2-m1',31,score);
-  perform public.submit_online_player_report(pb,'local-rpc-test-phase-1-sw-r2-m1',31,score);
+  if (public.read_online_player_reports(pa)->0->>'generation')::integer<>1 then raise exception 'generation not incremented'; end if;
+  begin perform public.submit_online_player_report(pa,'local-rpc-test-phase-1-sw-r2-m1',31,score); raise exception 'old API reset bypass'; exception when serialization_failure then null; end;
+  begin perform public.submit_online_player_report_v2(pa,'local-rpc-test-phase-1-sw-r2-m1',31,score,0); raise exception 'old generation accepted'; exception when serialization_failure then null; end;
+  perform public.submit_online_player_report_v2(pa,'local-rpc-test-phase-1-sw-r2-m1',31,score,1);
+  perform public.submit_online_player_report_v2(pb,'local-rpc-test-phase-1-sw-r2-m1',31,score,1);
   if public.list_online_result_reports(v_id)->0->'aSets' is distinct from public.list_online_result_reports(v_id)->0->'bSets' then raise exception 'matching reports lost'; end if;
   if (public.load_online_tournament(v_id)->>'revision')::int<>31 then raise exception 'player changed canonical revision'; end if;
+  perform public.publish_online_report_fixtures(v_id,new_token,31,fixture);
+  if (public.read_online_player_reports(pa)->0->>'generation')::integer<>1 then raise exception 'generation lost on republish'; end if;
   if public.read_online_player_bundle(pa)->'reports' is distinct from public.read_online_player_reports(pa) then raise exception 'bundle reports differ'; end if;
   if public.read_online_player_bundle(pa)->'view' is distinct from public.read_online_player_access(pa) then raise exception 'bundle view differs'; end if;
   if public.batch_online_player_access(v_id,'["p-c"]','disable')<>1 then raise exception 'bulk revoke count'; end if;

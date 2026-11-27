@@ -62,3 +62,6 @@ Bulk enable/disable validates all requested roster IDs and updates in one DB tra
 
 ## Workspace recovery safeguards
 Runtime journal discard requires acquiring the same exclusive workspace lease as retry; a verified archived catalog row is the exception because the server forbids claims on archived events. A second tab cannot discard an active editor's local journal. Creation journal discard is unchanged. Owner-only reads recheck the account after the RPC. Unknown revision state blocks editor actions until revalidation; a stale workspace stops renewing its lease. Deployment also runs lint and disposable PostgreSQL regression checks before publishing.
+
+## Report reset generation and ephemeral drafts
+Every explicit report reset increments a per-fixture generation. The v2 submission RPC checks it under the same advisory lock as reset, so a stale browser cannot re-submit an old confirmation. The legacy RPC is restricted to generation zero; browsers with the older build must refresh after a reset. The director compares generation on adoption. The player retains an in-memory draft across temporary projection gaps and unrelated revisions only for the same match ID, start timestamp, sides, rules and generation. No sensitive draft is persisted to local storage; revoked links and changed fixtures discard drafts.
