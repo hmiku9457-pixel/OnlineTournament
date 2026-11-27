@@ -2206,6 +2206,24 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     }
   }
 
+  async function retryOnlineCreation() {
+    const attempt = onlineAttempt.current;
+    if (!attempt || submittingTournament) return;
+    setSubmittingTournament(true); setCreationError(null);
+    try {
+      const tournament = await commitOnlineCreation(attempt);
+      clearCreationDraft(window.sessionStorage, sessionDraftKey);
+      await clearCreationRecoveryAtomic(recoveryKey).catch(() => undefined);
+      if (savedDraftId) {
+        try { await removeSavedCreationDraftAtomic(savedDraftId, savedDraftRevision.current ?? undefined); }
+        catch { setCreatedTournamentWithDraftNotice({ id: tournament.id, online: true, message: 'Das Online-Turnier wurde gespeichert. Der ursprüngliche Entwurf bleibt zur Sicherheit erhalten.' }); return; }
+      }
+      window.location.assign(onlineWorkspaceUrl(tournament.id));
+    } catch (error) {
+      setCreationError(error instanceof Error ? error.message : 'Speicherung nicht bestätigt.');
+    } finally { setSubmittingTournament(false); }
+  }
+
   async function submitTournament(overwriteExistingId?: string) {
     if (step !== 5 || !canCreate || scheduleIssues.length > 0 || submittingTournament || createdTournamentWithDraftNotice) return;
     if (onlineCreation && !session?.user.id) { setCreationError('Bitte für ein Online-Turnier zuerst anmelden.'); return; }
@@ -2273,6 +2291,8 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
         inlineBreakUntilDate: phase.inlineBreakUntilDate || finalTimeline.items.find((item) => item.id === `inline-break-${index + 1}`)?.at.slice(0, 10),
         dayBreaks: phase.dayBreaks, extraInlineBreaks: phase.extraInlineBreaks,
       })),
+      tournamentMode,
+      plannedDays,
       estimatedDurationMinutes: estimatedPlayingMinutes + plannedActiveBreakMinutes(finalTimeline),
       venueLayout: venueLayoutEnabled ? venueLayout : undefined,
     };
@@ -3869,6 +3889,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
                 <button type="button" className={onlineCreation ? 'btn primary' : 'btn'} aria-pressed={onlineCreation} disabled={submittingTournament || Boolean(onlineAttempt.current)} onClick={() => setOnlineCreation(true)}>Online (Testbetrieb)</button>
               </div>
               <p className="muted">{onlineCreation ? 'Das Turnier wird direkt und privat in Supabase gespeichert. Internetverbindung erforderlich.' : 'Das Turnier wird ausschließlich in diesem Browser gespeichert.'}</p>
+              {onlineAttempt.current && !submittingTournament && <div className="callout"><p>Eine frühere Online-Erstellung wurde noch nicht bestätigt. Prüfe die ursprüngliche Anfrage, ohne ein zweites Turnier anzulegen.</p><button type="button" className="btn primary" onClick={() => void retryOnlineCreation()}>Ursprüngliche Speicherung erneut versuchen</button></div>}
               {onlineCreation && !session && <p role="status">Bitte zuerst in einem anderen Tab <a href="#/login" target="_blank" rel="noopener noreferrer">anmelden</a>. Der Entwurf bleibt erhalten.</p>}
             </div>
             {minimumMatchesShortfall > 0 && (
