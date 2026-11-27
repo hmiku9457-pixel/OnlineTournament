@@ -15,7 +15,7 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
   const [revisionState,setRevisionState] = useState<'current'|'stale'|'unknown'>('current');
   const [checking,setChecking] = useState(false);
   const [leaving,setLeaving] = useState(false);
-  const [leaveError,setLeaveError] = useState('');
+  
   const inFlight=useRef(false);
   const active=useRef(true);
   const checkRevision=useCallback(async ()=>{
@@ -51,9 +51,9 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
   const route = '/tournaments/' + id + '/control';
   async function leave(reload=false) {
     if(pending || leaving) return;
-    setLeaving(true);setLeaveError('');
+    setLeaving(true);
     try { await releaseCurrentOnlineWorkspace(); }
-    catch { setLeaveError('Freigabe nicht bestätigt. Die Sperre läuft automatisch ab.'); }
+    catch { /* The lease expires automatically if release could not be confirmed. */ }
     finally { if(reload) window.location.reload(); else window.location.assign(localOverviewUrl()); }
   }
   return <main className="main">
@@ -64,7 +64,6 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
         <button className="btn small" disabled={pending || checking || !connected || !!error || revisionState==='stale'} onClick={()=>void checkRevision()}>{checking?'Prüfe …':'Datenbankstand prüfen'}</button>
         <button className="btn small" disabled={pending || leaving} onClick={()=>void leave()}>Bearbeitung freigeben und zurück</button>
       </div>
-      {leaveError && <p role="alert">{leaveError}</p>}
       {!connected && <p role="alert">Keine Internetverbindung. Bereits laufende Partien können am Tisch beendet werden. Neue Änderungen werden erst nach Wiederverbindung zugelassen.</p>}
       {revisionState==='stale' && !error && <div role="alert"><p>Die Bearbeitungssperre ist abgelaufen oder ein neuerer Datenbankstand vorhanden. Bitte lade das Turnier neu.</p><button className="btn primary small" disabled={pending || !connected} onClick={()=>void leave(true)}>Datenbankstand neu laden</button></div>}
       {revisionState==='unknown' && !error && connected && <p className="muted">Die Aktualität konnte nicht geprüft werden. Der nächste Schreibvorgang wird weiterhin durch die Datenbankrevision abgesichert.</p>}

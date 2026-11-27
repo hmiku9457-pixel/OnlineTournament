@@ -43,3 +43,6 @@ Für den Einstieg reicht Block 1 und ein kleiner Ausschnitt von Block 2: ein Onl
 
 ## Versionsanzeige
 Links unten auf jeder Ansicht steht `v0.1.0 · Build <Nummer> · <Commit>` beim GitHub-Pages-Deployment. Der Commit ist der tatsächlich ausgelieferte Build-Stand und nicht der aktuelle Stand eines Branches. Bei einem Fehler bitte diese Angabe mitliefern. Vite-Entwicklungsserver zeigen `Dev` statt `Build`.
+
+## Exklusive Bearbeitungssperre
+Block 3 entsprechend aktualisieren: Browser B muss zunächst die Sperrseite anzeigen. Browser A gibt die Bearbeitung über den Button frei, danach kann B das Turnier öffnen und weiterleiten. Nach einem Absturz darf die Sperre nach spätestens 90 Sekunden seit letzter Verlängerung ablaufen. B darf A nicht gewaltsam verdrängen. Eine alte Anwendung darf nach Verlust der Sperre keine weiteren Ergebnisse speichern.
