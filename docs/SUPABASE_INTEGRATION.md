@@ -71,3 +71,5 @@ A single owner-only revision plan checks which detail projections are missing fo
 
 ## Additional scoring and Swiss integrity
 Standard tie-break tennis/padel sets allow 6:0 through 6:4, 7:5 and 7:6; badminton uses the 21-point model with a 30-point cap. Decision and extra-time metadata are checked by PostgreSQL, and technical IDs use reserved non-NUL serialization. Swiss round fixtures must use unique roster IDs, at most one bye and valid indexed game IDs; a played or assigned round cannot be repartnered. Started phase evidence cannot be removed. Exact Swiss pairing optimality, full KO topology and every dependency are not independently calculated by the server.
+
+The report fixture guard additionally binds ordinary Swiss match sides to the actual persisted pair, in the correct orientation. Group/KO pairing reconstruction is still client-derived.

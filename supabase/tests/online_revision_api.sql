@@ -220,6 +220,7 @@ begin
   select token into pc from public.list_online_player_access(v_id) where participant_id='p-c';
   perform public.batch_online_player_access(v_id,'["p-a"]','enable');
   if (select token from public.list_online_player_access(v_id) where participant_id='p-a') is distinct from pa then raise exception 'bulk enable rotated existing link'; end if;
+  begin perform public.publish_online_report_fixtures(v_id,new_token,31,jsonb_set(fixture,'{0,bId}','"p-c"')); raise exception 'wrong Swiss opponent published'; exception when invalid_parameter_value then null; end;
   if not public.publish_online_report_fixtures(v_id,new_token,31,fixture) then raise exception 'publish report fixtures'; end if;
   if public.read_online_player_reports(pc) is distinct from '[]'::jsonb then raise exception 'foreign report list'; end if;
   begin perform public.submit_online_player_report(pc,'local-rpc-test-phase-1-sw-r2-m1',31,score); raise exception 'foreign report'; exception when insufficient_privilege then null; end;
