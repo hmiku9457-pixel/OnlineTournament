@@ -13,7 +13,7 @@ const exp = Math.floor(Date.now()/1000)+3600;
 const segment = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 const accessToken = segment({alg:'HS256',typ:'JWT'})+'.'+segment({sub:user.id,role:'authenticated',exp})+'.smoke';
 const session = { access_token: accessToken, refresh_token:'smoke-refresh', token_type:'bearer', expires_in:3600, expires_at:exp, user };
-const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), spectatorLinks = new Map(), detailSettings = new Set(), detailRows = new Map(), rankingRows = new Map(), bracketRows = new Map(), playerLinks = new Map(), playerRows = new Map(), calls = [];
+const rows = new Map(), operations = new Map(), leases = new Map(), archives = new Map(), spectatorLinks = new Map(), detailSettings = new Set(), detailRows = new Map(), rankingRows = new Map(), bracketRows = new Map(), playerLinks = new Map(), playerRows = new Map(), reportFixtures = new Map(), reports = new Map(), calls = [];
 let loseResponses = 0;
 async function install(context) {
   await context.route(api+'/**', async route => {
@@ -27,6 +27,48 @@ async function install(context) {
     if(path==='/auth/v1/user') return send(user);
     const body = req.method()==='POST' ? req.postDataJSON() : {};
     const record=id=>JSON.parse(rows.get(id).payload.entries['online-tournament:local-prototype-tournaments:v1:record:'+id]).tournament;
+    function currentReportRows(id) {
+      const published=reportFixtures.get(id);
+      if(published?.revision!==rows.get(id)?.revision)return [];
+      return published.fixtures.map(f=>({...f,revision:published.revision,aSets:reports.get(id+'|'+f.matchId+'|'+f.aId)??null,bSets:reports.get(id+'|'+f.matchId+'|'+f.bId)??null}));
+    }
+    function resolvePlayer(token) {
+      for(const [id,links] of playerLinks) {
+        const pid=[...links].find(([,value])=>value===token)?.[0];
+        if(pid&&!archives.has(id))return {id,pid};
+      }
+      return null;
+    }
+    if(path.endsWith('/publish_online_report_fixtures')) {
+      assert.equal(leases.get(body.p_id),body.p_token);
+      if(rows.get(body.p_id).revision!==body.p_revision)return send({code:'40001',message:'revision conflict'},409);
+      reportFixtures.set(body.p_id,{revision:body.p_revision,fixtures:body.p_fixtures});
+      return send(true);
+    }
+    if(path.endsWith('/list_online_result_reports')) {
+      assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
+      return send(currentReportRows(body.p_id));
+    }
+    if(path.endsWith('/read_online_player_reports')) {
+      const access=resolvePlayer(body.p_token);
+      if(!access)return send(null);
+      const names=Object.fromEntries(Object.entries(record(access.id).participantIds).map(([name,id])=>[id,name]));
+      return send(currentReportRows(access.id).filter(r=>[r.aId,r.bId].includes(access.pid)).map(r=>({matchId:r.matchId,side:r.aId===access.pid?'A':'B',sideA:names[r.aId],sideB:names[r.bId],bestOf:r.bestOf,requiresWinner:r.requiresWinner,revision:r.revision,aSets:r.aSets,bSets:r.bSets})));
+    }
+    if(path.endsWith('/submit_online_player_report')) {
+      const access=resolvePlayer(body.p_token);
+      if(!access)return send({code:'42501',message:'player unavailable'},403);
+      const f=currentReportRows(access.id).find(r=>r.matchId===body.p_match_id&&[r.aId,r.bId].includes(access.pid)&&r.revision===body.p_revision);
+      if(!f)return send({code:'40001',message:'match state changed'},409);
+      const key=access.id+'|'+f.matchId+'|'+access.pid;
+      if(reports.has(key))assert.deepEqual(reports.get(key),body.p_sets);
+      reports.set(key,body.p_sets);return send(true);
+    }
+    if(path.endsWith('/reset_online_result_reports')) {
+      assert.equal(leases.get(body.p_id),body.p_token);
+      for(const key of reports.keys())if(key.startsWith(body.p_id+'|'+body.p_match_id+'|'))reports.delete(key);
+      return send(true);
+    }
     if(path.endsWith('/list_online_player_access')) {
       assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
       return send(Object.entries(record(body.p_id).participantIds).map(([name,participant_id])=>({name,participant_id,token:playerLinks.get(body.p_id)?.get(participant_id)??null})));
@@ -211,6 +253,13 @@ try {
   await player.getByRole('heading',{name:'Anna',exact:true}).waitFor();
   await player.getByText(/Die Spielübersicht wird für die aktuelle Revision aktualisiert/).waitFor();
   assert.equal(spectatorLinks.has(id),false);
+  const bernd=playerModal.locator('article').filter({hasText:'Bernd'});
+  await bernd.getByRole('button',{name:'Zugang erstellen'}).click();
+  const opponentLink=await bernd.getByRole('link',{name:'Öffnen'}).getAttribute('href');
+  assert.ok(opponentLink);
+  const opponent=await personal.newPage();
+  await opponent.goto(opponentLink);
+  await opponent.getByRole('heading',{name:'Bernd',exact:true}).waitFor();
   await playerModal.getByRole('button',{name:'Schließen'}).click();
   // A fresh anonymous browser sees only the allowlisted progress projection.
   const spectator=await browser.newContext();
@@ -260,11 +309,41 @@ try {
   await player.getByText('gegen Bernd',{exact:true}).waitFor({timeout:45000});
   assert.equal(await player.locator('article.online-catalog-row').count(),3);
   assert.ok(playerRows.get(id).matches.length>3);
-  await personal.close();
   await viewer.getByLabel('Teilnehmer auswählen',{exact:true}).selectOption('Anna');
   await viewer.getByText(/Aktuelle und kommende Spiele von/).waitFor();
   assert.equal(await viewer.locator('article.online-catalog-row').filter({hasNotText:'Anna'}).count(),0);
   await spectator.close();
+  // Assign one real fixture through the existing guarded domain operation.
+  const reportId=await a.evaluate(async()=>{
+    const {getAllMockTournaments}=await import('/src/services/mockTournamentStore.ts');
+    const {getMockRuntimeMatches,assignMockMatchToTable}=await import('/src/services/mockRuntime.ts');
+    const t=getAllMockTournaments()[0];
+    const m=getMockRuntimeMatches(t).find(m=>[m.sideA,m.sideB].includes('Anna')&&[m.sideA,m.sideB].includes('Bernd'));
+    if(!m||!assignMockMatchToTable(t,m.id,'Tisch 1'))throw new Error('fixture assignment failed');
+    return m.id;
+  });
+  await confirmed(a);
+  await a.getByRole('button',{name:'Datenbankstand prüfen',exact:true}).click();
+  await player.reload();
+  await player.getByRole('heading',{name:'Ergebnis melden',exact:true}).waitFor({timeout:45000});
+  await player.getByLabel('Eigene Punkte 1',{exact:true}).fill('11');
+  await player.getByLabel('Gegnerpunkte 1',{exact:true}).fill('8');
+  await player.getByRole('button',{name:'Ergebnis prüfen'}).click();
+  await player.getByRole('dialog',{name:'Spielermeldung bestätigen'}).getByRole('button',{name:'Ergebnis melden'}).click();
+  await player.getByText('Wartet auf Meldung des Gegners.').waitFor();
+  const beforeReports=rows.get(id).revision;
+  await opponent.reload();
+  await opponent.getByRole('button',{name:'Diesen Stand bestätigen'}).click();
+  await opponent.getByRole('dialog',{name:'Spielermeldung bestätigen'}).getByRole('button',{name:'Ergebnis melden'}).click();
+  await opponent.getByText(/Beide Meldungen stimmen überein/).waitFor();
+  assert.equal(rows.get(id).revision,beforeReports,'reports cannot mutate canonical revision');
+  await a.getByRole('button',{name:'Übereinstimmendes Ergebnis übernehmen'}).click({timeout:45000});
+  await confirmed(a);
+  const adopted=JSON.parse(rows.get(id).payload.entries['online-tournament:mock-match-results:v2']).find(r=>r.matchId===reportId);
+  assert.equal(adopted.status,'FINISHED');
+  assert.equal(adopted.adminConfirmed,true);
+  assert.equal(rows.get(id).revision,beforeReports+1);
+  await personal.close();
   // The server commits, but both automatic HTTP responses are lost.
   loseResponses=2;
   const before=rows.get(id).revision;
