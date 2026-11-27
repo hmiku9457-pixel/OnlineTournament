@@ -1,6 +1,7 @@
 import type { DirectorMatchCall } from '@/domain/onlineMatchCalls';
 import type { MatchSet } from '@/domain/types';
-import { validateCompleteResult } from '@/domain/sportScoring';
+import { buildOnlinePersonalContexts } from '@/services/onlinePersonalContexts';
+import { validateCompleteResult, scoreDecisionSuffix } from '@/domain/sportScoring';
 import { decodeMatchSlot } from '@/domain/matchSlots';
 import { buildMockBracket, buildMockGroups, buildRoundRobinStandings, buildSwissStandings, type MockStanding } from '@/services/mockCompetitionViews';
 import { getMockConfirmedFinalStandings } from '@/services/mockParticipantProgress';
@@ -278,7 +279,7 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
   if(publishing){queuedProjection=start;return;}
   publishing=true;
   try {
-    const {data:plan,error:planError}=await supabase.rpc('online_projection_plan',{p_id:start.id,p_revision:start.revision}).abortSignal(AbortSignal.timeout(8000));
+    const {data:plan,error:planError}=await supabase.rpc('online_projection_plan_v2',{p_id:start.id,p_revision:start.revision}).abortSignal(AbortSignal.timeout(8000));
     if(planError)throw new Error(planError.message);
     if(!plan||!['player','matches','rankings','brackets'].some(key=>plan[key]===true))return;
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
@@ -293,14 +294,14 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
     const rank=(status:string)=>['LIVE','READY','CONFIRMATION'].includes(status)?0:status==='FINISHED'?1:2;
     rows.sort((a,b)=>rank(a.status)-rank(b.status));
     const matches=rows.slice(0,5000).map(m=>({sideA:m.sideA,sideB:m.sideB,phase:m.phase,round:m.round,status:m.status,
-      table:m.table,score:m.score,sets:(m.sets??[]).map(s=>({sideAScore:s.sideAScore,sideBScore:s.sideBScore}))}));
+      table:m.table,score:[m.score,scoreDecisionSuffix(m.decision)].filter(Boolean).join(' '),sets:(m.sets??[]).map(s=>({sideAScore:s.sideAScore,sideBScore:s.sideBScore}))}));
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
     if(plan.player===true) {
       const fixtures=getMockRuntimeMatches(tournament).filter(m=>['LIVE','READY'].includes(m.status)&&m.startedAt&&m.table.startsWith('Tisch ')&&!m.sets?.length&&!m.extraTimeProgress&&canEditMockMatch(tournament,m.id)&&roster.has(m.sideA)&&roster.has(m.sideB)&&tournament.participantIds?.[m.sideA]&&tournament.participantIds?.[m.sideB]).map(m=>({matchId:m.id,aId:tournament.participantIds![m.sideA],bId:tournament.participantIds![m.sideB],startedAt:m.startedAt,bestOf:m.bestOf,requiresWinner:m.requiresWinner}));
       const reportResult=await supabase.rpc('publish_online_report_fixtures',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_fixtures:fixtures}).abortSignal(AbortSignal.timeout(8000));
       if(reportResult.error)throw new Error(reportResult.error.message);
       // The server filters the projection by the capability's stable roster identity.
-      const playerResult=await supabase.rpc('publish_online_player_projection',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches,p_total:rows.length}).abortSignal(AbortSignal.timeout(8000));
+      const playerResult=await supabase.rpc('publish_online_player_projection_v2',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_matches:matches,p_total:rows.length,p_contexts:buildOnlinePersonalContexts(tournament,rows)}).abortSignal(AbortSignal.timeout(8000));
       if(playerResult.error)throw new Error(playerResult.error.message);
     }
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;

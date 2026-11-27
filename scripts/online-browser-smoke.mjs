@@ -114,7 +114,7 @@ async function install(context) {
       const participant=names[pid];
       if(!participant)return send({view:null,reports:[]});
       const projection=playerRows.get(id),current=projection?.revision===row.revision;
-      return send({calls:currentMatchCalls(id).filter(c=>[c.aId,c.bId].includes(pid)).map(c=>({callId:c.callId,matchId:c.matchId,table:c.table,calledAt:c.calledAt,sideA:c.sideA,sideB:c.sideB,revision:c.revision,acknowledged:c.aId===pid?c.ackA:c.ackB})),view:{name:row.name,participant,sport:t.sport,status:t.status,revision:row.revision,updatedAt:row.updated_at,complete:current?projection.total===projection.matches.length:null,matches:current?projection.matches.filter(m=>m.sideA===participant||m.sideB===participant):null},reports:currentReportRows(id).filter(r=>[r.aId,r.bId].includes(pid)).map(r=>({matchId:r.matchId,side:r.aId===pid?'A':'B',sideA:names[r.aId],sideB:names[r.bId],startedAt:r.startedAt,generation:r.generation,bestOf:r.bestOf,requiresWinner:r.requiresWinner,revision:r.revision,aSets:r.aSets,bSets:r.bSets}))});
+      return send({context:current?projection.contexts?.[pid]??null:null,calls:currentMatchCalls(id).filter(c=>[c.aId,c.bId].includes(pid)).map(c=>({callId:c.callId,matchId:c.matchId,table:c.table,calledAt:c.calledAt,sideA:c.sideA,sideB:c.sideB,revision:c.revision,acknowledged:c.aId===pid?c.ackA:c.ackB})),view:{name:row.name,participant,sport:t.sport,status:t.status,revision:row.revision,updatedAt:row.updated_at,complete:current?projection.total===projection.matches.length:null,matches:current?projection.matches.filter(m=>m.sideA===participant||m.sideB===participant):null},reports:currentReportRows(id).filter(r=>[r.aId,r.bId].includes(pid)).map(r=>({matchId:r.matchId,side:r.aId===pid?'A':'B',sideA:names[r.aId],sideB:names[r.bId],startedAt:r.startedAt,generation:r.generation,bestOf:r.bestOf,requiresWinner:r.requiresWinner,revision:r.revision,aSets:r.aSets,bSets:r.bSets}))});
     }
     if(path.endsWith('/list_online_player_access')) {
       assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
@@ -129,11 +129,11 @@ async function install(context) {
       return send(links.get(body.p_participant_id)??null);
     }
     if(path.endsWith('/online_player_access_active'))return send((playerLinks.get(body.p_id)?.size??0)>0);
-    if(path.endsWith('/publish_online_player_projection')) {
+    if(path.endsWith('/publish_online_player_projection')||path.endsWith('/publish_online_player_projection_v2')) {
       if(!playerLinks.get(body.p_id)?.size)return send(false);
       assert.equal(leases.get(body.p_id),body.p_token);
       if(rows.get(body.p_id).revision!==body.p_revision)return send({code:'40001',message:'revision conflict'},409);
-      playerRows.set(body.p_id,{revision:body.p_revision,matches:body.p_matches,total:body.p_total});
+      playerRows.set(body.p_id,{revision:body.p_revision,matches:body.p_matches,total:body.p_total,contexts:body.p_contexts??{}});
       return send(true);
     }
     if(path.endsWith('/read_online_player_access')) {
@@ -199,7 +199,7 @@ async function install(context) {
       const revision=rows.get(id).revision;
       return send(detailRows.get(id)?.revision===revision?detailRows.get(id):{revision,matches:null,total:null});
     }
-    if(path.endsWith('/online_projection_plan')) {
+    if(path.endsWith('/online_projection_plan')||path.endsWith('/online_projection_plan_v2')) {
       const id=body.p_id,revision=rows.get(id)?.revision;
       if(revision!==body.p_revision)return send({code:'40001',message:'revision conflict'},409);
       const spectator=detailSettings.has(id)&&spectatorLinks.has(id);
@@ -344,6 +344,9 @@ try {
   await a.getByRole('button',{name:'Zuschauerlink',exact:true}).click();
   const share=a.getByRole('dialog',{name:/Zuschauerlink/});
   await share.getByRole('button',{name:'Zuschaueransicht freigeben'}).click();
+  await share.getByRole('button',{name:'QR-Code anzeigen',exact:true}).click();
+  await share.locator('svg').filter({has:share.locator('title',{hasText:'QR-Code für die Zuschaueransicht'})}).waitFor();
+  await share.getByRole('button',{name:'QR-Code ausblenden',exact:true}).click();
   const viewerLink=await share.getByRole('link',{name:'Zuschaueransicht öffnen'}).getAttribute('href');
   assert.ok(viewerLink);
   await viewer.goto(viewerLink);
@@ -391,6 +394,7 @@ try {
   await player.reload();
   await player.getByRole('heading',{name:'Meine Spiele'}).waitFor();
   await player.getByRole('heading',{name:'Meine Ergebnisübersicht'}).waitFor();
+  await player.getByRole('heading',{name:'Mein Turnierstatus'}).waitFor();
   await player.getByRole('heading',{name:'Weitere geplante Begegnungen'}).waitFor();
   const personalGames=player.getByRole('region',{name:'Meine Spiele',exact:true});
   await personalGames.getByText('gegen Bernd',{exact:true}).waitFor({timeout:45000});

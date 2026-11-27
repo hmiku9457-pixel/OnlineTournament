@@ -561,6 +561,17 @@ function getLatestFinishedTimes(tournament: DemoTournament, results: StoredMatch
   return timestamps;
 }
 
+export function getMockPlayedFinishTimes(matches:readonly Pick<MockRuntimeMatch,'id'|'sideA'|'sideB'|'status'>[]):Map<string,number> {
+ const stored=new Map(readResults().filter(r=>r.status==='FINISHED'&&r.finishedAt&&!r.forcedWinner&&!r.thirdPlaceSkipped).map(r=>[r.matchId,r.finishedAt!]));
+ const times=new Map<string,number>();
+ for(const match of matches){
+  const finished=stored.get(match.id);
+  if(match.status!=='FINISHED'||finished===undefined)continue;
+  for(const name of [match.sideA,match.sideB])times.set(name,Math.max(times.get(name)??0,finished));
+ }
+ return times;
+}
+
 export function getElapsedRestMinutes(finishedAt: number | undefined, now = Date.now()): number | null {
   if (finishedAt === undefined || !Number.isFinite(finishedAt)) return null;
   return Math.max(0, Math.floor((now - finishedAt) / 60000));

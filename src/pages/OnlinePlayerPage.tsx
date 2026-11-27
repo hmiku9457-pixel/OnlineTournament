@@ -6,6 +6,7 @@ import { playerRefreshDelay } from '@/domain/playerCalls';
 import { supabase } from '@/lib/supabase';
 import { startOnlinePolling } from '@/domain/onlinePolling';
 import { onlinePlayerSummary, orientOnlineScore, onlineMatchOutcome, filterPlayerMatches, type OnlineMatchView } from '@/domain/onlineMatchViews';
+import { personalRestMinutes,formatPersonalRest,type OnlinePersonalContext } from '@/domain/onlinePersonalContext';
 import { callAgeMinutes,callLabel,type PlayerMatchCall } from '@/domain/onlineMatchCalls';
 import { displayVenueMessage } from '@/domain/venueTerminology';
 type Match=OnlineMatchView;
@@ -15,6 +16,9 @@ const active=(status:string)=>['LIVE','READY','CONFIRMATION'].includes(status);
 const statuses:Record<string,string>={WAITING:'Wartend',LIVE:'Läuft',READY:'Zugewiesen',CONFIRMATION:'Bestätigung offen',FINISHED:'Beendet',CANCELLED:'Abgebrochen'};
 export function OnlinePlayerPage({token}:{token:string}) {
  const [data,setData]=useState<PlayerView|null>(null);
+ const [context,setContext]=useState<OnlinePersonalContext|null>(null);
+ const [now,setNow]=useState(Date.now());
+ useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),15000);return()=>window.clearInterval(timer);},[]);
  const [message,setMessage]=useState('Persönliche Spielübersicht wird geladen …');
  const [reports,setReports]=useState<Report[]>([]);
  const [drafts,setDrafts]=useState<ReportDrafts>({});
@@ -48,7 +52,7 @@ export function OnlinePlayerPage({token}:{token:string}) {
     const currentReports:Report[]=view&&Array.isArray(raw)?raw.filter((r:Report)=>r.revision===view.revision):[];
     setReports(currentReports);
     setDrafts(old=>!view?{}:retainReportDrafts(old,currentReports,view.matches!==null&&Array.isArray(raw)));
-    setData(view);setLastChecked(Date.now());failures=0;
+    setData(view);setContext(view&&result.data?.context?result.data.context as OnlinePersonalContext:null);setLastChecked(Date.now());failures=0;
     setMessage(view?'':'Dieser Spielerlink ist nicht mehr verfügbar.');
     const currentCalls:PlayerMatchCall[]=view&&Array.isArray(result.data?.calls)?result.data.calls.filter((c:PlayerMatchCall)=>c.revision===view.revision):[];
     setCalls(currentCalls);
@@ -62,7 +66,7 @@ export function OnlinePlayerPage({token}:{token:string}) {
         if(vibrationRef.current&&document.visibilityState==='visible'&&typeof navigator.vibrate==='function')navigator.vibrate([180,100,180]);
       } else if(!currentCalls.some(c=>!c.acknowledged))setNewCallText('');
     }
-   }catch{if(alive){failures++;setData(null);setReports([]);setCalls([]);setNewCallText('');setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
+   }catch{if(alive){failures++;setData(null);setContext(null);setReports([]);setCalls([]);setNewCallText('');setMessage('Verbindung unterbrochen. Erneuter Versuch erfolgt automatisch.');}}
    finally{if(alive)setRefreshing(false);}
   }
   const polling=startOnlinePolling(refresh,()=>playerRefreshDelay(document.visibilityState==='visible',failures));
@@ -86,6 +90,13 @@ export function OnlinePlayerPage({token}:{token:string}) {
  {!data?<section className="card"><h1>Persönliche Spielübersicht</h1><p role="status">{message}</p></section>:<>
  <header className="dashboard-page-hero"><div><h1>{data.participant}</h1><p>{data.name} · {data.sport}</p></div><span className="badge">Spieleransicht</span></header>
  <nav className="actions online-player-nav" aria-label="Spieler-Navigation"><a href="#" onClick={e=>{e.preventDefault();document.getElementById('my-calls')?.scrollIntoView();}}>Aufrufe</a><a href="#" onClick={e=>{e.preventDefault();document.getElementById('my-results')?.scrollIntoView();}}>Statistik</a><a href="#" onClick={e=>{e.preventDefault();document.getElementById('my-games')?.scrollIntoView();}}>Spiele</a></nav>
+ {context&&<section className="card" aria-label="Persönlicher Turnierstatus"><h2>Mein Turnierstatus</h2><strong>{context.phaseStatus}</strong>
+ {context.placement&&<p>Bestätigte Platzierung: <strong>{context.placement}</strong></p>}
+ {context.breakUntil!==null&&<p>Geplante Fortsetzung: <strong>{new Date(context.breakUntil).toLocaleString('de-DE')}</strong>{context.breakUntil<=now?' · Freigabe durch die Turnierleitung abwarten.':''}</p>}
+ {data.status==='PAUSED'&&context.breakUntil===null&&<p>Turnier pausiert. Auf Freigabe der Turnierleitung warten.</p>}
+ {data.status==='RUNNING'&&data.matches!==null&&summary?.waiting!==0&&<p>Pause seit letztem erfassten Spiel: <strong>{formatPersonalRest(personalRestMinutes(context.lastFinishedAt,now,!!summary?.active))}</strong></p>}
+ {context.rankings.length>0&&<div className="online-personal-ranks">{context.rankings.map((r,i)=><div key={i}><span>{r.phase} · {r.label}</span><strong>Platz {r.rank}</strong></div>)}</div>}
+ </section>}
  <section className="card player-call-panel" id="my-calls"><div className="actions"><h2>Meine Spielaufrufe</h2><button className="btn small" disabled={refreshing} onClick={()=>setRefreshVersion(v=>v+1)}>{refreshing?'Aktualisiere …':'Jetzt aktualisieren'}</button></div>
  {newCallText&&<p role="status" className="player-call-notice">{newCallText}</p>}
  {ackError&&<p role="alert">{ackError}</p>}
