@@ -37,6 +37,13 @@ describe('automatic simultaneous table assignment',()=>{
     expect(new Set(result.map(a=>a.table)).size).toBe(20);
     expect(planControlAssignments(queue,options,[])).toEqual([]);
   });
+  it('avoids equivalent-table permutations when the greedy queue has many independent traps',()=>{
+    const free=Array.from({length:16},(_,i)=>'Tisch '+(i+1));
+    const q=Array.from({length:8},(_,i)=>[match('ab'+i,'A'+i,'B'+i),match('ac'+i,'A'+i,'C'+i),match('bd'+i,'B'+i,'D'+i)]).flat();
+    const result=planControlAssignments(q,new Map(q.map(m=>[m.id,free])),free);
+    expect(result).toHaveLength(16);
+    expect(new Set(result.map(r=>r.table)).size).toBe(16);
+  });
   it('returns an empty plan when no candidate is eligible',()=>{
     const queue=[match('ab','A','B')];
     expect(planControlAssignments(queue,new Map(),tables)).toEqual([]);

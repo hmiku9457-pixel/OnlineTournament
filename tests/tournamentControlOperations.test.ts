@@ -57,6 +57,18 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('Turnierleitung: Zuweisung, Pause, Codes, Audit', () => {
+  it('liefert für jede wartende Partie exakt dieselbe Zulässigkeit wie die Einzelprüfung',()=>{
+    const tournament=setup();
+    const first=getMockRuntimeMatches(tournament)[0];
+    expect(assignMockMatchToTable(tournament,first.id,'Tisch 1')).toBe(true);
+    for(const state of ['RUNNING','PAUSED'] as const){
+      updateMockTournamentStatus(tournament.id,state);
+      const options=getMockQueueAssignableTables(tournament);
+      for(const m of getMockRuntimeMatches(tournament).filter(m=>m.status==='WAITING')){
+        expect(options.get(m.id)).toEqual(['Tisch 1','Tisch 2','Tisch 3'].filter(table=>getMockAssignmentBlockReason(tournament,m.id,table)===null));
+      }
+    }
+  });
   it('meldet keine zuweisbaren Partien, solange alle Spieler belegt sind – trotz freiem Tisch', () => {
     const tournament = setup();
     const matches = getMockRuntimeMatches(tournament);

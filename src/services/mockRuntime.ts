@@ -577,9 +577,9 @@ export function formatPlayerRest(minutes: number | null): string {
   return `${Math.floor(minutes / 60)} Std. ${String(minutes % 60).padStart(2, '0')} Min. Pause`;
 }
 
-function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchResult[], storedRuntime: StoredMatchRuntime[]) {
-  const savedResult = storedResults.find((item) => item.matchId === match.id);
-  const savedRuntime = storedRuntime.find((item) => item.matchId === match.id);
+function applyStoredState(match: MockRuntimeMatch, storedResults: ReadonlyMap<string,StoredMatchResult>, storedRuntime: ReadonlyMap<string,StoredMatchRuntime>) {
+  const savedResult = storedResults.get(match.id);
+  const savedRuntime = storedRuntime.get(match.id);
   const status = savedResult?.status === 'FINISHED' ? 'FINISHED' : savedRuntime?.status ?? savedResult?.status ?? match.status;
   return {
     ...match,
@@ -600,6 +600,8 @@ function applyStoredState(match: MockRuntimeMatch, storedResults: StoredMatchRes
 export function getMockStageMatches(tournament: DemoTournament, stage: TournamentStage): MockRuntimeMatch[] {
   const results = readResults();
   const runtime = readRuntime();
+  const resultIndex=new Map(results.map(item=>[item.matchId,item]));
+  const runtimeIndex=new Map(runtime.map(item=>[item.matchId,item]));
   const started = isStageStarted(tournament, stage);
   const lastFinishByParticipant = getLatestFinishedTimes(tournament, results);
   const now = Date.now();
@@ -624,7 +626,7 @@ export function getMockStageMatches(tournament: DemoTournament, stage: Tournamen
       pauseA: getElapsedRestMinutes(lastFinishByParticipant.get(match.sideA), now),
       pauseB: getElapsedRestMinutes(lastFinishByParticipant.get(match.sideB), now),
       note: 'Wartet auf Tischzuweisung',
-    }, results, runtime))
+    }, resultIndex, runtimeIndex))
     .map((match) => tournament.status === 'ABORTED' && match.status !== 'FINISHED' ? { ...match, status: 'CANCELLED' as const, table: 'Noch offen' } : match);
 }
 
@@ -636,6 +638,8 @@ export function getSwissRoundRobinMatches(tournament: DemoTournament, stage: Tou
   if (!history) return [];
   const results = readResults();
   const runtime = readRuntime();
+  const resultIndex=new Map(results.map(item=>[item.matchId,item]));
+  const runtimeIndex=new Map(runtime.map(item=>[item.matchId,item]));
   const times = getLatestFinishedTimes(tournament, results);
   const rounds = history.extraRounds ?? [];
   return rounds.flatMap((round, roundIndex) => {
@@ -658,7 +662,7 @@ export function getSwissRoundRobinMatches(tournament: DemoTournament, stage: Tou
         pauseA: getElapsedRestMinutes(times.get(match.sideA)),
         pauseB: getElapsedRestMinutes(times.get(match.sideB)),
         note: 'Wartet auf Tischzuweisung',
-      }, results, runtime);
+      }, resultIndex, runtimeIndex);
     });
   });
 }
@@ -671,6 +675,8 @@ export function getSwissCutoffSetMatches(tournament: DemoTournament, stage: Tour
   const current = getPendingSwissCutoff(tournament);
   const savedResults = readResults();
   const savedRuntime = readRuntime();
+  const resultIndex=new Map(savedResults.map(item=>[item.matchId,item]));
+  const runtimeIndex=new Map(savedRuntime.map(item=>[item.matchId,item]));
   const times = getLatestFinishedTimes(tournament, savedResults);
   const complete = decision.sets.map((set) => [set.sideA, set.sideB] as const);
   const next = current?.stageId === stage.id ? getSwissCutoffPair(current) : null;
@@ -690,7 +696,7 @@ export function getSwissCutoffSetMatches(tournament: DemoTournament, stage: Tour
     pauseA: getElapsedRestMinutes(times.get(sideA)),
     pauseB: getElapsedRestMinutes(times.get(sideB)),
     note: 'Wartet auf Tischzuweisung',
-  }, savedResults, savedRuntime));
+  }, resultIndex, runtimeIndex));
 }
 
 /** Schedule the deciding set. The standard tournament overview assigns the
@@ -791,14 +797,23 @@ export function getMockAssignmentBlockReason(tournament: DemoTournament, matchId
 export function getMockQueueAssignableTables(tournament: DemoTournament): Map<string, string[]> {
   const currentTournament = getAllMockTournaments().find((item) => item.id === tournament.id) ?? tournament;
   const matches = getMockRuntimeMatches(currentTournament);
+  const waiting = matches.filter(match=>match.status==='WAITING');
+  if(currentTournament.status!=='RUNNING')return new Map(waiting.map(match=>[match.id,[]]));
   const blockedTables = new Set(getBlockedMockTables(currentTournament));
+  const occupiedTables=new Set<string>();
+  const occupiedParticipants=new Set<string>();
+  for(const match of matches)if(isActiveTableMatch(match)){
+    occupiedTables.add(match.table);occupiedParticipants.add(match.sideA);occupiedParticipants.add(match.sideB);
+  }
   const freeTables = Array.from({ length: currentTournament.tables }, (_, index) => `Tisch ${index + 1}`)
-    .filter((table) => !blockedTables.has(table) && !matches.some((match) => match.table === table && isActiveTableMatch(match)));
-
-  return new Map(matches.filter((match) => match.status === 'WAITING').map((match) => [
-    match.id,
-    freeTables.filter((table) => getAssignmentBlockReasonForSnapshot(currentTournament, match.id, table, matches, blockedTables, currentTournament.status) === null),
-  ]));
+    .filter(table => !blockedTables.has(table)&&!occupiedTables.has(table));
+  const stages=new Map(currentTournament.stages.map(stage=>[stage.id,stage]));
+  return new Map(waiting.map(match=>{
+    const stage=stages.get(match.stageId);
+    const allowed=freeTables.length>0&&!occupiedParticipants.has(match.sideA)&&!occupiedParticipants.has(match.sideB)
+      &&(!stage||!blocksInlineBreakRound(currentTournament,stage,match.id));
+    return [match.id,allowed?[...freeTables]:[]];
+  }));
 }
 
 /** Zuweisung = Spielstart. Restzeit ist der Wert genau zum Startzeitpunkt. */

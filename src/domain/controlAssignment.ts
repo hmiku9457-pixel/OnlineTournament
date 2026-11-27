@@ -54,6 +54,12 @@ export function planControlAssignments(
     occupied.add(match.sideA); occupied.add(match.sideB); usedTables.add(assignment.table);
   }
   const remaining = candidates.filter(match => !occupied.has(match.sideA) && !occupied.has(match.sideB));
+  // Tables with identical eligibility in the remaining queue are exchangeable.
+  // Explore only one currently free representative per class, avoiding the
+  // factorial duplication of equivalent table permutations.
+  const tableClasses = new Map<string,string[]>();
+  remaining.forEach((match,index)=>{for(const table of match.tables){const signature=tableClasses.get(table)??[];signature.push(String(index));tableClasses.set(table,signature);}});
+  const signatures=new Map([...tableClasses].map(([table,indices])=>[table,indices.join(',')]));
   let best = greedy;
   let budget = 20000;
   const path = [...fixed];
@@ -65,9 +71,13 @@ export function planControlAssignments(
       budget--;
       const match = remaining[i];
       if (occupied.has(match.sideA) || occupied.has(match.sideB)) continue;
+      const exploredClasses=new Set<string>();
       for (const table of match.tables) {
-        if (--budget < 0) return;
         if (usedTables.has(table)) continue;
+        const signature=signatures.get(table)??table;
+        if(exploredClasses.has(signature))continue;
+        exploredClasses.add(signature);
+        if (--budget < 0) return;
         occupied.add(match.sideA); occupied.add(match.sideB); usedTables.add(table);
         path.push({matchId:match.id,table});
         search(i+1);
