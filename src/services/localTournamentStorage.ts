@@ -506,6 +506,9 @@ export function initializeRemoteTournamentStorage(input: unknown, save: (snapsho
     if (hasPendingRemoteWrites()) { event.preventDefault(); event.returnValue = ''; }
   });
 }
+export function prestartRecoveryStorageKey(id: string): string {
+  return 'online-tournament:' + (remote ? 'online-prestart-recovery:' : 'prestart-recovery:') + id;
+}
 export function hasPendingRemoteWrites(): boolean {
   return remote !== null && (pendingChanges.size > 0 || outstandingCommits > 0);
 }

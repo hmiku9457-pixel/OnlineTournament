@@ -1,3 +1,4 @@
+import { prestartRecoveryStorageKey } from '@/services/localTournamentStorage';
 import { VenueLayoutEditor } from '@/components/VenueLayout';
 import { createVenueLayout, resizeVenueLayoutForTableCount, validateVenueLayout } from '@/domain/venueLayout';
 import { getVenueTerminology } from '@/domain/venueTerminology';
@@ -455,7 +456,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
     if (prestart) {
       const t = prestart.tournament;
       const recovered = typeof window !== 'undefined'
-        ? loadCreationDraft(window.sessionStorage, `online-tournament:prestart-recovery:${t.id}`) : null;
+        ? loadCreationDraft(window.sessionStorage, prestartRecoveryStorageKey(t.id)) : null;
       if (recovered?.name === t.name && recovered.step === 4) return recovered;
       const phases = initialPrestartPhases(t);
       const sportId = findSportOption(t.sport)?.id ?? 'table_tennis';
@@ -503,7 +504,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   });
   const [prestartRecovered] = useState(() => {
     if (!prestart || typeof window === 'undefined') return false;
-    return Boolean(loadCreationDraft(window.sessionStorage, `online-tournament:prestart-recovery:${prestart.tournament.id}`));
+    return Boolean(loadCreationDraft(window.sessionStorage, prestartRecoveryStorageKey(prestart.tournament.id)));
   });
   const [creationError, setCreationError] = useState<string | null>(null);
   const [draftSaveFailed, setDraftSaveFailed] = useState(false);
@@ -1056,7 +1057,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const originalPrestartPhases = useRef(prestart ? initialPrestartPhases(prestart.tournament) : []);
   // Recovery is based on the version that was originally edited, never on
   // the latest tournament loaded after a browser refresh.
-  const prestartRecoveryKey = prestart ? `online-tournament:prestart-recovery:${prestart.tournament.id}` : '';
+  const prestartRecoveryKey = prestart ? prestartRecoveryStorageKey(prestart.tournament.id) : '';
   const originalPrestartFingerprint = useRef((() => {
     if (!prestart) return '';
     if (prestartRecovered) {
@@ -1099,7 +1100,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   // successful save removes it; navigating within the director does not.
   useEffect(() => {
     if (!prestart) return;
-    const key = `online-tournament:prestart-recovery:${prestart.tournament.id}`;
+    const key = prestartRecoveryStorageKey(prestart.tournament.id);
     if (prestartDirty) {
       saveCreationDraft(draftSnapshot, window.sessionStorage, key);
       if (!prestartRecovered && originalPrestartFingerprint.current) {

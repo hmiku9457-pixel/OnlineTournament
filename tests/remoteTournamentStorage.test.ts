@@ -68,6 +68,28 @@ describe('isolated remote tournament persistence', () => {
     expect(() => adapter.localTournamentStorage.setItem(key, backup.entries[key])).toThrow();
     expect(save).toHaveBeenCalledTimes(1);
   });
+  it('runs the existing director engine against the remote storage boundary', async () => {
+    const { adapter, backup, t } = await setup();
+    const store = await import('@/services/mockTournamentStore');
+    const lifecycle = await import('@/services/mockPhaseLifecycle');
+    const runtime = await import('@/services/mockRuntime');
+    let persisted = backup;
+    adapter.initializeRemoteTournamentStorage(backup, async (next) => { persisted = next; });
+    expect(adapter.prestartRecoveryStorageKey(t.id)).toContain('online-prestart-recovery');
+    expect(lifecycle.startFirstStage(t)).toBe(true);
+    await adapter.flushPendingLocalTournamentWrites();
+    const running = store.getMockTournament(t.id);
+    const match = runtime.getMockRuntimeMatches(running).find((m) => m.status === 'WAITING');
+    expect(match).toBeDefined();
+    expect(runtime.assignMockMatchToTable(running, match!.id, 'Tisch 1')).toBe(true);
+    await adapter.flushPendingLocalTournamentWrites();
+    runtime.saveMockMatchSets(match!.id, [{ number: 1, sideAScore: 11, sideBScore: 6 }]);
+    await adapter.flushPendingLocalTournamentWrites();
+    const results = JSON.parse(persisted.entries['online-tournament:mock-match-results:v2']);
+    expect(results).toEqual(expect.arrayContaining([expect.objectContaining({ matchId: match!.id })]));
+    expect(JSON.stringify(persisted)).toContain('Tisch 1');
+    expect(data.get('online-tournament:mock-match-results:v2') ?? '').not.toContain(match!.id);
+  });
   it('does not persist a replacement or deletion of the online event', async () => {
     const { adapter, backup } = await setup();
     const save = vi.fn(async () => {});
