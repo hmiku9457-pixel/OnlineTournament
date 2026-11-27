@@ -366,7 +366,6 @@ function scheduleWrite(key: string, value: string | null): void {
   if (!ready || !key.startsWith(PREFIX)) return;
   if (currentError) throw new Error(currentError);
   pendingChanges.set(key, value);
-  if (remote) window.dispatchEvent(new Event('tournament-storage-integrity-change'));
   if (flushScheduled) return;
   flushScheduled = true;
   queueMicrotask(() => {

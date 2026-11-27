@@ -21,7 +21,9 @@ export function LoginPage() {
     if (!supabase || busy) return;
     setBusy(true); setMessage('');
     try {
-      const redirect = new URL(import.meta.env.BASE_URL, window.location.origin).href;
+      const redirectUrl = new URL(window.location.href);
+      redirectUrl.hash = ''; redirectUrl.search = '';
+      const redirect = redirectUrl.href;
       const result = mode === 'logout' ? await supabase.auth.signOut()
         : mode === 'link' ? await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: redirect } })
         : mode === 'register' ? await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: redirect } })
