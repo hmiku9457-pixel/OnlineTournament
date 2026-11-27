@@ -260,6 +260,18 @@ try {
   const opponent=await personal.newPage();
   await opponent.goto(opponentLink);
   await opponent.getByRole('heading',{name:'Bernd',exact:true}).waitFor();
+  // Prepare a second pair for the bulk adoption scenario.
+  const clara=playerModal.locator('article').filter({hasText:'Clara'});
+  const dieter=playerModal.locator('article').filter({hasText:'Dieter'});
+  await clara.getByRole('button',{name:'Zugang erstellen'}).click();
+  const claraLink=await clara.getByRole('link',{name:'Öffnen'}).getAttribute('href');
+  await dieter.getByRole('button',{name:'Zugang erstellen'}).click();
+  const dieterLink=await dieter.getByRole('link',{name:'Öffnen'}).getAttribute('href');
+  assert.ok(claraLink&&dieterLink);
+  const playerC=await personal.newPage(),playerD=await personal.newPage();
+  await playerC.goto(claraLink);await playerD.goto(dieterLink);
+  await playerC.getByRole('heading',{name:'Clara',exact:true}).waitFor();
+  await playerD.getByRole('heading',{name:'Dieter',exact:true}).waitFor();
   await playerModal.getByRole('button',{name:'Schließen'}).click();
   // A fresh anonymous browser sees only the allowlisted progress projection.
   const spectator=await browser.newContext();
@@ -320,10 +332,13 @@ try {
     const t=getAllMockTournaments()[0];
     const m=getMockRuntimeMatches(t).find(m=>[m.sideA,m.sideB].includes('Anna')&&[m.sideA,m.sideB].includes('Bernd'));
     if(!m||!assignMockMatchToTable(t,m.id,'Tisch 1'))throw new Error('fixture assignment failed');
-    return m.id;
+    const m2=getMockRuntimeMatches(t).find(m=>[m.sideA,m.sideB].includes('Clara')&&[m.sideA,m.sideB].includes('Dieter'));
+    if(!m2||!assignMockMatchToTable(t,m2.id,'Tisch 2'))throw new Error('second fixture assignment failed');
+    return [m.id,m2.id];
   });
   await confirmed(a);
-  await a.getByRole('button',{name:'Datenbankstand prüfen',exact:true}).click();
+  const checkButton=a.getByRole('button',{name:'Datenbankstand prüfen',exact:true});
+  if(await checkButton.isEnabled())await checkButton.click();
   await player.reload();
   await player.getByRole('heading',{name:'Ergebnis melden',exact:true}).waitFor({timeout:45000});
   await player.getByLabel('Eigene Punkte 1',{exact:true}).fill('11');
@@ -337,14 +352,27 @@ try {
   await opponent.getByRole('dialog',{name:'Spielermeldung bestätigen'}).getByRole('button',{name:'Ergebnis melden'}).click();
   await opponent.getByText(/Beide Meldungen stimmen überein/).waitFor();
   assert.equal(rows.get(id).revision,beforeReports,'reports cannot mutate canonical revision');
-  await a.getByRole('button',{name:'Übereinstimmendes Ergebnis übernehmen'}).click({timeout:45000});
-  await a.getByRole('button',{name:'Übereinstimmendes Ergebnis übernehmen'}).waitFor({state:'hidden',timeout:45000});
+  // A second independent pair reports another result before bulk adoption.
+  await playerC.reload();
+  await playerC.getByRole('heading',{name:'Ergebnis melden',exact:true}).waitFor({timeout:45000});
+  await playerC.getByLabel('Eigene Punkte 1',{exact:true}).fill('11');
+  await playerC.getByLabel('Gegnerpunkte 1',{exact:true}).fill('6');
+  await playerC.getByRole('button',{name:'Ergebnis prüfen'}).click();
+  await playerC.getByRole('dialog',{name:'Spielermeldung bestätigen'}).getByRole('button',{name:'Ergebnis melden'}).click();
+  await playerC.getByText('Wartet auf Meldung des Gegners.').waitFor();
+  await playerD.reload();
+  await playerD.getByRole('button',{name:'Diesen Stand bestätigen'}).click();
+  await playerD.getByRole('dialog',{name:'Spielermeldung bestätigen'}).getByRole('button',{name:'Ergebnis melden'}).click();
+  await playerD.getByText(/Beide Meldungen stimmen überein/).waitFor();
+  assert.equal(rows.get(id).revision,beforeReports);
+  await a.getByRole('button',{name:'Alle 2 übereinstimmenden Ergebnisse übernehmen'}).click({timeout:45000});
+  await a.getByRole('dialog',{name:'Sammelübernahme bestätigen'}).getByRole('button',{name:'Sammelübernahme bestätigen'}).click();
+  await a.getByRole('dialog',{name:'Sammelübernahme bestätigen'}).waitFor({state:'hidden',timeout:45000});
   await confirmed(a);
-  const adopted=JSON.parse(rows.get(id).payload.entries['online-tournament:mock-match-results:v2']).find(r=>r.matchId===reportId);
-  assert.ok(adopted,'result must be present in the confirmed snapshot');
-  assert.equal(adopted.status,'FINISHED');
-  assert.equal(adopted.adminConfirmed,true);
-  assert.equal(rows.get(id).revision,beforeReports+1);
+  const adopted=JSON.parse(rows.get(id).payload.entries['online-tournament:mock-match-results:v2']).filter(r=>reportId.includes(r.matchId));
+  assert.equal(adopted.length,2,'both results must be present in the confirmed snapshot');
+  assert.ok(adopted.every(r=>r.status==='FINISHED'&&r.adminConfirmed));
+  assert.equal(rows.get(id).revision,beforeReports+1,'bulk result adoption must commit exactly one revision');
   await personal.close();
   // The server commits, but both automatic HTTP responses are lost.
   loseResponses=2;
