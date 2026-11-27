@@ -14,7 +14,7 @@ declare
 begin
  v_entries := jsonb_build_object(
    'online-tournament:local-prototype-tournaments:v1:record:local-rpc-test',
-   '{"sortOrder":1,"tournament":{"id":"local-rpc-test","name":"Test","status":"READY","visibility":"PRIVATE","discipline":"SINGLES","hasStarted":false,"tables":2,"participantNames":["A","B"],"participantIds":{"A":"p-a","B":"p-b"},"stages":[{"id":"local-rpc-test-phase-1","tournamentId":"local-rpc-test","type":"ROUND_ROBIN","settings":{}}]}}',
+   '{"sortOrder":1,"tournament":{"id":"local-rpc-test","name":"Test","status":"READY","visibility":"PRIVATE","discipline":"SINGLES","sport":"Tischtennis","hasStarted":false,"tables":2,"participantNames":["A","B"],"participantIds":{"A":"p-a","B":"p-b"},"stages":[{"id":"local-rpc-test-phase-1","tournamentId":"local-rpc-test","type":"ROUND_ROBIN","bestOf":1,"settings":{}}]}}',
    'online-tournament:mock-draw-config:v1','[]','online-tournament:mock-phase-lifecycle:v1','[]',
    'online-tournament:mock-audit:v1','[]','online-tournament:mock-inline-breaks:v2','[]',
    'online-tournament:group-cutoff-decisions:v1','[]','online-tournament:mock-match-results:v2','[]',
@@ -41,6 +41,8 @@ begin
  begin perform public.commit_online_tournament(v_id,'Test',2,op3,v_invalid); raise exception 'unstarted phase completed'; exception when invalid_parameter_value then null; end;
  v_invalid := jsonb_set(v_payload,'{entries}',v_entries || jsonb_build_object('online-tournament:mock-phase-lifecycle:v1','[{"tournamentId":"local-rpc-test","startedStageIds":["local-rpc-test-phase-1"],"completedStageIds":[]}]','online-tournament:mock-match-runtime:v1','[{"matchId":"local-rpc-test-phase-1-m1","status":"LIVE","table":"Tisch 1"},{"matchId":"local-rpc-test-phase-1-m2","status":"LIVE","table":"Tisch 1"}]'));
  begin perform public.commit_online_tournament(v_id,'Test',2,op3,v_invalid); raise exception 'duplicate table accepted'; exception when invalid_parameter_value then null; end;
+ v_invalid := jsonb_set(v_payload,'{entries}',v_entries || jsonb_build_object('online-tournament:mock-match-results:v2','[{"matchId":"local-rpc-test-phase-1-m1","status":"FINISHED","sets":[{"number":1,"sideAScore":9,"sideBScore":7}]}]'));
+ begin perform public.commit_online_tournament(v_id,'Test',2,op3,v_invalid); raise exception 'invalid TT set accepted'; exception when invalid_parameter_value then null; end;
  if (select count(*) from public.list_online_checkpoints(v_id)) <> 2 then raise exception 'checkpoint count'; end if;
  if public.load_online_checkpoint(v_id,1) is distinct from v_payload then raise exception 'checkpoint payload'; end if;
  if (public.load_online_tournament(v_id)->>'revision')::int <> 2 then raise exception 'wrong revision'; end if;
