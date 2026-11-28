@@ -6,14 +6,16 @@ import { captureTournamentBackup, restoreTournamentBackup, validateTournamentBac
 import { listCloudBackups, saveCloudBackup, loadCloudBackup, deleteCloudBackup, type CloudBackupSummary } from '@/services/cloudBackups';
 
 export function BackupsPage() {
-  const { session, loading } = useAccount();
+  const {session,loading}=useAccount();
+  return <BackupWorkspace key={session?.user.id??'anonymous'} userId={session?.user.id} loading={loading}/>;
+}
+function BackupWorkspace({userId,loading}:{userId:string|undefined;loading:boolean}) {
   const navigate = useNavigate();
   const [local, setLocal] = useState(getAllMockTournaments);
   const [cloud, setCloud] = useState<CloudBackupSummary[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [removeId, setRemoveId] = useState<string | null>(null);
-  const userId = session?.user.id;
   useEffect(() => {
     let current = true;
     setCloud([]); setRemoveId(null);

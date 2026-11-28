@@ -628,6 +628,27 @@ try {
   await a.getByRole('button',{name:'Datenbankstand neu laden',exact:true}).click();
   await confirmed(a);
   await a.getByRole('button',{name:'Turnier pausieren',exact:true}).waitFor();
+  // Recover the confirmed checkpoint as an independent local emergency stand.
+  const original=structuredClone(rows.get(created));
+  await a.getByRole('button',{name:'Bearbeitung freigeben und zurück'}).click();
+  await a.getByRole('heading',{name:'Online-Turniere',exact:true}).waitFor();
+  const entry=a.locator('article.online-catalog-row').filter({hasText:'Erstellung Wiederaufnahme'});
+  await entry.getByRole('button',{name:'Wiederherstellungspunkte'}).click();
+  await a.getByRole('button',{name:'Lokal wiederherstellen …',exact:true}).click();
+  const restore=a.getByRole('dialog',{name:'Lokalen Notfallstand wiederherstellen'});
+  await restore.getByRole('button',{name:'Lokal wiederherstellen',exact:true}).click();
+  await a.getByText('Lokaler Notfallstand wiederhergestellt. Öffne ihn unter Lokale Turniere.',{exact:true}).waitFor();
+  const local=await a.evaluate(async id=>{
+    const {captureTournamentBackup}=await import('/src/services/localTournamentStorage.ts');
+    return await captureTournamentBackup(id);
+  },created);
+  assert.deepEqual(local.entries,original.payload.entries,'local recovery must preserve confirmed snapshot entries');
+  assert.deepEqual(rows.get(created),original,'local restoration must not alter online revision');
+  await a.getByRole('button',{name:'Lokal wiederherstellen …',exact:true}).click();
+  await restore.getByRole('button',{name:'Lokal wiederherstellen',exact:true}).click();
+  await restore.getByRole('alert').filter({hasText:'existiert bereits lokal'}).waitFor();
+  await restore.getByRole('button',{name:'Abbrechen',exact:true}).click();
+  assert.deepEqual(rows.get(created),original);
   await first.close(); await second.close();
   process.stdout.write('Online browser smoke passed: login, cloud creation, start, lost response, retry, second browser and stale revision.\n');
 } finally { await browser.close(); }

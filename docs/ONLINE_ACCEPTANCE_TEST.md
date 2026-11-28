@@ -62,3 +62,6 @@ Zum normalen Neuladen die Schaltfläche „Arbeitsbereich neu laden“ verwenden
 
 ## Freigabegrenze
 Automatische CI (Unit-Tests, echte Chromium-Sitzungen mit simulierten HTTP-Antworten, echte PostgreSQL-Integration mit synthetischen Daten) ist Voraussetzung, ersetzt aber keine manuelle Abnahme mit realer Anmeldung, Netzwerkausfall, Mobilgeräten und typischer Zuschauerlast. Kein produktives Turnier vor dieser Abnahme.
+
+## Automatisierte Belastungsprobe
+Die CI simuliert 32 Teilnehmer in acht Gruppen und einer anschließenden KO-Runde sowie 16 Teilnehmer im Jeder-gegen-jeden-Modus. Die separate Leseprobe verwendet acht parallele PostgreSQL-Verbindungen, 32 persönliche Zugangsschlüssel und 704 vollständige bzw. bedingte Bundle-Abfragen. Sie kontrolliert auch, dass fremde Paarungen nicht sichtbar sind und widerrufene Links keine Daten mehr liefern. Die Laufzeit wird im CI-Protokoll ausgegeben, ist aber keine Aussage über die reale Supabase-HTTP-Kapazität, Mobilfunk oder die maximale Zuschauerzahl.

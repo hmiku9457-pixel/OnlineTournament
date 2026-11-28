@@ -199,7 +199,22 @@ begin
  if public.claim_online_workspace(v_id,lease1,true) then raise exception 'released lease renewed'; end if;
  if not public.claim_online_workspace(v_id,lease2,false) then raise exception 'takeover after release failed'; end if;
  begin perform public.commit_leased_online_tournament(v_id,'Test',29,gen_random_uuid(),v_later,lease1); raise exception 'old token accepted'; exception when lock_not_available then null; end;
+ -- Named owner, different account, and anonymous sign-in under the same
+ -- authenticated role must have distinct backup access.
+ insert into public.tournament_backups(id,tournament_id,tournament_name,payload)
+ values ('00000000-0000-4000-8000-0000000000e1',v_id,'Test',v_payload);
+ if not exists(select 1 from public.tournament_backups where id='00000000-0000-4000-8000-0000000000e1') then raise exception 'owner backup missing'; end if;
+ perform set_config('request.jwt.claims','{"is_anonymous":true}',true);
+ if exists(select 1 from public.tournament_backups where id='00000000-0000-4000-8000-0000000000e1') then raise exception 'anonymous sign-in sees backup'; end if;
+ delete from public.tournament_backups where id='00000000-0000-4000-8000-0000000000e1';
+ if found then raise exception 'anonymous sign-in deleted backup'; end if;
+ begin perform public.inspect_online_operation(v_id,'Test',0,op1,v_payload); raise exception 'anonymous receipt accepted'; exception when insufficient_privilege then null; end;
+ perform set_config('request.jwt.claims','{}',true);
+ if not exists(select 1 from public.tournament_backups where id='00000000-0000-4000-8000-0000000000e1') then raise exception 'backup unexpectedly deleted'; end if;
  perform set_config('request.jwt.claim.sub','00000000-0000-4000-8000-0000000000b2',true);
+ if exists(select 1 from public.tournament_backups where id='00000000-0000-4000-8000-0000000000e1') then raise exception 'foreign backup visible'; end if;
+ delete from public.tournament_backups where id='00000000-0000-4000-8000-0000000000e1';
+ if found then raise exception 'foreign backup deleted'; end if;
  begin perform public.online_spectator_detail_setting(v_id,true); raise exception 'foreign details enabled'; exception when insufficient_privilege then null; end;
  begin perform public.manage_online_player_access(v_id,'p-a','rotate'); raise exception 'foreign player management'; exception when insufficient_privilege then null; end;
  begin perform public.list_online_player_access(v_id); raise exception 'foreign player list'; exception when insufficient_privilege then null; end;
