@@ -1,5 +1,5 @@
 import type { PendingOnlineOperation } from '@/services/onlineOutbox';
-import { backupTournamentName, type TournamentBackup } from '@/services/localTournamentStorage';
+import { backupTournamentName, restoreTournamentBackup, type TournamentBackup } from '@/services/localTournamentStorage';
 import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Link } from 'react-router-dom';
@@ -26,6 +26,7 @@ function OnlineCatalog() {
   const [pendingCreations,setPendingCreations]=useState<PendingOnlineOperation[]>([]);
   const [busy,setBusy]=useState(false);
   const [loaded,setLoaded]=useState(false);
+  const [restore,setRestore]=useState<{backup:TournamentBackup;revision:number}|null>(null);
   const [history,setHistory]=useState<{id:string;rows:OnlineCheckpoint[]}|null>(null);
   const [message,setMessage]=useState('');
   const [search,setSearch]=useState('');
@@ -87,13 +88,14 @@ function OnlineCatalog() {
       </article>)}
       {history&&<div className="card" style={{marginTop:12}}><div className="actions"><h3>Wiederherstellungspunkte</h3><button className="btn small" onClick={()=>setHistory(null)}>Schließen</button></div>
         <p className="muted">Bis zu 20 Revisionen (maximal 16 MiB je Turnier). Der aktive Datenbankstand bleibt unverändert.</p>
-        {history.rows.map(row=><div className="actions" key={row.revision}><strong>Revision {row.revision}</strong><span>{new Date(row.created_at).toLocaleString('de-DE')}</span><button className="btn small" disabled={busy} onClick={()=>void run(async()=>{const backup=await loadOnlineCheckpoint(history.id,row.revision);if(alive.current)download(backup,row.revision);})}>JSON herunterladen</button></div>)}
+        {history.rows.map(row=><div className="actions" key={row.revision}><strong>Revision {row.revision}</strong><span>{new Date(row.created_at).toLocaleString('de-DE')}</span><button className="btn small" disabled={busy} onClick={()=>void run(async()=>{const backup=await loadOnlineCheckpoint(history.id,row.revision);if(alive.current)download(backup,row.revision);})}>JSON herunterladen</button><button className="btn small" disabled={busy} onClick={()=>void run(async()=>{const backup=await loadOnlineCheckpoint(history.id,row.revision);if(alive.current)setRestore({backup,revision:row.revision});})}>Lokal wiederherstellen …</button></div>)}
       </div>}
     </section>
     <section className="card"><h2>Online-Testturnier vorbereiten</h2><p className="muted">Neues Online-Turnier erstellen oder ungestartetes lokales Turnier als unabhängige Kopie übernehmen.</p>
       <Link className="btn primary" to="/tournaments/new?mode=online">Neues Online-Turnier erstellen</Link>
       {local.map(t=><div key={t.id} className="actions" style={{marginTop:12}}><strong>{t.name}</strong><button className="btn small primary" disabled={busy||!loaded||pendingCreations.length>0||items.some(i=>i.id===t.id)} onClick={()=>void run(async()=>{try{await createOnlineTournamentFromLocal(t.id);if(alive.current)setMessage('Online-Testturnier angelegt. Lokale und Online-Version sind unabhängig.');}finally{await refresh();}})}>Als Online-Testturnier anlegen</button></div>)}
     </section>
+    {restore&&<div className="prototype-modal-backdrop"><section className="prototype-modal" role="dialog" aria-modal="true" aria-label="Lokalen Notfallstand wiederherstellen"><h2>Lokalen Notfallstand wiederherstellen</h2><p><strong>{backupTournamentName(restore.backup)}</strong> · Revision {restore.revision}</p><p>Erstellt ausschließlich einen lokalen Turnierstand. Das Online-Turnier und seine Zugänge bleiben unverändert. Ein bereits vorhandenes lokales Turnier wird nicht überschrieben. Nicht beide Stände parallel als denselben Wettbewerb leiten.</p><div className="actions"><button className="btn" disabled={busy} onClick={()=>setRestore(null)}>Abbrechen</button><button className="btn primary" disabled={busy} onClick={()=>void run(async()=>{await restoreTournamentBackup(restore.backup);if(alive.current){setRestore(null);setMessage('Lokaler Notfallstand wiederhergestellt. Öffne ihn unter Lokale Turniere.');}})}>Lokal wiederherstellen</button></div></section></div>}
     {players&&<div className="prototype-modal-backdrop" onMouseDown={()=>!busy&&setPlayers(null)}><section className="prototype-modal online-player-access-modal" role="dialog" aria-modal="true" aria-labelledby="players-title" onMouseDown={e=>e.stopPropagation()} onKeyDown={e=>{if(e.key==='Escape'&&!busy)setPlayers(null);}}>
       <h2 id="players-title">Spielerzugänge · {players.item.name}</h2>
       <p>Ein persönlicher Link erlaubt das Lesen eigener Begegnungen sowie die Meldung und gegenseitige Bestätigung regulärer Endergebnisse. Die Turnierleitung übernimmt das verbindliche Ergebnis. Kein Benutzerkonto erforderlich. Links vertraulich an die jeweiligen Teilnehmer weitergeben. Die öffentliche Zuschauerfreigabe ist unabhängig.</p>

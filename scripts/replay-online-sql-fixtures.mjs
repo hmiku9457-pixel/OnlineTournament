@@ -18,6 +18,9 @@ for(const snapshot of snapshots){
     sql+="select public.claim_online_workspace("+q(id)+","+q(token)+"::uuid,false);\n";
   } else sql+="select public.commit_leased_online_tournament("+q(id)+","+q(tournament.name)+","+revision+","+q(op)+"::uuid,"+q(JSON.stringify(snapshot))+"::jsonb,"+q(tokens.get(id))+"::uuid);\n";
   ids.set(id,revision+1);
+  // Large fixture runs may exceed the real 90-second workspace lease.
+  // Renew explicitly as the actual director would, never bypass the guard.
+  if(revision>0&&revision%10===0)sql+="select public.claim_online_workspace("+q(id)+","+q(tokens.get(id))+"::uuid,true);\n";
 }
 assert.ok(ids.size>=3,'Expected round-robin, Swiss and group/KO fixtures');
 assert.ok(snapshots.length>=20,'Expected complete runtime sequences');

@@ -450,6 +450,52 @@ describe('isolated remote tournament persistence', () => {
     expect(new Set(finished.map((m:{matchId:string})=>m.matchId)).size).toBe(120);
     expect(finished.every((m:{status:string;adminConfirmed:boolean})=>m.status==='FINISHED'&&m.adminConfirmed)).toBe(true);
   },30000);
+  it('runs 32 participants through eight groups and a 16-player KO on eight tables',async()=>{
+    const {adapter}=await setup();
+    const store=await import('@/services/mockTournamentStore');
+    const lifecycle=await import('@/services/mockPhaseLifecycle');
+    const runtime=await import('@/services/mockRuntime');
+    const {planControlAssignments}=await import('@/domain/controlAssignment');
+    const t=store.buildNewTournament({name:'32 Teilnehmer Mehrphasen-Simulation',sport:'table_tennis',discipline:'SINGLES',tables:8,minimumMatches:3,estimatedDurationMinutes:240,
+      participantNames:Array.from({length:32},(_,i)=>'Teilnehmer '+(i+1)),phases:[
+        {type:'GROUPS',label:'Gruppen',entrantCount:32,groupCount:8,swissRounds:1,bestOf:1,knockoutBestOf:[]},
+        {type:'KNOCKOUT',label:'Finalrunde',entrantCount:16,groupCount:1,swissRounds:1,bestOf:1,knockoutBestOf:[1,1,1,1]}]});
+    let saved=adapter.initialTournamentBackup(t);
+    recordSqlFixture(saved);
+    adapter.initializeRemoteTournamentStorage(saved,async next=>{saved=structuredClone(next);recordSqlFixture(saved);});
+    const free=Array.from({length:8},(_,i)=>'Tisch '+(i+1));
+    let total=0;
+    for(let phase=0;phase<2;phase++){
+      const current=store.getMockTournament(t.id);
+      adapter.runRemoteTournamentBatch(()=>{
+        expect(phase===0?lifecycle.startFirstStage(current):lifecycle.startStage(current,current.stages[phase])).toBe(true);
+        store.updateMockTournamentStatus(t.id,'RUNNING');
+      });
+      await adapter.flushPendingLocalTournamentWrites();
+      if(phase===1)expect(lifecycle.getStageEntrants(store.getMockTournament(t.id),t.stages[1])).toHaveLength(16);
+      for(let batch=0;batch<65;batch++){
+        const active=store.getMockTournament(t.id);
+        const waiting=runtime.getMockRuntimeMatches(active).filter(m=>m.status==='WAITING');
+        if(!waiting.length)break;
+        const plan=planControlAssignments(waiting,runtime.getMockQueueAssignableTables(active),free);
+        expect(plan.length).toBeGreaterThan(0);
+        expect(new Set(plan.map(p=>p.table)).size).toBe(plan.length);
+        const assigned=plan.flatMap(p=>{const m=waiting.find(m=>m.id===p.matchId)!;return [m.sideA,m.sideB]});
+        expect(new Set(assigned).size).toBe(assigned.length);
+        adapter.runRemoteTournamentBatch(()=>{for(const p of plan)expect(runtime.assignMockMatchToTable(active,p.matchId,p.table)).toBe(true);});
+        await adapter.flushPendingLocalTournamentWrites();
+        adapter.runRemoteTournamentBatch(()=>{for(const p of plan)runtime.completeMockMatch(p.matchId,[{number:1,sideAScore:11,sideBScore:7}],'FINISHED',true);});
+        await adapter.flushPendingLocalTournamentWrites();
+        total+=plan.length;
+      }
+      const active=store.getMockTournament(t.id);
+      expect(runtime.approveMockProgress(active)?.kind).toBe('STAGE');
+      await adapter.flushPendingLocalTournamentWrites();
+    }
+    expect(total).toBe(64);
+    expect(store.getMockTournament(t.id).status).toBe('FINISHED');
+    expect(JSON.parse(saved.entries['online-tournament:mock-match-results:v2'])).toHaveLength(64);
+  },60000);
   it('does not persist a replacement or deletion of the online event', async () => {
     const { adapter, backup } = await setup();
     const save = vi.fn(async () => {});

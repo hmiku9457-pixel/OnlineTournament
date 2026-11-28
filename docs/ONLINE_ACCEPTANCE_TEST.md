@@ -36,7 +36,7 @@ Erst nach grüner CI und erfolgreichem Deployment durchführen. Kein produktives
 Kein Datenverlust, keine fremden Daten, keine Doppelbuchung, keine unbemerkte Konfliktüberschreibung, korrekte Turnierstände nach Reload. Bei einem Fehler Test stoppen und Screenshot/Browser/Schritt notieren. Testdaten nicht für echte Veranstaltungen verwenden.
 
 ## Noch nicht freigegeben
-Der Online-Modus ist ein privater Testbetrieb mit versionierten Snapshots. Keine vollständige serverseitige Neuberechnung aller Paarungen, Qualifikationen oder Sonderentscheidungen, kein verteiltes Bearbeitungslease, keine öffentlichen Spieler-/Zuschaueransichten. Die IndexedDB-Wiederherstellung schützt vor normalen Browserneustarts, nicht vor Löschung des Browserprofils oder Verlust des Geräts.
+Der Online-Modus ist ein privater Testbetrieb mit versionierten Snapshots. Keine vollständige serverseitige Neuberechnung aller Paarungen, Qualifikationen oder Sonderentscheidungen. Exklusive Bearbeitungslease, widerrufbare persönliche Spielerlinks und optionale Zuschauerlinks sind implementiert; noch nicht unter realer Veranstaltungslast abgenommen. Die IndexedDB-Wiederherstellung schützt vor normalen Browserneustarts, nicht vor Löschung des Browserprofils oder Verlust des Geräts.
 
 ## Erste Kurzabnahme
 Für den Einstieg reicht Block 1 und ein kleiner Ausschnitt von Block 2: ein Online-Turnier mit vier fiktiven Spielern erstellen, starten, ein Ergebnis speichern, über „Arbeitsbereich neu laden“ neu laden, Ergebnis und Tabelle prüfen. Die Anmeldung muss erstmals mit dem echten Supabase-Konto durch den Anwender bestätigt werden. Erst danach die übrigen Testblöcke durchführen. Vor dem Test prüfen, dass die GitHub-Pages-Auslieferung den gewünschten Commit enthält.
@@ -48,3 +48,17 @@ Links unten auf jeder Ansicht steht `v0.1.0 · Build <Nummer> · <Commit>` beim 
 Block 3 entsprechend aktualisieren: Browser B muss zunächst die Sperrseite anzeigen. Browser A gibt die Bearbeitung über den Button frei, danach kann B das Turnier öffnen und weiterleiten. Nach einem Absturz darf die Sperre nach spätestens 90 Sekunden seit letzter Verlängerung ablaufen. B darf A nicht gewaltsam verdrängen. Eine alte Anwendung darf nach Verlust der Sperre keine weiteren Ergebnisse speichern.
 
 Zum normalen Neuladen die Schaltfläche „Arbeitsbereich neu laden“ verwenden, die die Sperre vorher freigibt.
+
+## Block 6 – Persönliche und öffentliche Ansichten
+- Persönliche Links erstellen, QR-Code scannen, Aufruf bestätigen und neu laden. Erneuter Aufruf muss die Bestätigung zurücksetzen. Fremde Spieler dürfen den Aufruf nicht bestätigen.
+- Beide Seiten melden ein übereinstimmendes Ergebnis; die Turnierleitung übernimmt es bewusst. Abweichende Meldungen dürfen nicht automatisch gewertet werden.
+- Zuschaueransicht ohne Details öffnen, Details freigeben und wieder entziehen. Hallenansicht und Phasenfilter prüfen.
+- Spieler- und Zuschauerlinks widerrufen oder rotieren; alte Links dürfen keine Daten mehr liefern. Auf geöffneter Seite erfolgt die Sperre bei der nächsten erfolgreichen Prüfung.
+
+## Block 7 – Notfall und Speicherbeleg
+- Bei unklarer Speicherung zuerst „Speicherstatus prüfen“. Eine bestätigte ursprüngliche Anfrage kann ohne erneutes Schreiben übernommen werden; eine abweichende Revision darf nicht überschrieben werden.
+- Einen Wiederherstellungspunkt lokal wiederherstellen (auf einem Browser ohne lokale Kopie derselben ID). Online-Revision muss unverändert bleiben. Lokale Kopie nur als Notfallstand benutzen, nicht parallel zum Online-Original.
+- Checkpoints: maximal 20 Revisionen und 16 MiB logisches Budget je Turnier. JSON-Dateien vertraulich außerhalb des Browsers sichern.
+
+## Freigabegrenze
+Automatische CI (Unit-Tests, echte Chromium-Sitzungen mit simulierten HTTP-Antworten, echte PostgreSQL-Integration mit synthetischen Daten) ist Voraussetzung, ersetzt aber keine manuelle Abnahme mit realer Anmeldung, Netzwerkausfall, Mobilgeräten und typischer Zuschauerlast. Kein produktives Turnier vor dieser Abnahme.

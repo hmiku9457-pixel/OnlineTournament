@@ -173,9 +173,24 @@ export async function releaseCurrentOnlineWorkspace(): Promise<void> {
   workspaceRevision=undefined;
   await releaseWorkspace(workspace.id,workspace.token);
 }
+export interface OnlineOperationReceipt {state:'confirmed'|'unconfirmed'|'conflict'|'unknown';currentRevision:number|null;committedRevision:number|null}
+export async function inspectPendingOnlineOperation(op:PendingOnlineOperation):Promise<OnlineOperationReceipt>{
+ const {client,userId}=await account();
+ if(op.ownerId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
+ const {data,error}=await client.rpc('inspect_online_operation',{p_id:op.tournamentId,p_name:backupTournamentName(op.snapshot),p_expected_revision:op.expectedRevision,p_operation_id:op.operationId,p_payload:op.snapshot}).abortSignal(AbortSignal.timeout(12000));
+ if((await account()).userId!==userId)throw new Error('Die Anmeldung hat sich geändert.');
+ if(error||!data||!['confirmed','unconfirmed','conflict','unknown'].includes(data.state))throw new Error(error?.message??'Speicherstatus nicht prüfbar.');
+ if(data.state==='confirmed'&&data.committedRevision!==op.expectedRevision+1)throw new Error('Unerwartete Datenbankrevision.');
+ return data as OnlineOperationReceipt;
+}
 export async function resolvePendingOnlineOperation(op: PendingOnlineOperation, discard = false): Promise<void> {
   const { userId } = await account();
   if (op.ownerId !== userId) throw new Error('Die Anmeldung hat sich geändert.');
+  if(!discard){
+    const receipt=await inspectPendingOnlineOperation(op);
+    if(receipt.state==='confirmed'){await removeOnlineOperation(op.operationId);return;}
+    if(receipt.state==='conflict')throw new Error('Ein neuerer Datenbankstand ist vorhanden. Nichts wurde überschrieben.');
+  }
   if(op.expectedRevision===0){
     if(!discard)await commit(op.snapshot,0,userId,op.operationId);
     await removeOnlineOperation(op.operationId);

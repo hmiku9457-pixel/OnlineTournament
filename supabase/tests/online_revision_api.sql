@@ -139,6 +139,10 @@ begin
  if public.read_online_spectator_rankings(spectator) is not null then raise exception 'disabled ranking exposed'; end if;
  if public.read_online_spectator_details(spectator) is not null then raise exception 'disabled details visible'; end if;
  if public.commit_online_tournament(v_id,'Test',0,op1,v_payload) <> 1 then raise exception 'late retry'; end if;
+ if public.inspect_online_operation(v_id,'Test',0,op1,v_payload)->>'state' is distinct from 'confirmed' then raise exception 'receipt not found'; end if;
+ if public.inspect_online_operation(v_id,'Test',0,op1,v_payload)->>'committedRevision' is distinct from '1' then raise exception 'receipt revision mismatch'; end if;
+ if public.inspect_online_operation(v_id,'Test',0,gen_random_uuid(),v_payload)->>'state' is distinct from 'conflict' then raise exception 'receipt conflict missing'; end if;
+ begin perform public.inspect_online_operation(v_id,'Changed',0,op1,v_payload); raise exception 'different receipt payload accepted'; exception when invalid_parameter_value then null; end;
  begin perform public.commit_leased_online_tournament(v_id,'Test',1,op3,v_payload,lease1); raise exception 'stale update accepted'; exception when serialization_failure then null; end;
  begin perform public.commit_leased_online_tournament(v_id,'Test',2,op2,v_payload,lease1); raise exception 'operation reuse accepted'; exception when invalid_parameter_value then null; end;
  v_invalid := jsonb_set(v_payload,'{entries}',v_entries-'online-tournament:mock-match-results:v2');
@@ -205,6 +209,7 @@ begin
  begin perform public.claim_online_workspace(v_id,lease2,false); raise exception 'foreign lease claimed'; exception when insufficient_privilege then null; end;
  begin perform public.release_online_workspace(v_id,lease2); raise exception 'foreign lease released'; exception when insufficient_privilege then null; end;
  if has_function_privilege('authenticated','tournament_private.commit_online(text,text,integer,uuid,jsonb)','EXECUTE') or has_function_privilege('anon','public.claim_online_workspace(text,uuid,boolean)','EXECUTE') then raise exception 'lease privilege leak'; end if;
+ if public.inspect_online_operation(v_id,'Test',0,op1,v_payload)->>'state' is distinct from 'unknown' then raise exception 'foreign receipt exposed'; end if;
  begin perform public.load_online_checkpoint(v_id,25); raise exception 'foreign checkpoint read'; exception when insufficient_privilege then null; end;
  begin perform public.list_online_checkpoints(v_id); raise exception 'foreign checkpoint list'; exception when insufficient_privilege then null; end;
  if exists(select 1 from public.list_online_tournaments() where id=v_id) then raise exception 'cross-owner list'; end if;
@@ -300,6 +305,7 @@ begin
  if public.read_online_player_access(gen_random_uuid()) is not null then raise exception 'unknown player token accepted'; end if;
  if has_function_privilege('anon','public.manage_online_player_access(text,text,text)','EXECUTE') or has_function_privilege('anon','public.publish_online_player_projection(text,uuid,integer,jsonb,integer)','EXECUTE') or has_table_privilege('anon','tournament_private.online_player_links','SELECT') or has_table_privilege('anon','tournament_private.online_player_projection','SELECT') then raise exception 'anon player write access'; end if;
  if public.read_online_spectator_bundle(gen_random_uuid())->'progress' is distinct from 'null'::jsonb then raise exception 'unknown bundled token'; end if;
+ if has_function_privilege('anon','public.inspect_online_operation(text,text,integer,uuid,jsonb)','EXECUTE') then raise exception 'anon receipt privilege'; end if;
  if has_function_privilege('anon','public.online_projection_plan(text,integer)','EXECUTE') then raise exception 'anon projection plan'; end if;
  if public.read_online_spectator(gen_random_uuid()) is not null then raise exception 'unknown token readable'; end if;
  if has_function_privilege('anon','public.publish_online_spectator_rankings(text,uuid,integer,jsonb)','EXECUTE') or has_table_privilege('anon','tournament_private.online_spectator_rankings','SELECT') or has_function_privilege('anon','public.publish_online_spectator_matches(text,uuid,integer,jsonb,integer)','EXECUTE') or has_function_privilege('anon','public.online_spectator_detail_setting(text,boolean)','EXECUTE') or has_table_privilege('anon','tournament_private.online_spectator_details','SELECT') or has_function_privilege('anon','public.manage_online_spectator(text,text)','EXECUTE') or has_function_privilege('anon','public.load_online_tournament(text)','EXECUTE') or has_table_privilege('anon','tournament_private.online_tournaments','SELECT') then raise exception 'anon private access'; end if;

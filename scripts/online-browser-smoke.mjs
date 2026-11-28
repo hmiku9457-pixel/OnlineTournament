@@ -240,6 +240,12 @@ async function install(context) {
       if(leases.get(body.p_id)!==body.p_token) return send(false);
       leases.delete(body.p_id);return send(true);
     }
+    if(path.endsWith('/inspect_online_operation')){
+      assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
+      const row=rows.get(body.p_id),previous=operations.get(body.p_id+':'+body.p_operation_id);
+      if(previous){const {p_token,...original}=previous.body;assert.deepEqual(body,original);return send({state:'confirmed',currentRevision:row.revision,committedRevision:previous.rev});}
+      return send({state:!row?'unknown':row.revision===body.p_expected_revision?'unconfirmed':'conflict',currentRevision:row?.revision??null,committedRevision:null});
+    }
     if(path.endsWith('/commit_online_tournament') || path.endsWith('/commit_leased_online_tournament')) {
       if(body.p_expected_revision>0 && (!body.p_token || leases.get(body.p_id)!==body.p_token))
         return send({code:'55P03',message:'workspace lease missing or expired'},409);
@@ -568,8 +574,12 @@ try {
   leases.delete(id);
   await a.reload();
   await a.getByRole('heading',{name:'Unbestätigte Online-Speicherung'}).waitFor();
-  await a.getByRole('button',{name:'Ursprüngliche Anfrage erneut senden'}).click();
+  await a.getByRole('button',{name:'Speicherstatus prüfen'}).click();
+  await a.getByText(/Bereits gespeichert: Revision/).waitFor();
+  const writesBeforeRecovery=calls.length;
+  await a.getByRole('button',{name:'Bestätigung übernehmen'}).click();
   await confirmed(a);
+  assert.equal(calls.length,writesBeforeRecovery,'confirmed receipt must not resend a write');
   await a.getByRole('button',{name:'Turnier fortsetzen',exact:true}).waitFor();
   assert.equal(rows.get(id).revision,crashRevision+1,'recovery must not commit twice');
   // Initial creation can be recovered after a lost response and page reload.

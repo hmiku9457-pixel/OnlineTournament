@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAccount } from '@/lib/useAccount';
-import { localOverviewUrl, resolvePendingOnlineOperation } from '@/services/onlineTournaments';
+import { localOverviewUrl, resolvePendingOnlineOperation, inspectPendingOnlineOperation, type OnlineOperationReceipt } from '@/services/onlineTournaments';
 import type { PendingOnlineOperation } from '@/services/onlineOutbox';
 
 export function OnlineRecoveryPage({ operations }: { operations: PendingOnlineOperation[] }) {
@@ -8,6 +8,13 @@ export function OnlineRecoveryPage({ operations }: { operations: PendingOnlineOp
   const [busy,setBusy] = useState(false);
   const [message,setMessage] = useState('');
   const [confirm,setConfirm] = useState<string|null>(null);
+  const [receipts,setReceipts]=useState<Record<string,OnlineOperationReceipt>>({});
+  async function inspect(op:PendingOnlineOperation){
+    setBusy(true);setMessage('');
+    try{const result=await inspectPendingOnlineOperation(op);setReceipts(old=>({...old,[op.operationId]:result}));}
+    catch(e){setMessage(e instanceof Error?e.message:'Speicherstatus nicht prüfbar.');}
+    finally{setBusy(false);}
+  }
   async function resolve(op: PendingOnlineOperation, discard: boolean) {
     if(busy) return;
     setBusy(true); setMessage('');
@@ -21,8 +28,10 @@ export function OnlineRecoveryPage({ operations }: { operations: PendingOnlineOp
     {loading ? <p>Konto wird geprüft …</p> : session?.user.id !== operations[0]?.ownerId ? <p role="alert">Bitte mit dem ursprünglichen Konto anmelden.</p> : operations.map((op,index) => <div className="card" key={op.operationId}>
       <strong>{op.expectedRevision===0 ? 'Unbestätigte Turniererstellung' : 'Änderung nach Revision '+op.expectedRevision}</strong>
       <p>{new Date(op.createdAt).toLocaleString('de-DE')}</p>
+      {receipts[op.operationId]&&<p role="status">{receipts[op.operationId].state==='confirmed'?'Bereits gespeichert: Revision '+receipts[op.operationId].committedRevision:receipts[op.operationId].state==='conflict'?'Revisionskonflikt – nicht überschreiben.':receipts[op.operationId].state==='unconfirmed'?'Keine Speicherbestätigung gefunden.':'Keine eindeutige Zuordnung gefunden.'}{receipts[op.operationId].currentRevision!==null?' · Aktueller Stand: Revision '+receipts[op.operationId].currentRevision:''}</p>}
       <div className="actions">
-        <button className="btn primary" disabled={busy || index!==0} onClick={()=>void resolve(op,false)}>Ursprüngliche Anfrage erneut senden</button>
+        <button className="btn" disabled={busy} onClick={()=>void inspect(op)}>Speicherstatus prüfen</button>
+        <button className="btn primary" disabled={busy || index!==0 || receipts[op.operationId]?.state==='conflict'} onClick={()=>void resolve(op,false)}>{receipts[op.operationId]?.state==='confirmed'?'Bestätigung übernehmen':'Ursprüngliche Anfrage erneut senden'}</button>
         <button className="btn" disabled={busy} onClick={()=>{
           const url=URL.createObjectURL(new Blob([JSON.stringify(op.snapshot,null,2)],{type:'application/json'}));
           const a=document.createElement('a');a.href=url;a.download='unbestaetigt-'+op.tournamentId+'.json';a.click();
