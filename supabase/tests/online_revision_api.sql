@@ -346,3 +346,18 @@ begin
  begin update ko_probe q set payload=jsonb_build_object('entries',e||jsonb_build_object('online-tournament:mock-draw-config:v1','[]')) where q.id='probe'; raise exception 'frozen KO draw removed'; exception when invalid_parameter_value then null; end;
 end $ko$;
 rollback;
+
+-- Global access regression, including tables added by future migrations.
+begin;
+do $access$
+declare r record; role_name text;
+begin
+ for r in select c.oid,c.relname,c.relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='tournament_private' and c.relkind in ('r','p') loop
+  if not r.relrowsecurity then raise exception 'private table without RLS: %',r.relname; end if;
+  foreach role_name in array array['anon','authenticated'] loop
+   if has_table_privilege(role_name,r.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') then raise exception 'direct private table privilege: % / %',r.relname,role_name; end if;
+  end loop;
+ end loop;
+ if exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.prosecdef) then raise exception 'public security definer'; end if;
+end $access$;
+rollback;

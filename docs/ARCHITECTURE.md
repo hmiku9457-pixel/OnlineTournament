@@ -7,8 +7,8 @@ OnlineTournament separates the **generic tournament core** from sport-specific r
 1. **Web UI** – React + TypeScript, responsive for desktop, tablet and mobile.
 2. **Tournament Engine** – deterministic pure functions for standings, Swiss pairing, bracket creation, withdrawals and scheduling.
 3. **Sport Rules** – first module: table tennis (`bestOf`, set to 11, win by 2).
-4. **Persistence** – Supabase PostgreSQL with RLS and RPCs.
-5. **Realtime** – Supabase Realtime for live set scores and spectator views.
+4. **Persistence** – local IndexedDB or owner-scoped Supabase PostgreSQL snapshots with revision checks, immutable operation receipts and exclusive leases.
+5. **Live views** – conditional capability polling. Public detail projections are consented and revision-bound; no subscription to private tables.
 
 ## Important design decisions
 
@@ -19,9 +19,11 @@ OnlineTournament separates the **generic tournament core** from sport-specific r
 - Table locations use `venue -> area -> play_table`. `area` is a logical grouping such as main court / side court.
 - Rest time is a soft scheduling constraint. Strict table restrictions remain possible.
 - A withdrawn participant remains in tournament history. Future matches become walkovers; confirmed matches remain unchanged.
-- Match code unlocks scoring. One player code per side confirms the final result.
-- The public live view can show `LIVE` and `FINISHED`, but official standings should use only `CONFIRMED` and `WALKOVER`.
+- Local match codes are separate from the online player capability. Online player reports are proposals until the director adopts them.
+- Historical checkpoints are not direct rollback commands. A confirmed local emergency restoration is available without mutating the canonical online record.
 
 ## GitHub Pages
 
 The app uses `HashRouter` and Vite `base: './'` so it can be hosted below a repository path without server-side route rewrites.
+
+The earlier normalized Supabase schema and multi-role design are archived planning material, not the deployed online API. See [Access model](ACCESS_MODEL.md) and [Acceptance test](ONLINE_ACCEPTANCE_TEST.md).

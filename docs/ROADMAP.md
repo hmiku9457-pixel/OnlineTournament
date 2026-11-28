@@ -1,56 +1,23 @@
-# Roadmap
+# Entwicklungsstand und Freigabegrenzen
 
-## 0.1 Foundation (included)
+Die ursprüngliche 0.1–0.5-Roadmap beschrieb eine normalisierte Serverarchitektur. Der aktuelle Testbetrieb verwendet stattdessen versionierte, eigentümergebundene Snapshots. Maßgeblich sind die folgenden Phasen:
 
-- Vite / React / TypeScript shell
-- GitHub Pages deployment workflow
-- Supabase schema, Auth foundation and RLS starter
-- stage-oriented tournament model
-- singles + doubles data model
-- table-tennis rule module
-- standings engine
-- format recommendation engine
-- Swiss pairing starter
-- knockout seeding starter
-- withdrawal/walkover handling
-- scheduler scoring starter
-- match-code + player-code RPC foundation
-- responsive admin/scoring/spectator screens
-- PWA/offline shell cache
-- unit tests
+| Phase | Aktueller Funktionsumfang |
+|---|---|
+| 1 | Turniererstellung, lokale Engine, sportliche Invarianten |
+| 2 | Datenbankvalidierung, Revisionskonflikte, Paarungs- und Ergebnisschutz |
+| 3 | Exklusive Workspace-Lease, begrenzte und bedingte Polling-Anfragen |
+| 4 | Turnierleitung, Zuweisung, Abschlusskontrolle, Ergebniskorrektur |
+| 5 | Private Spielerlinks, QR, persönliche Ranglisten, Aufrufe, Ergebnisvorschläge |
+| 6 | Freiwillige Zuschauerprojektionen, Hallenanzeige, Phasenfilter |
+| 7 | Eigentümerisolation, Speicherbelege, Checkpoints, lokale Notfallwiederherstellung |
+| 8 | Reproduzierbare Turniersimulationen, Browser- und SQL-Integration, parallele Testdatenbank-Lesezugriffe |
+| 9 | Dokumentierte Abnahme, CI-Gates, Betriebsgrenzen und reale Pilotprüfung |
 
-## 0.2 Tournament creation
+Eine Implementierung gilt erst nach erfolgreicher CI als automatisch geprüft. Ein grüner Build ist keine Freigabe für echte Veranstaltungen. Die reale Pilotprüfung ist gesondert durchzuführen (siehe [Abnahme](ONLINE_ACCEPTANCE_TEST.md)).
 
-- real CRUD forms backed by Supabase
-- participant import/manual entry
-- player/match code generation UI
-- areas/tables editor
-- stage builder
-- seeding preview + manual override
-- group draw preview + confirmation
-
-## 0.3 Running tournament
-
-- automatic match generation
-- richer administrative result correction workflow
-- table queue and auto-assignment
-- rest-time warnings
-- referee/staff roles
-- live public standings
-- audit log UI
-
-## 0.4 Advanced formats
-
-- Swiss score groups + stronger optimizer
-- double elimination
-- placement trees
-- consolation brackets
-- configurable tie-breakers
-- format recommendation with estimated duration
-
-## 0.5 Resilience
-
-- offline write queue for emergency scoring
-- conflict resolution after reconnect
-- optional JSON backup/import
-- recovery tools
+## Nicht Teil der aktuellen Freigabe
+- Mehrere Bearbeiterkonten und fein abgestufte Schiedsrichter-/Helferrollen.
+- Vollständige serverseitige Turnierengine statt Snapshot-Validierung.
+- Hintergrund-Push, echte Offline-Synchronisierung und produktive Lastgarantien.
+- Automatischer Rollback auf alte Online-Revisionen (würde abhängige Spielstände gefährden).

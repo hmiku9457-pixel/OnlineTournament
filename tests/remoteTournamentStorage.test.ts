@@ -1,4 +1,4 @@
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, writeFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 type Snapshot = import('@/services/localTournamentStorage').TournamentBackup;
 function recordSqlFixture(snapshot: Snapshot) {
@@ -497,6 +497,14 @@ describe('isolated remote tournament persistence', () => {
     expect(total).toBe(64);
     expect(store.getMockTournament(t.id).status).toBe('FINISHED');
     expect(JSON.parse(saved.entries['online-tournament:mock-match-results:v2'])).toHaveLength(64);
+    if(process.env.ONLINE_SQL_FIXTURES){
+      const {buildOnlinePersonalContexts}=await import('@/services/onlinePersonalContexts');
+      const {buildPublicMatchOverview}=await import('@/services/onlinePublicOverview');
+      const finished=store.getMockTournament(t.id);
+      const rows=finished.stages.flatMap(stage=>runtime.getMockStageMatches(finished,stage));
+      const matches=rows.map(m=>({sideA:m.sideA,sideB:m.sideB,phase:m.phase,round:m.round,status:m.status,table:m.table,score:m.score,sets:(m.sets??[]).map(s=>({sideAScore:s.sideAScore,sideBScore:s.sideBScore}))}));
+      writeFileSync(process.env.ONLINE_SQL_FIXTURES+'.read-load.json',JSON.stringify({id:t.id,matches,contexts:buildOnlinePersonalContexts(finished,rows),overview:buildPublicMatchOverview(finished,rows,runtime.getMockRecordedFinishTimes())}));
+    }
   },60000);
   it('does not persist a replacement or deletion of the online event', async () => {
     const { adapter, backup } = await setup();

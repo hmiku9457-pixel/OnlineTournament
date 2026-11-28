@@ -240,6 +240,14 @@ async function install(context) {
       if(leases.get(body.p_id)!==body.p_token) return send(false);
       leases.delete(body.p_id);return send(true);
     }
+    if(path.endsWith('/list_online_checkpoints')){
+      const row=rows.get(body.p_id);
+      return send(row?[{revision:row.revision,name:row.name,created_at:row.updated_at}]:[],row?200:403);
+    }
+    if(path.endsWith('/load_online_checkpoint')){
+      const row=rows.get(body.p_id);
+      return send(row?.revision===body.p_revision?row.payload:null,row?.revision===body.p_revision?200:403);
+    }
     if(path.endsWith('/inspect_online_operation')){
       assert.equal(req.headers()['authorization'],'Bearer '+accessToken);
       const row=rows.get(body.p_id),previous=operations.get(body.p_id+':'+body.p_operation_id);

@@ -103,3 +103,5 @@ jobs:
         run: |
           npx vitest run tests/remoteTournamentStorage.test.ts
           node scripts/replay-online-sql-fixtures.mjs
+      - name: Concurrent capability reads on disposable PostgreSQL
+        run: node scripts/online-read-load.mjs
