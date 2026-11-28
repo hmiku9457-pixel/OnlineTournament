@@ -1,3 +1,4 @@
+import { buildWorkspaceDiagnostic,publicationMessage } from '@/domain/workspaceHealth';
 import { OnlineMatchCallPanel } from '@/components/OnlineMatchCallPanel';
 import { OnlineResultInbox } from '@/components/OnlineResultInbox';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -5,7 +6,7 @@ import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { TournamentControlPage } from '@/pages/TournamentControlPage';
 import { ScoringPage } from '@/pages/ScoringPage';
 import { getTournamentStorageError, hasPendingRemoteWrites, getRemoteRecovery, retryRemoteTournamentWrite } from '@/services/localTournamentStorage';
-import { localOverviewUrl, checkOnlineWorkspaceRevision, refreshConfirmedOnlineProjection, releaseCurrentOnlineWorkspace } from '@/services/onlineTournaments';
+import { localOverviewUrl, checkOnlineWorkspaceRevision, refreshConfirmedOnlineProjection, releaseCurrentOnlineWorkspace, getOnlinePublicationHealth, loadConfirmedOnlineBackup } from '@/services/onlineTournaments';
 
 function OnlineControl({ id }: { id: string }) {
   const params = useParams();
@@ -21,6 +22,12 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
   const [resultVersion,setResultVersion]=useState(0);
   const [reportBusy,setReportBusy]=useState(false);
   const [callBusy,setCallBusy]=useState(false);
+  const [health,setHealth]=useState(getOnlinePublicationHealth);
+  const [lastCheck,setLastCheck]=useState<number|null>(null);
+  const [diagnostics,setDiagnostics]=useState(false);
+  const [backupBusy,setBackupBusy]=useState(false);
+  const [backupMessage,setBackupMessage]=useState('');
+  useEffect(()=>{const update=()=>setHealth(getOnlinePublicationHealth());window.addEventListener('online-publication-health',update);update();return()=>window.removeEventListener('online-publication-health',update);},[]);
   
   const inFlight=useRef(false);
   const active=useRef(true);
@@ -29,7 +36,7 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
     inFlight.current=true; setChecking(true);
     try {
       const result=await checkOnlineWorkspaceRevision(id);
-      if(active.current) {revisionStateRef.current=result;setRevisionState(result);}
+      if(active.current) {revisionStateRef.current=result;setRevisionState(result);if(result==='current')setLastCheck(Date.now());}
     } catch { if(active.current) {revisionStateRef.current='unknown';setRevisionState('unknown');} }
     finally { inFlight.current=false; if(active.current) setChecking(false); }
   },[id]);
@@ -60,6 +67,8 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
   const error = getTournamentStorageError();
   const recovery = getRemoteRecovery();
   const route = '/tournaments/' + id + '/control';
+  function downloadJson(value:unknown,name:string){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+  async function backupConfirmed(){if(backupBusy)return;setBackupBusy(true);setBackupMessage('');try{const result=await loadConfirmedOnlineBackup(id);downloadJson(result.backup,'turnier-'+id+'-revision-'+result.revision+'.json');setBackupMessage('Bestätigte Revision '+result.revision+' als JSON gesichert.');}catch{setBackupMessage('Bestätigter Stand konnte nicht gesichert werden.');}finally{setBackupBusy(false);}}
   async function leave(reload=false) {
     if(pending || leaving || reportBusy || callBusy) return;
     setLeaving(true);
@@ -88,6 +97,10 @@ export function OnlineWorkspaceApp({ id }: { id: string }) {
         }}>Unbestätigten Stand als JSON sichern</button>}
         <button className="btn small" disabled={pending || !connected} onClick={() => void leave(true)}>Datenbankstand neu laden</button>
       </div>{recovery && <p className="muted">Die ursprüngliche übertragene Anfrage wird in diesem Browser journalisiert. Wenn weitere Änderungen hinzugekommen sind, enthält der JSON-Export auch den aktuellsten unbestätigten Stand. Sichere diese Datei vor dem Neuladen. Die JSON-Datei ist keine bestätigte Cloud-Version und darf nicht blind überschrieben werden.</p>}</div>}
+      {health.state==='failed'&&<p role="alert">Spieler- oder Zuschaueransichten konnten nicht aktualisiert werden. Der bestätigte Turnierstand bleibt davon unabhängig.</p>}
+      <div className="actions"><button className="btn small" onClick={()=>setDiagnostics(v=>!v)}>{diagnostics?'Betriebsdiagnose ausblenden':'Betriebsdiagnose anzeigen'}</button><button className="btn small" disabled={!connected||backupBusy} onClick={()=>void backupConfirmed()}>{backupBusy?'Sichere …':'Bestätigten Stand sichern'}</button></div>
+      {backupMessage&&<p role="status">{backupMessage}</p>}
+      {diagnostics&&<section aria-label="Betriebsdiagnose"><p>Letzte bestätigte Verbindungsprüfung: {lastCheck===null?'Seit Öffnen noch nicht geprüft':new Date(lastCheck).toLocaleTimeString('de-DE')}</p><p>{publicationMessage(health)}{health.revision===null?'':' · Revision '+health.revision}</p><div className="actions"><button className="btn small" disabled={pending||!connected||!!error||revisionState!=='current'||health.state==='publishing'} onClick={()=>refreshConfirmedOnlineProjection()}>Ansichten erneut prüfen</button><button className="btn small" onClick={()=>downloadJson(buildWorkspaceDiagnostic({online:connected,revisionState,pending,storageError:!!error,lastCheck,publication:health}),'betriebsdiagnose.json')}>Diagnose herunterladen</button></div><p className="muted">Diagnose enthält keine Teilnehmerdaten, Zugangsschlüssel oder Fehlerdetails. JSON-Turniersicherungen hingegen vertraulich aufbewahren.</p></section>}
       <p className="muted">Nur für Entwicklungstests. Spieler- und Zuschauerzugriffe sind in der Online-Übersicht separat freizugeben.</p>
     </section>
     {!error&&revisionState!=='stale'&&<OnlineMatchCallPanel id={id} disabled={pending||leaving||reportBusy||!connected||revisionState!=='current'} onBusyChange={setCallBusy}/>}

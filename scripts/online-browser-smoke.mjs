@@ -564,6 +564,15 @@ try {
   await confirmed(a);
   await a.getByRole('button',{name:'Turnier pausieren',exact:true}).waitFor();
   // Lost response followed by reload: the original UUID must survive in IndexedDB.
+  await a.getByRole('button',{name:'Betriebsdiagnose anzeigen'}).click();
+  await a.getByRole('region',{name:'Betriebsdiagnose'}).waitFor();
+  const diagnosticDownload=a.waitForEvent('download');
+  await a.getByRole('button',{name:'Diagnose herunterladen'}).click();
+  assert.equal((await diagnosticDownload).suggestedFilename(),'betriebsdiagnose.json');
+  const backupDownload=a.waitForEvent('download');
+  await a.getByRole('button',{name:'Bestätigten Stand sichern'}).click();
+  assert.ok((await backupDownload).suggestedFilename().includes('-revision-'));
+  await a.getByRole('button',{name:'Betriebsdiagnose ausblenden'}).click();
   const crashRevision=rows.get(id).revision;
   loseResponses=2;
   await a.getByRole('button',{name:'Turnier pausieren',exact:true}).click();
@@ -649,6 +658,8 @@ try {
   await restore.getByRole('alert').filter({hasText:'existiert bereits lokal'}).waitFor();
   await restore.getByRole('button',{name:'Abbrechen',exact:true}).click();
   assert.deepEqual(rows.get(created),original);
+  // A confirmed download and an allowlisted diagnostic must be available
+  // even in the director without leaving the active workspace.
   await first.close(); await second.close();
   process.stdout.write('Online browser smoke passed: login, cloud creation, start, lost response, retry, second browser and stale revision.\n');
 } finally { await browser.close(); }

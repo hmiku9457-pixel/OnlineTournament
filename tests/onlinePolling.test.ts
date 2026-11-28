@@ -33,6 +33,16 @@ describe('online polling lifecycle', () => {
     poll.stop();
   });
 
+  it('recovers after an unexpected reader rejection',async()=>{
+    vi.useFakeTimers();
+    const read=vi.fn(async()=>{}).mockRejectedValueOnce(new Error('transport'));
+    const poll=startOnlinePolling(read,()=>1000);
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(read).toHaveBeenCalledTimes(2);
+    poll.stop();
+  });
+
   it('aborts on timeout and retries, then aborts on disposal', async () => {
     vi.useFakeTimers();
     const signals: AbortSignal[] = [];

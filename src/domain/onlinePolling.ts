@@ -28,6 +28,9 @@ export function startOnlinePolling(
     void (async () => {
       try {
         await read(controller.signal);
+      } catch {
+        // A rejected reader must not create an unhandled rejection or stop polling.
+        // View-specific errors are handled by the reader itself.
       } finally {
         clearTimeout(deadline);
         pending = null;

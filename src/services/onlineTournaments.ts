@@ -1,3 +1,4 @@
+import {initialPublicationHealth,type PublicationHealth} from '@/domain/workspaceHealth';
 import { buildPublicMatchOverview } from '@/services/onlinePublicOverview';
 import type { DirectorMatchCall } from '@/domain/onlineMatchCalls';
 import type { MatchSet } from '@/domain/types';
@@ -287,6 +288,11 @@ export async function spectatorDetailSetting(id:string, enabled:boolean|null=nul
 // compares the exact revision and current lease again before publishing.
 let publishing=false;
 let queuedProjection:NonNullable<typeof workspaceRevision>|undefined;
+let publicationHealth:PublicationHealth=initialPublicationHealth;
+export function getOnlinePublicationHealth():PublicationHealth{return {...publicationHealth};}
+function setPublicationHealth(state:PublicationHealth['state'],revision:number){
+ publicationHealth={state,revision,checkedAt:Date.now()};window.dispatchEvent(new Event('online-publication-health'));
+}
 export function refreshConfirmedOnlineProjection():void {
   if(workspaceRevision&&!hasPendingRemoteWrites()&&!getTournamentStorageError())void publishSpectatorDetails(workspaceRevision).catch(()=>{});
 }
@@ -294,10 +300,12 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
   if(!supabase||workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
   if(publishing){queuedProjection=start;return;}
   publishing=true;
+  setPublicationHealth('publishing',start.revision);
   try {
     const {data:plan,error:planError}=await supabase.rpc('online_projection_plan_v2',{p_id:start.id,p_revision:start.revision}).abortSignal(AbortSignal.timeout(8000));
     if(planError)throw new Error(planError.message);
-    if(!plan||!['player','matches','rankings','brackets'].some(key=>plan[key]===true))return;
+    if(!plan)throw new Error('Projektionsstatus fehlt.');
+    if(!['player','matches','rankings','brackets'].some(key=>plan[key]===true)){if(workspaceRevision===start)setPublicationHealth('current',start.revision);return;}
     if(workspaceRevision!==start||hasPendingRemoteWrites()||getTournamentStorageError())return;
     const tournament=getAllMockTournaments().find(t=>t.id===start.id);
     if(!tournament)return;
@@ -353,6 +361,10 @@ async function publishSpectatorDetails(start:NonNullable<typeof workspaceRevisio
     const bracketResult=await supabase.rpc('publish_online_spectator_brackets',{p_id:start.id,p_token:start.token,p_revision:start.revision,p_brackets:brackets}).abortSignal(AbortSignal.timeout(8000));
     if(bracketResult.error)throw new Error(bracketResult.error.message);
     }
+    if(workspaceRevision===start&&!hasPendingRemoteWrites()&&!getTournamentStorageError())setPublicationHealth('current',start.revision);
+  } catch(error) {
+    if(workspaceRevision===start)setPublicationHealth('failed',start.revision);
+    throw error;
   } finally {
     publishing=false;
     const queued=queuedProjection;queuedProjection=undefined;

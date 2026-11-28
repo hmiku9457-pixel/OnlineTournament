@@ -1,0 +1,42 @@
+name: Encrypted tournament backup
+on:
+  schedule:
+    - cron: '47 2 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: encrypted-tournament-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    if: vars.ENABLE_ENCRYPTED_BACKUPS == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PGDATABASE: ${{ secrets.SUPABASE_BACKUP_DB_URL }}
+      BACKUP_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install age encryption
+        run: sudo apt-get update -qq && sudo apt-get install -y age
+      - name: Export and encrypt application tables
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$PGDATABASE" || { echo 'Missing backup DB connection'; exit 1; }
+          [[ "$BACKUP_RECIPIENT" =~ ^age1[a-z0-9]+$ ]] || { echo 'Missing or invalid age public recipient'; exit 1; }
+          mkdir -p backup
+          # No plaintext archive on disk. The connection secret is passed as
+          # an environment variable, not as a command-line argument.
+          docker run --rm -e PGDATABASE -e PGSSLMODE=require postgres:17 \
+            pg_dump --format=custom --no-owner --no-privileges --table='tournament_private.*' --table='public.tournament_backups' \
+            | age --encrypt --recipient "$BACKUP_RECIPIENT" --output backup/tournament.dump.age
+          test -s backup/tournament.dump.age
+          sha256sum backup/tournament.dump.age > backup/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-tournament-backup-${{ github.run_id }}
+          path: backup/
+          if-no-files-found: error
+          retention-days: 14

@@ -79,7 +79,7 @@ export function OnlinePlayerPage({token}:{token:string}) {
  async function acknowledge(call:PlayerMatchCall){
   if(ackBusy||!supabase)return;setAckBusy(true);setAckError('');
   try{const {data:ok,error}=await supabase.rpc('ack_online_match_call',{p_token:token,p_call_id:call.callId}).abortSignal(AbortSignal.timeout(8000));
-   if(error||ok!==true)throw new Error('Aufruf konnte nicht bestätigt werden. Bitte aktualisieren.');
+   if(error||ok!==true)throw new Error(error?.code==='PT429'?'Zu viele Änderungen. Bitte eine Minute warten.':'Aufruf konnte nicht bestätigt werden. Bitte aktualisieren.');
    setCalls(old=>old.map(c=>c.callId===call.callId?{...c,acknowledged:true}:c));setNewCallText('');setRefreshVersion(v=>v+1);
   }catch(e){setAckError(e instanceof Error?e.message:'Bestätigung fehlgeschlagen.');}
   finally{setAckBusy(false);}

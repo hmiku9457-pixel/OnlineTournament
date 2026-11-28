@@ -65,3 +65,8 @@ Automatische CI (Unit-Tests, echte Chromium-Sitzungen mit simulierten HTTP-Antwo
 
 ## Automatisierte Belastungsprobe
 Die CI simuliert 32 Teilnehmer in acht Gruppen und einer anschließenden KO-Runde sowie 16 Teilnehmer im Jeder-gegen-jeden-Modus. Die separate Leseprobe verwendet acht parallele PostgreSQL-Verbindungen, 32 persönliche Zugangsschlüssel und 704 vollständige bzw. bedingte Bundle-Abfragen. Sie kontrolliert auch, dass fremde Paarungen nicht sichtbar sind und widerrufene Links keine Daten mehr liefern. Die Laufzeit wird im CI-Protokoll ausgegeben, ist aber keine Aussage über die reale Supabase-HTTP-Kapazität, Mobilfunk oder die maximale Zuschauerzahl.
+
+## Härtungsblock 10–12
+- Betriebsdiagnose öffnen, bestätigten Stand als JSON sichern, Diagnose separat herunterladen. Bei unterbrochener Veröffentlichung muss eine Warnung erscheinen; der kanonische Stand darf nicht zurückgesetzt werden.
+- Gruppen- und Jeder-gegen-jeden-Paarungen werden anhand des eingefrorenen Teilnehmerfelds und des Rotationsverfahrens auf dem Server geprüft. Vollständige serverseitige Qualifikations- und Sonderentscheidungsberechnung bleibt offen.
+- Die Spieler-Änderungsgrenze beträgt 30 erfolgreiche neue Zustandsänderungen je Teilnehmer und Kalenderminute, nicht 30 Reads. Sie schützt weder vor volumetrischen HTTP-Angriffen noch vor allen ungültigen Anfragen. Eine Gateway-Drosselung erfordert gesonderte Infrastruktur.
