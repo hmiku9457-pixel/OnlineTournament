@@ -376,3 +376,20 @@ begin
  if exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.prosecdef) then raise exception 'public security definer'; end if;
 end $access$;
 rollback;
+
+begin;
+do $circle$
+declare expected jsonb; s jsonb:='{"id":"rr","type":"ROUND_ROBIN","settings":{}}'; members jsonb:='["a","b","c","d","e"]'; seen text[]:='{}'; i int;j int;p jsonb;
+begin
+ for i in 1..5 loop
+  for j in 1..2 loop
+   p:=tournament_private.round_robin_pair(s,members,null,'rr-rr-d'||i||'-m'||j);
+   if p is null or (p->>0)=(p->>1) then raise exception 'invalid odd circle pair'; end if;
+   if (p->>0||':'||p->>1)=any(seen) or (p->>1||':'||p->>0)=any(seen) then raise exception 'repeat circle pair'; end if;
+   seen:=array_append(seen,p->>0||':'||p->>1);
+  end loop;
+ end loop;
+ if cardinality(seen)<>10 or tournament_private.round_robin_pair(s,members,null,'rr-rr-d6-m1') is not null then raise exception 'circle coverage'; end if;
+ if tournament_private.circle_pair(array['a','b','c','d'],1,1) is distinct from '["a","d"]'::jsonb or tournament_private.circle_pair(array['a','b','c','d'],2,1) is distinct from '["a","c"]'::jsonb then raise exception 'circle orientation'; end if;
+end $circle$;
+rollback;

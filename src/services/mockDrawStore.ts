@@ -193,7 +193,11 @@ export function compactStartedGroupAssignments(
   const count = Math.max(1, Number(stage.settings.groups) || 1);
   const occupied = Array.from({ length: count }, (_, i) => i)
     .filter((i) => entrants.some((name) => assignments[name] === i));
-  if (occupied.length === count) return count;
+  if (occupied.length === count) {
+    const existing = findConfig(tournament.id, stage.id);
+    upsert({ ...existing, tournamentId: tournament.id, stageId: stage.id, groupAssignments: assignments });
+    return count;
+  }
   const offsets = new Map(occupied.map((original, index) => [original, index]));
   const compact = Object.fromEntries(entrants.map((name) =>
     [name, offsets.get(assignments[name] ?? 0) ?? 0]));
