@@ -484,11 +484,13 @@ describe('isolated remote tournament persistence', () => {
         expect(new Set(assigned).size).toBe(assigned.length);
         adapter.runRemoteTournamentBatch(()=>{for(const p of plan)expect(runtime.assignMockMatchToTable(active,p.matchId,p.table)).toBe(true);});
         await adapter.flushPendingLocalTournamentWrites();
-        adapter.runRemoteTournamentBatch(()=>{for(const p of plan)runtime.completeMockMatch(p.matchId,[{number:1,sideAScore:11,sideBScore:7}],'FINISHED',true);});
+        adapter.runRemoteTournamentBatch(()=>{for(const p of plan){const m=waiting.find(m=>m.id===p.matchId)!;const a=Number(m.sideA.split(' ').at(-1)),b=Number(m.sideB.split(' ').at(-1));runtime.completeMockMatch(p.matchId,[{number:1,sideAScore:a<b?11:7,sideBScore:a<b?7:11}],'FINISHED',true);}});
         await adapter.flushPendingLocalTournamentWrites();
         total+=plan.length;
       }
       const active=store.getMockTournament(t.id);
+      expect(runtime.getPendingGroupCutoff(active)).toBeNull();
+      expect(runtime.getPendingMockApproval(active)?.kind).toBe('STAGE');
       expect(runtime.approveMockProgress(active)?.kind).toBe('STAGE');
       await adapter.flushPendingLocalTournamentWrites();
     }
