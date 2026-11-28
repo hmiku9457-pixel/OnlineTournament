@@ -326,6 +326,16 @@ begin
  if has_function_privilege('anon','public.publish_online_spectator_rankings(text,uuid,integer,jsonb)','EXECUTE') or has_table_privilege('anon','tournament_private.online_spectator_rankings','SELECT') or has_function_privilege('anon','public.publish_online_spectator_matches(text,uuid,integer,jsonb,integer)','EXECUTE') or has_function_privilege('anon','public.online_spectator_detail_setting(text,boolean)','EXECUTE') or has_table_privilege('anon','tournament_private.online_spectator_details','SELECT') or has_function_privilege('anon','public.manage_online_spectator(text,text)','EXECUTE') or has_function_privilege('anon','public.load_online_tournament(text)','EXECUTE') or has_table_privilege('anon','tournament_private.online_tournaments','SELECT') then raise exception 'anon private access'; end if;
 end $$;
 reset role;
+do $budget$
+declare i int; p_id text:='local-rpc-test'; pid text:='p-probe'; current_bucket bigint:=floor(extract(epoch from clock_timestamp())/60)::bigint;
+begin
+ -- Put a full current bucket in a synthetic fixture; no sleep or time race.
+ insert into tournament_private.online_player_write_budget(tournament_id,participant_id,minute_bucket,used) values(p_id,pid,current_bucket,30);
+ begin perform tournament_private.consume_player_write(p_id,pid); raise exception 'write budget ignored'; exception when sqlstate 'PT429' then null; end;
+ update tournament_private.online_player_write_budget set minute_bucket=current_bucket-1 where tournament_id=p_id and participant_id=pid;
+ perform tournament_private.consume_player_write(p_id,pid);
+ if (select used from tournament_private.online_player_write_budget where tournament_id=p_id and participant_id=pid)<>1 then raise exception 'write budget not renewed'; end if;
+end $budget$;
 set local role authenticated;
 select public.manage_online_spectator('local-rpc-test','disable');
 rollback;
@@ -385,11 +395,32 @@ begin
   for j in 1..2 loop
    p:=tournament_private.round_robin_pair(s,members,null,'rr-rr-d'||i||'-m'||j);
    if p is null or (p->>0)=(p->>1) then raise exception 'invalid odd circle pair'; end if;
-   if (p->>0||':'||p->>1)=any(seen) or (p->>1||':'||p->>0)=any(seen) then raise exception 'repeat circle pair'; end if;
-   seen:=array_append(seen,p->>0||':'||p->>1);
+   if ((p->>0)||':'||(p->>1))=any(seen) or ((p->>1)||':'||(p->>0))=any(seen) then raise exception 'repeat circle pair'; end if;
+   seen:=array_append(seen,(p->>0)||':'||(p->>1));
   end loop;
  end loop;
  if cardinality(seen)<>10 or tournament_private.round_robin_pair(s,members,null,'rr-rr-d6-m1') is not null then raise exception 'circle coverage'; end if;
  if tournament_private.circle_pair(array['a','b','c','d'],1,1) is distinct from '["a","d"]'::jsonb or tournament_private.circle_pair(array['a','b','c','d'],2,1) is distinct from '["a","c"]'::jsonb then raise exception 'circle orientation'; end if;
 end $circle$;
+rollback;
+
+begin;
+do $rr$
+declare e jsonb; s jsonb; t tournament_private.online_tournaments; f tournament_private.online_report_fixtures;
+begin
+ create temporary table rr_probe(id text,payload jsonb) on commit drop;
+ create trigger rr_guard before insert or update on rr_probe for each row execute function tournament_private.validate_online_round_robin();
+ s:='{"id":"rr","type":"GROUPS","settings":{"groups":1,"entrants":4}}';
+ e:=jsonb_build_object('online-tournament:local-prototype-tournaments:v1:record:probe',jsonb_build_object('tournament',jsonb_build_object('status','RUNNING','stages',jsonb_build_array(s)))::text,
+ 'online-tournament:mock-phase-lifecycle:v1','[{"startedStageIds":["rr"],"completedStageIds":[],"stageEntrants":{"rr":["a","b","c","d"]}}]',
+ 'online-tournament:mock-draw-config:v1','[{"stageId":"rr","groupAssignments":{"a":0,"b":0,"c":0,"d":0}}]',
+ 'online-tournament:mock-match-results:v2','[]','online-tournament:mock-match-runtime:v1','[{"matchId":"rr-g1-d1-m1","table":"Tisch 1","status":"LIVE","startedAt":1}]');
+ insert into rr_probe values('probe',jsonb_build_object('entries',e));
+ t.id:='probe';t.payload:=jsonb_build_object('entries',e);f.match_id:='rr-g1-d1-m1';f.a_id:='a';f.b_id:='d';
+ if not tournament_private.round_robin_report_pair_valid(f,t) then raise exception 'correct pair rejected'; end if;
+ f.b_id:='c';if tournament_private.round_robin_report_pair_valid(f,t) then raise exception 'wrong pair accepted'; end if;
+ begin update rr_probe set payload=jsonb_build_object('entries',e||jsonb_build_object('online-tournament:mock-match-runtime:v1','[{"matchId":"rr-g1-d1-m1","table":"Tisch 1","status":"LIVE"},{"matchId":"rr-g1-d2-m1","table":"Tisch 2","status":"LIVE"}]')); raise exception 'double-booked participant accepted'; exception when invalid_parameter_value then null; end;
+ begin update rr_probe set payload=jsonb_build_object('entries',e||jsonb_build_object('online-tournament:mock-match-results:v2','[{"matchId":"rr-g1-d1-m99","status":"FINISHED","sets":[]}]')); raise exception 'fake match accepted'; exception when invalid_parameter_value then null; end;
+ begin update rr_probe set payload=jsonb_build_object('entries',e||jsonb_build_object('online-tournament:mock-phase-lifecycle:v1','[{"startedStageIds":["rr"],"completedStageIds":[]}]')); raise exception 'missing frozen entrants accepted'; exception when invalid_parameter_value then null; end;
+end $rr$;
 rollback;
