@@ -25,10 +25,11 @@ export function OnlineResultInbox({id,disabled,onApplied,onBusyChange}:{id:strin
    finally{reading.current=false;if(alive.current)setLoading(false);}
  },[id]);
  useEffect(()=>{
-  alive.current=true;void load();const timer=window.setInterval(()=>void load(),5000);
+  const requestSequence=sequence;
+  alive.current=true;void load();const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void load();},5000);
   const focus=()=>void load();
   window.addEventListener('focus',focus);window.addEventListener('online',focus);
-  return()=>{alive.current=false;sequence.current++;window.clearInterval(timer);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);};
+  return()=>{alive.current=false;requestSequence.current++;window.clearInterval(timer);window.removeEventListener('focus',focus);window.removeEventListener('online',focus);};
  },[load]);
  const ready=rows.filter(matchingReports);
  const conflicts=rows.filter(r=>r.aSets&&r.bSets&&!matchingReports(r));

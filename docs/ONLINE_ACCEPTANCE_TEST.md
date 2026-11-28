@@ -70,3 +70,5 @@ Die CI simuliert 32 Teilnehmer in acht Gruppen und einer anschließenden KO-Rund
 - Betriebsdiagnose öffnen, bestätigten Stand als JSON sichern, Diagnose separat herunterladen. Bei unterbrochener Veröffentlichung muss eine Warnung erscheinen; der kanonische Stand darf nicht zurückgesetzt werden.
 - Gruppen- und Jeder-gegen-jeden-Paarungen werden anhand des eingefrorenen Teilnehmerfelds und des Rotationsverfahrens auf dem Server geprüft. Vollständige serverseitige Qualifikations- und Sonderentscheidungsberechnung bleibt offen.
 - Die Spieler-Änderungsgrenze beträgt 30 erfolgreiche neue Zustandsänderungen je Teilnehmer und Kalenderminute, nicht 30 Reads. Sie schützt weder vor volumetrischen HTTP-Angriffen noch vor allen ungültigen Anfragen. Eine Gateway-Drosselung erfordert gesonderte Infrastruktur.
+
+Die Mehrphasen-Simulation wird zusätzlich mit 64 Teilnehmern (16 Gruppen, 32 KO-Qualifikanten, 16 Tischen) ausgeführt. Eine Gruppen-/Ligaphase kann serverseitig erst freigegeben werden, wenn die Zahl tatsächlich beendeter gültiger Paarungen vollständig ist. Die sportliche Auswahl der Qualifikanten selbst bleibt ein separater Prüfbereich.

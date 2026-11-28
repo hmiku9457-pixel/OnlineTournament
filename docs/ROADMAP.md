@@ -24,3 +24,5 @@ Eine Implementierung gilt erst nach erfolgreicher CI als automatisch geprüft. E
 - Vollständige serverseitige Turnierengine statt Snapshot-Validierung.
 - Hintergrund-Push, echte Offline-Synchronisierung und produktive Lastgarantien.
 - Automatischer Rollback auf alte Online-Revisionen (würde abhängige Spielstände gefährden).
+
+Details des externen Sicherungsworkflows: [Notfallbetrieb](DISASTER_RECOVERY.md). Externe Sicherungen sind erst nach Konfiguration und nachgewiesener Wiederherstellung aktiv. API-weite Drosselung und vollständige unabhängige Qualifikationsberechnung sind offene Infrastruktur-/Architekturaufgaben.

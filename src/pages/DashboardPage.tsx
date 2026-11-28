@@ -104,7 +104,6 @@ function TournamentCard({ item }: { item: DashboardTournament }) {
 
 export function DashboardPage() {
   const [tournaments, setTournaments] = useState(getAllMockTournaments);
-  const [revision, setRevision] = useState(0);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<DashboardFilter>('all');
   const [sort, setSort] = useState<DashboardSort>('recent');
@@ -114,7 +113,6 @@ export function DashboardPage() {
   useEffect(() => {
     const refresh = () => {
       setTournaments(getAllMockTournaments());
-      setRevision((current) => current + 1);
     };
     const onStorage = (event: StorageEvent) => {
       if (!event.key || event.key.startsWith('online-tournament:')) refresh();
@@ -163,7 +161,7 @@ export function DashboardPage() {
     };
   }, [resetConfirmOpen]);
 
-  const items = useMemo(() => tournaments.map(buildDashboardTournament), [tournaments, revision]);
+  const items = useMemo(() => tournaments.map(buildDashboardTournament), [tournaments]);
   const summary = useMemo(() => summarizeDashboard(items), [items]);
   const visible = useMemo(() => filterAndSortDashboard(items, query, filter, sort), [items, query, filter, sort]);
   const counts: Record<DashboardFilter, number> = {
@@ -179,7 +177,6 @@ export function DashboardPage() {
       await flushPendingLocalTournamentWrites();
       setResetConfirmOpen(false);
       setTournaments([]);
-      setRevision((value) => value + 1);
       setQuery('');
       setFilter('all');
     } catch {

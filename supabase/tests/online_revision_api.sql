@@ -421,6 +421,7 @@ begin
  f.b_id:='c';if tournament_private.round_robin_report_pair_valid(f,t) then raise exception 'wrong pair accepted'; end if;
  begin update rr_probe set payload=jsonb_build_object('entries',e||jsonb_build_object('online-tournament:mock-match-runtime:v1','[{"matchId":"rr-g1-d1-m1","table":"Tisch 1","status":"LIVE"},{"matchId":"rr-g1-d2-m1","table":"Tisch 2","status":"LIVE"}]')); raise exception 'double-booked participant accepted'; exception when invalid_parameter_value then null; end;
  begin update rr_probe set payload=jsonb_build_object('entries',e||jsonb_build_object('online-tournament:mock-match-results:v2','[{"matchId":"rr-g1-d1-m99","status":"FINISHED","sets":[]}]')); raise exception 'fake match accepted'; exception when invalid_parameter_value then null; end;
+ begin update rr_probe set payload=jsonb_build_object('entries',e||jsonb_build_object('online-tournament:mock-phase-lifecycle:v1','[{"startedStageIds":["rr"],"completedStageIds":["rr"],"stageEntrants":{"rr":["a","b","c","d"]}}]')); raise exception 'incomplete phase released'; exception when invalid_parameter_value then null; end;
  begin update rr_probe set payload=jsonb_build_object('entries',e||jsonb_build_object('online-tournament:mock-phase-lifecycle:v1','[{"startedStageIds":["rr"],"completedStageIds":[]}]')); raise exception 'missing frozen entrants accepted'; exception when invalid_parameter_value then null; end;
 end $rr$;
 rollback;

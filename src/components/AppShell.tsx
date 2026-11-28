@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { sidebarTournaments, type SidebarTournament } from '@/domain/sidebarTournaments';
 import { getAllMockTournaments } from '@/services/mockTournamentStore';
@@ -87,10 +87,7 @@ export function AppShell() {
     });
     return () => { cancelled = true; };
   }, [revision, location.key]);
-  const yourTournaments = useMemo(
-    () => sidebarTournaments(getAllMockTournaments()),
-    [revision, location.key],
-  );
+  const yourTournaments = sidebarTournaments(getAllMockTournaments());
 
   return (
     <div className="shell">

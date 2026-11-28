@@ -760,11 +760,12 @@ export function TournamentControlPage() {
   const breakReady = activeBreak ? canFinishBreak(tournament, activeBreak, new Date()) : false;
   const activeBreakResume = activeBreak ? getBreakResumeAt(tournament, activeBreak) : null;
   void pauseClockTick;
+  const pauseTimerActive=Boolean(activeBreak||inlineBreakRunning)&&tournament.status!=='ABORTED';
   useEffect(() => {
-    if ((!activeBreak && !inlineBreakRunning) || tournament.status === 'ABORTED') return;
+    if (!pauseTimerActive) return;
     const timer = window.setInterval(() => setPauseClockTick((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
-  }, [activeBreak?.id, inlineBreakRunning?.resumeAt?.getTime(), tournament.status]);
+  }, [pauseTimerActive]);
   const reviewMatches = pendingApproval ? getMockApprovalReviewMatches(tournament) : [];
   // These checkmarks are independent from normal table-side result confirmation.
   const unreviewedMatches = reviewMatches.filter((match) => !getMockStoredResult(match.id)?.reviewConfirmed);

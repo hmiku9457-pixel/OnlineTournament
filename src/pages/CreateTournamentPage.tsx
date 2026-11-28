@@ -752,15 +752,16 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   const [participantForm, setParticipantForm] = useState<ParticipantFields>(restoredDraft?.participantForm ?? emptyParticipantFields());
   // Registration may change in another director tab while this editor stays
   // mounted. Reconcile the field size without discarding its unsaved plan.
+  const prestartParticipantCount=prestart?.activeParticipants;
   useEffect(() => {
-    if (!prestart) return;
-    setParticipants((current) => current.length === prestart.activeParticipants
-      ? current : Array.from({ length: prestart.activeParticipants }, (_, index) => ({
+    if (prestartParticipantCount===undefined) return;
+    setParticipants((current) => current.length === prestartParticipantCount
+      ? current : Array.from({ length: prestartParticipantCount }, (_, index) => ({
         id: `participant-${index + 1}`, firstName: 'Teilnehmer', lastName: String(index + 1),
         partnerFirstName: 'Partner', partnerLastName: String(index + 1),
         teamName: `Mannschaft ${index + 1}`,
       })));
-  }, [prestart?.activeParticipants]);
+  }, [prestartParticipantCount]);
   const [participantErrors, setParticipantErrors] = useState<ParticipantErrors>({});
   const [editingParticipantId, setEditingParticipantId] = useState<string | null>(restoredDraft?.editingParticipantId ?? null);
   const [minimumMatches, setMinimumMatches] = useState(restoredDraft?.minimumMatches ?? 4);
@@ -1036,12 +1037,12 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
   }), [
     step, maxReachedStep, hasVisitedPhaseStep, name, scheduledDate, scheduledTime, useCurrentTime,
     sport, discipline, timedMatchMinutes, venueTurnoverMinutes, tables,
-    customTables, venueLayoutEnabled, venueLayout, participants, participantForm,
+    customTables, venueLayoutEnabled, venueLayout, venueLayoutCustomized, participants, participantForm,
     editingParticipantId, rosterReviewRequired, minimumMatches, customMinimumMatches, phaseDrafts, reviewRequiredPhaseIds,
     selectedRecommendationId, enabledSystems, maxGroups, maxSwissRounds,
     knockoutQualifierCount, preferredDurationMinutes, preferredEarlierDaysMinutes,
     preferredTimePriority, preferredFixedEndAt, tournamentMode, plannedDays, awardsEnabled, awardsAtOverride,
-    pendingPhaseChange, timeValuesReviewRequired, prestartCeremonyAt, prestartManualCeremony?.at,
+    pendingPhaseChange, timeValuesReviewRequired, prestartCeremonyAt, prestartManualCeremony,
   ]);
   const latestDraftSnapshot = useRef(draftSnapshot);
   useEffect(() => { latestDraftSnapshot.current = draftSnapshot; }, [draftSnapshot]);
@@ -1057,7 +1058,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       .then(() => { if (active) setDraftSaveFailed(false); })
       .catch(() => { if (active) setDraftSaveFailed(true); });
     return () => { active = false; };
-  }, [draftSnapshot, recoveryKey, prestart]);
+  }, [draftSnapshot, recoveryKey, sessionDraftKey, prestart]);
 
   const originalPrestartPhases = useRef(prestart ? initialPrestartPhases(prestart.tournament) : []);
   // Recovery is based on the version that was originally edited, never on
@@ -1098,14 +1099,16 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       setPrestartSaveError('Die Planung wurde nach dem Prüfen geändert. Bitte die Änderungen erneut bestätigen.');
     }
   }, [confirmPrestartSave, currentPrestartSignature]);
+  const notifyPrestartDirty=prestart?.onDirtyChange;
   useEffect(() => {
-    prestart?.onDirtyChange?.(prestartDirty);
-  }, [prestartDirty, prestart?.onDirtyChange]);
+    notifyPrestartDirty?.(prestartDirty);
+  }, [prestartDirty, notifyPrestartDirty]);
   // Keep a recoverable snapshot across reloads. A deliberate discard or a
   // successful save removes it; navigating within the director does not.
+  const prestartTournamentId=prestart?.tournament.id;
   useEffect(() => {
-    if (!prestart) return;
-    const key = prestartRecoveryStorageKey(prestart.tournament.id);
+    if (!prestartTournamentId) return;
+    const key = prestartRecoveryStorageKey(prestartTournamentId);
     if (prestartDirty) {
       saveCreationDraft(draftSnapshot, window.sessionStorage, key);
       if (!prestartRecovered && originalPrestartFingerprint.current) {
@@ -1116,7 +1119,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       clearCreationDraft(window.sessionStorage, key);
       try { window.sessionStorage.removeItem(`${key}:fingerprint`); } catch { /* ignore */ }
     }
-  }, [prestartDirty, prestart?.tournament.id, draftSnapshot]);
+  }, [prestartDirty, prestartTournamentId, prestartRecovered, draftSnapshot]);
   function discardPrestartEditing() {
     if (prestart) {
       try {
@@ -1270,7 +1273,7 @@ export function CreateTournamentPage({ prestart, initialNamedDraft, initialRecov
       participantCount,
       tables,
       minimumMatches,
-      tournamentMode, plannedDays,
+      tournamentMode,
       matchDurationMinutes,
       breakMinutes,
       sport,
